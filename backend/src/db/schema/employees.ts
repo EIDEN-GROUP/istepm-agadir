@@ -1,0 +1,23 @@
+import { pgTable, uuid, text, numeric, date, timestamp } from "drizzle-orm/pg-core";
+
+export const employees = pgTable("employees", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fullName: text("full_name").notNull(),
+  position: text("position").notNull().default(""),
+  department: text("department").notNull().default(""),
+  email: text("email").notNull().default(""),
+  personalEmail: text("personal_email").notNull().default(""),
+  phone: text("phone").notNull().default(""),
+  phone2: text("phone2").notNull().default(""),
+  cin: text("cin").notNull().default(""),
+  birthDate: text("birth_date").notNull().default(""),
+  hireDate: text("hire_date").notNull().default(""),
+  address: text("address").notNull().default(""),
+  contractType: text("contract_type").notNull().default(""),
+  salary: numeric("salary").notNull().default("0"),
+  leaveStart: date("leave_start"),
+  leaveEnd: date("leave_end"),
+  status: text("status").notNull().default("actif"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
