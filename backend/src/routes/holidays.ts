@@ -54,8 +54,13 @@ export async function holidayRoutes(app: FastifyInstance) {
 
     for (const year of years) {
       try {
-        const res = await fetch(`https://date.nager.at/api/v3/publicholidays/${year}/MA`);
-        const data = await res.json() as Array<{ date: string; localName: string }>;
+        const res = await fetch(
+          `https://date.nager.at/api/v3/publicholidays/${year}/MA`,
+        );
+        const data = (await res.json()) as Array<{
+          date: string;
+          localName: string;
+        }>;
         for (const h of data) {
           const [existing] = await db
             .select()
@@ -63,7 +68,9 @@ export async function holidayRoutes(app: FastifyInstance) {
             .where(eq(holidays.date, h.date))
             .limit(1);
           if (!existing) {
-            await db.insert(holidays).values({ date: h.date, label: h.localName });
+            await db
+              .insert(holidays)
+              .values({ date: h.date, label: h.localName });
             imported++;
           }
         }
@@ -77,26 +84,39 @@ export async function holidayRoutes(app: FastifyInstance) {
 
   app.get("/vacations", { preHandler: [authenticate] }, async () => {
     const db = getDb();
-    return db.select().from(schoolVacations).orderBy(desc(schoolVacations.startDate));
+    return db
+      .select()
+      .from(schoolVacations)
+      .orderBy(desc(schoolVacations.startDate));
   });
 
   app.post("/vacations", { preHandler: [authenticate] }, async (request) => {
     const input = vacationSchema.parse(request.body);
     const db = getDb();
-    const [vacation] = await db.insert(schoolVacations).values(input).returning();
+    const [vacation] = await db
+      .insert(schoolVacations)
+      .values(input)
+      .returning();
     return vacation;
   });
 
-  app.delete("/vacations/:id", { preHandler: [authenticate] }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const db = getDb();
-    await db.delete(schoolVacations).where(eq(schoolVacations.id, id));
-    return { ok: true };
-  });
+  app.delete(
+    "/vacations/:id",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const db = getDb();
+      await db.delete(schoolVacations).where(eq(schoolVacations.id, id));
+      return { ok: true };
+    },
+  );
 
   app.get("/exceptions", { preHandler: [authenticate] }, async () => {
     const db = getDb();
-    return db.select().from(calendarExceptions).orderBy(desc(calendarExceptions.date));
+    return db
+      .select()
+      .from(calendarExceptions)
+      .orderBy(desc(calendarExceptions.date));
   });
 
   app.post("/exceptions", { preHandler: [authenticate] }, async (request) => {
@@ -106,10 +126,14 @@ export async function holidayRoutes(app: FastifyInstance) {
     return exc;
   });
 
-  app.delete("/exceptions/:id", { preHandler: [authenticate] }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const db = getDb();
-    await db.delete(calendarExceptions).where(eq(calendarExceptions.id, id));
-    return { ok: true };
-  });
+  app.delete(
+    "/exceptions/:id",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const db = getDb();
+      await db.delete(calendarExceptions).where(eq(calendarExceptions.id, id));
+      return { ok: true };
+    },
+  );
 }

@@ -72,8 +72,17 @@ export async function emailRoutes(app: FastifyInstance) {
 
       return { ok: true };
     } catch (err) {
-      await logEmail(input.to, input.subject, "custom", "failed", err instanceof Error ? err.message : "Unknown");
-      return { ok: false, error: err instanceof Error ? err.message : "Erreur inconnue" };
+      await logEmail(
+        input.to,
+        input.subject,
+        "custom",
+        "failed",
+        err instanceof Error ? err.message : "Unknown",
+      );
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : "Erreur inconnue",
+      };
     }
   });
 
@@ -114,17 +123,28 @@ export async function emailRoutes(app: FastifyInstance) {
       await logEmail(input.to, `Reçu ${input.receipt}`, "receipt", "sent");
       return { ok: true };
     } catch (err) {
-      await logEmail(input.to, `Reçu ${input.receipt}`, "receipt", "failed", err instanceof Error ? err.message : "Unknown");
-      return { ok: false, error: err instanceof Error ? err.message : "Erreur inconnue" };
+      await logEmail(
+        input.to,
+        `Reçu ${input.receipt}`,
+        "receipt",
+        "failed",
+        err instanceof Error ? err.message : "Unknown",
+      );
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : "Erreur inconnue",
+      };
     }
   });
 
   app.post("/send-demo", async (request) => {
     // Public endpoint (no auth required) for the landing page
-    const input = z.object({
-      visitor: sendSchema,
-      admin: sendSchema,
-    }).parse(request.body);
+    const input = z
+      .object({
+        visitor: sendSchema,
+        admin: sendSchema,
+      })
+      .parse(request.body);
 
     const env = getEnv();
     const transporter = getTransporter();
@@ -154,7 +174,10 @@ export async function emailRoutes(app: FastifyInstance) {
 
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : "Erreur inconnue" };
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : "Erreur inconnue",
+      };
     }
   });
 
@@ -164,10 +187,18 @@ export async function emailRoutes(app: FastifyInstance) {
   });
 }
 
-async function logEmail(recipient: string, subject: string, type: string, status: "sent" | "failed", errorMsg?: string) {
+async function logEmail(
+  recipient: string,
+  subject: string,
+  type: string,
+  status: "sent" | "failed",
+  errorMsg?: string,
+) {
   try {
     const db = getDb();
-    await db.insert(emailLogs).values({ recipient, subject, type, status, errorMsg: errorMsg ?? "" });
+    await db
+      .insert(emailLogs)
+      .values({ recipient, subject, type, status, errorMsg: errorMsg ?? "" });
   } catch {
     // Don't throw if logging fails
   }

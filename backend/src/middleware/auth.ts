@@ -17,7 +17,10 @@ declare module "@fastify/jwt" {
   }
 }
 
-export async function authenticate(request: FastifyRequest, reply: FastifyReply) {
+export async function authenticate(
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
   try {
     await request.jwtVerify();
     const payload = request.user;
@@ -26,17 +29,25 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
     }
     const db = getDb();
     const [user] = await db
-      .select({ id: users.id, email: users.email, name: users.name, role: users.role })
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        role: users.role,
+      })
       .from(users)
       .where(eq(users.id, payload.id))
       .limit(1);
     if (!user) {
       return reply.status(401).send({ error: "Utilisateur introuvable" });
     }
-    request.user = { id: user.id, email: user.email, name: user.name, role: user.role as "admin" | "superadmin" };
+    request.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role as "admin" | "superadmin",
+    };
   } catch {
     return reply.status(401).send({ error: "Token invalide ou expiré" });
   }
 }
-
-

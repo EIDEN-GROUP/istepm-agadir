@@ -25,7 +25,9 @@ function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#28396C] to-[#1a264f] p-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl">
-        <h1 className="mb-6 text-center font-display text-2xl font-bold text-foreground">School CRM</h1>
+        <h1 className="mb-6 text-center font-display text-2xl font-bold text-foreground">
+          School CRM
+        </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="email"
@@ -51,7 +53,6 @@ function LoginPage() {
             {busy ? "Connexion..." : "Se connecter"}
           </button>
         </form>
-        
       </div>
     </div>
   );

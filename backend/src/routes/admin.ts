@@ -19,7 +19,10 @@ async function verifyApiKey(request: any, reply: any) {
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook("preHandler", verifyApiKey);
 
-  app.get("/health", async () => ({ status: "ok", timestamp: new Date().toISOString() }));
+  app.get("/health", async () => ({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+  }));
 
   app.get("/info", async () => ({
     name: "School-CRM",
@@ -29,18 +32,24 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.get("/stats", async () => {
     const db = getDb();
-    const [centerRows, adminCount, clientCount, paymentRows, demoCount] = await Promise.all([
-      db.select({
-        status: centers.status,
-        monthlyPrice: centers.monthlyPrice,
-        studentsCount: centers.studentsCount,
-        isPrimary: centers.isPrimary,
-      }).from(centers),
-      db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.role, "admin")),
-      db.select({ count: sql<number>`count(*)` }).from(clients),
-      db.select({ amount: payments.amount }).from(payments),
-      db.select({ count: sql<number>`count(*)` }).from(demoRequests),
-    ]);
+    const [centerRows, adminCount, clientCount, paymentRows, demoCount] =
+      await Promise.all([
+        db
+          .select({
+            status: centers.status,
+            monthlyPrice: centers.monthlyPrice,
+            studentsCount: centers.studentsCount,
+            isPrimary: centers.isPrimary,
+          })
+          .from(centers),
+        db
+          .select({ count: sql<number>`count(*)` })
+          .from(users)
+          .where(eq(users.role, "admin")),
+        db.select({ count: sql<number>`count(*)` }).from(clients),
+        db.select({ amount: payments.amount }).from(payments),
+        db.select({ count: sql<number>`count(*)` }).from(demoRequests),
+      ]);
 
     const liveClients = Number(clientCount[0]?.count ?? 0);
     const declared = centerRows.reduce(
@@ -51,7 +60,8 @@ export async function adminRoutes(app: FastifyInstance) {
     return {
       totalCenters: centerRows.length,
       activeCenters: centerRows.filter((c) => c.status === "actif").length,
-      suspendedCenters: centerRows.filter((c) => c.status === "suspendu").length,
+      suspendedCenters: centerRows.filter((c) => c.status === "suspendu")
+        .length,
       totalAdmins: Number(adminCount[0]?.count ?? 0),
       totalStudents: declared,
       platformRevenue: paymentRows.reduce((s, p) => s + Number(p.amount), 0),
@@ -103,19 +113,39 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.get("/revenue-history", async () => {
     const db = getDb();
-    const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
+    const months = [
+      "Jan",
+      "Fév",
+      "Mar",
+      "Avr",
+      "Mai",
+      "Juin",
+      "Juil",
+      "Août",
+      "Sept",
+      "Oct",
+      "Nov",
+      "Déc",
+    ];
     const now = new Date();
     const results: Array<{ m: string; v: number; mrr: number }> = [];
 
     const centerRows = await db
-      .select({ status: centers.status, monthlyPrice: centers.monthlyPrice, createdAt: centers.createdAt })
+      .select({
+        status: centers.status,
+        monthlyPrice: centers.monthlyPrice,
+        createdAt: centers.createdAt,
+      })
       .from(centers);
     const activeCenters = centerRows.filter((c) => c.status === "actif");
 
     for (let i = 6; i >= 0; i--) {
       let m = now.getMonth() - i;
       let y = now.getFullYear();
-      if (m < 0) { m += 12; y -= 1; }
+      if (m < 0) {
+        m += 12;
+        y -= 1;
+      }
       const first = new Date(y, m, 1).toISOString().split("T")[0];
       const last = new Date(y, m + 1, 0).toISOString().split("T")[0];
 

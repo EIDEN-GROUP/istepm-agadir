@@ -82,7 +82,9 @@ export const STATUS_COLORS = {
 } as const;
 
 /** Rounded status pill with a soft tinted background. */
-export function statusPill(tone: "paye" | "en_attente" | "retard" | "impaye" | "neutral") {
+export function statusPill(
+  tone: "paye" | "en_attente" | "retard" | "impaye" | "neutral",
+) {
   const map = {
     paye: "bg-[#B5E18B]/30 text-[#3E6420]",
     en_attente: "bg-[#F4E3C0] text-[#8A5A16]",

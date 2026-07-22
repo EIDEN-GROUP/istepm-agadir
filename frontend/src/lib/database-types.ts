@@ -226,5 +226,8 @@ export type SupportMessage = {
 };
 
 export type SupportSessionWithLastMessage = SupportSession & {
-  last_message?: Pick<SupportMessage, "content" | "sender_role" | "created_at"> | null;
+  last_message?: Pick<
+    SupportMessage,
+    "content" | "sender_role" | "created_at"
+  > | null;
 };

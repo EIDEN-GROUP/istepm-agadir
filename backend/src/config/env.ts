@@ -2,11 +2,15 @@ import "dotenv/config";
 import { z } from "zod";
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "production", "test"])
+    .default("development"),
   PORT: z.coerce.number().default(3000),
   HOST: z.string().default("0.0.0.0"),
 
-  DATABASE_URL: z.string().default("postgres://postgres:postgres@localhost:5432/school_crm"),
+  DATABASE_URL: z
+    .string()
+    .default("postgres://postgres:postgres@localhost:5432/school_crm"),
 
   JWT_SECRET: z.string().default("change-me-in-production"),
   JWT_EXPIRES_IN: z.string().default("7d"),

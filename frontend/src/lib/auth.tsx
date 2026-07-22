@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { api } from "@/lib/api";
 import type { UserRole } from "@/lib/database-types";
 
@@ -48,14 +54,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const login = async (email: string, password: string): Promise<{ error: string | null }> => {
+  const login = async (
+    email: string,
+    password: string,
+  ): Promise<{ error: string | null }> => {
     try {
-      const res = await api.post<{ token: string; user: AuthUser }>("/auth/login", { email, password });
+      const res = await api.post<{ token: string; user: AuthUser }>(
+        "/auth/login",
+        { email, password },
+      );
       api.setToken(res.token);
       setUser(res.user);
       return { error: null };
     } catch (err) {
-      return { error: err instanceof Error ? err.message : "Erreur de connexion" };
+      return {
+        error: err instanceof Error ? err.message : "Erreur de connexion",
+      };
     }
   };
 

@@ -3,7 +3,9 @@ import { clients } from "./clients";
 
 export const whatsappMessages = pgTable("whatsapp_messages", {
   id: uuid("id").primaryKey().defaultRandom(),
-  clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+  clientId: uuid("client_id").references(() => clients.id, {
+    onDelete: "set null",
+  }),
   phone: text("phone").notNull(),
   direction: text("direction").notNull(),
   content: text("content").notNull(),

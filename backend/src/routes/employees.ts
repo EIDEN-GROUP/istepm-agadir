@@ -31,10 +31,13 @@ export async function employeeRoutes(app: FastifyInstance) {
   app.post("/", { preHandler: [authenticate] }, async (request) => {
     const input = employeeSchema.parse(request.body);
     const db = getDb();
-    const [employee] = await db.insert(employees).values({
-      ...input,
-      salary: String(input.salary),
-    }).returning();
+    const [employee] = await db
+      .insert(employees)
+      .values({
+        ...input,
+        salary: String(input.salary),
+      })
+      .returning();
     return employee;
   });
 
@@ -53,7 +56,8 @@ export async function employeeRoutes(app: FastifyInstance) {
       .set(values)
       .where(eq(employees.id, id))
       .returning();
-    if (!employee) return reply.status(404).send({ error: "Employé introuvable" });
+    if (!employee)
+      return reply.status(404).send({ error: "Employé introuvable" });
     return employee;
   });
 
@@ -70,9 +74,17 @@ export async function employeeRoutes(app: FastifyInstance) {
     let imported = 0;
     const db = getDb();
     for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+      const cols = lines[i]
+        .split(",")
+        .map((c) => c.trim().replace(/^"|"$/g, ""));
       if (cols[0]) {
-        await db.insert(employees).values({ fullName: cols[0], position: cols[1] ?? "", department: cols[2] ?? "" });
+        await db
+          .insert(employees)
+          .values({
+            fullName: cols[0],
+            position: cols[1] ?? "",
+            department: cols[2] ?? "",
+          });
         imported++;
       }
     }

@@ -15,12 +15,9 @@ const Toaster = () => {
             "!font-display !text-sm !font-semibold !tracking-tight !text-foreground",
           description:
             "!mt-0.5 !text-xs !leading-relaxed !text-muted-foreground",
-          success:
-            "!border-l-[3px] !border-l-emerald-500",
-          error:
-            "!border-l-[3px] !border-l-red-500",
-          warning:
-            "!border-l-[3px] !border-l-amber-500",
+          success: "!border-l-[3px] !border-l-emerald-500",
+          error: "!border-l-[3px] !border-l-red-500",
+          warning: "!border-l-[3px] !border-l-amber-500",
           icon: "!h-4 !w-4",
           actionButton:
             "!rounded-full !bg-[#B5E18B] !px-4 !py-1.5 !text-xs !font-bold !text-[#28396C] !shadow-none !transition hover:!brightness-105",

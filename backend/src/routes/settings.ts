@@ -61,27 +61,39 @@ export async function settingsRoutes(app: FastifyInstance) {
   app.post("/levels", { preHandler: [authenticate] }, async (request) => {
     const input = levelSchema.parse(request.body);
     const db = getDb();
-    const [level] = await db.insert(levels).values({
-      ...input,
-      monthlyFee: String(input.monthlyFee),
-    }).returning();
+    const [level] = await db
+      .insert(levels)
+      .values({
+        ...input,
+        monthlyFee: String(input.monthlyFee),
+      })
+      .returning();
     return level;
   });
 
-  app.put("/levels/:id", { preHandler: [authenticate] }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const input = levelSchema.partial().parse(request.body);
-    const db = getDb();
-    const values: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(input)) {
-      if (val !== undefined) {
-        values[key] = key === "monthlyFee" ? String(val) : val;
+  app.put(
+    "/levels/:id",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const input = levelSchema.partial().parse(request.body);
+      const db = getDb();
+      const values: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(input)) {
+        if (val !== undefined) {
+          values[key] = key === "monthlyFee" ? String(val) : val;
+        }
       }
-    }
-    const [level] = await db.update(levels).set(values).where(eq(levels.id, id)).returning();
-    if (!level) return reply.status(404).send({ error: "Niveau introuvable" });
-    return level;
-  });
+      const [level] = await db
+        .update(levels)
+        .set(values)
+        .where(eq(levels.id, id))
+        .returning();
+      if (!level)
+        return reply.status(404).send({ error: "Niveau introuvable" });
+      return level;
+    },
+  );
 
   app.delete("/levels/:id", { preHandler: [authenticate] }, async (request) => {
     const { id } = request.params as { id: string };

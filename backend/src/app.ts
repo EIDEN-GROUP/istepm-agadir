@@ -27,7 +27,8 @@ export async function buildApp() {
   const app = Fastify({
     logger: {
       level: env.LOG_LEVEL,
-      transport: env.NODE_ENV === "development" ? { target: "pino-pretty" } : undefined,
+      transport:
+        env.NODE_ENV === "development" ? { target: "pino-pretty" } : undefined,
     },
   });
 
@@ -52,7 +53,10 @@ export async function buildApp() {
     reply.status(404).send({ error: "Route non trouvée" });
   });
 
-  app.get("/health", async () => ({ status: "ok", timestamp: new Date().toISOString() }));
+  app.get("/health", async () => ({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+  }));
 
   await app.register(authRoutes, { prefix: "/api/auth" });
   await app.register(clientRoutes, { prefix: "/api/clients" });

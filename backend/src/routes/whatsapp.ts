@@ -24,13 +24,21 @@ export async function whatsappRoutes(app: FastifyInstance) {
     const db = getDb();
 
     const [client] = await db
-      .select({ id: clients.id, phone: clients.phone, parentName: clients.parentName, whatsappOptin: clients.whatsappOptin })
+      .select({
+        id: clients.id,
+        phone: clients.phone,
+        parentName: clients.parentName,
+        whatsappOptin: clients.whatsappOptin,
+      })
       .from(clients)
       .where(eq(clients.id, input.clientId))
       .limit(1);
 
     if (!client) return reply.status(404).send({ error: "Client introuvable" });
-    if (!client.whatsappOptin) return reply.status(400).send({ error: "Ce client n'a pas activé WhatsApp" });
+    if (!client.whatsappOptin)
+      return reply
+        .status(400)
+        .send({ error: "Ce client n'a pas activé WhatsApp" });
 
     const result = await sendWhatsAppMessage(client.phone, input.content);
 
@@ -51,7 +59,12 @@ export async function whatsappRoutes(app: FastifyInstance) {
     const db = getDb();
 
     let query = db
-      .select({ id: clients.id, phone: clients.phone, parentName: clients.parentName, whatsappOptin: clients.whatsappOptin })
+      .select({
+        id: clients.id,
+        phone: clients.phone,
+        parentName: clients.parentName,
+        whatsappOptin: clients.whatsappOptin,
+      })
       .from(clients)
       .where(sql`${clients.whatsappOptin} = true AND ${clients.phone} != ''`)
       .$dynamic();
@@ -64,7 +77,8 @@ export async function whatsappRoutes(app: FastifyInstance) {
     }
 
     const eligibleClients = await query;
-    if (eligibleClients.length === 0) return { ok: false, error: "Aucun client éligible" };
+    if (eligibleClients.length === 0)
+      return { ok: false, error: "Aucun client éligible" };
 
     const broadcastId = crypto.randomUUID();
     const results: Array<{ phone: string; ok: boolean; error?: string }> = [];
@@ -107,17 +121,24 @@ export async function whatsappRoutes(app: FastifyInstance) {
       .limit(200);
   });
 
-  app.delete("/messages/:id", { preHandler: [authenticate] }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const db = getDb();
-    await db.delete(whatsappMessages).where(eq(whatsappMessages.id, id));
-    return { ok: true };
-  });
+  app.delete(
+    "/messages/:id",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const db = getDb();
+      await db.delete(whatsappMessages).where(eq(whatsappMessages.id, id));
+      return { ok: true };
+    },
+  );
 }
 
 type SendResult = { ok: boolean; waId?: string; error?: string };
 
-async function sendWhatsAppMessage(phone: string, content: string): Promise<SendResult> {
+async function sendWhatsAppMessage(
+  phone: string,
+  content: string,
+): Promise<SendResult> {
   const cleanPhone = phone.replace(/\D/g, "");
   if (cleanPhone.length < 8) return { ok: false, error: "Numéro invalide" };
 
@@ -128,13 +149,19 @@ async function sendWhatsAppMessage(phone: string, content: string): Promise<Send
   return sendViaMeta(cleanPhone, content, env);
 }
 
-async function sendViaN8n(phone: string, content: string, env: ReturnType<typeof getEnv>): Promise<SendResult> {
+async function sendViaN8n(
+  phone: string,
+  content: string,
+  env: ReturnType<typeof getEnv>,
+): Promise<SendResult> {
   try {
     const res = await fetch(env.N8N_WEBHOOK_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(env.N8N_WEBHOOK_SECRET ? { "X-Webhook-Secret": env.N8N_WEBHOOK_SECRET } : {}),
+        ...(env.N8N_WEBHOOK_SECRET
+          ? { "X-Webhook-Secret": env.N8N_WEBHOOK_SECRET }
+          : {}),
       },
       body: JSON.stringify({ phone, content }),
     });
@@ -142,11 +169,18 @@ async function sendViaN8n(phone: string, content: string, env: ReturnType<typeof
     if (!res.ok) return { ok: false, error: `n8n HTTP ${res.status}` };
     return { ok: true, waId: (body as any).waId ?? (body as any).messageId };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Erreur inconnue" };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Erreur inconnue",
+    };
   }
 }
 
-async function sendViaMeta(phone: string, content: string, env: ReturnType<typeof getEnv>): Promise<SendResult> {
+async function sendViaMeta(
+  phone: string,
+  content: string,
+  env: ReturnType<typeof getEnv>,
+): Promise<SendResult> {
   if (!env.WHATSAPP_PHONE_NUMBER_ID || !env.WHATSAPP_ACCESS_TOKEN) {
     return { ok: false, error: "WhatsApp API non configurée" };
   }
@@ -166,10 +200,17 @@ async function sendViaMeta(phone: string, content: string, env: ReturnType<typeo
         text: { preview_url: false, body: content },
       }),
     });
-    const body = await res.json() as any;
-    if (!res.ok) return { ok: false, error: body.error?.message ?? `Erreur ${res.status}` };
+    const body = (await res.json()) as any;
+    if (!res.ok)
+      return {
+        ok: false,
+        error: body.error?.message ?? `Erreur ${res.status}`,
+      };
     return { ok: true, waId: body.messages?.[0]?.id };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Erreur inconnue" };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Erreur inconnue",
+    };
   }
 }

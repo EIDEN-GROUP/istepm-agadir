@@ -10,7 +10,10 @@ const planifSchema = z.object({
   time: z.string(),
   title: z.string().min(1),
   detail: z.string().optional().default(""),
-  tone: z.enum(["violet", "emerald", "amber", "zinc"]).optional().default("zinc"),
+  tone: z
+    .enum(["violet", "emerald", "amber", "zinc"])
+    .optional()
+    .default("zinc"),
 });
 
 export async function planificationRoutes(app: FastifyInstance) {
@@ -35,7 +38,8 @@ export async function planificationRoutes(app: FastifyInstance) {
       .set(input)
       .where(eq(planifications.id, id))
       .returning();
-    if (!plan) return reply.status(404).send({ error: "Planification introuvable" });
+    if (!plan)
+      return reply.status(404).send({ error: "Planification introuvable" });
     return plan;
   });
 

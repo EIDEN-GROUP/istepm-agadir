@@ -17,7 +17,13 @@ function DashboardLayout() {
   const { topNav, brand } = useDashboardNav();
 
   return (
-    <DashShell brand={brand} brandColor="primary" variant="topnav" topNav={topNav} dir={dir}>
+    <DashShell
+      brand={brand}
+      brandColor="primary"
+      variant="topnav"
+      topNav={topNav}
+      dir={dir}
+    >
       <Outlet />
     </DashShell>
   );

@@ -79,7 +79,10 @@ function formatMsgTime(iso: string): string {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-function parentName(m: { clients: { parent_name: string } | null; phone: string }): string {
+function parentName(m: {
+  clients: { parent_name: string } | null;
+  phone: string;
+}): string {
   return m.clients?.parent_name ?? m.phone;
 }
 
@@ -96,12 +99,23 @@ function ShellNotifications() {
     refetchInterval: 30_000,
   });
   const messages = rawMessages as unknown as Array<{
-    id: string; direction: "sent" | "received"; phone: string; content: string;
-    status: string; created_at: string; clients: { parent_name: string } | null;
+    id: string;
+    direction: "sent" | "received";
+    phone: string;
+    content: string;
+    status: string;
+    created_at: string;
+    clients: { parent_name: string } | null;
   }>;
 
-  const received = useMemo(() => messages.filter((m) => m.direction === "received"), [messages]);
-  const sent = useMemo(() => messages.filter((m) => m.direction === "sent"), [messages]);
+  const received = useMemo(
+    () => messages.filter((m) => m.direction === "received"),
+    [messages],
+  );
+  const sent = useMemo(
+    () => messages.filter((m) => m.direction === "sent"),
+    [messages],
+  );
   const failedCount = sent.filter((m) => m.status === "failed").length;
   const sentCount = sent.length;
 
@@ -119,7 +133,7 @@ function ShellNotifications() {
   });
 
   const deleteMsgMutation = useMutation({
-        mutationFn: (id: string) => api.delete(`/whatsapp/messages/${id}`),
+    mutationFn: (id: string) => api.delete(`/whatsapp/messages/${id}`),
     onSuccess: () => {
       toast.success("Message supprimé");
       queryClient.invalidateQueries({ queryKey: ["message-history"] });
@@ -127,17 +141,39 @@ function ShellNotifications() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const openOn = (n: PanelTab) => { setTab(n); setSelected(null); setOpen(true); };
-  const selectedReceived = tab === "alertes" && selected ? received.find((m) => m.id === selected) : undefined;
-  const selectedSent = tab === "whatsapp" && selected ? sent.find((m) => m.id === selected) : undefined;
+  const openOn = (n: PanelTab) => {
+    setTab(n);
+    setSelected(null);
+    setOpen(true);
+  };
+  const selectedReceived =
+    tab === "alertes" && selected
+      ? received.find((m) => m.id === selected)
+      : undefined;
+  const selectedSent =
+    tab === "whatsapp" && selected
+      ? sent.find((m) => m.id === selected)
+      : undefined;
 
-  const triggerClass = "relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#28396C]/15 text-muted-foreground transition-colors hover:text-foreground";
-  const rowClass = "flex w-full gap-3 px-5 py-4 text-left transition-colors hover:bg-[#B5E18B]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#6BA53A]";
-  const actionClass = "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition";
+  const triggerClass =
+    "relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#28396C]/15 text-muted-foreground transition-colors hover:text-foreground";
+  const rowClass =
+    "flex w-full gap-3 px-5 py-4 text-left transition-colors hover:bg-[#B5E18B]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#6BA53A]";
+  const actionClass =
+    "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition";
 
   return (
     <>
-      <button type="button" onClick={() => openOn("alertes")} aria-label={received.length > 0 ? `Notifications   ${received.length} reçues` : "Notifications"} className={cn(triggerClass, "hover:bg-[#B5E18B]/15")}>
+      <button
+        type="button"
+        onClick={() => openOn("alertes")}
+        aria-label={
+          received.length > 0
+            ? `Notifications   ${received.length} reçues`
+            : "Notifications"
+        }
+        className={cn(triggerClass, "hover:bg-[#B5E18B]/15")}
+      >
         <Bell className="h-4 w-4" strokeWidth={1.75} />
         {received.length > 0 ? (
           <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#E25C5C] px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
@@ -146,20 +182,41 @@ function ShellNotifications() {
         ) : null}
       </button>
 
-      <button type="button" onClick={() => openOn("whatsapp")} aria-label={failedCount > 0 ? `WhatsApp   ${failedCount} échecs` : `WhatsApp   ${sentCount} envoyés`} className={cn(triggerClass, "hover:bg-[#25D366]/15")}>
+      <button
+        type="button"
+        onClick={() => openOn("whatsapp")}
+        aria-label={
+          failedCount > 0
+            ? `WhatsApp   ${failedCount} échecs`
+            : `WhatsApp   ${sentCount} envoyés`
+        }
+        className={cn(triggerClass, "hover:bg-[#25D366]/15")}
+      >
         <MessageCircle className="h-4 w-4" strokeWidth={1.75} />
         {sentCount > 0 ? (
-          <span className={cn("absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white", failedCount > 0 ? "bg-[#E25C5C]" : "bg-[#25D366]")}>
-            {(failedCount || sentCount) > 9 ? "9+" : (failedCount || sentCount)}
+          <span
+            className={cn(
+              "absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white",
+              failedCount > 0 ? "bg-[#E25C5C]" : "bg-[#25D366]",
+            )}
+          >
+            {(failedCount || sentCount) > 9 ? "9+" : failedCount || sentCount}
           </span>
         ) : null}
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="flex w-[min(26rem,100vw-2rem)] flex-col gap-0 border-l-[#28396C]/10 bg-card p-0 sm:max-w-md">
+        <SheetContent
+          side="right"
+          className="flex w-[min(26rem,100vw-2rem)] flex-col gap-0 border-l-[#28396C]/10 bg-card p-0 sm:max-w-md"
+        >
           <SheetHeader className="space-y-1 border-b border-[#28396C]/10 px-5 pb-4 pt-5 pr-14 text-left">
-            <SheetTitle className="font-display text-xl tracking-tight text-foreground">Centre de messages</SheetTitle>
-            <SheetDescription className="text-xs">Notifications reçues des parents et messages envoyés.</SheetDescription>
+            <SheetTitle className="font-display text-xl tracking-tight text-foreground">
+              Centre de messages
+            </SheetTitle>
+            <SheetDescription className="text-xs">
+              Notifications reçues des parents et messages envoyés.
+            </SheetDescription>
           </SheetHeader>
 
           {!selected ? (
@@ -167,31 +224,73 @@ function ShellNotifications() {
               {/* Tabs and actions sit on separate rows: at the sheet's width, all four
                   controls on one line wrap "Tout effacer" and clip "Envoyer". */}
               <div className="flex gap-1">
-                {([{ key: "alertes" as const, label: "Notifications", count: received.length, dot: "bg-[#E25C5C]" },
-                   { key: "whatsapp" as const, label: "WhatsApp", count: failedCount || sentCount, dot: failedCount > 0 ? "bg-[#E25C5C]" : "bg-[#25D366]" }] as const).map((tb) => (
-                  <button key={tb.key} type="button" onClick={() => setTab(tb.key)}
-                    className={cn("inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors", tab === tb.key ? "bg-[#28396C] text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                {(
+                  [
+                    {
+                      key: "alertes" as const,
+                      label: "Notifications",
+                      count: received.length,
+                      dot: "bg-[#E25C5C]",
+                    },
+                    {
+                      key: "whatsapp" as const,
+                      label: "WhatsApp",
+                      count: failedCount || sentCount,
+                      dot: failedCount > 0 ? "bg-[#E25C5C]" : "bg-[#25D366]",
+                    },
+                  ] as const
+                ).map((tb) => (
+                  <button
+                    key={tb.key}
+                    type="button"
+                    onClick={() => setTab(tb.key)}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors",
+                      tab === tb.key
+                        ? "bg-[#28396C] text-white"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
                     {tb.label}
-                    {tb.count > 0 ? <span className={cn("grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white", tb.dot)}>{tb.count}</span> : null}
+                    {tb.count > 0 ? (
+                      <span
+                        className={cn(
+                          "grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white",
+                          tb.dot,
+                        )}
+                      >
+                        {tb.count}
+                      </span>
+                    ) : null}
                   </button>
                 ))}
               </div>
               <div className="flex items-center gap-2">
                 {tab === "alertes" && received.length > 0 ? (
-                  <button type="button" onClick={() => clearMutation.mutate()}
-                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#E25C5C]/30 px-3.5 py-1.5 text-xs font-semibold text-[#E25C5C] transition hover:bg-[#E25C5C]/10">
+                  <button
+                    type="button"
+                    onClick={() => clearMutation.mutate()}
+                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#E25C5C]/30 px-3.5 py-1.5 text-xs font-semibold text-[#E25C5C] transition hover:bg-[#E25C5C]/10"
+                  >
                     <Trash2 className="h-3.5 w-3.5" /> Tout effacer
                   </button>
                 ) : null}
-                <button type="button" onClick={() => setSendOpen(true)}
-                  className="ml-auto inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-[#B5E18B] px-4 py-1.5 text-xs font-bold text-[#28396C] transition hover:brightness-105">
+                <button
+                  type="button"
+                  onClick={() => setSendOpen(true)}
+                  className="ml-auto inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-[#B5E18B] px-4 py-1.5 text-xs font-bold text-[#28396C] transition hover:brightness-105"
+                >
                   <Send className="h-3.5 w-3.5" /> Envoyer
                 </button>
               </div>
             </div>
           ) : (
             <div className="border-b border-[#28396C]/10 px-5 py-3">
-              <button type="button" onClick={() => setSelected(null)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#28396C] hover:underline">
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#28396C] hover:underline"
+              >
                 <ArrowLeft className="h-3.5 w-3.5" /> Retour à la liste
               </button>
             </div>
@@ -201,18 +300,50 @@ function ShellNotifications() {
             {selectedReceived ? (
               <div className="space-y-4 px-5 py-5">
                 <div>
-                  <p className="font-display text-lg font-semibold text-foreground">{parentName(selectedReceived)}</p>
-                  <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">{formatMsgTime(selectedReceived.created_at)}   {selectedReceived.phone}</p>
+                  <p className="font-display text-lg font-semibold text-foreground">
+                    {parentName(selectedReceived)}
+                  </p>
+                  <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {formatMsgTime(selectedReceived.created_at)}{" "}
+                    {selectedReceived.phone}
+                  </p>
                 </div>
-                <p className="rounded-2xl bg-muted/60 px-4 py-3 text-sm leading-relaxed text-foreground">{selectedReceived.content}</p>
+                <p className="rounded-2xl bg-muted/60 px-4 py-3 text-sm leading-relaxed text-foreground">
+                  {selectedReceived.content}
+                </p>
                 <div className="flex flex-wrap gap-2">
-                  <Link to="/dashboard/familles" onClick={() => setOpen(false)} className={cn(actionClass, "bg-[#B5E18B] text-[#28396C] hover:brightness-105")}>
-                    <ExternalLink className="h-3.5 w-3.5" /> Voir la fiche famille
+                  <Link
+                    to="/dashboard/familles"
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      actionClass,
+                      "bg-[#B5E18B] text-[#28396C] hover:brightness-105",
+                    )}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> Voir la fiche
+                    famille
                   </Link>
-                  <Link to="/dashboard/paiements" onClick={() => setOpen(false)} className={cn(actionClass, "border border-[#28396C]/15 text-foreground hover:bg-muted")}>
+                  <Link
+                    to="/dashboard/paiements"
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      actionClass,
+                      "border border-[#28396C]/15 text-foreground hover:bg-muted",
+                    )}
+                  >
                     Voir les paiements
                   </Link>
-                  <button type="button" onClick={() => { deleteMsgMutation.mutate(selectedReceived.id); setSelected(null); }} className={cn(actionClass, "border border-[#E25C5C]/30 text-[#E25C5C] hover:bg-[#E25C5C]/10")}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      deleteMsgMutation.mutate(selectedReceived.id);
+                      setSelected(null);
+                    }}
+                    className={cn(
+                      actionClass,
+                      "border border-[#E25C5C]/30 text-[#E25C5C] hover:bg-[#E25C5C]/10",
+                    )}
+                  >
                     <Trash2 className="h-3.5 w-3.5" /> Supprimer
                   </button>
                 </div>
@@ -223,26 +354,69 @@ function ShellNotifications() {
               <div className="space-y-4 px-5 py-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-display text-lg font-semibold text-foreground">{parentName(selectedSent)}</p>
-                    <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">{formatMsgTime(selectedSent.created_at)}   {selectedSent.phone}</p>
+                    <p className="font-display text-lg font-semibold text-foreground">
+                      {parentName(selectedSent)}
+                    </p>
+                    <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {formatMsgTime(selectedSent.created_at)}{" "}
+                      {selectedSent.phone}
+                    </p>
                   </div>
-                  <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold", selectedSent.status === "sent" ? "bg-[#25D366]/15 text-[#1B7F45]" : "bg-[#F6D8D8] text-[#9A2F2F]")}>
-                    {selectedSent.status === "sent" ? <CheckCheck className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                  <span
+                    className={cn(
+                      "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                      selectedSent.status === "sent"
+                        ? "bg-[#25D366]/15 text-[#1B7F45]"
+                        : "bg-[#F6D8D8] text-[#9A2F2F]",
+                    )}
+                  >
+                    {selectedSent.status === "sent" ? (
+                      <CheckCheck className="h-3 w-3" />
+                    ) : (
+                      <AlertTriangle className="h-3 w-3" />
+                    )}
                     {selectedSent.status === "sent" ? "Envoyé" : "Échec"}
                   </span>
                 </div>
-                <p className={cn("rounded-2xl border-l-[3px] px-4 py-3 text-sm leading-relaxed text-foreground", selectedSent.status === "sent" ? "border-l-[#25D366] bg-[#25D366]/[0.05]" : "border-l-[#E25C5C] bg-[#E25C5C]/[0.05]")}>
+                <p
+                  className={cn(
+                    "rounded-2xl border-l-[3px] px-4 py-3 text-sm leading-relaxed text-foreground",
+                    selectedSent.status === "sent"
+                      ? "border-l-[#25D366] bg-[#25D366]/[0.05]"
+                      : "border-l-[#E25C5C] bg-[#E25C5C]/[0.05]",
+                  )}
+                >
                   {selectedSent.content}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {selectedSent.status === "failed" ? (
-                    <p className="text-xs font-medium text-[#9A2F2F]">Le message n'est pas parti.</p>
+                    <p className="text-xs font-medium text-[#9A2F2F]">
+                      Le message n'est pas parti.
+                    </p>
                   ) : (
-                    <Link to="/dashboard/familles" onClick={() => setOpen(false)} className={cn(actionClass, "border border-[#28396C]/15 text-foreground hover:bg-muted")}>
-                      <ExternalLink className="h-3.5 w-3.5" /> Voir la fiche famille
+                    <Link
+                      to="/dashboard/familles"
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        actionClass,
+                        "border border-[#28396C]/15 text-foreground hover:bg-muted",
+                      )}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> Voir la fiche
+                      famille
                     </Link>
                   )}
-                  <button type="button" onClick={() => { deleteMsgMutation.mutate(selectedSent.id); setSelected(null); }} className={cn(actionClass, "border border-[#E25C5C]/30 text-[#E25C5C] hover:bg-[#E25C5C]/10")}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      deleteMsgMutation.mutate(selectedSent.id);
+                      setSelected(null);
+                    }}
+                    className={cn(
+                      actionClass,
+                      "border border-[#E25C5C]/30 text-[#E25C5C] hover:bg-[#E25C5C]/10",
+                    )}
+                  >
                     <Trash2 className="h-3.5 w-3.5" /> Supprimer
                   </button>
                 </div>
@@ -253,24 +427,49 @@ function ShellNotifications() {
               <ul className="divide-y divide-[#28396C]/8">
                 {received.map((m) => (
                   <li key={m.id} className="group relative">
-                    <button type="button" onClick={() => { setSelected(m.id); }} className={cn(rowClass, "pr-12")}>
-                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#6BA53A]" aria-hidden />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelected(m.id);
+                      }}
+                      className={cn(rowClass, "pr-12")}
+                    >
+                      <span
+                        className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#6BA53A]"
+                        aria-hidden
+                      />
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center justify-between gap-2">
-                          <span className="truncate text-sm font-medium text-foreground">{parentName(m)}</span>
+                          <span className="truncate text-sm font-medium text-foreground">
+                            {parentName(m)}
+                          </span>
                           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         </span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">{m.content}</span>
-                        <span className="mt-1 block text-[10px] uppercase tracking-wider text-muted-foreground/80">{formatMsgTime(m.created_at)}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {m.content}
+                        </span>
+                        <span className="mt-1 block text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                          {formatMsgTime(m.created_at)}
+                        </span>
                       </span>
                     </button>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); deleteMsgMutation.mutate(m.id); }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-[#E25C5C]/10 hover:text-[#E25C5C] transition-all">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteMsgMutation.mutate(m.id);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-[#E25C5C]/10 hover:text-[#E25C5C] transition-all"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </li>
                 ))}
-                {received.length === 0 ? <li className="px-5 py-8 text-center text-xs text-muted-foreground">Aucune notification reçue</li> : null}
+                {received.length === 0 ? (
+                  <li className="px-5 py-8 text-center text-xs text-muted-foreground">
+                    Aucune notification reçue
+                  </li>
+                ) : null}
               </ul>
             ) : null}
 
@@ -278,28 +477,66 @@ function ShellNotifications() {
               <ul className="divide-y divide-[#28396C]/8">
                 {sent.map((m) => (
                   <li key={m.id} className="group relative">
-                    <button type="button" onClick={() => setSelected(m.id)}
-                      className={cn(rowClass, "flex-col border-l-[3px] pr-12", m.status === "sent" ? "border-l-[#25D366] bg-[#25D366]/[0.05]" : "border-l-[#E25C5C] bg-[#E25C5C]/[0.05]")}>
+                    <button
+                      type="button"
+                      onClick={() => setSelected(m.id)}
+                      className={cn(
+                        rowClass,
+                        "flex-col border-l-[3px] pr-12",
+                        m.status === "sent"
+                          ? "border-l-[#25D366] bg-[#25D366]/[0.05]"
+                          : "border-l-[#E25C5C] bg-[#E25C5C]/[0.05]",
+                      )}
+                    >
                       <span className="flex w-full items-baseline justify-between gap-2">
-                        <span className="truncate text-sm font-medium text-foreground">{parentName(m)}</span>
-                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{m.phone}</span>
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {parentName(m)}
+                        </span>
+                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                          {m.phone}
+                        </span>
                       </span>
-                      <span className="mt-1 block w-full text-xs text-muted-foreground">{m.content}</span>
+                      <span className="mt-1 block w-full text-xs text-muted-foreground">
+                        {m.content}
+                      </span>
                       <span className="mt-2 flex w-full items-center justify-between gap-2">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80">{formatMsgTime(m.created_at)}</span>
-                        <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold", m.status === "sent" ? "bg-[#25D366]/15 text-[#1B7F45]" : "bg-[#F6D8D8] text-[#9A2F2F]")}>
-                          {m.status === "sent" ? <CheckCheck className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                          {formatMsgTime(m.created_at)}
+                        </span>
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                            m.status === "sent"
+                              ? "bg-[#25D366]/15 text-[#1B7F45]"
+                              : "bg-[#F6D8D8] text-[#9A2F2F]",
+                          )}
+                        >
+                          {m.status === "sent" ? (
+                            <CheckCheck className="h-3 w-3" />
+                          ) : (
+                            <AlertTriangle className="h-3 w-3" />
+                          )}
                           {m.status === "sent" ? "Envoyé" : "Échec"}
                         </span>
                       </span>
                     </button>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); deleteMsgMutation.mutate(m.id); }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-[#E25C5C]/10 hover:text-[#E25C5C] transition-all">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteMsgMutation.mutate(m.id);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-[#E25C5C]/10 hover:text-[#E25C5C] transition-all"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </li>
                 ))}
-                {sent.length === 0 ? <li className="px-5 py-8 text-center text-xs text-muted-foreground">Aucun message envoyé</li> : null}
+                {sent.length === 0 ? (
+                  <li className="px-5 py-8 text-center text-xs text-muted-foreground">
+                    Aucun message envoyé
+                  </li>
+                ) : null}
               </ul>
             ) : null}
           </div>
@@ -311,11 +548,26 @@ function ShellNotifications() {
   );
 }
 
-function SendMessageModal({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+function SendMessageModal({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
   const { t } = useDashboardI18n();
   const queryClient = useQueryClient();
-  const { data: clients = [] } = useQuery({ queryKey: ["clients"], queryFn: () => api.get("/clients") });
-  const typedClients = clients as unknown as Array<{ id: string; parent_name: string; phone: string; email: string; whatsapp_optin: boolean }>;
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients"],
+    queryFn: () => api.get("/clients"),
+  });
+  const typedClients = clients as unknown as Array<{
+    id: string;
+    parent_name: string;
+    phone: string;
+    email: string;
+    whatsapp_optin: boolean;
+  }>;
 
   const [mode, setMode] = useState<"individual" | "all">("individual");
   const [selectedId, setSelectedId] = useState<string>("");
@@ -329,26 +581,37 @@ function SendMessageModal({ open, onOpenChange }: { open: boolean; onOpenChange:
         const client = typedClients.find((c) => c.id === selectedId);
         if (!client) throw new Error("Parent introuvable");
         if (channel === "whatsapp") {
-          const wa = await api.post<{ ok: boolean; error?: string }>("/whatsapp/send", { clientId: selectedId, content });
+          const wa = await api.post<{ ok: boolean; error?: string }>(
+            "/whatsapp/send",
+            { clientId: selectedId, content },
+          );
           if (!wa.ok) throw new Error(wa.error ?? "Erreur WhatsApp");
         } else {
-          const em = await api.post<{ ok: boolean; error?: string }>("/email/send", {
-            data: {
-              to: client.email,
-              subject: "Message de l'école",
-              message: content,
-              parentName: client.parent_name,
+          const em = await api.post<{ ok: boolean; error?: string }>(
+            "/email/send",
+            {
+              data: {
+                to: client.email,
+                subject: "Message de l'école",
+                message: content,
+                parentName: client.parent_name,
+              },
             },
-          });
+          );
           if (!em.ok) throw new Error(em.error ?? "Erreur email");
         }
       } else {
-        const bc = await api.post<{ ok: boolean; error?: string }>("/whatsapp/broadcast", { content });
+        const bc = await api.post<{ ok: boolean; error?: string }>(
+          "/whatsapp/broadcast",
+          { content },
+        );
         if (!bc.ok) throw new Error(bc.error ?? "Erreur envoi");
       }
     },
     onSuccess: () => {
-      toast.success(mode === "all" ? "Message envoyé à tous les parents" : "Message envoyé");
+      toast.success(
+        mode === "all" ? "Message envoyé à tous les parents" : "Message envoyé",
+      );
       queryClient.invalidateQueries({ queryKey: ["message-history"] });
       onOpenChange(false);
       setContent("");
@@ -362,15 +625,25 @@ function SendMessageModal({ open, onOpenChange }: { open: boolean; onOpenChange:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={cn(dialogSurface, "max-w-[520px]")}>
-        <DialogDescription className="sr-only">Envoyer un message aux parents</DialogDescription>
+        <DialogDescription className="sr-only">
+          Envoyer un message aux parents
+        </DialogDescription>
         <div className="border-t-4 border-t-primary">
           <div className="border-b border-border px-6 pb-4 pt-6 pr-14">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Centre de messages</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              Centre de messages
+            </p>
             <DialogTitle className="mt-2 text-left font-display text-xl font-semibold tracking-tight text-foreground">
               Envoyer un message
             </DialogTitle>
           </div>
-          <form className="space-y-4 px-6 py-5" onSubmit={(e) => { e.preventDefault(); if (valid) sendMutation.mutate(); }}>
+          <form
+            className="space-y-4 px-6 py-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (valid) sendMutation.mutate();
+            }}
+          >
             <div className="space-y-1.5">
               <Label className={labelClass}>Destinataire</Label>
               <div className="flex gap-2">
@@ -378,8 +651,17 @@ function SendMessageModal({ open, onOpenChange }: { open: boolean; onOpenChange:
                   { value: "individual" as const, label: "Individuel" },
                   { value: "all" as const, label: "Tous les parents" },
                 ].map((opt) => (
-                  <button key={opt.value} type="button" onClick={() => setMode(opt.value)}
-                    className={cn("rounded-full px-4 py-2 text-xs font-semibold transition", mode === opt.value ? "bg-[#28396C] text-white" : "border border-[#28396C]/15 text-foreground hover:bg-muted")}>
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setMode(opt.value)}
+                    className={cn(
+                      "rounded-full px-4 py-2 text-xs font-semibold transition",
+                      mode === opt.value
+                        ? "bg-[#28396C] text-white"
+                        : "border border-[#28396C]/15 text-foreground hover:bg-muted",
+                    )}
+                  >
                     {opt.label}
                   </button>
                 ))}
@@ -388,14 +670,21 @@ function SendMessageModal({ open, onOpenChange }: { open: boolean; onOpenChange:
 
             {mode === "individual" ? (
               <div className="space-y-1.5">
-                <Label htmlFor="msg-client" className={labelClass}>Parent</Label>
+                <Label htmlFor="msg-client" className={labelClass}>
+                  Parent
+                </Label>
                 <Select value={selectedId} onValueChange={setSelectedId}>
-                  <SelectTrigger id="msg-client" className="rounded-xl border-[#28396C]/15">
+                  <SelectTrigger
+                    id="msg-client"
+                    className="rounded-xl border-[#28396C]/15"
+                  >
                     <SelectValue placeholder="Sélectionner un parent..." />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-[#28396C]/10">
                     {typedClients.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.parent_name}   {c.phone}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.parent_name} {c.phone}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -406,11 +695,24 @@ function SendMessageModal({ open, onOpenChange }: { open: boolean; onOpenChange:
               <Label className={labelClass}>Canal</Label>
               <div className="flex gap-2">
                 {[
-                  { value: "whatsapp" as const, label: "WhatsApp", icon: MessageCircle },
+                  {
+                    value: "whatsapp" as const,
+                    label: "WhatsApp",
+                    icon: MessageCircle,
+                  },
                   { value: "email" as const, label: "Email", icon: Send },
                 ].map((opt) => (
-                  <button key={opt.value} type="button" onClick={() => setChannel(opt.value)}
-                    className={cn("inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition", channel === opt.value ? "bg-[#28396C] text-white" : "border border-[#28396C]/15 text-foreground hover:bg-muted")}>
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setChannel(opt.value)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition",
+                      channel === opt.value
+                        ? "bg-[#28396C] text-white"
+                        : "border border-[#28396C]/15 text-foreground hover:bg-muted",
+                    )}
+                  >
                     <opt.icon className="h-3.5 w-3.5" /> {opt.label}
                   </button>
                 ))}
@@ -418,19 +720,36 @@ function SendMessageModal({ open, onOpenChange }: { open: boolean; onOpenChange:
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="msg-content" className={labelClass}>Message</Label>
-              <textarea id="msg-content" value={content} onChange={(e) => setContent(e.target.value)} rows={4} required
-                className={cn(inputClass, "min-h-[100px] resize-y rounded-2xl px-4 py-3 text-sm")}
-                placeholder="Écrivez votre message ici..." />
+              <Label htmlFor="msg-content" className={labelClass}>
+                Message
+              </Label>
+              <textarea
+                id="msg-content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={4}
+                required
+                className={cn(
+                  inputClass,
+                  "min-h-[100px] resize-y rounded-2xl px-4 py-3 text-sm",
+                )}
+                placeholder="Écrivez votre message ici..."
+              />
             </div>
 
             <div className="flex flex-wrap justify-end gap-3 border-t border-border pt-5">
-              <button type="button" onClick={() => onOpenChange(false)}
-                className="rounded-full border border-[#28396C]/15 bg-card px-5 py-2 text-sm font-medium text-foreground hover:bg-muted">
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="rounded-full border border-[#28396C]/15 bg-card px-5 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              >
                 {t.common.cancel}
               </button>
-              <button type="submit" disabled={!valid || sendMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-full bg-[#B5E18B] px-5 py-2 text-sm font-bold text-[#28396C] shadow-[0_14px_30px_-14px_rgba(107,165,58,0.7)] transition hover:brightness-105 disabled:opacity-50">
+              <button
+                type="submit"
+                disabled={!valid || sendMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-full bg-[#B5E18B] px-5 py-2 text-sm font-bold text-[#28396C] shadow-[0_14px_30px_-14px_rgba(107,165,58,0.7)] transition hover:brightness-105 disabled:opacity-50"
+              >
                 <Send className="h-4 w-4" />
                 {sendMutation.isPending ? "Envoi..." : "Envoyer"}
               </button>
@@ -446,15 +765,30 @@ function topNavItemActive(pathname: string, to: string) {
   if (to === "/dashboard")
     return pathname === "/dashboard" || pathname === "/dashboard/";
   if (to === "/dashboard/rendez-vous")
-    return pathname === "/dashboard/rendez-vous" || pathname.startsWith("/dashboard/rendez-vous/");
+    return (
+      pathname === "/dashboard/rendez-vous" ||
+      pathname.startsWith("/dashboard/rendez-vous/")
+    );
   if (to === "/dashboard/familles")
-    return pathname === "/dashboard/familles" || pathname.startsWith("/dashboard/familles/");
+    return (
+      pathname === "/dashboard/familles" ||
+      pathname.startsWith("/dashboard/familles/")
+    );
   if (to === "/dashboard/paiements")
-    return pathname === "/dashboard/paiements" || pathname.startsWith("/dashboard/paiements/");
+    return (
+      pathname === "/dashboard/paiements" ||
+      pathname.startsWith("/dashboard/paiements/")
+    );
   if (to === "/dashboard/affiches")
-    return pathname === "/dashboard/affiches" || pathname.startsWith("/dashboard/affiches/");
+    return (
+      pathname === "/dashboard/affiches" ||
+      pathname.startsWith("/dashboard/affiches/")
+    );
   if (to === "/dashboard/rapports")
-    return pathname === "/dashboard/rapports" || pathname.startsWith("/dashboard/rapports/");
+    return (
+      pathname === "/dashboard/rapports" ||
+      pathname.startsWith("/dashboard/rapports/")
+    );
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
@@ -469,11 +803,21 @@ function MobileBottomNav({
   mainNavAria: string;
 }) {
   const compact = topNav.length >= 4;
-  const labelClass = compact ? "text-[9px] leading-tight" : "text-[10px] leading-tight";
+  const labelClass = compact
+    ? "text-[9px] leading-tight"
+    : "text-[10px] leading-tight";
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#28396C]/10 bg-white/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-10px_35px_-15px_rgba(40,57,108,0.3)] backdrop-blur-xl lg:hidden" aria-label={mainNavAria}>
-      <div className="grid min-h-[4.25rem] w-full auto-cols-fr" style={{ gridTemplateColumns: `repeat(${topNav.length}, minmax(0, 1fr))` }}>
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#28396C]/10 bg-white/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-10px_35px_-15px_rgba(40,57,108,0.3)] backdrop-blur-xl lg:hidden"
+      aria-label={mainNavAria}
+    >
+      <div
+        className="grid min-h-[4.25rem] w-full auto-cols-fr"
+        style={{
+          gridTemplateColumns: `repeat(${topNav.length}, minmax(0, 1fr))`,
+        }}
+      >
         {topNav.map((n) => {
           const active = topNavItemActive(pathname, n.to);
           const Icon = n.icon;
@@ -483,14 +827,35 @@ function MobileBottomNav({
               to={n.to}
               className={cn(
                 "relative mx-0.5 flex min-w-0 flex-col items-center justify-center gap-1 rounded-full px-0.5 py-2 font-sans transition-colors",
-                active ? "text-foreground" : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+                active
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
               )}
             >
-              <span className="flex h-1 w-full shrink-0 items-center justify-center" aria-hidden>
-                <span className={cn("h-0.5 w-6 shrink-0 rounded-full", active ? "bg-primary" : "bg-transparent")} />
+              <span
+                className="flex h-1 w-full shrink-0 items-center justify-center"
+                aria-hidden
+              >
+                <span
+                  className={cn(
+                    "h-0.5 w-6 shrink-0 rounded-full",
+                    active ? "bg-primary" : "bg-transparent",
+                  )}
+                />
               </span>
-              <Icon className="h-5 w-5 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
-              <span className={cn( "w-full max-w-full truncate px-0.5 text-center font-semibold leading-tight", labelClass, active ? "text-foreground" : "font-medium text-muted-foreground", )}>
+              <Icon
+                className="h-5 w-5 shrink-0"
+                strokeWidth={active ? 2.25 : 1.75}
+              />
+              <span
+                className={cn(
+                  "w-full max-w-full truncate px-0.5 text-center font-semibold leading-tight",
+                  labelClass,
+                  active
+                    ? "text-foreground"
+                    : "font-medium text-muted-foreground",
+                )}
+              >
                 {n.shortLabel ?? n.label}
               </span>
             </Link>
@@ -543,21 +908,36 @@ export function DashShell({
     };
 
     return (
-      <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#F4FAE6_45%,#EEF6E0_100%)]" dir={shellDir}>
+      <div
+        className="flex h-dvh min-h-0 flex-col overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#F4FAE6_45%,#EEF6E0_100%)]"
+        dir={shellDir}
+      >
         <header className="z-30 shrink-0 border-b border-[#28396C]/10 bg-white/85 backdrop-blur-xl">
           {/* Mobile: compact top bar (tabs live in bottom nav) */}
           <div className="flex items-center justify-between gap-3 px-4 lg:hidden">
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <Link to={topNav[0]?.to ?? "/dashboard"} className="flex min-w-0 items-center">
-                <img src="/edu-logo.png" alt={`${brand} logo`} className="h-15 w-15" />
+              <Link
+                to={topNav[0]?.to ?? "/dashboard"}
+                className="flex min-w-0 items-center"
+              >
+                <img
+                  src="/edu-logo.png"
+                  alt={`${brand} logo`}
+                  className="h-15 w-15"
+                />
               </Link>
             </div>
             <div className="flex shrink-0 items-center gap-2 pt-0.5">
               {hideNotifications ? null : <ShellNotifications />}
               <div className="grid h-9 w-9 place-items-center rounded-full bg-[#28396C] text-sm font-medium text-[#B5E18B] shadow-[0_10px_20px_-10px_rgba(40,57,108,0.5)]">
-                {((user?.name || user?.email || "A"))!.slice(0, 1).toUpperCase()}
+                {(user?.name || user?.email || "A")!.slice(0, 1).toUpperCase()}
               </div>
-              <button type="button" onClick={handleLogout} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#28396C]/15 text-muted-foreground transition-colors hover:bg-[#B5E18B]/15 hover:text-foreground" aria-label={t.shell.logoutAria}>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#28396C]/15 text-muted-foreground transition-colors hover:bg-[#B5E18B]/15 hover:text-foreground"
+                aria-label={t.shell.logoutAria}
+              >
                 <LogOut className="h-4 w-4" strokeWidth={1.75} />
               </button>
             </div>
@@ -566,8 +946,15 @@ export function DashShell({
           {/* Desktop: full header */}
           <div className="hidden grid-cols-1 items-center gap-3 px-4 py-0 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:gap-4 lg:px-6 lg:py-2.5 lg:min-h-16">
             <div className="flex min-w-0 flex-col justify-center justify-self-start gap-1.5">
-              <Link to={topNav[0]?.to ?? "/dashboard"} className="flex items-center">
-                <img src="/edu-logo.png" alt={`${brand} logo`} className="h-15 w-15" />
+              <Link
+                to={topNav[0]?.to ?? "/dashboard"}
+                className="flex items-center"
+              >
+                <img
+                  src="/edu-logo.png"
+                  alt={`${brand} logo`}
+                  className="h-15 w-15"
+                />
               </Link>
             </div>
 
@@ -596,13 +983,22 @@ export function DashShell({
               {hideNotifications ? null : <ShellNotifications />}
               <div className="flex items-center gap-2">
                 <div className="hidden text-right sm:block">
-                  <p className="text-sm font-medium leading-none text-foreground">{(user?.name || user?.email || "admin")}</p>
+                  <p className="text-sm font-medium leading-none text-foreground">
+                    {user?.name || user?.email || "admin"}
+                  </p>
                 </div>
                 <div className="grid h-9 w-9 place-items-center rounded-full bg-[#28396C] text-sm font-medium text-[#B5E18B] shadow-[0_10px_20px_-10px_rgba(40,57,108,0.5)]">
-                {((user?.name || user?.email || "A"))!.slice(0, 1).toUpperCase()}
+                  {(user?.name || user?.email || "A")!
+                    .slice(0, 1)
+                    .toUpperCase()}
                 </div>
               </div>
-              <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full border border-[#28396C]/15 px-3 py-1.5 text-muted-foreground hover:bg-[#B5E18B]/15" aria-label={t.shell.logoutAria}>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#28396C]/15 px-3 py-1.5 text-muted-foreground hover:bg-[#B5E18B]/15"
+                aria-label={t.shell.logoutAria}
+              >
                 <LogOut className="h-3.5 w-3.5 shrink-0" />
                 <span className="hidden lg:inline">{t.shell.logout}</span>
               </button>
@@ -612,7 +1008,8 @@ export function DashShell({
           {secondaryNav && secondaryNav.length > 0 ? (
             <div className="scroll-touch flex flex-nowrap items-center gap-1 overflow-x-auto border-t border-border bg-secondary/40 px-4 py-2 lg:flex-wrap lg:px-6">
               {secondaryNav.map((n) => {
-                const active = loc.pathname === n.to || loc.pathname.startsWith(`${n.to}/`);
+                const active =
+                  loc.pathname === n.to || loc.pathname.startsWith(`${n.to}/`);
                 return (
                   <Link
                     key={n.to}
@@ -634,11 +1031,19 @@ export function DashShell({
         </header>
 
         {/* pb clears the fixed bottom nav *and* the language button floating above it. */}
-        <main data-dashboard-main dir={shellDir} className="min-h-0 flex-1 overflow-y-auto scroll-touch p-4 pb-36 lg:p-8 lg:pb-8">
+        <main
+          data-dashboard-main
+          dir={shellDir}
+          className="min-h-0 flex-1 overflow-y-auto scroll-touch p-4 pb-36 lg:p-8 lg:pb-8"
+        >
           {children}
         </main>
 
-        <MobileBottomNav topNav={topNav} pathname={loc.pathname} mainNavAria={t.shell.mainNavAria} />
+        <MobileBottomNav
+          topNav={topNav}
+          pathname={loc.pathname}
+          mainNavAria={t.shell.mainNavAria}
+        />
         <Toaster />
       </div>
     );
@@ -692,15 +1097,19 @@ export function DashShell({
           <div className="px-6 h-16 flex items-center justify-end gap-4">
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium leading-none text-foreground">{(user?.name || user?.email || "Admin")}</p>
+                <p className="text-sm font-medium leading-none text-foreground">
+                  {user?.name || user?.email || "Admin"}
+                </p>
               </div>
               <div className="h-9 w-9 rounded-full bg-primary text-primary-foreground grid place-items-center text-sm font-medium">
-                {((user?.name || user?.email || "A"))!.slice(0, 1).toUpperCase()}
+                {(user?.name || user?.email || "A")!.slice(0, 1).toUpperCase()}
               </div>
             </div>
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto scroll-touch p-6 lg:p-8">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto scroll-touch p-6 lg:p-8">
+          {children}
+        </main>
       </div>
       <Toaster />
     </div>
@@ -725,7 +1134,9 @@ export function StatCard({
   return (
     <div className="rounded-2xl bg-card border border-[#28396C]/10 p-5 shadow-[0_18px_45px_-28px_rgba(40,57,108,0.35)]">
       <div className="flex items-center justify-between">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">{label}</p>
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">
+          {label}
+        </p>
         {Icon && (
           <span
             className={
@@ -736,7 +1147,10 @@ export function StatCard({
             style={
               monochrome
                 ? undefined
-                : { backgroundColor: `color-mix(in oklab, var(--${color}) 22%, var(--background))`, color: `var(--${color})` }
+                : {
+                    backgroundColor: `color-mix(in oklab, var(--${color}) 22%, var(--background))`,
+                    color: `var(--${color})`,
+                  }
             }
           >
             <Icon className="h-4 w-4" />
@@ -749,12 +1163,26 @@ export function StatCard({
   );
 }
 
-export function PageTitle({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: ReactNode }) {
+export function PageTitle({
+  eyebrow,
+  title,
+  action,
+}: {
+  eyebrow?: string;
+  title: string;
+  action?: ReactNode;
+}) {
   return (
     <div className="flex items-end justify-between flex-wrap gap-4 mb-8">
       <div>
-        {eyebrow && <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{eyebrow}</p>}
-        <h1 className="mt-1 font-display text-3xl md:text-4xl text-foreground">{title}</h1>
+        {eyebrow && (
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            {eyebrow}
+          </p>
+        )}
+        <h1 className="mt-1 font-display text-3xl md:text-4xl text-foreground">
+          {title}
+        </h1>
       </div>
       {action}
     </div>

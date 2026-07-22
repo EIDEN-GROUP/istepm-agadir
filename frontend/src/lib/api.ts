@@ -19,12 +19,19 @@ function clearToken() {
   localStorage.removeItem("school_crm_token");
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
   const token = getToken();
   const url = `${API_BASE}${path}`;
   const queryParams = options.params
-    ? "?" + new URLSearchParams(
-        Object.entries(options.params).filter(([_, v]) => v !== undefined) as [string, string][]
+    ? "?" +
+      new URLSearchParams(
+        Object.entries(options.params).filter(([_, v]) => v !== undefined) as [
+          string,
+          string,
+        ][],
       ).toString()
     : "";
 
@@ -67,8 +74,7 @@ export const api = {
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "PUT", body }),
 
-  delete: <T>(path: string) =>
-    request<T>(path, { method: "DELETE" }),
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 
   // Auth-specific helpers
   getToken,

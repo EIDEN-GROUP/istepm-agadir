@@ -21,12 +21,13 @@ export async function receiptRoutes(app: FastifyInstance) {
     const settingsMap: Record<string, any> = {};
     for (const r of settingsRows) settingsMap[r.key] = r.value;
 
-    const templateMeta = settingsMap.pdf_template as { url?: string } | undefined;
+    const templateMeta = settingsMap.pdf_template as
+      { url?: string } | undefined;
     const fieldSource = settingsMap.active_field_source as string | undefined;
     const fields: Array<{ key: string; x: number; y: number }> =
       fieldSource === "ai"
-        ? (settingsMap.receipt_fields_ai as any[]) ?? []
-        : (settingsMap.receipt_fields as any[]) ?? [];
+        ? ((settingsMap.receipt_fields_ai as any[]) ?? [])
+        : ((settingsMap.receipt_fields as any[]) ?? []);
 
     if (!templateMeta?.url) {
       // Generate a simple PDF without template
@@ -36,11 +37,23 @@ export async function receiptRoutes(app: FastifyInstance) {
       const { width, height } = page.getSize();
 
       let y = height - 60;
-      page.drawText("Reçu de paiement", { x: 50, y, size: 20, font, color: rgb(0, 0, 0) });
+      page.drawText("Reçu de paiement", {
+        x: 50,
+        y,
+        size: 20,
+        font,
+        color: rgb(0, 0, 0),
+      });
       y -= 40;
 
       for (const [key, value] of Object.entries(input.data)) {
-        page.drawText(`${key}: ${value}`, { x: 50, y, size: 12, font, color: rgb(0.2, 0.2, 0.2) });
+        page.drawText(`${key}: ${value}`, {
+          x: 50,
+          y,
+          size: 12,
+          font,
+          color: rgb(0.2, 0.2, 0.2),
+        });
         y -= 20;
       }
 

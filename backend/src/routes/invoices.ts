@@ -31,7 +31,12 @@ export async function invoiceRoutes(app: FastifyInstance) {
 
     const totalDue = rows.reduce((s, r) => s + Number(r.amountDue), 0);
     const totalPaid = rows.reduce((s, r) => s + Number(r.amountPaid), 0);
-    return { totalDue, totalPaid, outstanding: totalDue - totalPaid, count: rows.length };
+    return {
+      totalDue,
+      totalPaid,
+      outstanding: totalDue - totalPaid,
+      count: rows.length,
+    };
   });
 
   app.get("/years", { preHandler: [authenticate] }, async () => {
@@ -40,7 +45,9 @@ export async function invoiceRoutes(app: FastifyInstance) {
       .select({ period: invoices.period })
       .from(invoices)
       .groupBy(invoices.period);
-    const years = [...new Set(rows.map((r) => r.period?.split("/")[1]).filter(Boolean))];
+    const years = [
+      ...new Set(rows.map((r) => r.period?.split("/")[1]).filter(Boolean)),
+    ];
     return years.sort();
   });
 
@@ -48,13 +55,29 @@ export async function invoiceRoutes(app: FastifyInstance) {
     const query = request.query as { grain?: string; year?: string };
     const db = getDb();
     const now = new Date();
-    const months = ["Sept", "Oct", "Nov", "Déc", "Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août"];
+    const months = [
+      "Sept",
+      "Oct",
+      "Nov",
+      "Déc",
+      "Jan",
+      "Fév",
+      "Mar",
+      "Avr",
+      "Mai",
+      "Juin",
+      "Juil",
+      "Août",
+    ];
     const results: Array<{ m: string; v: number }> = [];
 
     for (let i = 6; i >= 0; i--) {
       let m = now.getMonth() - i;
       let y = now.getFullYear();
-      if (m < 0) { m += 12; y -= 1; }
+      if (m < 0) {
+        m += 12;
+        y -= 1;
+      }
       const first = new Date(y, m, 1).toISOString().split("T")[0];
       const last = new Date(y, m + 1, 0).toISOString().split("T")[0];
 
@@ -81,7 +104,9 @@ export async function invoiceRoutes(app: FastifyInstance) {
       const [existing] = await db
         .select()
         .from(invoices)
-        .where(and(eq(invoices.clientId, client.id), eq(invoices.period, period)))
+        .where(
+          and(eq(invoices.clientId, client.id), eq(invoices.period, period)),
+        )
         .limit(1);
 
       if (!existing) {

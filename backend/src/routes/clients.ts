@@ -41,7 +41,11 @@ const clientSchema = z.object({
 export async function clientRoutes(app: FastifyInstance) {
   app.get("/", { preHandler: [authenticate] }, async (request) => {
     const db = getDb();
-    const query = request.query as { search?: string; level?: string; service?: string };
+    const query = request.query as {
+      search?: string;
+      level?: string;
+      service?: string;
+    };
     let result = db
       .select()
       .from(clients)
@@ -71,7 +75,11 @@ export async function clientRoutes(app: FastifyInstance) {
   app.get("/:id", { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
-    const [client] = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
+    const [client] = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, id))
+      .limit(1);
     if (!client) return reply.status(404).send({ error: "Client introuvable" });
     return client;
   });
@@ -79,11 +87,14 @@ export async function clientRoutes(app: FastifyInstance) {
   app.post("/", { preHandler: [authenticate] }, async (request) => {
     const input = clientSchema.parse(request.body);
     const db = getDb();
-    const [client] = await db.insert(clients).values({
-      ...input,
-      monthlyFee: String(input.monthlyFee),
-      remise: String(input.remise),
-    }).returning();
+    const [client] = await db
+      .insert(clients)
+      .values({
+        ...input,
+        monthlyFee: String(input.monthlyFee),
+        remise: String(input.remise),
+      })
+      .returning();
     return client;
   });
 
@@ -94,10 +105,15 @@ export async function clientRoutes(app: FastifyInstance) {
     const values: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(input)) {
       if (val !== undefined) {
-        values[key] = key === "monthlyFee" || key === "remise" ? String(val) : val;
+        values[key] =
+          key === "monthlyFee" || key === "remise" ? String(val) : val;
       }
     }
-    const [client] = await db.update(clients).set(values).where(eq(clients.id, id)).returning();
+    const [client] = await db
+      .update(clients)
+      .set(values)
+      .where(eq(clients.id, id))
+      .returning();
     if (!client) return reply.status(404).send({ error: "Client introuvable" });
     return client;
   });
@@ -130,11 +146,15 @@ export async function clientRoutes(app: FastifyInstance) {
           email: r["email"] || r["Email"] || "",
           phone: r["phone"] || r["Téléphone"] || r["Telephone"] || "",
           level: r["level"] || r["Niveau"] || "",
-          monthlyFee: String(Number(r["monthly_fee"] || r["Frais mensuels"] || 0)),
+          monthlyFee: String(
+            Number(r["monthly_fee"] || r["Frais mensuels"] || 0),
+          ),
         });
         imported++;
       } catch (e) {
-        errors.push(`Ligne ${i + 2}: ${e instanceof Error ? e.message : "Erreur inconnue"}`);
+        errors.push(
+          `Ligne ${i + 2}: ${e instanceof Error ? e.message : "Erreur inconnue"}`,
+        );
       }
     }
 
@@ -146,14 +166,19 @@ function parseCsv(text: string): Record<string, string>[] {
   let t = text;
   if (t.charCodeAt(0) === 0xfeff) t = t.slice(1);
   t = t.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = t
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   if (lines.length < 2) return [];
   const headers = splitCsvLine(lines[0]).map((h) => h.trim());
   const result: Record<string, string>[] = [];
   for (let i = 1; i < lines.length; i++) {
     const values = splitCsvLine(lines[i]);
     const row: Record<string, string> = {};
-    headers.forEach((h, j) => { row[h] = (values[j] ?? "").trim(); });
+    headers.forEach((h, j) => {
+      row[h] = (values[j] ?? "").trim();
+    });
     result.push(row);
   }
   return result;
@@ -166,10 +191,14 @@ function splitCsvLine(line: string): string[] {
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
     if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
-      else inQuotes = !inQuotes;
-    } else if (ch === "," && !inQuotes) { result.push(current); current = ""; }
-    else current += ch;
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else inQuotes = !inQuotes;
+    } else if (ch === "," && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else current += ch;
   }
   result.push(current);
   return result;

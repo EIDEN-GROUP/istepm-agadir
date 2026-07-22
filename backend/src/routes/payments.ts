@@ -10,7 +10,10 @@ const paymentSchema = z.object({
   clientId: z.string().uuid(),
   amount: z.number().min(0),
   date: z.string().optional(),
-  mode: z.enum(["especes", "virement", "carte", "cheque"]).optional().default("especes"),
+  mode: z
+    .enum(["especes", "virement", "carte", "cheque"])
+    .optional()
+    .default("especes"),
   period: z.string().optional(),
   notes: z.string().optional().default(""),
 });
@@ -40,7 +43,9 @@ export async function paymentRoutes(app: FastifyInstance) {
     const db = getDb();
 
     const dateStr = input.date ?? now.toISOString().split("T")[0];
-    const period = input.period ?? `${now.toLocaleString("fr-FR", { month: "long" })} ${now.getFullYear()}`;
+    const period =
+      input.period ??
+      `${now.toLocaleString("fr-FR", { month: "long" })} ${now.getFullYear()}`;
 
     const [payment] = await db
       .insert(payments)
@@ -59,17 +64,22 @@ export async function paymentRoutes(app: FastifyInstance) {
     return payment;
   });
 
-  app.put("/:id/invoice-sent", { preHandler: [authenticate] }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const db = getDb();
-    const [payment] = await db
-      .update(payments)
-      .set({ invoiceSent: true })
-      .where(eq(payments.id, id))
-      .returning();
-    if (!payment) return reply.status(404).send({ error: "Paiement introuvable" });
-    return payment;
-  });
+  app.put(
+    "/:id/invoice-sent",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const db = getDb();
+      const [payment] = await db
+        .update(payments)
+        .set({ invoiceSent: true })
+        .where(eq(payments.id, id))
+        .returning();
+      if (!payment)
+        return reply.status(404).send({ error: "Paiement introuvable" });
+      return payment;
+    },
+  );
 
   app.delete("/:id", { preHandler: [authenticate] }, async (request) => {
     const { id } = request.params as { id: string };
@@ -93,8 +103,12 @@ export async function paymentRoutes(app: FastifyInstance) {
     const query = request.query as { startDate?: string; endDate?: string };
     const db = getDb();
     const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-    const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      .toISOString()
+      .split("T")[0];
+    const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      .toISOString()
+      .split("T")[0];
 
     const start = query.startDate ?? firstOfMonth;
     const end = query.endDate ?? lastOfMonth;
@@ -109,7 +123,10 @@ export async function paymentRoutes(app: FastifyInstance) {
   });
 }
 
-async function recalcClientDebt(db: ReturnType<typeof getDb>, clientId: string) {
+async function recalcClientDebt(
+  db: ReturnType<typeof getDb>,
+  clientId: string,
+) {
   const [client] = await db
     .select({ monthlyFee: clients.monthlyFee })
     .from(clients)

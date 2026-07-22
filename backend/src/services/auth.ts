@@ -35,7 +35,10 @@ export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
 
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+export async function verifyPassword(
+  password: string,
+  hash: string,
+): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
 
@@ -56,7 +59,11 @@ export async function createUser(input: CreateUserInput): Promise<UserResult> {
 
 export async function findByEmail(email: string) {
   const db = getDb();
-  const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
   return user ?? null;
 }
 
@@ -80,12 +87,20 @@ export async function listAllUsers(): Promise<UserResult[]> {
   return rows.map(toUserResult);
 }
 
-export async function updateUser(id: string, data: { name?: string; password?: string }) {
+export async function updateUser(
+  id: string,
+  data: { name?: string; password?: string },
+) {
   const db = getDb();
   const values: Record<string, unknown> = {};
   if (data.name !== undefined) values.name = data.name;
-  if (data.password !== undefined) values.passwordHash = await hashPassword(data.password);
-  const [updated] = await db.update(users).set(values).where(eq(users.id, id)).returning();
+  if (data.password !== undefined)
+    values.passwordHash = await hashPassword(data.password);
+  const [updated] = await db
+    .update(users)
+    .set(values)
+    .where(eq(users.id, id))
+    .returning();
   return updated ? toUserResult(updated) : null;
 }
 

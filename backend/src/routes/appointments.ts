@@ -11,7 +11,10 @@ const appointmentSchema = z.object({
   phone: z.string().optional().default(""),
   subject: z.string().optional().default(""),
   type: z.enum(["contact", "rdv"]).optional().default("contact"),
-  status: z.enum(["nouveau", "contacte", "converti"]).optional().default("nouveau"),
+  status: z
+    .enum(["nouveau", "contacte", "converti"])
+    .optional()
+    .default("nouveau"),
   age: z.string().optional().default(""),
   message: z.string().optional().default(""),
   dateTable: z.string().optional().default(""),
@@ -27,7 +30,10 @@ export async function appointmentRoutes(app: FastifyInstance) {
   app.post("/", { preHandler: [authenticate] }, async (request) => {
     const input = appointmentSchema.parse(request.body);
     const db = getDb();
-    const [appointment] = await db.insert(appointments).values(input).returning();
+    const [appointment] = await db
+      .insert(appointments)
+      .values(input)
+      .returning();
     return appointment;
   });
 
@@ -40,7 +46,8 @@ export async function appointmentRoutes(app: FastifyInstance) {
       .set(input)
       .where(eq(appointments.id, id))
       .returning();
-    if (!appointment) return reply.status(404).send({ error: "Rendez-vous introuvable" });
+    if (!appointment)
+      return reply.status(404).send({ error: "Rendez-vous introuvable" });
     return appointment;
   });
 

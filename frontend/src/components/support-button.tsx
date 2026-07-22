@@ -39,8 +39,15 @@ export function SupportButton() {
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className={cn(dialogSurface, "w-[min(100vw-1.5rem,460px)] max-w-[min(100vw-1.5rem,460px)]")}>
-          <DialogDescription className="sr-only">Contacter l'assistance de l'école</DialogDescription>
+        <DialogContent
+          className={cn(
+            dialogSurface,
+            "w-[min(100vw-1.5rem,460px)] max-w-[min(100vw-1.5rem,460px)]",
+          )}
+        >
+          <DialogDescription className="sr-only">
+            Contacter l'assistance de l'école
+          </DialogDescription>
           <div className="border-t-4 border-t-primary">
             <div className="border-b border-border px-6 pb-4 pt-6 pr-14">
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
@@ -61,7 +68,10 @@ export function SupportButton() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={4}
-                  className={cn(softInput, "min-h-[100px] resize-y rounded-2xl px-4 py-3 text-sm")}
+                  className={cn(
+                    softInput,
+                    "min-h-[100px] resize-y rounded-2xl px-4 py-3 text-sm",
+                  )}
                   placeholder="Décrivez votre problème en quelques mots..."
                 />
               </div>

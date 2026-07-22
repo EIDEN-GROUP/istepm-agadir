@@ -40,7 +40,9 @@ type DashboardI18nContextValue = {
   dashboard: DashboardTranslations;
 };
 
-const DashboardI18nContext = createContext<DashboardI18nContextValue | null>(null);
+const DashboardI18nContext = createContext<DashboardI18nContextValue | null>(
+  null,
+);
 
 function readStoredLocale(): DashboardLocale {
   if (typeof window === "undefined") return "fr";
@@ -82,12 +84,19 @@ export function DashboardI18nProvider({ children }: { children: ReactNode }) {
     [locale, setLocale, toggleLocale, dir, numberLocale, dashboard],
   );
 
-  return <DashboardI18nContext.Provider value={value}>{children}</DashboardI18nContext.Provider>;
+  return (
+    <DashboardI18nContext.Provider value={value}>
+      {children}
+    </DashboardI18nContext.Provider>
+  );
 }
 
 export function useDashboardI18n() {
   const ctx = useContext(DashboardI18nContext);
-  if (!ctx) throw new Error("useDashboardI18n must be used within DashboardI18nProvider");
+  if (!ctx)
+    throw new Error(
+      "useDashboardI18n must be used within DashboardI18nProvider",
+    );
   return { ...ctx, t: ctx.dashboard };
 }
 
@@ -141,6 +150,11 @@ export function useDashboardNav() {
   return { topNav, secondaryNav, brand: t.shell.brand };
 }
 
-export function interpolate(template: string, vars: Record<string, string | number>) {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(vars[key] ?? ""));
+export function interpolate(
+  template: string,
+  vars: Record<string, string | number>,
+) {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) =>
+    String(vars[key] ?? ""),
+  );
 }

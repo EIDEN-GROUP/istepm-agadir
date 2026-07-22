@@ -1,9 +1,19 @@
-import { pgTable, uuid, text, numeric, boolean, date, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  text,
+  numeric,
+  boolean,
+  date,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { clients } from "./clients";
 
 export const payments = pgTable("payments", {
   id: uuid("id").primaryKey().defaultRandom(),
-  clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  clientId: uuid("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
   amount: numeric("amount").notNull(),
   date: date("date").notNull().defaultNow(),
   mode: text("mode").notNull().default("especes"),

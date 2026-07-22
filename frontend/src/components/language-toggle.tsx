@@ -23,7 +23,9 @@ function LanguageToggleButton({
       )}
     >
       <Languages className="h-5 w-5" strokeWidth={2} aria-hidden />
-      <span className="sr-only">{locale === "fr" ? "العربية" : "Français"}</span>
+      <span className="sr-only">
+        {locale === "fr" ? "العربية" : "Français"}
+      </span>
       <span
         className="pointer-events-none absolute -bottom-0.5 -end-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-black uppercase text-primary-foreground"
         aria-hidden
@@ -38,10 +40,12 @@ export function LanguageToggleFloating() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { locale, toggleLocale } = useDashboardI18n();
 
-  const show = pathname.startsWith("/login") || pathname.startsWith("/dashboard");
+  const show =
+    pathname.startsWith("/login") || pathname.startsWith("/dashboard");
   if (!show) return null;
 
-  const langLabel = locale === "fr" ? "Passer en arabe" : "التبديل إلى الفرنسية";
+  const langLabel =
+    locale === "fr" ? "Passer en arabe" : "التبديل إلى الفرنسية";
 
   const onDashboard = pathname.startsWith("/dashboard");
 
@@ -56,7 +60,11 @@ export function LanguageToggleFloating() {
       )}
     >
       {onDashboard ? <SupportChat /> : null}
-      <LanguageToggleButton locale={locale} onToggle={toggleLocale} label={langLabel} />
+      <LanguageToggleButton
+        locale={locale}
+        onToggle={toggleLocale}
+        label={langLabel}
+      />
     </div>
   );
 }
