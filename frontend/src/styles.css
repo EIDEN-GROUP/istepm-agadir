@@ -1,0 +1,494 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sun: var(--sun);
+  --color-sky: var(--sky);
+  --color-leaf: var(--leaf);
+  --color-coral: var(--coral);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  /* EIDEN Group   Brand Identity System v2 (Outfit / DM Serif / Cormorant / Inter) */
+  --font-display: "Outfit", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --animate-brand-progress: brand-progress 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+:root {
+  --radius: 0.875rem;
+
+  /* Color Hunt palette   https://colorhunt.co/palette/b5e18bf0ffc2eae6bc28396c */
+  --eiden-brass: #b5e18b;
+  --eiden-canvas: color-mix(in srgb, #fefdfb 62%, #f0ffc2 38%);
+  --eiden-beige: #eae6bc;
+  --eiden-beige-dk: color-mix(in srgb, #ded9a8 70%, var(--eiden-brass) 30%);
+  --eiden-forest: #28396c;
+  --eiden-forest-md: #32467f;
+  --eiden-deep: #32467f;
+  --eiden-teal: #32467f;
+  --eiden-teal-lt: #46599b;
+  --eiden-gold: #cfc27a;
+  --eiden-gold-dk: color-mix(in srgb, var(--eiden-brass) 58%, #28396c 42%);
+  --eiden-mint: #cdeeae;
+  --eiden-cream: #f6ffdb;
+  --eiden-ink: #141d3a;
+  --eiden-white: #ffffff;
+  --eiden-red: #ef4444;
+  --eiden-blue: #60a5fa;
+
+  /* Landing   match reference hero (flat dark green + emerald CTAs) */
+  --landing-hero-bg: color-mix(in srgb, var(--eiden-forest) 22%, #060908 78%);
+  --landing-cta-primary: #b5e18b;
+  --landing-cta-primary-hover: #9ecf6e;
+  --landing-cta-on-primary: var(--eiden-forest);
+
+  --background: var(--eiden-canvas);
+  --foreground: var(--eiden-forest);
+  --hover-menu-foreground: var(--eiden-forest);
+
+  --card: var(--eiden-white);
+  --card-foreground: var(--eiden-forest);
+  --popover: var(--eiden-white);
+  --popover-foreground: var(--eiden-forest);
+
+  /* Brand accent / CTA   brass + forest for strong contrast */
+  --primary: var(--eiden-brass);
+  --primary-foreground: var(--eiden-forest);
+
+  --secondary: var(--eiden-beige);
+  --secondary-foreground: var(--eiden-forest);
+
+  --muted: var(--eiden-cream);
+  --muted-foreground: color-mix(in srgb, var(--eiden-forest) 62%, var(--eiden-deep) 38%);
+
+  --accent: color-mix(in srgb, var(--eiden-gold) 38%, var(--eiden-beige) 62%);
+  --accent-foreground: var(--eiden-forest);
+
+  --destructive: var(--eiden-red);
+  --destructive-foreground: var(--eiden-white);
+
+  --border: color-mix(in srgb, var(--eiden-beige-dk) 78%, var(--eiden-forest) 22%);
+  --input: var(--eiden-beige-dk);
+  --ring: var(--eiden-deep);
+
+  /* Supporting accents (charts, badges, utilities) */
+  --sun: var(--eiden-gold);
+  --sky: var(--eiden-teal-lt);
+  --leaf: var(--eiden-mint);
+  --coral: var(--eiden-gold-dk);
+
+  --chart-1: var(--eiden-brass);
+  --chart-2: var(--eiden-gold);
+  --chart-3: var(--eiden-forest);
+  --chart-4: var(--eiden-teal-lt);
+  --chart-5: var(--eiden-mint);
+
+  --sidebar: var(--eiden-canvas);
+  --sidebar-foreground: var(--eiden-forest);
+  --sidebar-primary: var(--eiden-brass);
+  --sidebar-primary-foreground: var(--eiden-forest);
+  --sidebar-accent: var(--eiden-beige);
+  --sidebar-accent-foreground: var(--eiden-forest);
+  --sidebar-border: var(--eiden-beige-dk);
+  --sidebar-ring: var(--eiden-deep);
+
+  --scrollbar-thumb: color-mix(in srgb, var(--eiden-brass) 44%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--eiden-gold) 55%, transparent);
+
+  --gradient-hero: linear-gradient(135deg, var(--eiden-forest) 0%, var(--eiden-deep) 42%, color-mix(in srgb, var(--eiden-brass) 55%, var(--eiden-deep) 45%) 100%);
+  --shadow-elegant: 0 20px 60px -20px color-mix(in srgb, var(--eiden-forest) 34%, transparent);
+  --shadow-soft: 0 8px 30px -10px color-mix(in srgb, var(--eiden-brass) 22%, transparent);
+}
+
+.dark {
+  --background: var(--eiden-forest-md);
+  --foreground: var(--eiden-canvas);
+  --card: var(--eiden-forest);
+  --card-foreground: var(--eiden-canvas);
+  --popover: var(--eiden-forest);
+  --popover-foreground: var(--eiden-canvas);
+  --primary: var(--eiden-gold);
+  --primary-foreground: var(--eiden-forest);
+  --secondary: color-mix(in srgb, var(--eiden-forest) 86%, var(--eiden-deep) 14%);
+  --secondary-foreground: var(--eiden-canvas);
+  --muted: color-mix(in srgb, var(--eiden-forest) 78%, var(--eiden-deep) 22%);
+  --muted-foreground: color-mix(in srgb, var(--eiden-beige) 58%, transparent);
+  --accent: color-mix(in srgb, var(--eiden-brass) 28%, var(--eiden-forest) 72%);
+  --accent-foreground: var(--eiden-canvas);
+  --destructive: color-mix(in srgb, var(--eiden-red) 92%, white 8%);
+  --destructive-foreground: var(--eiden-ink);
+  --border: color-mix(in srgb, var(--eiden-canvas) 14%, transparent);
+  --input: color-mix(in srgb, var(--eiden-canvas) 16%, transparent);
+  --ring: var(--eiden-gold);
+  --sidebar: var(--eiden-ink);
+  --sidebar-foreground: var(--eiden-canvas);
+  --sidebar-primary: var(--eiden-gold);
+  --sidebar-primary-foreground: var(--eiden-forest);
+  --sidebar-accent: var(--eiden-forest);
+  --sidebar-accent-foreground: var(--eiden-canvas);
+  --sidebar-border: color-mix(in srgb, var(--eiden-canvas) 12%, transparent);
+  --sidebar-ring: var(--eiden-gold);
+
+  --sun: var(--eiden-gold);
+  --sky: var(--eiden-teal-lt);
+  --leaf: var(--eiden-mint);
+  --coral: var(--eiden-gold-dk);
+
+  --chart-1: var(--eiden-gold);
+  --chart-2: var(--eiden-brass);
+  --chart-3: var(--eiden-canvas);
+  --chart-4: var(--eiden-mint);
+  --chart-5: var(--eiden-blue);
+
+  --scrollbar-thumb: color-mix(in srgb, var(--eiden-gold) 42%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--eiden-brass) 52%, transparent);
+
+  --gradient-hero: linear-gradient(135deg, var(--eiden-ink) 0%, var(--eiden-deep) 45%, color-mix(in srgb, var(--eiden-brass) 40%, var(--eiden-forest) 60%) 100%);
+  --shadow-elegant: 0 20px 60px -20px color-mix(in srgb, black 55%, transparent);
+  --shadow-soft: 0 8px 30px -10px color-mix(in srgb, var(--eiden-brass) 28%, transparent);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
+
+  /**
+   * App-wide scrollbars (overflow areas + main document).
+   * Firefox: scrollbar-color on * above
+   * WebKit: track transparent, rounded thumb
+   */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  /** Momentum scrolling + less scroll chaining on iOS / nested areas */
+  .scroll-touch {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .bg-grid {
+    background-image:
+      radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--foreground) 8%, transparent) 1px, transparent 0);
+    background-size: 28px 28px;
+  }
+  .gradient-warm {
+    background: linear-gradient(135deg,
+      color-mix(in oklab, var(--foreground) 6%, var(--background)) 0%,
+      color-mix(in oklab, var(--foreground) 10%, var(--background)) 50%,
+      color-mix(in oklab, var(--foreground) 4%, var(--background)) 100%);
+  }
+  .gradient-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 55%, var(--background)) 100%);
+  }
+  .text-balance { text-wrap: balance; }
+
+  /* Lumina-style landing mesh (login keeps dot `bg-grid` above) */
+  .hero-mesh-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--foreground) 7%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--foreground) 7%, transparent) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  .hero-mesh-fade {
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 40%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 40%, transparent 100%);
+  }
+
+  /* Landing hero   flat dark slab (reference screenshot) */
+  .hero-promo-section {
+    border-bottom: 1px solid rgb(255 255 255 / 0.08);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  }
+
+  .hero-backdrop-aurora {
+    background: var(--landing-hero-bg);
+  }
+
+  .text-shimmer {
+    background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 50%, var(--primary) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: landing-shimmer 4s linear infinite;
+  }
+
+  .text-shimmer-neon {
+    background: linear-gradient(
+      90deg,
+      #9ecf6e 0%,
+      var(--landing-cta-primary) 35%,
+      #e2f7c4 52%,
+      var(--landing-cta-primary) 70%,
+      #9ecf6e 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: landing-shimmer 4.5s linear infinite;
+    text-shadow: 0 0 20px color-mix(in srgb, var(--landing-cta-primary) 35%, transparent);
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--landing-cta-primary) 30%, transparent));
+  }
+
+  .landing-cta-primary {
+    background-color: var(--landing-cta-primary);
+    color: var(--landing-cta-on-primary);
+    border: 1px solid color-mix(in srgb, var(--landing-cta-primary) 78%, #28396c 22%);
+    border-radius: 9999px !important;
+    box-shadow: 0 16px 36px -14px color-mix(in srgb, var(--landing-cta-primary) 65%, #28396c 35%);
+  }
+
+  .landing-cta-primary:hover {
+    background-color: var(--landing-cta-primary-hover);
+  }
+
+  .landing-cta-secondary-dark {
+    border: 1px solid rgb(255 255 255 / 0.38);
+    border-radius: 9999px !important;
+    background-color: transparent;
+    color: rgb(248 250 252);
+  }
+
+  .landing-cta-secondary-dark:hover {
+    border-color: rgb(255 255 255 / 0.55);
+    background-color: rgb(255 255 255 / 0.06);
+  }
+
+  .landing-cta-secondary-light {
+    border: 1px solid color-mix(in srgb, var(--foreground) 28%, transparent);
+    border-radius: 9999px !important;
+    background-color: color-mix(in srgb, #ffffff 70%, transparent);
+    color: var(--foreground);
+  }
+
+  /* Frosted-glass floating tile (reference-style hero decoration) */
+  .glass-tile {
+    background: linear-gradient(135deg, rgb(255 255 255 / 0.6), rgb(255 255 255 / 0.14));
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgb(255 255 255 / 0.65);
+    border-radius: 1.4rem;
+    box-shadow:
+      0 24px 48px -20px rgb(40 57 108 / 0.28),
+      inset 0 1px 0 rgb(255 255 255 / 0.8);
+  }
+
+  .landing-cta-secondary-light:hover {
+    border-color: color-mix(in srgb, var(--foreground) 48%, transparent);
+    background-color: color-mix(in srgb, var(--muted) 40%, transparent);
+  }
+}
+
+@keyframes landing-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes landing-blob {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -40px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.95);
+  }
+}
+
+.animate-blob {
+  animation: landing-blob 14s ease-in-out infinite;
+}
+
+@keyframes landing-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: landing-marquee 40s linear infinite;
+}
+
+/**
+ * CRM dashboard (topnav)   mobile / tablet < lg: slightly smaller, denser type
+ * Scoped via [data-dashboard-main] on DashShell main (children only; modals in portal unchanged).
+ */
+@media (max-width: 1023px) {
+  [data-dashboard-main] {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  [data-dashboard-main] :where(table) {
+    font-size: 0.75rem;
+    line-height: 1.35;
+  }
+
+  [data-dashboard-main] :where(table th) {
+    font-size: 0.625rem !important;
+    letter-spacing: 0.06em;
+  }
+
+  [data-dashboard-main] :where(table td) {
+    font-size: 0.75rem !important;
+  }
+
+  /* Display utility sizes (KPIs, titles that use classes instead of h1–h3) */
+  [data-dashboard-main] :where(.text-3xl) {
+    font-size: clamp(1.2rem, 5.2vw, 1.6rem) !important;
+    line-height: 1.1;
+  }
+
+  [data-dashboard-main] :where(.text-2xl) {
+    font-size: clamp(1.05rem, 3.8vw, 1.3rem) !important;
+    line-height: 1.15;
+  }
+
+  [data-dashboard-main] :where(.text-xl) {
+    font-size: clamp(0.95rem, 2.4vw + 0.5rem, 1.125rem) !important;
+    line-height: 1.2;
+  }
+
+  [data-dashboard-main] :where(h1) {
+    font-size: clamp(1.3rem, 4.5vw + 0.55rem, 1.8125rem) !important;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+  }
+
+  [data-dashboard-main] :where(h2) {
+    font-size: clamp(1.05rem, 2.6vw + 0.55rem, 1.25rem) !important;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+  }
+
+  [data-dashboard-main] :where(h3) {
+    font-size: 1rem !important;
+    line-height: 1.25;
+  }
+
+  /* Form controls: keep ≥16px where possible to limit iOS zoom on focus */
+  [data-dashboard-main] :where(input:not([type="checkbox"]):not([type="radio"]), textarea) {
+    font-size: max(0.875rem, 16px);
+  }
+
+  /* Placeholders & select empty state   slightly smaller than field text on mobile */
+  [data-dashboard-main] input::placeholder,
+  [data-dashboard-main] textarea::placeholder {
+    font-size: 0.75rem !important;
+    line-height: 1.35;
+  }
+
+  [data-dashboard-main] button[data-placeholder] span {
+    font-size: 0.75rem !important;
+    line-height: 1.35;
+  }
+}
+
+/* Barre de progression indéterminée   va-et-vient continu (rideau de transition). */
+@keyframes brand-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+html[dir="rtl"] .landing-page {
+  direction: rtl;
+}
+
+html[dir="rtl"] [data-dashboard-main] {
+  direction: rtl;
+}
