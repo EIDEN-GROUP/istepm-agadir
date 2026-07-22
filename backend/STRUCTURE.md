@@ -24,7 +24,7 @@ backend/
 │   │       ├── calendar-exceptions.ts # Calendar overrides
 │   │       ├── whatsapp-messages.ts # WhatsApp message log
 │   │       ├── email-logs.ts    # Email send log
-│   │       ├── demo-requests.ts # Landing page demo requests
+│   │       ├── demo-requests.ts # Demo requests from landing page
 │   │       ├── centers.ts       # Multi-centre support
 │   │       ├── center-admins.ts # Centre admin assignments
 │   │       ├── support-sessions.ts # Support chat sessions
@@ -45,20 +45,19 @@ backend/
 │   │   ├── dashboard.ts         # Dashboard stats + revenue charts
 │   │   ├── settings.ts          # Centre settings + levels CRUD
 │   │   ├── holidays.ts          # Holidays, vacations, exceptions
-│   │   ├── superadmin.ts        # Multi-centre admin (stats, centres, admins)
+│   │   ├── admin.ts             # Admin API (/api/admin/*) — multi-product integration
 │   │   ├── support.ts           # Support sessions + messages
 │   │   ├── whatsapp.ts          # Send + broadcast + message log
 │   │   ├── email.ts             # Send email + receipt + demo
 │   │   └── receipt.ts           # PDF receipt generation
 │   ├── services/
 │   │   └── auth.ts              # JWT sign + verify helpers
+│   ├── scripts/
+│   │   └── migrate-from-supabase.ts # Supabase → self-hosted PG migration
 │   ├── app.ts                   # Fastify app assembly (plugins + routes)
 │   └── index.ts                 # Server entry point
 ├── docker/
 │   └── entrypoint.sh            # Runs migrations then starts app
-├── scripts/
-│   └── migrate-from-supabase.ts # Supabase → self-hosted PG migration
-├── migrations/                  # Drizzle SQL migration files (generated)
 ├── Dockerfile                   # Multi-stage: dev (tsx) + prod (compiled)
 ├── drizzle.config.ts
 ├── tsconfig.json
@@ -89,12 +88,26 @@ backend/
 | `support_sessions` | Chat sessions |
 | `support_messages` | Chat messages |
 
-## API endpoints (15 route modules, ~96 routes)
+## API endpoints
 
 All prefixed with `/api`. Public: `POST /api/auth/login`, `POST /api/email/send-demo`, `GET /api/health`. Everything else requires JWT Bearer token.
+
+### Admin API (`/api/admin/*`)
+
+Protected by `X-API-Key` header (not JWT). Used by external platforms like SuperAdmin CRM.
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/admin/health` | Health check |
+| `GET /api/admin/info` | Product info (name, version, environment) |
+| `GET /api/admin/stats` | Platform statistics |
+| `GET /api/admin/tenants` | All centres with admin details |
+| `GET /api/admin/users` | All user accounts |
+| `GET /api/admin/demo-requests` | Pending demo requests |
+| `GET /api/admin/revenue-history` | Monthly revenue (last 7 months) |
 
 ## Middleware
 
 - `authenticate` — verifies JWT, attaches `request.user`
-- `requireSuperadmin` — role check on top of authenticate
+- `verifyApiKey` — validates `X-API-Key` header for Admin API routes
 - Global error handler — catches all unhandled errors, returns `{ error: string }`
