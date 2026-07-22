@@ -17,6 +17,12 @@ dist-ssr/
 .nitro
 
 # ==============================
+# TypeScript build info
+# ==============================
+*.tsbuildinfo
+src/routeTree.gen.ts
+
+# ==============================
 # Environment & secrets
 # ==============================
 .env
