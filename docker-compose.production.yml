@@ -1,0 +1,206 @@
+# Docker Compose file for production (Docker Swarm)
+# Deploy with: docker stack deploy -c docker-compose.production.yml school-crm
+
+services:
+
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    command:
+      - "--providers.docker.swarmMode=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    networks:
+      - school-crm
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: school_crm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - school-crm
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - school-crm
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - school-crm
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+  minio-init:
+    image: minio/mc:latest
+    restart: no
+    entrypoint: >
+      sh -c "
+      until mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}; do sleep 2; done &&
+      mc mb local/school-crm --ignore-existing &&
+      echo 'MinIO bucket ready'
+      "
+    networks:
+      - school-crm
+    deploy:
+      restart_policy:
+        condition: none
+
+  backend:
+    image: school-crm-api:latest
+    build:
+      context: ./backend
+      target: production
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD}@postgres:5432/school_crm
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: school-crm
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 7d
+      CORS_ORIGIN: https://${FRONTEND_DOMAIN}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      FROM_EMAIL: ${FROM_EMAIL}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
+      WHATSAPP_API_VERSION: v22.0
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL}
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET}
+      LOG_LEVEL: info
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - minio-init
+    healthcheck:
+      test: ["CMD", "node", "--eval", "require('http').get('http://localhost:3000/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.backend.loadbalancer.server.port=3000"
+    networks:
+      - school-crm
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+  backend-worker:
+    image: school-crm-api:latest
+    restart: unless-stopped
+    command: ["node", "dist/jobs/worker.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD}@postgres:5432/school_crm
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: school-crm
+      JWT_SECRET: ${JWT_SECRET}
+      LOG_LEVEL: info
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - school-crm
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  letsencrypt:
+
+networks:
+  school-crm:
+    driver: overlay
