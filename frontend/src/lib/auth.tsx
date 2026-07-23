@@ -14,6 +14,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { FORMATEURS } from "@/lib/istpm-data";
 
 export type UserRole = "directeur" | "enseignant" | "responsable";
 
@@ -41,10 +42,26 @@ export const ROLE_META: Record<
   },
 };
 
+/**
+ * Formateur incarné par le rôle « enseignant ».
+ *
+ * Les examens enregistrent leur auteur : il faut donc que l'enseignant connecté
+ * corresponde à un formateur réel du jeu de données, sinon « créé par » ne
+ * pointerait vers personne.
+ */
+export const DEMO_FORMATEUR_ID = "fo-1";
+
+const demoFormateur = FORMATEURS.find((f) => f.id === DEMO_FORMATEUR_ID);
+
 /** Sample identity shown in the header for each role. */
 const ROLE_USER: Record<UserRole, { name: string; email: string }> = {
   directeur: { name: "Dr. Youssef Benali", email: "direction@istpm-agadir.ma" },
-  enseignant: { name: "Mme Salma Ait Taleb", email: "s.aittaleb@istpm-agadir.ma" },
+  enseignant: {
+    name: demoFormateur
+      ? `${demoFormateur.prenom} ${demoFormateur.nom}`
+      : "Formateur",
+    email: demoFormateur?.email ?? "formateur@istpm-agadir.ma",
+  },
   responsable: { name: "M. Rachid El Ouafi", email: "scolarite@istpm-agadir.ma" },
 };
 

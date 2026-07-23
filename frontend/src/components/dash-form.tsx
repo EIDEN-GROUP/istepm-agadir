@@ -5,7 +5,8 @@
  * from these so validation, spacing and error styling stay identical across
  * the app, and each page's form stays a short declarative list of fields.
  */
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import { FileText, Upload, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -225,6 +226,105 @@ export function parseList(v: string): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/**
+ * Dépôt de fichier.
+ *
+ * Gère deux états : un document déjà enregistré (`existing`) et une sélection
+ * en attente d'enregistrement (`file`). La création d'un examen n'ayant pas
+ * encore d'identifiant, le fichier est retenu ici puis écrit par l'appelant
+ * une fois l'examen créé.
+ */
+export function FileField({
+  label,
+  file,
+  onFile,
+  existing,
+  onRemoveExisting,
+  accept,
+  hint,
+  error,
+}: {
+  label: string;
+  file: File | null;
+  onFile: (f: File | null) => void;
+  existing?: { nom: string; taille: number } | null;
+  onRemoveExisting?: () => void;
+  accept?: string;
+  hint?: string;
+  error?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const current = file ?? existing ?? null;
+  const currentName = file ? file.name : (existing?.nom ?? null);
+  const currentSize = file ? file.size : (existing?.taille ?? 0);
+
+  return (
+    <FieldShell label={label} error={error}>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+      />
+
+      {current ? (
+        <div className="flex items-center gap-3 rounded-xl border border-brand/20 bg-brand/5 px-3 py-2.5">
+          <FileText className="h-4 w-4 shrink-0 text-brand" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-foreground">
+              {currentName}
+            </span>
+            <span className="block text-[11px] text-muted-foreground">
+              {formatBytes(currentSize)}
+              {file ? " · en attente d'enregistrement" : ""}
+            </span>
+          </span>
+          <button
+            type="button"
+            aria-label="Remplacer le fichier"
+            onClick={() => inputRef.current?.click()}
+            className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold text-brand-dk transition hover:bg-brand/10"
+          >
+            Remplacer
+          </button>
+          <button
+            type="button"
+            aria-label="Retirer le fichier"
+            onClick={() => {
+              if (file) onFile(null);
+              else onRemoveExisting?.();
+              if (inputRef.current) inputRef.current.value = "";
+            }}
+            className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition hover:bg-alert/10 hover:text-alert"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-brand/35 bg-card px-3 py-5 text-sm font-medium text-muted-foreground transition hover:border-brand hover:bg-brand/5 hover:text-brand-dk"
+        >
+          <Upload className="h-4 w-4" />
+          Choisir un fichier
+        </button>
+      )}
+
+      <p className="text-[11px] text-muted-foreground">
+        {hint ?? "PDF ou Word, 10 Mo maximum."}
+      </p>
+    </FieldShell>
+  );
+}
+
+function formatBytes(n: number) {
+  if (n < 1024) return `${n} o`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} Ko`;
+  return `${(n / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
 /* ------------------------------------------------------------------ */

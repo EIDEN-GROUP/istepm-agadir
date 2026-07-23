@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, BellRing } from "lucide-react";
+import { Plus, BellRing, Eye, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { useIstpm } from "@/lib/istpm-store";
 import {
@@ -10,6 +10,7 @@ import {
   fmtDate,
   fmtMAD,
   type LignePaiement,
+  type PaiementLigne,
   type StatutPaiement,
 } from "@/lib/istpm-data";
 import {
@@ -18,6 +19,9 @@ import {
   ghostPill,
   toneBadge,
   tableRow,
+  cellTruncate,
+  rowActions,
+  iconButton,
   TONE_COLORS,
   dialogSurface,
 } from "@/lib/dash-ui";
@@ -27,6 +31,9 @@ import {
   FilterSelect,
   DataTable,
   DetailShell,
+  DetailSection,
+  DetailGrid,
+  DetailField,
   ALL,
 } from "@/components/dash-page";
 import {
@@ -61,6 +68,7 @@ function PaiementsPage() {
   const [statut, setStatut] = useState<string>(ALL);
   const [addOpen, setAddOpen] = useState(false);
   const [relanceOpen, setRelanceOpen] = useState(false);
+  const [detail, setDetail] = useState<PaiementLigne | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -156,53 +164,97 @@ function PaiementsPage() {
         empty="Aucun paiement ne correspond à ces critères."
         head={
           <>
-            <th className="px-4 py-3.5">Étudiant</th>
-            <th className="px-4 py-3.5">Filière / niveau</th>
-            <th className="px-4 py-3.5 text-right">Montant</th>
-            <th className="px-4 py-3.5">Date</th>
-            <th className="px-4 py-3.5">Mode</th>
-            <th className="px-4 py-3.5">Période</th>
-            <th className="px-4 py-3.5">Reçu</th>
-            <th className="px-4 py-3.5">Statut</th>
+            <th>Étudiant</th>
+            <th>Filière</th>
+            <th className="text-right">Montant</th>
+            <th>Date</th>
+            <th>Mode</th>
+            <th>Statut</th>
+            <th className="w-20 text-center">Actions</th>
           </>
         }
       >
         {filtered.map((p) => (
-          <tr key={p.id} className={cn(tableRow, "cursor-default")}>
+          <tr key={p.id} onClick={() => setDetail(p)} className={tableRow}>
             <td
-              className="border-l-[3px] px-4 py-3.5"
+              className={cn("border-l-[3px] font-medium", cellTruncate)}
               style={{
                 borderLeftColor: TONE_COLORS[STATUT_PAIEMENT_TONE[p.statut]],
               }}
             >
-              <span className="block font-medium">{p.etudiant}</span>
-              <span className="text-xs tabular-nums text-muted-foreground">
-                {p.cne}
-              </span>
+              {p.etudiant}
             </td>
-            <td className="px-4 py-3.5 text-muted-foreground">
-              <span className="block">{p.filiere}</span>
-              <span className="text-xs">{p.niveau}</span>
+            <td className={cn("text-muted-foreground", cellTruncate)}>
+              {p.filiere}
             </td>
-            <td className="px-4 py-3.5 text-right font-semibold tabular-nums">
+            <td className="text-right font-semibold tabular-nums">
               {fmtMAD(p.montant)}
             </td>
-            <td className="px-4 py-3.5 whitespace-nowrap text-muted-foreground">
-              {fmtDate(p.date)}
-            </td>
-            <td className="px-4 py-3.5 text-muted-foreground">{p.mode}</td>
-            <td className="px-4 py-3.5 text-muted-foreground">{p.periode}</td>
-            <td className="px-4 py-3.5 text-xs tabular-nums text-muted-foreground">
-              {p.recu}
-            </td>
-            <td className="px-4 py-3.5">
+            <td className="text-muted-foreground">{fmtDate(p.date)}</td>
+            <td className="text-muted-foreground">{p.mode}</td>
+            <td>
               <span className={toneBadge(STATUT_PAIEMENT_TONE[p.statut])}>
                 {STATUT_PAIEMENT_LABEL[p.statut]}
               </span>
             </td>
+            <td
+              className="text-center"
+              onClick={(ev) => ev.stopPropagation()}
+            >
+              <div className={rowActions}>
+                <button
+                  className={iconButton}
+                  aria-label="Voir le détail"
+                  onClick={() => setDetail(p)}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </td>
           </tr>
         ))}
       </DataTable>
+
+      {/* Détail d'un règlement */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className={dialogSurface}>
+          <DialogTitle className="sr-only">Détail du paiement</DialogTitle>
+          <DialogDescription className="sr-only">
+            Règlement sélectionné
+          </DialogDescription>
+          {detail ? (
+            <DetailShell
+              icon={<Receipt className="h-5 w-5" />}
+              title={fmtMAD(detail.montant)}
+              subtitle={`${detail.etudiant} · ${detail.cne}`}
+              badges={
+                <span className={toneBadge(STATUT_PAIEMENT_TONE[detail.statut])}>
+                  {STATUT_PAIEMENT_LABEL[detail.statut]}
+                </span>
+              }
+            >
+              <DetailSection title="Règlement">
+                <DetailGrid>
+                  <DetailField label="Montant" value={fmtMAD(detail.montant)} />
+                  <DetailField label="Date" value={fmtDate(detail.date)} />
+                  <DetailField label="Mode" value={detail.mode} />
+                  <DetailField label="Période" value={detail.periode} />
+                  <DetailField label="N° de reçu" value={detail.recu} full />
+                </DetailGrid>
+              </DetailSection>
+
+              <DetailSection title="Étudiant">
+                <DetailGrid>
+                  <DetailField label="Nom" value={detail.etudiant} />
+                  <DetailField label="CNE" value={detail.cne} />
+                  <DetailField label="Filière" value={detail.filiere} />
+                  <DetailField label="Niveau" value={detail.niveau} />
+                </DetailGrid>
+              </DetailSection>
+            </DetailShell>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       {addOpen ? (
         <PaiementForm

@@ -23,6 +23,9 @@ import {
   toneBadge,
   dialogSurfaceWide,
   tableRow,
+  cellTruncate,
+  rowActions,
+  initials,
   TONE_COLORS,
 } from "@/lib/dash-ui";
 import {
@@ -31,6 +34,9 @@ import {
   FilterSelect,
   DataTable,
   DetailSection,
+  DetailGrid,
+  DetailField,
+  DetailTable,
   DetailRow,
   DetailShell,
   ALL,
@@ -88,7 +94,7 @@ function printBulletin(b: Bulletin) {
            border-bottom:1px solid #d6efee;padding:6px 0;}
   .clin{background:#f1f9f9;font-weight:600;}
 </style></head><body>
-<h1>ISTPM Agadir — Bulletin de notes</h1>
+<h1>ISTEPM Agadir  — Bulletin de notes</h1>
 <div class="sub">Institut spécialisé des techniques paramédicales</div>
 <div class="sum">
   <div><span>Étudiant</span><strong>${b.prenom} ${b.nom}</strong></div>
@@ -209,65 +215,55 @@ function BulletinsPage() {
         empty="Aucun bulletin ne correspond à ces critères."
         head={
           <>
-            <th className="px-4 py-3.5">Étudiant</th>
-            <th className="px-4 py-3.5">Filière / niveau</th>
-            <th className="px-4 py-3.5">Session</th>
-            <th className="px-4 py-3.5 text-right">Moyenne</th>
-            <th className="px-4 py-3.5">Mention</th>
-            <th className="px-4 py-3.5">Décision</th>
-            <th className="px-4 py-3.5">Statut</th>
-            <th className="w-36 px-4 py-3.5 text-center">Actions</th>
+            <th>Étudiant</th>
+            <th className="text-center">Niveau</th>
+            <th className="text-right">Moyenne</th>
+            <th>Mention</th>
+            <th>Décision</th>
+            <th>Statut</th>
+            <th className="w-36 text-center">Actions</th>
           </>
         }
       >
         {filtered.map((b) => (
           <tr key={b.id} onClick={() => setDetail(b)} className={tableRow}>
             <td
-              className="border-l-[3px] px-4 py-3.5"
+              className={cn("border-l-[3px] font-medium", cellTruncate)}
               style={{ borderLeftColor: TONE_COLORS[DECISION_TONE[b.decision]] }}
             >
-              <span className="block font-medium">
-                {b.prenom} {b.nom}
-              </span>
-              <span className="text-xs tabular-nums text-muted-foreground">
-                {b.cne}
-              </span>
+              {b.prenom} {b.nom}
             </td>
-            <td className="px-4 py-3.5 text-muted-foreground">
-              <span className="block">{b.filiere}</span>
-              <span className="text-xs">{b.niveau}</span>
-            </td>
-            <td className="px-4 py-3.5 capitalize text-muted-foreground">
-              {b.session}
+            <td className="text-center tabular-nums text-muted-foreground">
+              {b.niveau}
             </td>
             <td
               className={cn(
-                "px-4 py-3.5 text-right font-semibold tabular-nums",
+                "text-right font-semibold tabular-nums",
                 b.moyenne < 10 ? "text-alert" : "text-brand-dk",
               )}
             >
               {b.moyenne.toFixed(2)}
             </td>
-            <td className="px-4 py-3.5">
+            <td>
               <span className={toneBadge(MENTION_TONE[b.mention])}>
                 {b.mention}
               </span>
             </td>
-            <td className="px-4 py-3.5">
+            <td>
               <span className={toneBadge(DECISION_TONE[b.decision])}>
                 {b.decision}
               </span>
             </td>
-            <td className="px-4 py-3.5">
+            <td>
               <span className={toneBadge(STATUT_BULLETIN_TONE[b.statut])}>
                 {STATUT_BULLETIN_LABEL[b.statut]}
               </span>
             </td>
             <td
-              className="px-4 py-3.5 text-center"
+              className="text-center"
               onClick={(ev) => ev.stopPropagation()}
             >
-              <div className="flex items-center justify-center gap-1">
+              <div className={rowActions}>
                 <button
                   className={iconButton}
                   aria-label="Voir le bulletin"
@@ -479,8 +475,22 @@ function BulletinDetail({
 
   return (
     <DetailShell
+      icon={initials(`${b.prenom} ${b.nom}`)}
       title={`${b.prenom} ${b.nom}`}
-      subtitle={`${b.cne} · ${b.filiere} · ${b.niveau} · session ${b.session}`}
+      subtitle={`${b.cne} · ${b.filiere}`}
+      badges={
+        <>
+          <span className={toneBadge(DECISION_TONE[b.decision])}>
+            {b.decision}
+          </span>
+          <span className={toneBadge(MENTION_TONE[b.mention])}>
+            {b.mention}
+          </span>
+          <span className={toneBadge(STATUT_BULLETIN_TONE[b.statut])}>
+            {STATUT_BULLETIN_LABEL[b.statut]}
+          </span>
+        </>
+      }
       footer={
         <div className="flex items-center justify-end gap-2">
           <button
@@ -497,100 +507,79 @@ function BulletinDetail({
         </div>
       }
     >
-      <div className="flex flex-wrap gap-2">
-        <span className={toneBadge(DECISION_TONE[b.decision])}>
-          {b.decision}
-        </span>
-        <span className={toneBadge(MENTION_TONE[b.mention])}>{b.mention}</span>
-        <span className={toneBadge(STATUT_BULLETIN_TONE[b.statut])}>
-          {STATUT_BULLETIN_LABEL[b.statut]}
-        </span>
-      </div>
-
       <DetailSection title="Synthèse">
-        <div>
-          <DetailRow
-            label="Moyenne générale"
-            value={
-              <span className={b.moyenne < 10 ? "text-alert" : "text-brand-dk"}>
-                {b.moyenne.toFixed(2)} / 20
-              </span>
-            }
+        <DetailGrid>
+          <DetailField label="CNE" value={b.cne} />
+          <DetailField label="Filière" value={b.filiere} />
+          <DetailField label="Niveau" value={b.niveau} />
+          <DetailField
+            label="Session"
+            value={<span className="capitalize">{b.session}</span>}
           />
-          <DetailRow
+          <DetailField
+            label="Moyenne générale"
+            value={`${b.moyenne.toFixed(2)} / 20`}
+            tone={b.moyenne < 10 ? "negative" : "positive"}
+          />
+          <DetailField
             label="Crédits validés"
             value={`${creditsValides} / ${totalCredits}`}
           />
-          <DetailRow
-            label="Évaluation clinique / pratique"
-            value={
-              <span
-                className={
-                  b.evaluationClinique < 10 ? "text-alert" : "text-brand-dk"
-                }
-              >
-                {b.evaluationClinique.toFixed(2)} / 20
-              </span>
-            }
-          />
-        </div>
+        </DetailGrid>
       </DetailSection>
 
       <DetailSection title="Notes par module">
-        <div className="overflow-hidden rounded-2xl border border-brand/12">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-brand/12 bg-muted text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <th className="px-3 py-2">Module</th>
-                <th className="px-3 py-2 text-right">Note</th>
-                <th className="px-3 py-2 text-right">Coef.</th>
-                <th className="px-3 py-2 text-right">Crédits</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand/8">
-              {b.notes.map((n) => (
-                <tr key={n.module}>
-                  <td className="px-3 py-2">{n.module}</td>
-                  <td
-                    className={cn(
-                      "px-3 py-2 text-right font-semibold tabular-nums",
-                      n.note < 10 ? "text-alert" : "text-brand-dk",
-                    )}
-                  >
-                    {n.note.toFixed(2)}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                    {n.coef}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                    {n.credits}
-                  </td>
-                </tr>
-              ))}
-              {/* The clinical/practical evaluation is graded separately from the
-                  taught modules but appears on the same transcript. */}
-              <tr className="bg-brand/8">
-                <td className="px-3 py-2 font-medium">
-                  Évaluation clinique / pratique
-                </td>
-                <td
-                  className={cn(
-                    "px-3 py-2 text-right font-semibold tabular-nums",
-                    b.evaluationClinique < 10 ? "text-alert" : "text-brand-dk",
-                  )}
-                >
-                  {b.evaluationClinique.toFixed(2)}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                  2
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                  4
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DetailTable
+          head={
+            <>
+              <th className="px-3 py-2">Module</th>
+              <th className="px-3 py-2 text-right">Note</th>
+              <th className="px-3 py-2 text-right">Coef.</th>
+              <th className="px-3 py-2 text-right">Crédits</th>
+            </>
+          }
+        >
+          {b.notes.map((n) => (
+            <tr key={n.module}>
+              <td className="px-3 py-2">{n.module}</td>
+              <td
+                className={cn(
+                  "px-3 py-2 text-right font-semibold tabular-nums",
+                  n.note < 10 ? "text-alert" : "text-brand-dk",
+                )}
+              >
+                {n.note.toFixed(2)}
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                {n.coef}
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                {n.credits}
+              </td>
+            </tr>
+          ))}
+          {/* The clinical/practical evaluation is graded separately from the
+              taught modules but appears on the same transcript. */}
+          <tr className="bg-brand/8">
+            <td className="px-3 py-2 font-medium">
+              Évaluation clinique / pratique
+            </td>
+            <td
+              className={cn(
+                "px-3 py-2 text-right font-semibold tabular-nums",
+                b.evaluationClinique < 10 ? "text-alert" : "text-brand-dk",
+              )}
+            >
+              {b.evaluationClinique.toFixed(2)}
+            </td>
+            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+              2
+            </td>
+            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+              4
+            </td>
+          </tr>
+        </DetailTable>
       </DetailSection>
     </DetailShell>
   );

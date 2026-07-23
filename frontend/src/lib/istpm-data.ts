@@ -735,161 +735,357 @@ export const STATUT_EXAMEN_TONE: Record<StatutExamen, BadgeTone> = {
   notes_saisies: "teal",
 };
 
+/**
+ * Métadonnées du sujet d'examen déposé par le formateur.
+ *
+ * Le fichier lui-même n'est pas ici : il est conservé dans IndexedDB
+ * (voir `doc-store.ts`), car un PDF ne tient pas dans le localStorage.
+ * `id` est la clé qui relie les deux.
+ */
+export type ExamDocument = {
+  id: string;
+  nom: string;
+  /** Taille en octets. */
+  taille: number;
+  mime: string;
+  /** ISO — date de dépôt. */
+  uploadedAt: string;
+};
+
+export const ANNEES_UNIVERSITAIRES = [
+  "2025/2026",
+  "2024/2025",
+  "2023/2024",
+] as const;
+export type AnneeUniversitaire = (typeof ANNEES_UNIVERSITAIRES)[number];
+
 export type Examen = {
   id: string;
+  titre: string;
   module: string;
   filiere: Filiere;
+  /** Le niveau tient lieu de semestre (S1–S6). */
   niveau: Niveau;
+  /** Classe / groupe convoqué, ex. « S5-G1 ». */
+  classe: string;
+  anneeUniversitaire: string;
   type: TypeExamen;
   date: string;
   heure: string;
+  /** Durée en minutes. */
+  duree: number;
   salle: string;
   surveillants: string[];
   statut: StatutExamen;
   etudiantsConvoques: number;
   composante: "Théorique" | "Pratique" | "Théorique + Pratique";
+  description?: string;
+  /** Identifiant du formateur auteur — renseigné automatiquement. */
+  createdBy: string;
+  document?: ExamDocument;
 };
+
+/** Durées proposées à la création (minutes). */
+export const DUREES_EXAMEN = [30, 45, 60, 90, 120, 150, 180, 240] as const;
+
+export function fmtDuree(minutes: number): string {
+  if (!minutes) return "—";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (!h) return `${m} min`;
+  return m ? `${h} h ${String(m).padStart(2, "0")}` : `${h} h`;
+}
+
+export function fmtTaille(octets: number): string {
+  if (octets < 1024) return `${octets} o`;
+  if (octets < 1024 * 1024) return `${Math.round(octets / 1024)} Ko`;
+  return `${(octets / (1024 * 1024)).toFixed(1)} Mo`;
+}
 
 export const EXAMENS: Examen[] = [
   {
     id: "ex-1",
+    titre: "Examen final — Soins infirmiers en médecine",
     module: "Soins infirmiers en médecine",
     filiere: "Infirmier polyvalent",
     niveau: "S5",
+    classe: "S5-G1",
+    anneeUniversitaire: "2025/2026",
     type: "examen_theorique",
     date: "2026-07-28",
     heure: "09:00",
+    duree: 120,
     salle: "Amphi A",
     surveillants: ["S. El Idrissi", "M. El Khattabi"],
     statut: "planifie",
     etudiantsConvoques: 32,
     composante: "Théorique + Pratique",
+    description:
+      "Épreuve théorique (2 h) suivie d'une mise en situation clinique au laboratoire de simulation.",
+    createdBy: "fo-1",
+    document: {
+      id: "doc-ex-1",
+      nom: "sujet-soins-infirmiers-S5.pdf",
+      taille: 912,
+      mime: "application/pdf",
+      uploadedAt: "2026-07-20",
+    },
   },
   {
     id: "ex-2",
+    titre: "Évaluation pratique — Réanimation et soins intensifs",
     module: "Réanimation et soins intensifs",
     filiere: "Infirmier en anesthésie-réanimation",
     niveau: "S5",
+    classe: "S5-G1",
+    anneeUniversitaire: "2025/2026",
     type: "evaluation_pratique",
     date: "2026-07-29",
     heure: "08:30",
+    duree: 90,
     salle: "Labo simulation 2",
     surveillants: ["R. Benjelloun"],
     statut: "planifie",
     etudiantsConvoques: 24,
     composante: "Pratique",
+    description: "Prise en charge d'un arrêt cardiorespiratoire sur mannequin.",
+    createdBy: "fo-2",
+    document: {
+      id: "doc-ex-2",
+      nom: "grille-evaluation-reanimation.pdf",
+      taille: 912,
+      mime: "application/pdf",
+      uploadedAt: "2026-07-21",
+    },
   },
   {
     id: "ex-3",
+    titre: "Contrôle continu — Obstétrique",
     module: "Obstétrique",
     filiere: "Sage-femme",
     niveau: "S3",
+    classe: "S3-G2",
+    anneeUniversitaire: "2025/2026",
     type: "controle_continu",
     date: "2026-07-24",
     heure: "10:00",
+    duree: 60,
     salle: "Salle 12",
     surveillants: ["N. Ait Hammou"],
     statut: "en_cours",
     etudiantsConvoques: 28,
     composante: "Théorique",
+    createdBy: "fo-3",
+    document: {
+      id: "doc-ex-3",
+      nom: "cc-obstetrique-S3.pdf",
+      taille: 912,
+      mime: "application/pdf",
+      uploadedAt: "2026-07-18",
+    },
   },
   {
     id: "ex-4",
+    titre: "Évaluation pratique — Rééducation fonctionnelle",
     module: "Rééducation fonctionnelle",
     filiere: "Kinésithérapie",
     niveau: "S3",
+    classe: "S3-G1",
+    anneeUniversitaire: "2025/2026",
     type: "evaluation_pratique",
     date: "2026-07-22",
     heure: "14:00",
+    duree: 90,
     salle: "Salle de rééducation",
     surveillants: ["H. Bouzid"],
     statut: "notes_saisies",
     etudiantsConvoques: 26,
     composante: "Pratique",
+    createdBy: "fo-4",
   },
   {
     id: "ex-5",
+    titre: "Examen final — Techniques de radiologie",
     module: "Techniques de radiologie",
     filiere: "Radiologie / Imagerie médicale",
     niveau: "S6",
+    classe: "S6-G1",
+    anneeUniversitaire: "2025/2026",
     type: "examen_theorique",
     date: "2026-07-30",
     heure: "09:00",
+    duree: 150,
     salle: "Amphi B",
     surveillants: ["L. Sekkat", "K. Tahiri"],
     statut: "planifie",
     etudiantsConvoques: 22,
     composante: "Théorique + Pratique",
+    description: "Interprétation de clichés et radioprotection.",
+    createdBy: "fo-5",
+    document: {
+      id: "doc-ex-5",
+      nom: "sujet-radiologie-S6.pdf",
+      taille: 912,
+      mime: "application/pdf",
+      uploadedAt: "2026-07-22",
+    },
   },
   {
     id: "ex-6",
+    titre: "Évaluation pratique — Hématologie",
     module: "Hématologie",
     filiere: "Laboratoire / Biologie médicale",
     niveau: "S6",
+    classe: "S6-G2",
+    anneeUniversitaire: "2025/2026",
     type: "evaluation_pratique",
     date: "2026-07-23",
     heure: "11:00",
+    duree: 120,
     salle: "Labo biologie",
     surveillants: ["K. Tahiri"],
     statut: "en_cours",
     etudiantsConvoques: 20,
     composante: "Pratique",
+    createdBy: "fo-6",
   },
   {
     id: "ex-7",
+    titre: "Contrôle continu — Anatomie dentaire",
     module: "Anatomie dentaire",
     filiere: "Prothèse dentaire",
     niveau: "S1",
+    classe: "S1-A",
+    anneeUniversitaire: "2025/2026",
     type: "controle_continu",
     date: "2026-07-21",
     heure: "10:30",
+    duree: 60,
     salle: "Salle 5",
     surveillants: ["A. Rochdi"],
     statut: "notes_saisies",
     etudiantsConvoques: 30,
     composante: "Théorique",
+    createdBy: "fo-7",
+    document: {
+      id: "doc-ex-7",
+      nom: "cc-anatomie-dentaire.pdf",
+      taille: 912,
+      mime: "application/pdf",
+      uploadedAt: "2026-07-15",
+    },
   },
   {
     id: "ex-8",
+    titre: "Rattrapage — Biochimie clinique",
     module: "Biochimie clinique",
     filiere: "Laboratoire / Biologie médicale",
     niveau: "S6",
+    classe: "S6-G2",
+    anneeUniversitaire: "2025/2026",
     type: "rattrapage",
     date: "2026-09-08",
     heure: "09:00",
+    duree: 120,
     salle: "Salle 9",
     surveillants: ["K. Tahiri"],
     statut: "planifie",
     etudiantsConvoques: 6,
     composante: "Théorique + Pratique",
+    description: "Session de rattrapage réservée aux étudiants ajournés.",
+    createdBy: "fo-6",
   },
   {
     id: "ex-9",
+    titre: "Examen final — Anesthésie clinique",
     module: "Anesthésie clinique",
     filiere: "Infirmier en anesthésie-réanimation",
     niveau: "S5",
+    classe: "S5-G1",
+    anneeUniversitaire: "2025/2026",
     type: "examen_theorique",
     date: "2026-07-27",
     heure: "08:30",
+    duree: 120,
     salle: "Amphi A",
     surveillants: ["R. Benjelloun", "S. El Idrissi"],
     statut: "planifie",
     etudiantsConvoques: 24,
     composante: "Théorique + Pratique",
+    createdBy: "fo-2",
+    document: {
+      id: "doc-ex-9",
+      nom: "sujet-anesthesie-clinique.pdf",
+      taille: 912,
+      mime: "application/pdf",
+      uploadedAt: "2026-07-19",
+    },
   },
   {
     id: "ex-10",
+    titre: "Évaluation pratique — Prothèse fixe (TP)",
     module: "Prothèse fixe (TP)",
     filiere: "Prothèse dentaire",
     niveau: "S1",
+    classe: "S1-A",
+    anneeUniversitaire: "2025/2026",
     type: "evaluation_pratique",
     date: "2026-07-25",
     heure: "14:00",
+    duree: 180,
     salle: "Atelier prothèse",
     surveillants: ["A. Rochdi"],
     statut: "planifie",
     etudiantsConvoques: 30,
     composante: "Pratique",
+    createdBy: "fo-7",
+  },
+  {
+    id: "ex-11",
+    titre: "Contrôle continu — Hygiène hospitalière",
+    module: "Hygiène hospitalière",
+    filiere: "Infirmier polyvalent",
+    niveau: "S5",
+    classe: "S5-G1",
+    anneeUniversitaire: "2025/2026",
+    type: "controle_continu",
+    date: "2026-07-26",
+    heure: "11:00",
+    duree: 60,
+    salle: "Salle 8",
+    surveillants: ["S. El Idrissi"],
+    statut: "planifie",
+    etudiantsConvoques: 32,
+    composante: "Théorique",
+    description:
+      "QCM sur les précautions standard et la chaîne de stérilisation.",
+    createdBy: "fo-1",
+    document: {
+      id: "doc-ex-11",
+      nom: "cc-hygiene-hospitaliere.pdf",
+      taille: 912,
+      mime: "application/pdf",
+      uploadedAt: "2026-07-23",
+    },
+  },
+  {
+    id: "ex-12",
+    titre: "Contrôle continu — Éthique et déontologie",
+    module: "Éthique et déontologie",
+    filiere: "Infirmier polyvalent",
+    niveau: "S1",
+    classe: "S1-B",
+    anneeUniversitaire: "2025/2026",
+    type: "controle_continu",
+    date: "2026-08-03",
+    heure: "09:30",
+    duree: 90,
+    salle: "Salle 3",
+    surveillants: ["S. El Idrissi"],
+    statut: "planifie",
+    etudiantsConvoques: 28,
+    composante: "Théorique",
+    createdBy: "fo-1",
   },
 ];
 

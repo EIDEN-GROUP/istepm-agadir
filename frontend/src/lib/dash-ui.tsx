@@ -75,7 +75,10 @@ export const iconButtonDanger =
  */
 export const dialogSurface =
   "flex flex-col gap-0 overflow-hidden rounded-3xl border border-brand/15 bg-card p-0 shadow-[0_35px_80px_-40px_rgb(var(--istpm-shadow)/0.5)] sm:rounded-3xl " +
-  "max-h-[min(90vh,720px)] w-[min(100vw-1.5rem,560px)] max-w-[min(100vw-1.5rem,560px)] " +
+  // Les `_` deviennent des espaces : `min()` exige des espaces autour du `-`,
+  // sans quoi la déclaration est invalide et ignorée — le dialogue gardait
+  // alors 560 px et débordait sur mobile.
+  "max-h-[min(90vh,720px)] w-[min(100vw_-_1.5rem,560px)] max-w-[min(100vw_-_1.5rem,560px)] " +
   "[&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-brand/20 [&>button]:bg-card [&>button]:opacity-100 [&>button]:hover:bg-muted [&>button]:focus:ring-0 [&>button]:focus:ring-offset-0";
 
 /**
@@ -86,7 +89,7 @@ export const dialogSurface =
  */
 export const dialogSurfaceWide =
   "flex flex-col gap-0 overflow-hidden rounded-3xl border border-brand/15 bg-card p-0 shadow-[0_35px_80px_-40px_rgb(var(--istpm-shadow)/0.5)] sm:rounded-3xl " +
-  "max-h-[min(90vh,720px)] w-[min(100vw-1.5rem,760px)] max-w-[min(100vw-1.5rem,760px)] " +
+  "max-h-[min(90vh,720px)] w-[min(100vw_-_1.5rem,760px)] max-w-[min(100vw_-_1.5rem,760px)] " +
   "[&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-brand/20 [&>button]:bg-card [&>button]:opacity-100 [&>button]:hover:bg-muted [&>button]:focus:ring-0 [&>button]:focus:ring-offset-0";
 
 /** Recharts tooltip content style   matches the soft card language. */
@@ -214,11 +217,24 @@ export function initials(name: string) {
 export const avatarChip =
   "grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand/15 text-[11px] font-bold text-brand-dk";
 
-/** Shared table shell classes   used by every list page. */
+/**
+ * Shared table shell classes   used by every list page.
+ *
+ * Les lignes tiennent sur **une seule ligne de texte** : chaque cellule est en
+ * `whitespace-nowrap`, et le détail complet se lit dans la fiche. Cela garde
+ * une hauteur de ligne constante et un balayage vertical rapide.
+ */
 export const tableWrap = "overflow-x-auto";
 export const tableEl =
-  "w-full min-w-[900px] text-left text-sm [&_th]:border-r [&_th]:border-brand/12 [&_td]:border-r [&_td]:border-brand/8";
+  "w-full min-w-[900px] text-left text-sm [&_th]:border-r [&_th]:border-brand/12 [&_td]:border-r [&_td]:border-brand/8 " +
+  "[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap [&_td]:px-4 [&_td]:py-3 [&_th]:px-4 [&_th]:py-3";
 export const tableHead =
   "border-b border-brand/15 bg-muted text-[11px] font-semibold uppercase tracking-wider text-muted-foreground";
 export const tableBody = "divide-y divide-brand/8";
-export const tableRow = "cursor-pointer transition-colors hover:bg-brand/8";
+export const tableRow =
+  "h-14 cursor-pointer transition-colors hover:bg-brand/8";
+
+/** Cellule dont le contenu peut être long : tronquée plutôt que repliée. */
+export const cellTruncate = "max-w-[15rem] truncate";
+/** Groupe de boutons d'action, centré dans sa cellule. */
+export const rowActions = "flex items-center justify-center gap-1";

@@ -21,11 +21,11 @@ function LoginPage() {
         <div className="flex flex-col items-center text-center">
           <img
             src="/istpm-logo-mark.svg"
-            alt="ISTPM Agadir"
+            alt="ISTEPM Agadir "
             className="h-20 w-20"
           />
           <h1 className="mt-4 font-display text-2xl font-bold tracking-tight text-foreground">
-            ISTPM Agadir
+            ISTEPM Agadir 
           </h1>
           <p className="mt-1 text-sm leading-snug text-muted-foreground">
             Institut spécialisé des techniques paramédicales

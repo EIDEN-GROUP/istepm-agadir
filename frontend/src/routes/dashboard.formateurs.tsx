@@ -22,6 +22,8 @@ import {
   initials,
   dialogSurface,
   tableRow,
+  cellTruncate,
+  rowActions,
 } from "@/lib/dash-ui";
 import {
   PageHeader,
@@ -29,7 +31,10 @@ import {
   FilterSelect,
   DataTable,
   DetailSection,
-  DetailRow,
+  DetailGrid,
+  DetailField,
+  DetailEmpty,
+
   DetailShell,
   ALL,
 } from "@/components/dash-page";
@@ -48,6 +53,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 const GRADES: GradeFormateur[] = ["PES", "vacataire", "formateur_clinique"];
 const STATUTS: StatutFormateur[] = ["permanent", "vacataire", "en_conge"];
@@ -121,64 +127,46 @@ function FormateursPage() {
         empty="Aucun formateur ne correspond à ces critères."
         head={
           <>
-            <th className="px-4 py-3.5">Matricule</th>
-            <th className="px-4 py-3.5">Nom &amp; prénom</th>
-            <th className="px-4 py-3.5">Grade</th>
-            <th className="px-4 py-3.5">Département / filière</th>
-            <th className="px-4 py-3.5 text-center">Modules</th>
-            <th className="px-4 py-3.5">Groupes</th>
-            <th className="px-4 py-3.5">Statut</th>
-            <th className="w-28 px-4 py-3.5 text-center">Actions</th>
+            <th>Matricule</th>
+            <th>Nom &amp; prénom</th>
+            <th>Grade</th>
+            <th>Département</th>
+            <th className="text-center">Modules</th>
+            <th>Statut</th>
+            <th className="w-28 text-center">Actions</th>
           </>
         }
       >
         {filtered.map((f) => (
           <tr key={f.id} onClick={() => setDetail(f)} className={tableRow}>
-            <td className="px-4 py-3.5">
-              <span className="block font-medium tabular-nums">
-                {f.matricule}
-              </span>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                CIN {f.cin || "—"}
-              </span>
-            </td>
-            <td className="px-4 py-3.5">
+            <td className="font-medium tabular-nums">{f.matricule}</td>
+            <td>
               <span className="flex items-center gap-2.5">
                 <span className={avatarChip}>
                   {initials(`${f.prenom} ${f.nom}`)}
                 </span>
-                <span className="min-w-0">
-                  <span className="block font-medium">
-                    {f.prenom} {f.nom}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {f.email}
-                  </span>
+                <span className={cn("font-medium", cellTruncate)}>
+                  {f.prenom} {f.nom}
                 </span>
               </span>
             </td>
-            <td className="px-4 py-3.5 text-muted-foreground">
-              {GRADE_LABEL[f.grade]}
-            </td>
-            <td className="px-4 py-3.5 text-muted-foreground">
+            <td className="text-muted-foreground">{GRADE_LABEL[f.grade]}</td>
+            <td className={cn("text-muted-foreground", cellTruncate)}>
               {f.departement}
             </td>
-            <td className="px-4 py-3.5 text-center font-medium tabular-nums">
+            <td className="text-center font-medium tabular-nums">
               {f.modules.length}
             </td>
-            <td className="px-4 py-3.5 text-muted-foreground">
-              {f.groupes.join(", ")}
-            </td>
-            <td className="px-4 py-3.5">
+            <td>
               <span className={toneBadge(STATUT_FORMATEUR_TONE[f.statut])}>
                 {STATUT_FORMATEUR_LABEL[f.statut]}
               </span>
             </td>
             <td
-              className="px-4 py-3.5 text-center"
+              className="text-center"
               onClick={(ev) => ev.stopPropagation()}
             >
-              <div className="flex items-center justify-center gap-1">
+              <div className={rowActions}>
                 <button
                   className={iconButton}
                   aria-label="Voir la fiche"
@@ -220,52 +208,63 @@ function FormateursPage() {
                 const f = formateurs.find((x) => x.id === detail.id) ?? detail;
                 return (
                   <DetailShell
+                    icon={initials(`${f.prenom} ${f.nom}`)}
                     title={`${f.prenom} ${f.nom}`}
-                    subtitle={`${f.matricule} · ${GRADE_LABEL[f.grade]} · ${f.departement}`}
+                    subtitle={`${f.matricule} · ${f.departement}`}
+                    badges={
+                      <>
+                        <span
+                          className={toneBadge(STATUT_FORMATEUR_TONE[f.statut])}
+                        >
+                          {STATUT_FORMATEUR_LABEL[f.statut]}
+                        </span>
+                        <span className={toneBadge("neutral")}>
+                          {GRADE_LABEL[f.grade]}
+                        </span>
+                        <span className={toneBadge("blue")}>
+                          {f.notesSaisies} notes saisies
+                        </span>
+                      </>
+                    }
                   >
-                    <div className="flex flex-wrap gap-2">
-                      <span
-                        className={toneBadge(STATUT_FORMATEUR_TONE[f.statut])}
-                      >
-                        {STATUT_FORMATEUR_LABEL[f.statut]}
-                      </span>
-                      <span className={toneBadge("blue")}>
-                        {f.notesSaisies} notes saisies
-                      </span>
-                    </div>
-
                     <DetailSection title="Identité">
-                      <div>
-                        <DetailRow label="Matricule" value={f.matricule} />
-                        <DetailRow label="CIN" value={f.cin || "—"} />
-                      </div>
+                      <DetailGrid>
+                        <DetailField label="Matricule" value={f.matricule} />
+                        <DetailField label="CIN" value={f.cin} />
+                        <DetailField
+                          label="Grade"
+                          value={GRADE_LABEL[f.grade]}
+                        />
+                        <DetailField
+                          label="Département / filière"
+                          value={f.departement}
+                        />
+                      </DetailGrid>
                     </DetailSection>
 
                     <DetailSection title="Contact">
-                      <div>
-                        <DetailRow label="Téléphone" value={f.telephone || "—"} />
-                        <DetailRow label="E-mail" value={f.email || "—"} />
-                      </div>
+                      <DetailGrid>
+                        <DetailField label="Téléphone" value={f.telephone} />
+                        <DetailField label="E-mail" value={f.email} />
+                      </DetailGrid>
                     </DetailSection>
 
                     <DetailSection
                       title={`Modules enseignés (${f.modules.length})`}
                     >
                       {f.modules.length ? (
-                        <ul className="space-y-1.5">
+                        <ul className="grid gap-1.5 sm:grid-cols-2">
                           {f.modules.map((m) => (
                             <li
                               key={m}
-                              className="rounded-xl bg-muted px-3 py-2 text-sm text-foreground"
+                              className="rounded-xl border border-brand/12 bg-muted px-3 py-2 text-sm text-foreground"
                             >
                               {m}
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-sm text-muted-foreground">
-                          Aucun module affecté.
-                        </p>
+                        <DetailEmpty>Aucun module affecté.</DetailEmpty>
                       )}
                     </DetailSection>
 
@@ -275,16 +274,14 @@ function FormateursPage() {
                           {f.groupes.map((g) => (
                             <span
                               key={g}
-                              className="rounded-full bg-brand/12 px-3 py-1 text-xs font-semibold text-brand-dk"
+                              className="rounded-full bg-brand/12 px-3 py-1.5 text-xs font-semibold text-brand-dk"
                             >
                               {g}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground">
-                          Aucun groupe affecté.
-                        </p>
+                        <DetailEmpty>Aucun groupe affecté.</DetailEmpty>
                       )}
                     </DetailSection>
                   </DetailShell>

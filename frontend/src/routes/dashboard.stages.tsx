@@ -23,6 +23,9 @@ import {
   toneBadge,
   dialogSurface,
   tableRow,
+  cellTruncate,
+  rowActions,
+  initials,
   TONE_COLORS,
 } from "@/lib/dash-ui";
 import {
@@ -31,7 +34,9 @@ import {
   FilterSelect,
   DataTable,
   DetailSection,
-  DetailRow,
+  DetailGrid,
+  DetailField,
+
   DetailShell,
   ALL,
 } from "@/components/dash-page";
@@ -49,6 +54,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 const STATUTS: StatutStage[] = [
   "recherche",
@@ -142,54 +148,42 @@ function StagesPage() {
         empty="Aucun stage ne correspond à ces critères."
         head={
           <>
-            <th className="px-4 py-3.5">Étudiant</th>
-            <th className="px-4 py-3.5">Filière / niveau</th>
-            <th className="px-4 py-3.5">Structure d'accueil</th>
-            <th className="px-4 py-3.5">Service</th>
-            <th className="px-4 py-3.5">Encadrant clinique</th>
-            <th className="px-4 py-3.5">Période</th>
-            <th className="px-4 py-3.5">Statut</th>
-            <th className="w-28 px-4 py-3.5 text-center">Actions</th>
+            <th>Étudiant</th>
+            <th>Structure d'accueil</th>
+            <th>Service</th>
+            <th>Période</th>
+            <th>Statut</th>
+            <th className="w-28 text-center">Actions</th>
           </>
         }
       >
         {filtered.map((s) => (
           <tr key={s.id} onClick={() => setDetail(s)} className={tableRow}>
             <td
-              className="border-l-[3px] px-4 py-3.5"
+              className={cn("border-l-[3px] font-medium", cellTruncate)}
               style={{
                 borderLeftColor: TONE_COLORS[STATUT_STAGE_TONE[s.statut]],
               }}
             >
-              <span className="block font-medium">
-                {s.prenom} {s.nom}
-              </span>
-              <span className="text-xs tabular-nums text-muted-foreground">
-                {s.cne}
-              </span>
+              {s.prenom} {s.nom}
             </td>
-            <td className="px-4 py-3.5 text-muted-foreground">
-              <span className="block">{s.filiere}</span>
-              <span className="text-xs">{s.niveau}</span>
+            <td className={cellTruncate}>{s.structure}</td>
+            <td className={cn("text-muted-foreground", cellTruncate)}>
+              {s.service}
             </td>
-            <td className="px-4 py-3.5">{s.structure}</td>
-            <td className="px-4 py-3.5 text-muted-foreground">{s.service}</td>
-            <td className="px-4 py-3.5 text-muted-foreground">
-              {s.encadrantClinique}
-            </td>
-            <td className="px-4 py-3.5 whitespace-nowrap text-muted-foreground">
+            <td className="text-muted-foreground">
               {fmtDate(s.debut)} → {fmtDate(s.fin)}
             </td>
-            <td className="px-4 py-3.5">
+            <td>
               <span className={toneBadge(STATUT_STAGE_TONE[s.statut])}>
                 {STATUT_STAGE_LABEL[s.statut]}
               </span>
             </td>
             <td
-              className="px-4 py-3.5 text-center"
+              className="text-center"
               onClick={(ev) => ev.stopPropagation()}
             >
-              <div className="flex items-center justify-center gap-1">
+              <div className={rowActions}>
                 <button
                   className={iconButton}
                   aria-label="Voir le détail"
@@ -235,8 +229,25 @@ function StagesPage() {
                 const s = stages.find((x) => x.id === detail.id) ?? detail;
                 return (
                   <DetailShell
+                    icon={initials(`${s.prenom} ${s.nom}`)}
                     title={`${s.prenom} ${s.nom}`}
                     subtitle={`${s.cne} · ${s.filiere} · ${s.niveau}`}
+                    badges={
+                      <>
+                        <span className={toneBadge(STATUT_STAGE_TONE[s.statut])}>
+                          {STATUT_STAGE_LABEL[s.statut]}
+                        </span>
+                        <span
+                          className={toneBadge(
+                            s.conventionSignee ? "teal" : "red",
+                          )}
+                        >
+                          {s.conventionSignee
+                            ? "Convention signée"
+                            : "Convention en attente"}
+                        </span>
+                      </>
+                    }
                     footer={
                       <div className="flex flex-wrap items-center gap-2">
                         <button
@@ -275,67 +286,51 @@ function StagesPage() {
                       </div>
                     }
                   >
-                    <div className="flex flex-wrap gap-2">
-                      <span className={toneBadge(STATUT_STAGE_TONE[s.statut])}>
-                        {STATUT_STAGE_LABEL[s.statut]}
-                      </span>
-                      <span
-                        className={toneBadge(
-                          s.conventionSignee ? "teal" : "red",
-                        )}
-                      >
-                        {s.conventionSignee
-                          ? "Convention signée"
-                          : "Convention en attente"}
-                      </span>
-                    </div>
-
                     <DetailSection title="Lieu de stage">
-                      <div>
-                        <DetailRow
+                      <DetailGrid>
+                        <DetailField
                           label="Structure d'accueil"
                           value={s.structure}
+                          full
                         />
-                        <DetailRow label="Service" value={s.service} />
-                        <DetailRow label="Début" value={fmtDate(s.debut)} />
-                        <DetailRow label="Fin" value={fmtDate(s.fin)} />
-                      </div>
+                        <DetailField label="Service" value={s.service} />
+                        <DetailField label="Niveau" value={s.niveau} />
+                        <DetailField label="Début" value={fmtDate(s.debut)} />
+                        <DetailField label="Fin" value={fmtDate(s.fin)} />
+                      </DetailGrid>
                     </DetailSection>
 
                     <DetailSection title="Encadrement">
-                      <div>
-                        <DetailRow
+                      <DetailGrid>
+                        <DetailField
                           label="Tuteur clinique"
                           value={s.encadrantClinique}
                         />
-                        <DetailRow
+                        <DetailField
                           label="Tuteur académique"
                           value={s.tuteurAcademique}
                         />
-                      </div>
+                      </DetailGrid>
                     </DetailSection>
 
                     <DetailSection title="Soutenance">
-                      <div>
-                        <DetailRow
+                      <DetailGrid>
+                        <DetailField
                           label="Note de soutenance"
                           value={
-                            s.noteSoutenance !== undefined ? (
-                              <span
-                                className={
-                                  s.noteSoutenance < 10
-                                    ? "text-alert"
-                                    : "text-brand-dk"
-                                }
-                              >
-                                {s.noteSoutenance.toFixed(2)} / 20
-                              </span>
-                            ) : (
-                              "Non soutenu"
-                            )
+                            s.noteSoutenance !== undefined
+                              ? `${s.noteSoutenance.toFixed(2)} / 20`
+                              : "Non soutenu"
+                          }
+                          tone={
+                            s.noteSoutenance === undefined
+                              ? "muted"
+                              : s.noteSoutenance < 10
+                                ? "negative"
+                                : "positive"
                           }
                         />
-                      </div>
+                      </DetailGrid>
                     </DetailSection>
                   </DetailShell>
                 );

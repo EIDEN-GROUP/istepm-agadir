@@ -42,7 +42,14 @@ import {
   type PaiementLigne,
   type Mention,
   type Decision,
+  type ExamDocument,
 } from "@/lib/istpm-data";
+import {
+  deleteDoc,
+  ensureSeedDocuments,
+  putDoc,
+  MAX_DOC_SIZE,
+} from "@/lib/doc-store";
 
 /* ------------------------------------------------------------------ */
 /*  Persistance                                                        */
@@ -133,7 +140,8 @@ export type NouvelEtudiant = Omit<
   "id" | "moyenne" | "notes" | "historique"
 >;
 export type NouveauFormateur = Omit<Formateur, "id" | "notesSaisies">;
-export type NouvelExamen = Omit<Examen, "id">;
+/** `createdBy` et `document` sont posés par le store, pas par le formulaire. */
+export type NouvelExamen = Omit<Examen, "id" | "createdBy" | "document">;
 export type NouveauStage = Omit<Stage, "id">;
 
 /** Une note saisie pour un examen, par étudiant. */
@@ -192,10 +200,14 @@ type IstpmCtx = {
   updateFormateur: (id: string, patch: Partial<Formateur>) => void;
   deleteFormateur: (id: string) => void;
 
-  addExamen: (data: NouvelExamen) => Examen;
+  /** `createdBy` reçoit `auteurId` — l'auteur est toujours enregistré. */
+  addExamen: (data: NouvelExamen, auteurId: string) => Examen;
   updateExamen: (id: string, patch: Partial<Examen>) => void;
   deleteExamen: (id: string) => void;
   saveNotesExamen: (examenId: string, saisies: SaisieNote[]) => number;
+  /** Dépose le sujet : le fichier va dans IndexedDB, les métadonnées ici. */
+  attachDocument: (examenId: string, file: File) => Promise<void>;
+  removeDocument: (examenId: string) => Promise<void>;
 
   updateBulletin: (id: string, patch: Partial<Bulletin>) => void;
   publierBulletin: (id: string) => void;
@@ -222,6 +234,35 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   // reading storage during render carries none of the hydration risk that makes
   // the effect pattern worthwhile in the locale and role providers.
   const [snap, setSnap] = useState<Snapshot>(load);
+
+  // Crée les fichiers des sujets de démonstration absents d'IndexedDB, puis
+  // aligne la taille affichée sur celle du fichier réellement écrit.
+  useEffect(() => {
+    let cancelled = false;
+    ensureSeedDocuments(snap.examens).then((sizes) => {
+      if (cancelled || !Object.keys(sizes).length) return;
+      setSnap((s) => {
+        const stale = s.examens.some(
+          (x) => x.document && sizes[x.document.id] !== undefined
+            && sizes[x.document.id] !== x.document.taille,
+        );
+        if (!stale) return s;
+        return {
+          ...s,
+          examens: s.examens.map((x) =>
+            x.document && sizes[x.document.id] !== undefined
+              ? { ...x, document: { ...x.document, taille: sizes[x.document.id] } }
+              : x,
+          ),
+        };
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Une seule passe au montage : les dépôts ultérieurs gèrent leur fichier.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Skip the write triggered by the initial state, which would only rewrite
   // what was just read.
@@ -324,8 +365,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   /* ---------------- Examens ---------------- */
 
-  const addExamen = useCallback((data: NouvelExamen) => {
-    const examen: Examen = { ...data, id: uid("ex") };
+  const addExamen = useCallback((data: NouvelExamen, auteurId: string) => {
+    const examen: Examen = { ...data, id: uid("ex"), createdBy: auteurId };
     setSnap((s) => ({ ...s, examens: [examen, ...s.examens] }));
     return examen;
   }, []);
@@ -341,8 +382,60 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const deleteExamen = useCallback(
     (id: string) =>
-      setSnap((s) => ({ ...s, examens: s.examens.filter((x) => x.id !== id) })),
+      setSnap((s) => {
+        // Ne pas laisser le fichier orphelin dans IndexedDB.
+        const doc = s.examens.find((x) => x.id === id)?.document;
+        if (doc) void deleteDoc(doc.id).catch(() => {});
+        return { ...s, examens: s.examens.filter((x) => x.id !== id) };
+      }),
     [],
+  );
+
+  const attachDocument = useCallback(async (examenId: string, file: File) => {
+    if (file.size > MAX_DOC_SIZE) {
+      throw new Error(
+        `Fichier trop volumineux (max ${Math.round(MAX_DOC_SIZE / 1024 / 1024)} Mo)`,
+      );
+    }
+    // Une clé neuve à chaque dépôt : remplacer un sujet n'écrase pas l'ancien
+    // fichier tant que le nouveau n'est pas écrit sans erreur.
+    const docId = uid("doc");
+    await putDoc(docId, file);
+
+    const meta: ExamDocument = {
+      id: docId,
+      nom: file.name,
+      taille: file.size,
+      mime: file.type || "application/octet-stream",
+      uploadedAt: today(),
+    };
+
+    setSnap((s) => {
+      const previous = s.examens.find((x) => x.id === examenId)?.document;
+      if (previous) void deleteDoc(previous.id).catch(() => {});
+      return {
+        ...s,
+        examens: s.examens.map((x) =>
+          x.id === examenId ? { ...x, document: meta } : x,
+        ),
+      };
+    });
+  }, []);
+
+  // L'id est lu sur l'instantané de rendu, pas dans l'updater : React peut
+  // rejouer un updater (StrictMode), une valeur capturée dedans n'est pas fiable.
+  const removeDocument = useCallback(
+    async (examenId: string) => {
+      const docId = snap.examens.find((x) => x.id === examenId)?.document?.id;
+      setSnap((s) => ({
+        ...s,
+        examens: s.examens.map((x) =>
+          x.id === examenId ? { ...x, document: undefined } : x,
+        ),
+      }));
+      if (docId) await deleteDoc(docId).catch(() => {});
+    },
+    [snap.examens],
   );
 
   /**
@@ -661,6 +754,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     updateExamen,
     deleteExamen,
     saveNotesExamen,
+    attachDocument,
+    removeDocument,
     updateBulletin,
     publierBulletin,
     publierTousBulletins,

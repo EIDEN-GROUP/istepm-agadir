@@ -29,6 +29,8 @@ import {
   initials,
   dialogSurfaceWide,
   tableRow,
+  cellTruncate,
+  rowActions,
   TONE_COLORS,
 } from "@/lib/dash-ui";
 import {
@@ -37,6 +39,10 @@ import {
   FilterSelect,
   DataTable,
   DetailSection,
+  DetailGrid,
+  DetailField,
+  DetailTable,
+  DetailEmpty,
   DetailRow,
   DetailShell,
   ALL,
@@ -199,63 +205,55 @@ function EtudiantsPage() {
         empty="Aucun étudiant ne correspond à ces critères."
         head={
           <>
-            <th className="px-4 py-3.5">CNE / Matricule</th>
-            <th className="px-4 py-3.5">Nom &amp; prénom</th>
-            <th className="px-4 py-3.5">Filière</th>
-            <th className="px-4 py-3.5">Niveau</th>
-            <th className="px-4 py-3.5">Groupe</th>
-            <th className="px-4 py-3.5">Statut</th>
-            <th className="px-4 py-3.5">Paiement</th>
-            <th className="w-28 px-4 py-3.5 text-center">Actions</th>
+            <th>CNE</th>
+            <th>Nom &amp; prénom</th>
+            <th>Filière</th>
+            <th className="text-center">Niveau</th>
+            <th>Statut</th>
+            <th>Paiement</th>
+            <th className="w-28 text-center">Actions</th>
           </>
         }
       >
         {filtered.map((e) => (
           <tr key={e.id} onClick={() => setDetail(e)} className={tableRow}>
             <td
-              className="border-l-[3px] px-4 py-3.5"
+              className="border-l-[3px] font-medium tabular-nums"
               style={{
                 borderLeftColor: TONE_COLORS[STATUT_PAIEMENT_TONE[e.paiement]],
               }}
             >
-              <span className="block font-medium tabular-nums">{e.cne}</span>
-              <span className="text-xs text-muted-foreground">
-                {e.matricule}
-              </span>
+              {e.cne}
             </td>
-            <td className="px-4 py-3.5">
+            <td>
               <span className="flex items-center gap-2.5">
                 <span className={avatarChip}>
                   {initials(`${e.prenom} ${e.nom}`)}
                 </span>
-                <span className="min-w-0">
-                  <span className="block font-medium">
-                    {e.prenom} {e.nom}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {e.ville}
-                  </span>
+                <span className={cn("font-medium", cellTruncate)}>
+                  {e.prenom} {e.nom}
                 </span>
               </span>
             </td>
-            <td className="px-4 py-3.5 text-muted-foreground">{e.filiere}</td>
-            <td className="px-4 py-3.5 tabular-nums">{e.niveau}</td>
-            <td className="px-4 py-3.5 text-muted-foreground">{e.groupe}</td>
-            <td className="px-4 py-3.5">
+            <td className={cn("text-muted-foreground", cellTruncate)}>
+              {e.filiere}
+            </td>
+            <td className="text-center tabular-nums">{e.niveau}</td>
+            <td>
               <span className={toneBadge(STATUT_ETUDIANT_TONE[e.statut])}>
                 {STATUT_ETUDIANT_LABEL[e.statut]}
               </span>
             </td>
-            <td className="px-4 py-3.5">
+            <td>
               <span className={toneBadge(STATUT_PAIEMENT_TONE[e.paiement])}>
                 {STATUT_PAIEMENT_LABEL[e.paiement]}
               </span>
             </td>
             <td
-              className="px-4 py-3.5 text-center"
+              className="text-center"
               onClick={(ev) => ev.stopPropagation()}
             >
-              <div className="flex items-center justify-center gap-1">
+              <div className={rowActions}>
                 <button
                   className={iconButton}
                   aria-label="Voir la fiche"
@@ -583,138 +581,165 @@ function EtudiantForm({
 /* ------------------------------------------------------------------ */
 
 function EtudiantDetail({ e }: { e: Etudiant }) {
+  const paye = e.fraisAnnuels - e.resteAPayer;
+  const progression = e.fraisAnnuels
+    ? Math.round((paye / e.fraisAnnuels) * 100)
+    : 0;
+
   return (
     <DetailShell
+      icon={initials(`${e.prenom} ${e.nom}`)}
       title={`${e.prenom} ${e.nom}`}
-      subtitle={`${e.cne} · ${e.filiere} · ${e.niveau} · Groupe ${e.groupe}`}
+      subtitle={`${e.cne} · ${e.filiere}`}
+      badges={
+        <>
+          <span className={toneBadge(STATUT_ETUDIANT_TONE[e.statut])}>
+            {STATUT_ETUDIANT_LABEL[e.statut]}
+          </span>
+          <span className={toneBadge(STATUT_PAIEMENT_TONE[e.paiement])}>
+            {STATUT_PAIEMENT_LABEL[e.paiement]}
+          </span>
+          <span className={toneBadge(e.moyenne < 10 ? "red" : "teal")}>
+            {e.moyenne > 0 ? `Moyenne ${e.moyenne.toFixed(2)}/20` : "Sans note"}
+          </span>
+        </>
+      }
     >
-      <div className="flex flex-wrap gap-2">
-        <span className={toneBadge(STATUT_ETUDIANT_TONE[e.statut])}>
-          {STATUT_ETUDIANT_LABEL[e.statut]}
-        </span>
-        <span className={toneBadge(STATUT_PAIEMENT_TONE[e.paiement])}>
-          {STATUT_PAIEMENT_LABEL[e.paiement]}
-        </span>
-        <span className={toneBadge(e.moyenne < 10 ? "red" : "teal")}>
-          {e.moyenne > 0 ? `Moyenne ${e.moyenne.toFixed(2)}/20` : "Sans note"}
-        </span>
-      </div>
+      <DetailSection title="Scolarité">
+        <DetailGrid>
+          <DetailField label="Matricule" value={e.matricule} />
+          <DetailField label="Filière" value={e.filiere} />
+          <DetailField label="Niveau" value={e.niveau} />
+          <DetailField label="Groupe" value={e.groupe} />
+          <DetailField label="Année universitaire" value={e.annee} />
+          <DetailField
+            label="Moyenne générale"
+            value={e.moyenne > 0 ? `${e.moyenne.toFixed(2)} / 20` : "—"}
+            tone={e.moyenne > 0 && e.moyenne < 10 ? "negative" : "positive"}
+          />
+        </DetailGrid>
+      </DetailSection>
 
-      <DetailSection title="Informations personnelles">
-        <div>
-          <DetailRow
+      <DetailSection title="Coordonnées">
+        <DetailGrid>
+          <DetailField
             label="Date de naissance"
             value={fmtDate(e.dateNaissance)}
           />
-          <DetailRow label="Ville" value={e.ville || "—"} />
-          <DetailRow label="Téléphone" value={e.telephone || "—"} />
-          <DetailRow label="E-mail" value={e.email || "—"} />
-          <DetailRow label="Matricule" value={e.matricule} />
-          <DetailRow label="Année universitaire" value={e.annee} />
-        </div>
+          <DetailField label="Ville" value={e.ville} />
+          <DetailField label="Téléphone" value={e.telephone} />
+          <DetailField label="E-mail" value={e.email} />
+        </DetailGrid>
       </DetailSection>
 
       <DetailSection title="Stage en cours">
-        <p className="rounded-2xl bg-muted px-4 py-3 text-sm text-foreground">
-          {e.stageEnCours ?? "Aucun stage en cours."}
-        </p>
+        {e.stageEnCours ? (
+          <DetailEmpty>{e.stageEnCours}</DetailEmpty>
+        ) : (
+          <DetailEmpty>Aucun stage en cours.</DetailEmpty>
+        )}
       </DetailSection>
 
       <DetailSection title="Notes par module">
         {e.notes.length ? (
-          <div className="overflow-hidden rounded-2xl border border-brand/12">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-brand/12 bg-muted text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2">Module</th>
-                  <th className="px-3 py-2 text-right">Note</th>
-                  <th className="px-3 py-2 text-right">Coef.</th>
-                  <th className="px-3 py-2 text-right">Crédits</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand/8">
-                {e.notes.map((n) => (
-                  <tr key={n.module}>
-                    <td className="px-3 py-2">{n.module}</td>
-                    <td
-                      className={cn(
-                        "px-3 py-2 text-right font-semibold tabular-nums",
-                        n.note < 10 ? "text-alert" : "text-brand-dk",
-                      )}
-                    >
-                      {n.note.toFixed(2)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                      {n.coef}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                      {n.credits}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DetailTable
+            head={
+              <>
+                <th className="px-3 py-2">Module</th>
+                <th className="px-3 py-2 text-right">Note</th>
+                <th className="px-3 py-2 text-right">Coef.</th>
+                <th className="px-3 py-2 text-right">Crédits</th>
+              </>
+            }
+          >
+            {e.notes.map((n) => (
+              <tr key={n.module}>
+                <td className="px-3 py-2">{n.module}</td>
+                <td
+                  className={cn(
+                    "px-3 py-2 text-right font-semibold tabular-nums",
+                    n.note < 10 ? "text-alert" : "text-brand-dk",
+                  )}
+                >
+                  {n.note.toFixed(2)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                  {n.coef}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                  {n.credits}
+                </td>
+              </tr>
+            ))}
+          </DetailTable>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            Aucune note saisie pour ce semestre.
-          </p>
+          <DetailEmpty>Aucune note saisie pour ce semestre.</DetailEmpty>
         )}
       </DetailSection>
 
-      <DetailSection title="Historique de paiements">
-        <div>
-          <DetailRow label="Frais annuels" value={fmtMAD(e.fraisAnnuels)} />
-          <DetailRow
+      <DetailSection title="Situation financière">
+        <DetailGrid>
+          <DetailField label="Frais annuels" value={fmtMAD(e.fraisAnnuels)} />
+          <DetailField
+            label="Réglé"
+            value={fmtMAD(paye)}
+            tone="positive"
+          />
+          <DetailField
             label="Reste à payer"
-            value={
-              <span className={e.resteAPayer > 0 ? "text-alert" : undefined}>
-                {fmtMAD(e.resteAPayer)}
-              </span>
-            }
+            value={fmtMAD(e.resteAPayer)}
+            tone={e.resteAPayer > 0 ? "negative" : "positive"}
+          />
+          <DetailField label="Progression" value={`${progression} %`} />
+        </DetailGrid>
+
+        {/* Jauge de recouvrement : lit plus vite qu'un pourcentage seul. */}
+        <div
+          className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-brand/12"
+          role="img"
+          aria-label={`Réglé à ${progression} %`}
+        >
+          <div
+            className={cn(
+              "h-full rounded-full transition-all",
+              e.resteAPayer > 0 ? "bg-warn" : "bg-brand",
+            )}
+            style={{ width: `${Math.min(100, Math.max(0, progression))}%` }}
           />
         </div>
+
         {e.historique.length ? (
-          <div className="mt-2 overflow-hidden rounded-2xl border border-brand/12">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-brand/12 bg-muted text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Période</th>
-                  <th className="px-3 py-2">Mode</th>
-                  <th className="px-3 py-2 text-right">Montant</th>
-                  <th className="px-3 py-2">Statut</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand/8">
-                {e.historique.map((h) => (
-                  <tr key={h.recu}>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {fmtDate(h.date)}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {h.periode}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">{h.mode}</td>
-                    <td className="px-3 py-2 text-right font-medium tabular-nums">
-                      {fmtMAD(h.montant)}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={toneBadge(STATUT_PAIEMENT_TONE[h.statut])}
-                      >
-                        {STATUT_PAIEMENT_LABEL[h.statut]}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DetailTable
+            head={
+              <>
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2">Période</th>
+                <th className="px-3 py-2">Mode</th>
+                <th className="px-3 py-2 text-right">Montant</th>
+                <th className="px-3 py-2">Statut</th>
+              </>
+            }
+          >
+            {e.historique.map((h) => (
+              <tr key={h.recu}>
+                <td className="whitespace-nowrap px-3 py-2">
+                  {fmtDate(h.date)}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">{h.periode}</td>
+                <td className="px-3 py-2 text-muted-foreground">{h.mode}</td>
+                <td className="px-3 py-2 text-right font-medium tabular-nums">
+                  {fmtMAD(h.montant)}
+                </td>
+                <td className="px-3 py-2">
+                  <span className={toneBadge(STATUT_PAIEMENT_TONE[h.statut])}>
+                    {STATUT_PAIEMENT_LABEL[h.statut]}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </DetailTable>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            Aucun paiement enregistré.
-          </p>
+          <DetailEmpty>Aucun paiement enregistré.</DetailEmpty>
         )}
       </DetailSection>
     </DetailShell>
