@@ -17,3 +17,12 @@ export { centers } from "./centers";
 export { centerAdmins } from "./center-admins";
 export { supportSessions } from "./support-sessions";
 export { supportMessages } from "./support-messages";
+
+export { etudiants } from "./etudiants";
+export { notesEtudiant } from "./notes-etudiant";
+export { formateurs } from "./formateurs";
+export { examens } from "./examens";
+export { notesExamen } from "./notes-examen";
+export { bulletins } from "./bulletins";
+export { stages } from "./stages";
+export { historiquePaiements } from "./historique-paiements";

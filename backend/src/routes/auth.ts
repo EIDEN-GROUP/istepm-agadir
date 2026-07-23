@@ -19,7 +19,10 @@ const createUserSchema = z.object({
   email: z.string().email("Email invalide"),
   password: z.string().min(6, "Mot de passe trop court"),
   name: z.string().min(1, "Nom requis"),
-  role: z.enum(["admin", "superadmin"]).optional().default("admin"),
+  role: z
+    .enum(["admin", "superadmin", "directeur", "enseignant", "responsable"])
+    .optional()
+    .default("admin"),
 });
 
 const updateUserSchema = z.object({
@@ -40,7 +43,7 @@ export async function authRoutes(app: FastifyInstance) {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role as "admin" | "superadmin",
+      role: user.role as "admin" | "superadmin" | "directeur" | "enseignant" | "responsable",
     });
     return { token, user };
   });

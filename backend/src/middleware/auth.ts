@@ -7,7 +7,7 @@ export interface AuthUserPayload {
   id: string;
   email: string;
   name: string;
-  role: "admin" | "superadmin";
+  role: "admin" | "superadmin" | "directeur" | "enseignant" | "responsable";
 }
 
 declare module "@fastify/jwt" {
@@ -45,7 +45,7 @@ export async function authenticate(
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role as "admin" | "superadmin",
+      role: user.role as AuthUserPayload["role"],
     };
   } catch {
     return reply.status(401).send({ error: "Token invalide ou expiré" });

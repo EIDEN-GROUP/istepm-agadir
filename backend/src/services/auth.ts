@@ -10,7 +10,7 @@ export type CreateUserInput = {
   email: string;
   password: string;
   name: string;
-  role?: "admin" | "superadmin";
+  role?: "admin" | "superadmin" | "directeur" | "enseignant" | "responsable";
 };
 
 export type UserResult = {

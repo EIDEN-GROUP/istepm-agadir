@@ -21,6 +21,13 @@ import { whatsappRoutes } from "@/routes/whatsapp";
 import { emailRoutes } from "@/routes/email";
 import { receiptRoutes } from "@/routes/receipt";
 
+import { etudiantRoutes } from "@/routes/etudiants";
+import { formateurRoutes } from "@/routes/formateurs";
+import { examenRoutes } from "@/routes/examens";
+import { bulletinRoutes } from "@/routes/bulletins";
+import { stageRoutes } from "@/routes/stages";
+import { paiementIstpmRoutes } from "@/routes/paiements-istpm";
+
 export async function buildApp() {
   const env = getEnv();
 
@@ -74,6 +81,13 @@ export async function buildApp() {
   await app.register(whatsappRoutes, { prefix: "/api/whatsapp" });
   await app.register(emailRoutes, { prefix: "/api/email" });
   await app.register(receiptRoutes, { prefix: "/api/receipts" });
+
+  await app.register(etudiantRoutes, { prefix: "/api/etudiants" });
+  await app.register(formateurRoutes, { prefix: "/api/formateurs" });
+  await app.register(examenRoutes, { prefix: "/api/examens" });
+  await app.register(bulletinRoutes, { prefix: "/api/bulletins" });
+  await app.register(stageRoutes, { prefix: "/api/stages" });
+  await app.register(paiementIstpmRoutes, { prefix: "/api/paiements-istpm" });
 
   return app;
 }

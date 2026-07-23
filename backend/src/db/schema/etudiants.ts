@@ -1,0 +1,24 @@
+import { pgTable, uuid, text, numeric, timestamp } from "drizzle-orm/pg-core";
+
+export const etudiants = pgTable("etudiants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  cne: text("cne").notNull().default(""),
+  matricule: text("matricule").notNull().default(""),
+  prenom: text("prenom").notNull(),
+  nom: text("nom").notNull(),
+  filiere: text("filiere").notNull(),
+  niveau: text("niveau").notNull(),
+  annee: text("annee").notNull().default(""),
+  groupe: text("groupe").notNull().default(""),
+  statut: text("statut").notNull().default("inscrit"),
+  paiement: text("paiement").notNull().default("en_attente"),
+  moyenne: numeric("moyenne").notNull().default("0"),
+  telephone: text("telephone").notNull().default(""),
+  email: text("email").notNull().default(""),
+  dateNaissance: text("date_naissance").notNull().default(""),
+  ville: text("ville").notNull().default(""),
+  fraisAnnuels: numeric("frais_annuels").notNull().default("0"),
+  resteAPayer: numeric("reste_a_payer").notNull().default("0"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
