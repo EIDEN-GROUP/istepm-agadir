@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Plus, Pencil, Eye, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
 import {
   FILIERES,
@@ -59,8 +60,10 @@ const GRADES: GradeFormateur[] = ["PES", "vacataire", "formateur_clinique"];
 const STATUTS: StatutFormateur[] = ["permanent", "vacataire", "en_conge"];
 
 function FormateursPage() {
+  const { role } = useAuth();
   const { formateurs, addFormateur, updateFormateur, deleteFormateur } =
     useIstpm();
+  const canEdit = role === "directeur" || role === "responsable";
 
   const [search, setSearch] = useState("");
   const [departement, setDepartement] = useState<string>(ALL);
@@ -89,15 +92,17 @@ function FormateursPage() {
         eyebrow="Corps enseignant"
         title="Formateurs"
         actions={
-          <button
-            className={primaryPill}
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" /> Ajouter un formateur
-          </button>
+          canEdit ? (
+            <button
+              className={primaryPill}
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" /> Ajouter un formateur
+            </button>
+          ) : null
         }
       />
 
@@ -184,23 +189,27 @@ function FormateursPage() {
                 >
                   <Eye className="h-3.5 w-3.5" />
                 </button>
-                <button
-                  className={iconButton}
-                  aria-label="Modifier"
-                  onClick={() => {
-                    setEditing(f);
-                    setFormOpen(true);
-                  }}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  className={iconButtonDanger}
-                  aria-label="Supprimer"
-                  onClick={() => setToDelete(f)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {canEdit ? (
+                  <>
+                    <button
+                      className={iconButton}
+                      aria-label="Modifier"
+                      onClick={() => {
+                        setEditing(f);
+                        setFormOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      className={iconButtonDanger}
+                      aria-label="Supprimer"
+                      onClick={() => setToDelete(f)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                ) : null}
               </div>
             </td>
           </motion.tr>

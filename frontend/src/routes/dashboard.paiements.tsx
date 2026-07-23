@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Plus, BellRing, Eye, Receipt } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
 import {
   FILIERES,
@@ -60,8 +61,10 @@ const MODES: LignePaiement["mode"][] = [
 const STATUTS: StatutPaiement[] = ["paye", "en_attente", "retard", "impaye"];
 
 function PaiementsPage() {
+  const { role } = useAuth();
   const { paiements, etudiants, financier, aRelancer, addPaiement } =
     useIstpm();
+  const canEdit = role === "directeur" || role === "responsable";
 
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
@@ -107,15 +110,19 @@ function PaiementsPage() {
         title="Paiements"
         actions={
           <>
-            <button
-              className={cn(ghostPill, "gap-1.5")}
-              onClick={() => setRelanceOpen(true)}
-            >
-              <BellRing className="h-3.5 w-3.5" /> Relances ({aRelancer.length})
-            </button>
-            <button onClick={() => setAddOpen(true)} className={primaryPill}>
-              <Plus className="h-4 w-4" /> Nouveau paiement
-            </button>
+            {canEdit ? (
+              <button
+                className={cn(ghostPill, "gap-1.5")}
+                onClick={() => setRelanceOpen(true)}
+              >
+                <BellRing className="h-3.5 w-3.5" /> Relances ({aRelancer.length})
+              </button>
+            ) : null}
+            {canEdit ? (
+              <button onClick={() => setAddOpen(true)} className={primaryPill}>
+                <Plus className="h-4 w-4" /> Nouveau paiement
+              </button>
+            ) : null}
           </>
         }
       />

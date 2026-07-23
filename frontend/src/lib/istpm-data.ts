@@ -1836,8 +1836,12 @@ const SEMAINE_TYPE: Array<Omit<Seance, "id" | "date"> & { jour: number }> = [
   { jour: 5, module: "Anatomie dentaire", professeurId: "fo-7", groupe: "S1-B", salle: "Salle 5", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S1", type: "td" },
 ];
 
-/** Séances de la semaine courante et de la suivante. */
-export const SEANCES: Seance[] = (() => {
+/**
+ * Génère les séances des deux prochaines semaines (courante + suivante).
+ * Les dates sont calculées depuis le lundi de la semaine en cours, donc
+ * l'appel est idempotent à l'intérieur de la même semaine.
+ */
+export function genererSeances(): Seance[] {
   const lundi = lundiDeLaSemaine(new Date());
   const out: Seance[] = [];
   for (const semaine of [0, 1]) {
@@ -1849,4 +1853,7 @@ export const SEANCES: Seance[] = (() => {
     });
   }
   return out;
-})();
+}
+
+/** Séances de la semaine courante et de la suivante. */
+export const SEANCES: Seance[] = genererSeances();

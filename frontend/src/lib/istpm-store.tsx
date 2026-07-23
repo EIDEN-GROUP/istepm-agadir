@@ -39,6 +39,8 @@ import {
   type ActiviteItem,
   type Seance,
   SEANCES,
+  lundiDeLaSemaine,
+  genererSeances,
   minutesDepuisMinuit,
   ajouterMinutes,
   type LignePaiement,
@@ -96,6 +98,21 @@ function load(): Snapshot {
     const parsed = JSON.parse(raw) as Snapshot;
     // Guard against a truncated or hand-edited payload.
     if (!Array.isArray(parsed?.etudiants)) return seed();
+
+    // Rebase seance dates to the current week.
+    // Seed‑pattern seances ("se-0-…", "se-1-…") have dates frozen at save
+    // time; regenerate them so the planning always shows the present week.
+    const expectedLundi = lundiDeLaSemaine(new Date()).toISOString().slice(0, 10);
+    const storedLundi = parsed.seances?.[0]?.date?.slice(0, 10);
+    if (storedLundi && storedLundi !== expectedLundi) {
+      const hasSeedIds = parsed.seances.some(
+        (s) => /^se-\d+-\d+$/.test(s.id),
+      );
+      if (hasSeedIds) {
+        parsed.seances = genererSeances();
+      }
+    }
+
     return parsed;
   } catch {
     return seed();
