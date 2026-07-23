@@ -10,6 +10,65 @@ async function seed() {
   console.log("Seeding ISTPM data...");
 
   /* ------------------------------------------------------------------ */
+  /*  0. Default roles                                                   */
+  /* ------------------------------------------------------------------ */
+  const defaultRoles = [
+    {
+      name: "directeur",
+      description: "Accès complet à l'ensemble du système",
+      permissions: [
+        "etudiants.read", "etudiants.write", "etudiants.delete",
+        "formateurs.read", "formateurs.write", "formateurs.delete",
+        "examens.read", "examens.write", "examens.delete",
+        "bulletins.read", "bulletins.write", "bulletins.delete",
+        "stages.read", "stages.write", "stages.delete",
+        "paiements.read", "paiements.write", "paiements.delete",
+        "settings.read", "settings.write",
+        "users.read", "users.write", "users.delete",
+        "roles.read", "roles.manage",
+        "dashboard.read",
+      ],
+      isSystem: true,
+    },
+    {
+      name: "responsable",
+      description: "Gestion pédagogique et organisationnelle",
+      permissions: [
+        "etudiants.read", "etudiants.write",
+        "formateurs.read", "formateurs.write",
+        "examens.read", "examens.write",
+        "bulletins.read", "bulletins.write",
+        "stages.read", "stages.write",
+        "paiements.read", "paiements.write",
+        "settings.read", "settings.write",
+        "dashboard.read",
+      ],
+      isSystem: true,
+    },
+    {
+      name: "enseignant",
+      description: "Accès limité à ses modules, séances, et saisie de notes",
+      permissions: [
+        "etudiants.read",
+        "examens.read", "examens.write",
+        "bulletins.read",
+        "dashboard.read",
+      ],
+      isSystem: true,
+    },
+  ];
+
+  for (const r of defaultRoles) {
+    await pool.query(
+      `INSERT INTO roles (name, description, permissions, is_system)
+       VALUES ($1, $2, $3::jsonb, $4)
+       ON CONFLICT (name) DO NOTHING`,
+      [r.name, r.description, JSON.stringify(r.permissions), r.isSystem],
+    );
+  }
+  console.log("  ✓ 3 default roles created");
+
+  /* ------------------------------------------------------------------ */
   /*  1. Demo users                                                      */
   /* ------------------------------------------------------------------ */
   const users = [

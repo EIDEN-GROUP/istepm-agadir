@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useEffect, useRef, type ReactNode } from "react";
 import {
   Plus,
   Trash2,
@@ -21,7 +21,6 @@ import {
 import { toast } from "sonner";
 import { useAuth, ROLE_META, type UserRole } from "@/lib/auth";
 import {
-  FILIERES,
   NIVEAUX,
   SALLES,
   GROUPES,
@@ -31,6 +30,13 @@ import {
   fmtMAD,
 } from "@/lib/istpm-data";
 import { useIstpm } from "@/lib/istpm-store";
+import {
+  fetchSettings,
+  updateSetting,
+  createFiliereApi,
+  deleteFiliereApi,
+  resetSettings,
+} from "@/lib/istpm-api";
 import { ConfirmDialog } from "@/components/dash-form";
 import {
   softCard,
@@ -323,6 +329,59 @@ function SettingsPage() {
     creditsSemestre: "30",
   });
 
+  /* --------- API sync --------- */
+  const filieresRef = useRef(listeFilieres);
+  filieresRef.current = listeFilieres;
+
+  useEffect(() => {
+    fetchSettings()
+      .then((data) => {
+        if (Array.isArray(data.annees_universitaires))
+          setAnnees(data.annees_universitaires as string[]);
+        if (Array.isArray(data.semestres))
+          setSemestres(data.semestres as string[]);
+        if (Array.isArray(data.groupes))
+          setGroupes(data.groupes as string[]);
+        if (Array.isArray(data.salles))
+          setSalles(data.salles as string[]);
+        if (Array.isArray(data.creneaux))
+          setCreneaux(data.creneaux as string[]);
+        if (Array.isArray(data.types_examen))
+          setTypesExamen(data.types_examen as string[]);
+        if (typeof data.institut_nom === "string")
+          setInstitut((p) => ({ ...p, nom: data.institut_nom as string }));
+        if (typeof data.institut_ville === "string")
+          setInstitut((p) => ({ ...p, ville: data.institut_ville as string }));
+        if (typeof data.institut_telephone === "string")
+          setInstitut((p) => ({ ...p, telephone: data.institut_telephone as string }));
+        if (typeof data.institut_email === "string")
+          setInstitut((p) => ({ ...p, email: data.institut_email as string }));
+        if (typeof data.systeme_langue === "string")
+          setSysteme((p) => ({ ...p, langue: data.systeme_langue as string }));
+        if (typeof data.systeme_devise === "string")
+          setSysteme((p) => ({ ...p, devise: data.systeme_devise as string }));
+        if (typeof data.systeme_fuseau === "string")
+          setSysteme((p) => ({ ...p, fuseau: data.systeme_fuseau as string }));
+        if (typeof data.securite_longueurMdp === "string")
+          setSecurite((p) => ({ ...p, longueurMdp: data.securite_longueurMdp as string }));
+        if (typeof data.securite_expirationSession === "string")
+          setSecurite((p) => ({ ...p, expirationSession: data.securite_expirationSession as string }));
+        if (typeof data.planning_joursOuvres === "string")
+          setPlanning((p) => ({ ...p, joursOuvres: data.planning_joursOuvres as string }));
+        if (typeof data.planning_heureDebut === "string")
+          setPlanning((p) => ({ ...p, heureDebut: data.planning_heureDebut as string }));
+        if (typeof data.planning_heureFin === "string")
+          setPlanning((p) => ({ ...p, heureFin: data.planning_heureFin as string }));
+        if (typeof data.bulletin_bareme === "string")
+          setBulletin((p) => ({ ...p, bareme: data.bulletin_bareme as string }));
+        if (typeof data.bulletin_seuilAdmission === "string")
+          setBulletin((p) => ({ ...p, seuilAdmission: data.bulletin_seuilAdmission as string }));
+        if (typeof data.bulletin_creditsSemestre === "string")
+          setBulletin((p) => ({ ...p, creditsSemestre: data.bulletin_creditsSemestre as string }));
+      })
+      .catch(() => {});
+  }, []);
+
   /** Modules réellement enseignés, dérivés du corps enseignant. */
   const modules = useMemo(
     () => [...new Set(formateurs.flatMap((f) => f.modules))].sort(),
@@ -394,8 +453,8 @@ function SettingsPage() {
           Données de démonstration
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Les créations et modifications sont conservées dans ce navigateur.
-          Réinitialiser restaure le jeu de données d'origine.
+          Les modifications sont sauvegardées sur le serveur.
+          Réinitialiser efface toutes les données et restaure les valeurs par défaut.
         </p>
         <button
           onClick={() => setResetOpen(true)}
@@ -412,8 +471,9 @@ function SettingsPage() {
         message="Toutes les créations, modifications et suppressions effectuées seront perdues, et le jeu de démonstration d'origine sera restauré."
         confirmLabel="Réinitialiser"
         onConfirm={() => {
+          resetSettings().catch(() => {});
           reset();
-          toast.success("Données de démonstration restaurées");
+          toast.success("Données réinitialisées");
         }}
       />
     </div>
@@ -427,7 +487,7 @@ function SettingsPage() {
           <Carte id="annees">
             <ListeEditable
               valeurs={annees}
-              onChange={setAnnees}
+              onChange={(v) => { setAnnees(v); updateSetting("annees_universitaires", v).catch(() => {}); }}
               placeholder="2026/2027"
             />
           </Carte>
@@ -438,7 +498,7 @@ function SettingsPage() {
           <Carte id="semestres">
             <ListeEditable
               valeurs={semestres}
-              onChange={setSemestres}
+              onChange={(v) => { setSemestres(v); updateSetting("semestres", v).catch(() => {}); }}
               placeholder="S7"
             />
           </Carte>
@@ -449,7 +509,7 @@ function SettingsPage() {
           <Carte id="groupes">
             <ListeEditable
               valeurs={groupes}
-              onChange={setGroupes}
+              onChange={(v) => { setGroupes(v); updateSetting("groupes", v).catch(() => {}); }}
               placeholder="S2-C"
             />
           </Carte>
@@ -460,7 +520,7 @@ function SettingsPage() {
           <Carte id="salles">
             <ListeEditable
               valeurs={salles}
-              onChange={setSalles}
+              onChange={(v) => { setSalles(v); updateSetting("salles", v).catch(() => {}); }}
               placeholder="Salle 14"
             />
           </Carte>
@@ -471,7 +531,7 @@ function SettingsPage() {
           <Carte id="creneaux">
             <ListeEditable
               valeurs={creneaux}
-              onChange={setCreneaux}
+              onChange={(v) => { setCreneaux(v); updateSetting("creneaux", v).catch(() => {}); }}
               placeholder="19:15 – 20:45"
             />
           </Carte>
@@ -506,17 +566,17 @@ function SettingsPage() {
               <ChampReglage
                 label="Jours ouvrés"
                 value={planning.joursOuvres}
-                onChange={(v) => setPlanning({ ...planning, joursOuvres: v })}
+                onChange={(v) => { setPlanning({ ...planning, joursOuvres: v }); updateSetting("planning_joursOuvres", v).catch(() => {}); }}
               />
               <ChampReglage
                 label="Ouverture"
                 value={planning.heureDebut}
-                onChange={(v) => setPlanning({ ...planning, heureDebut: v })}
+                onChange={(v) => { setPlanning({ ...planning, heureDebut: v }); updateSetting("planning_heureDebut", v).catch(() => {}); }}
               />
               <ChampReglage
                 label="Fermeture"
                 value={planning.heureFin}
-                onChange={(v) => setPlanning({ ...planning, heureFin: v })}
+                onChange={(v) => { setPlanning({ ...planning, heureFin: v }); updateSetting("planning_heureFin", v).catch(() => {}); }}
               />
             </div>
           </Carte>
@@ -527,7 +587,14 @@ function SettingsPage() {
           <Carte id="filieres">
             <ListeEditable
               valeurs={listeFilieres}
-              onChange={setListeFilieres}
+              onChange={(v) => {
+                const oldList = filieresRef.current;
+                const added = v.filter((x) => !oldList.includes(x));
+                const removed = oldList.filter((x) => !v.includes(x));
+                added.forEach((nom) => createFiliereApi(nom).catch(() => {}));
+                removed.forEach((nom) => deleteFiliereApi(nom).catch(() => {}));
+                setListeFilieres(v);
+              }}
               placeholder="Orthoptie"
             />
           </Carte>
@@ -630,7 +697,7 @@ function SettingsPage() {
           <Carte id="examens">
             <ListeEditable
               valeurs={typesExamen}
-              onChange={setTypesExamen}
+              onChange={(v) => { setTypesExamen(v); updateSetting("types_examen", v).catch(() => {}); }}
               placeholder="Oral"
             />
             <p className="mt-2 text-[11px] text-muted-foreground">
@@ -646,23 +713,19 @@ function SettingsPage() {
               <ChampReglage
                 label="Barème"
                 value={bulletin.bareme}
-                onChange={(v) => setBulletin({ ...bulletin, bareme: v })}
+                onChange={(v) => { setBulletin({ ...bulletin, bareme: v }); updateSetting("bulletin_bareme", v).catch(() => {}); }}
                 suffix="points"
               />
               <ChampReglage
                 label="Seuil d'admission"
                 value={bulletin.seuilAdmission}
-                onChange={(v) =>
-                  setBulletin({ ...bulletin, seuilAdmission: v })
-                }
+                onChange={(v) => { setBulletin({ ...bulletin, seuilAdmission: v }); updateSetting("bulletin_seuilAdmission", v).catch(() => {}); }}
                 suffix="/20"
               />
               <ChampReglage
                 label="Crédits par semestre"
                 value={bulletin.creditsSemestre}
-                onChange={(v) =>
-                  setBulletin({ ...bulletin, creditsSemestre: v })
-                }
+                onChange={(v) => { setBulletin({ ...bulletin, creditsSemestre: v }); updateSetting("bulletin_creditsSemestre", v).catch(() => {}); }}
               />
             </div>
           </Carte>
@@ -675,22 +738,22 @@ function SettingsPage() {
               <ChampReglage
                 label="Nom"
                 value={institut.nom}
-                onChange={(v) => setInstitut({ ...institut, nom: v })}
+                onChange={(v) => { setInstitut({ ...institut, nom: v }); updateSetting("institut_nom", v).catch(() => {}); }}
               />
               <ChampReglage
                 label="Ville"
                 value={institut.ville}
-                onChange={(v) => setInstitut({ ...institut, ville: v })}
+                onChange={(v) => { setInstitut({ ...institut, ville: v }); updateSetting("institut_ville", v).catch(() => {}); }}
               />
               <ChampReglage
                 label="Téléphone"
                 value={institut.telephone}
-                onChange={(v) => setInstitut({ ...institut, telephone: v })}
+                onChange={(v) => { setInstitut({ ...institut, telephone: v }); updateSetting("institut_telephone", v).catch(() => {}); }}
               />
               <ChampReglage
                 label="E-mail"
                 value={institut.email}
-                onChange={(v) => setInstitut({ ...institut, email: v })}
+                onChange={(v) => { setInstitut({ ...institut, email: v }); updateSetting("institut_email", v).catch(() => {}); }}
               />
             </div>
           </Carte>
@@ -703,17 +766,17 @@ function SettingsPage() {
               <ChampReglage
                 label="Langue par défaut"
                 value={systeme.langue}
-                onChange={(v) => setSysteme({ ...systeme, langue: v })}
+                onChange={(v) => { setSysteme({ ...systeme, langue: v }); updateSetting("systeme_langue", v).catch(() => {}); }}
               />
               <ChampReglage
                 label="Devise"
                 value={systeme.devise}
-                onChange={(v) => setSysteme({ ...systeme, devise: v })}
+                onChange={(v) => { setSysteme({ ...systeme, devise: v }); updateSetting("systeme_devise", v).catch(() => {}); }}
               />
               <ChampReglage
                 label="Fuseau horaire"
                 value={systeme.fuseau}
-                onChange={(v) => setSysteme({ ...systeme, fuseau: v })}
+                onChange={(v) => { setSysteme({ ...systeme, fuseau: v }); updateSetting("systeme_fuseau", v).catch(() => {}); }}
               />
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
@@ -735,17 +798,13 @@ function SettingsPage() {
               <ChampReglage
                 label="Longueur minimale du mot de passe"
                 value={securite.longueurMdp}
-                onChange={(v) =>
-                  setSecurite({ ...securite, longueurMdp: v })
-                }
+                onChange={(v) => { setSecurite({ ...securite, longueurMdp: v }); updateSetting("securite_longueurMdp", v).catch(() => {}); }}
                 suffix="car."
               />
               <ChampReglage
                 label="Expiration de session"
                 value={securite.expirationSession}
-                onChange={(v) =>
-                  setSecurite({ ...securite, expirationSession: v })
-                }
+                onChange={(v) => { setSecurite({ ...securite, expirationSession: v }); updateSetting("securite_expirationSession", v).catch(() => {}); }}
                 suffix="min"
               />
             </div>

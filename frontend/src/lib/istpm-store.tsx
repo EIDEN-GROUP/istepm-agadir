@@ -56,6 +56,35 @@ import {
   putDoc,
   MAX_DOC_SIZE,
 } from "@/lib/doc-store";
+import {
+  fetchEtudiants as apiFetchEtudiants,
+  createEtudiant as apiCreateEtudiant,
+  updateEtudiant as apiUpdateEtudiant,
+  deleteEtudiant as apiDeleteEtudiant,
+  fetchFormateurs as apiFetchFormateurs,
+  createFormateur as apiCreateFormateur,
+  updateFormateur as apiUpdateFormateur,
+  deleteFormateur as apiDeleteFormateur,
+  fetchExamens as apiFetchExamens,
+  createExamen as apiCreateExamen,
+  updateExamen as apiUpdateExamen,
+  deleteExamen as apiDeleteExamen,
+  saveNotesExamenApi,
+  fetchBulletins as apiFetchBulletins,
+  createBulletin as apiCreateBulletin,
+  updateBulletin as apiUpdateBulletin,
+  deleteBulletin as apiDeleteBulletin,
+  publierBulletinApi,
+  publierTousBulletinsApi,
+  fetchStages as apiFetchStages,
+  createStage as apiCreateStage,
+  updateStage as apiUpdateStage,
+  deleteStage as apiDeleteStage,
+  validerStageApi,
+  createPaiement as apiCreatePaiement,
+  createFiliereApi,
+  deleteFiliereApi,
+} from "@/lib/istpm-api";
 
 /* ------------------------------------------------------------------ */
 /*  Persistance                                                        */
@@ -312,6 +341,40 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Sync from the backend API on mount, replacing localStorage data.
+  // If the API is unreachable the existing localStorage data stays in place.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const [etudiants, formateurs, examens, bulletins, stages, paiementsRows] =
+          await Promise.all([
+            apiFetchEtudiants(),
+            apiFetchFormateurs(),
+            apiFetchExamens(),
+            apiFetchBulletins(),
+            apiFetchStages(),
+            apiFetchEtudiants(), // paiements are derived from etudiants
+          ]);
+        if (!mounted) return;
+        setSnap((s) => ({
+          ...s,
+          etudiants: etudiants as unknown as Etudiant[],
+          formateurs: formateurs as unknown as Formateur[],
+          examens: examens as unknown as Examen[],
+          bulletins: bulletins as unknown as Bulletin[],
+          stages: stages as unknown as Stage[],
+        }));
+      } catch {
+        // Backend not available — keep localStorage data.
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Skip the write triggered by the initial state, which would only rewrite
   // what was just read.
   const hydrated = useRef(false);
@@ -346,6 +409,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         notes: [],
         historique: [],
       };
+      apiCreateEtudiant(data as unknown as Record<string, unknown>).catch(() => {});
       setSnap((s) => ({ ...s, etudiants: [etudiant, ...s.etudiants] }));
       log(
         "inscription",
@@ -357,26 +421,28 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   );
 
   const updateEtudiant = useCallback(
-    (id: string, patch: Partial<Etudiant>) =>
+    (id: string, patch: Partial<Etudiant>) => {
+      apiUpdateEtudiant(id, patch as unknown as Record<string, unknown>).catch(() => {});
       setSnap((s) => ({
         ...s,
         etudiants: s.etudiants.map((e) =>
           e.id === id ? { ...e, ...patch } : e,
         ),
-      })),
+      }));
+    },
     [],
   );
 
   const deleteEtudiant = useCallback(
-    (id: string) =>
+    (id: string) => {
+      apiDeleteEtudiant(id).catch(() => {});
       setSnap((s) => ({
         ...s,
         etudiants: s.etudiants.filter((e) => e.id !== id),
-        // Keep the dataset coherent: a removed student leaves no orphan
-        // transcript or internship behind.
         bulletins: s.bulletins.filter((b) => b.etudiantId !== id),
         stages: s.stages.filter((st) => st.etudiantId !== id),
-      })),
+      }));
+    },
     [],
   );
 
@@ -385,6 +451,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   const addFormateur = useCallback(
     (data: NouveauFormateur) => {
       const formateur: Formateur = { ...data, id: uid("fo"), notesSaisies: 0 };
+      apiCreateFormateur(data as unknown as Record<string, unknown>).catch(() => {});
       setSnap((s) => ({ ...s, formateurs: [formateur, ...s.formateurs] }));
       return formateur;
     },
@@ -392,22 +459,26 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   );
 
   const updateFormateur = useCallback(
-    (id: string, patch: Partial<Formateur>) =>
+    (id: string, patch: Partial<Formateur>) => {
+      apiUpdateFormateur(id, patch as unknown as Record<string, unknown>).catch(() => {});
       setSnap((s) => ({
         ...s,
         formateurs: s.formateurs.map((f) =>
           f.id === id ? { ...f, ...patch } : f,
         ),
-      })),
+      }));
+    },
     [],
   );
 
   const deleteFormateur = useCallback(
-    (id: string) =>
+    (id: string) => {
+      apiDeleteFormateur(id).catch(() => {});
       setSnap((s) => ({
         ...s,
         formateurs: s.formateurs.filter((f) => f.id !== id),
-      })),
+      }));
+    },
     [],
   );
 
@@ -415,27 +486,31 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const addExamen = useCallback((data: NouvelExamen, auteurId: string) => {
     const examen: Examen = { ...data, id: uid("ex"), createdBy: auteurId };
+    apiCreateExamen(data as unknown as Record<string, unknown>).catch(() => {});
     setSnap((s) => ({ ...s, examens: [examen, ...s.examens] }));
     return examen;
   }, []);
 
   const updateExamen = useCallback(
-    (id: string, patch: Partial<Examen>) =>
+    (id: string, patch: Partial<Examen>) => {
+      apiUpdateExamen(id, patch as unknown as Record<string, unknown>).catch(() => {});
       setSnap((s) => ({
         ...s,
         examens: s.examens.map((x) => (x.id === id ? { ...x, ...patch } : x)),
-      })),
+      }));
+    },
     [],
   );
 
   const deleteExamen = useCallback(
-    (id: string) =>
+    (id: string) => {
+      apiDeleteExamen(id).catch(() => {});
       setSnap((s) => {
-        // Ne pas laisser le fichier orphelin dans IndexedDB.
         const doc = s.examens.find((x) => x.id === id)?.document;
         if (doc) void deleteDoc(doc.id).catch(() => {});
         return { ...s, examens: s.examens.filter((x) => x.id !== id) };
-      }),
+      });
+    },
     [],
   );
 
@@ -512,6 +587,11 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
       );
       if (!retenues.length) return 0;
 
+      saveNotesExamenApi(
+        examenId,
+        retenues.map((s) => ({ etudiantId: s.etudiantId, theorique: s.theorique, pratique: s.pratique })),
+      ).catch(() => {});
+
       setSnap((s) => {
         const examen = s.examens.find((x) => x.id === examenId);
         if (!examen) return s;
@@ -569,32 +649,34 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   /* ---------------- Bulletins ---------------- */
 
   const updateBulletin = useCallback(
-    (id: string, patch: Partial<Bulletin>) =>
+    (id: string, patch: Partial<Bulletin>) => {
+      apiUpdateBulletin(id, patch as unknown as Record<string, unknown>).catch(() => {});
       setSnap((s) => ({
         ...s,
         bulletins: s.bulletins.map((b) =>
           b.id === id ? { ...b, ...patch } : b,
         ),
-      })),
+      }));
+    },
     [],
   );
 
   const publierBulletin = useCallback(
-    (id: string) =>
+    (id: string) => {
+      publierBulletinApi(id).catch(() => {});
       setSnap((s) => ({
         ...s,
         bulletins: s.bulletins.map((b) =>
           b.id === id ? { ...b, statut: "publie" as const } : b,
         ),
-      })),
+      }));
+    },
     [],
   );
 
-  // Count is read from the render-time snapshot rather than from inside the
-  // updater: React may invoke an updater twice (StrictMode) or defer it, so a
-  // value assigned in there cannot be returned reliably.
   const publierTousBulletins = useCallback(() => {
     const count = snap.bulletins.filter((b) => b.statut !== "publie").length;
+    publierTousBulletinsApi().catch(() => {});
     setSnap((s) => ({
       ...s,
       bulletins: s.bulletins.map((b) => ({ ...b, statut: "publie" as const })),
@@ -606,22 +688,27 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const addStage = useCallback((data: NouveauStage) => {
     const stage: Stage = { ...data, id: uid("st") };
+    apiCreateStage(data as unknown as Record<string, unknown>).catch(() => {});
     setSnap((s) => ({ ...s, stages: [stage, ...s.stages] }));
     return stage;
   }, []);
 
   const updateStage = useCallback(
-    (id: string, patch: Partial<Stage>) =>
+    (id: string, patch: Partial<Stage>) => {
+      apiUpdateStage(id, patch as unknown as Record<string, unknown>).catch(() => {});
       setSnap((s) => ({
         ...s,
         stages: s.stages.map((st) => (st.id === id ? { ...st, ...patch } : st)),
-      })),
+      }));
+    },
     [],
   );
 
   const deleteStage = useCallback(
-    (id: string) =>
-      setSnap((s) => ({ ...s, stages: s.stages.filter((st) => st.id !== id) })),
+    (id: string) => {
+      apiDeleteStage(id).catch(() => {});
+      setSnap((s) => ({ ...s, stages: s.stages.filter((st) => st.id !== id) }));
+    },
     [],
   );
 
@@ -633,6 +720,13 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
    */
   const addPaiement = useCallback(
     (etudiantId: string, ligne: Omit<LignePaiement, "recu">) => {
+      apiCreatePaiement({
+        etudiantId,
+        montant: ligne.montant,
+        mode: ligne.mode,
+        periode: ligne.periode,
+        date: ligne.date,
+      }).catch(() => {});
       setSnap((s) => {
         const etudiant = s.etudiants.find((e) => e.id === etudiantId);
         if (!etudiant) return s;
@@ -670,20 +764,24 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   );
 
   const addFiliere = useCallback(
-    (nom: string) =>
+    (nom: string) => {
+      createFiliereApi(nom).catch(() => {});
       setSnap((s) => ({
         ...s,
         filieres: s.filieres.includes(nom) ? s.filieres : [...s.filieres, nom],
-      })),
+      }));
+    },
     [],
   );
 
   const deleteFiliere = useCallback(
-    (nom: string) =>
+    (nom: string) => {
+      deleteFiliereApi(nom).catch(() => {});
       setSnap((s) => ({
         ...s,
         filieres: s.filieres.filter((f) => f !== nom),
-      })),
+      }));
+    },
     [],
   );
 

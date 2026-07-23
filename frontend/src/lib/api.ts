@@ -1,3 +1,5 @@
+import { getStoredToken } from "@/lib/auth";
+
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
 type RequestOptions = {
@@ -7,23 +9,11 @@ type RequestOptions = {
   params?: Record<string, string | undefined>;
 };
 
-function getToken(): string | null {
-  return localStorage.getItem("school_crm_token");
-}
-
-function setToken(token: string) {
-  localStorage.setItem("school_crm_token", token);
-}
-
-function clearToken() {
-  localStorage.removeItem("school_crm_token");
-}
-
 async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const token = getToken();
+  const token = getStoredToken();
   const url = `${API_BASE}${path}`;
   const queryParams = options.params
     ? "?" +
@@ -45,12 +35,7 @@ async function request<T>(
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
-  // This build is frontend-only and has no real authentication, so a 401 can
-  // only come from one of the orphaned legacy routes. Surface it as a normal
-  // error instead of hard-redirecting to /login, which would eject the user
-  // out of a perfectly valid session.
   if (res.status === 401) {
-    clearToken();
     throw new Error("Non authentifié");
   }
 
@@ -78,9 +63,4 @@ export const api = {
     request<T>(path, { method: "PUT", body }),
 
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
-
-  // Auth-specific helpers
-  getToken,
-  setToken,
-  clearToken,
 };

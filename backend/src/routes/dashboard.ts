@@ -275,4 +275,80 @@ export async function dashboardRoutes(app: FastifyInstance) {
       .orderBy(desc(etudiants.resteAPayer));
     return rows;
   });
+
+  app.get("/activities", { preHandler: [authenticate] }, async () => {
+    const db = getDb();
+    const [recentPayments, recentExamens, recentBulletins, recentStages, recentEtudiants] =
+      await Promise.all([
+        db
+          .select({
+            id: historiquePaiements.id,
+            type: sql<string>`'paiement'`,
+            message: sql<string>`'Paiement de ' || ${historiquePaiements.montant} || ' DH enregistré'`,
+            date: historiquePaiements.date,
+            createdAt: historiquePaiements.createdAt,
+          })
+          .from(historiquePaiements)
+          .orderBy(desc(historiquePaiements.createdAt))
+          .limit(10),
+        db
+          .select({
+            id: examens.id,
+            type: sql<string>`'examen'`,
+            message: sql<string>`'Examen ' || ${examens.module} || ' ' || ${examens.statut}`,
+            date: examens.date,
+            createdAt: examens.createdAt,
+          })
+          .from(examens)
+          .orderBy(desc(examens.createdAt))
+          .limit(10),
+        db
+          .select({
+            id: bulletins.id,
+            type: sql<string>`'bulletin'`,
+            message: sql<string>`'Bulletin ' || ${bulletins.prenom} || ' ' || ${bulletins.nom} || ' ' || ${bulletins.statut}`,
+            date: sql<string>`''`,
+            createdAt: bulletins.createdAt,
+          })
+          .from(bulletins)
+          .orderBy(desc(bulletins.createdAt))
+          .limit(10),
+        db
+          .select({
+            id: stages.id,
+            type: sql<string>`'stage'`,
+            message: sql<string>`'Stage ' || ${stages.prenom} || ' ' || ${stages.nom} || ' ' || ${stages.statut}`,
+            date: sql<string>`''`,
+            createdAt: stages.createdAt,
+          })
+          .from(stages)
+          .orderBy(desc(stages.createdAt))
+          .limit(10),
+        db
+          .select({
+            id: etudiants.id,
+            type: sql<string>`'etudiant'`,
+            message: sql<string>`'Étudiant ' || ${etudiants.prenom} || ' ' || ${etudiants.nom} || ' inscrit en ' || ${etudiants.filiere}`,
+            date: sql<string>`''`,
+            createdAt: etudiants.createdAt,
+          })
+          .from(etudiants)
+          .orderBy(desc(etudiants.createdAt))
+          .limit(10),
+      ]);
+
+    const all = [
+      ...recentPayments,
+      ...recentExamens,
+      ...recentBulletins,
+      ...recentStages,
+      ...recentEtudiants,
+    ].sort((a, b) => {
+      const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return db - da;
+    });
+
+    return all.slice(0, 30);
+  });
 }

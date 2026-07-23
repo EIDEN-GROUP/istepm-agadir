@@ -27,6 +27,15 @@ import { examenRoutes } from "@/routes/examens";
 import { bulletinRoutes } from "@/routes/bulletins";
 import { stageRoutes } from "@/routes/stages";
 import { paiementIstpmRoutes } from "@/routes/paiements-istpm";
+import { roleRoutes } from "@/routes/roles";
+import { eventRoutes } from "@/routes/events";
+import { notificationRoutes } from "@/routes/notifications";
+import { seanceRoutes } from "@/routes/seances";
+import { teacherRoutes } from "@/routes/teacher";
+import { userPreferenceRoutes } from "@/routes/user-preferences";
+import { attendanceRoutes } from "@/routes/attendance";
+import { reminderRoutes } from "@/routes/reminders";
+import { reportRoutes } from "@/routes/reports";
 
 export async function buildApp() {
   const env = getEnv();
@@ -88,6 +97,15 @@ export async function buildApp() {
   await app.register(bulletinRoutes, { prefix: "/api/bulletins" });
   await app.register(stageRoutes, { prefix: "/api/stages" });
   await app.register(paiementIstpmRoutes, { prefix: "/api/paiements-istpm" });
+  await app.register(roleRoutes, { prefix: "/api/roles" });
+  await app.register(eventRoutes, { prefix: "/api/events" });
+  await app.register(notificationRoutes, { prefix: "/api/notifications" });
+  await app.register(seanceRoutes, { prefix: "/api/seances" });
+  await app.register(teacherRoutes, { prefix: "/api/teacher" });
+  await app.register(userPreferenceRoutes, { prefix: "/api/preferences" });
+  await app.register(attendanceRoutes, { prefix: "/api/attendance" });
+  await app.register(reminderRoutes, { prefix: "/api/reminders" });
+  await app.register(reportRoutes, { prefix: "/api/reports" });
 
   return app;
 }
