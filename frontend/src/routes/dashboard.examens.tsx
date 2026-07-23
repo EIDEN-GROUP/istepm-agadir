@@ -786,52 +786,18 @@ function EspaceDirecteur() {
       </DataTable>
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent className={dialogSurface}>
+        <DialogContent className={dialogSurfaceWide}>
           <DialogTitle className="sr-only">Détail de l'examen</DialogTitle>
           <DialogDescription className="sr-only">
-            Consultation d'un examen
+            Consultation et saisie des notes
           </DialogDescription>
           {detail ? (
-            <DetailShell
-              icon={<ClipboardList className="h-5 w-5" />}
-              title={detail.titre}
-              subtitle={`${detail.module} · ${detail.classe} · ${nomFormateur(formateurs, detail.createdBy)}`}
-              badges={
-                <>
-                  <span className={toneBadge(STATUT_EXAMEN_TONE[detail.statut])}>
-                    {STATUT_EXAMEN_LABEL[detail.statut]}
-                  </span>
-                  <span className={toneBadge("blue")}>{detail.composante}</span>
-                  <DocumentBadge examen={detail} />
-                </>
-              }
-              footer={
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    className={cn(ghostPill, "gap-1.5")}
-                    disabled={!detail.document}
-                    onClick={() => setPreview(detail)}
-                  >
-                    <Eye className="h-3.5 w-3.5" /> Voir le sujet
-                  </button>
-                  <button
-                    className={cn(primaryPill, "gap-1.5")}
-                    disabled={!detail.document}
-                    onClick={async () => {
-                      const doc = detail.document;
-                      if (!doc) return;
-                      const ok = await downloadDoc(doc.id, doc.nom);
-                      if (ok) toast.success(`Téléchargement — ${doc.nom}`);
-                      else toast.error("Fichier introuvable");
-                    }}
-                  >
-                    <Download className="h-4 w-4" /> Télécharger
-                  </button>
-                </div>
-              }
-            >
-              <InfosExamen examen={detail} formateurs={formateurs} />
-            </DetailShell>
+            <ExamenDetailFormateur
+              key={detail.id}
+              examen={examens.find((x) => x.id === detail.id) ?? detail}
+              onPreview={setPreview}
+              onClose={() => setDetail(null)}
+            />
           ) : null}
         </DialogContent>
       </Dialog>

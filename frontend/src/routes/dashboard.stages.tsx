@@ -30,8 +30,7 @@ import {
 } from "@/lib/dash-ui";
 import {
   PageHeader,
-  FilterBar,
-  FilterSelect,
+  FilterPanel,
   DataTable,
   DetailSection,
   DetailGrid,
@@ -114,33 +113,37 @@ function StagesPage() {
         }
       />
 
-      <FilterBar
+      <FilterPanel
         search={search}
         onSearch={setSearch}
         placeholder="Rechercher par CNE, nom, structure, service…"
-      >
-        <FilterSelect
-          value={filiere}
-          onChange={setFiliere}
-          options={FILIERES}
-          allLabel="Toutes les filières"
-          width="w-[15rem]"
-        />
-        <FilterSelect
-          value={structure}
-          onChange={setStructure}
-          options={STRUCTURES_ACCUEIL}
-          allLabel="Toutes les structures"
-          width="w-[16rem]"
-        />
-        <FilterSelect
-          value={statut}
-          onChange={setStatut}
-          options={STATUTS.map((s) => STATUT_STAGE_LABEL[s])}
-          allLabel="Tous les statuts"
-          width="w-[13rem]"
-        />
-      </FilterBar>
+        filters={[
+          {
+            id: "filiere",
+            label: "Filière",
+            value: filiere,
+            onChange: setFiliere,
+            options: FILIERES,
+            allLabel: "Toutes les filières",
+          },
+          {
+            id: "structure",
+            label: "Structure",
+            value: structure,
+            onChange: setStructure,
+            options: STRUCTURES_ACCUEIL,
+            allLabel: "Toutes les structures",
+          },
+          {
+            id: "statut",
+            label: "Statut",
+            value: statut,
+            onChange: setStatut,
+            options: STATUTS.map((s) => STATUT_STAGE_LABEL[s]),
+            allLabel: "Tous les statuts",
+          },
+        ]}
+      />
 
       <DataTable
         minWidth="min-w-[1150px]"

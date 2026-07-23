@@ -30,8 +30,7 @@ import {
 } from "@/lib/dash-ui";
 import {
   PageHeader,
-  FilterBar,
-  FilterSelect,
+  FilterPanel,
   DataTable,
   DetailSection,
   DetailGrid,
@@ -181,33 +180,37 @@ function BulletinsPage() {
         }
       />
 
-      <FilterBar
+      <FilterPanel
         search={search}
         onSearch={setSearch}
         placeholder="Rechercher par CNE ou nom…"
-      >
-        <FilterSelect
-          value={filiere}
-          onChange={setFiliere}
-          options={FILIERES}
-          allLabel="Toutes les filières"
-          width="w-[15rem]"
-        />
-        <FilterSelect
-          value={niveau}
-          onChange={setNiveau}
-          options={NIVEAUX}
-          allLabel="Tous les semestres"
-          width="w-[11rem]"
-        />
-        <FilterSelect
-          value={session}
-          onChange={setSession}
-          options={SESSIONS}
-          allLabel="Toutes les sessions"
-          width="w-[12rem]"
-        />
-      </FilterBar>
+        filters={[
+          {
+            id: "filiere",
+            label: "Filière",
+            value: filiere,
+            onChange: setFiliere,
+            options: FILIERES,
+            allLabel: "Toutes les filières",
+          },
+          {
+            id: "niveau",
+            label: "Semestre",
+            value: niveau,
+            onChange: setNiveau,
+            options: NIVEAUX,
+            allLabel: "Tous les semestres",
+          },
+          {
+            id: "session",
+            label: "Session",
+            value: session,
+            onChange: setSession,
+            options: SESSIONS,
+            allLabel: "Toutes les sessions",
+          },
+        ]}
+      />
 
       <DataTable
         minWidth="min-w-[1100px]"

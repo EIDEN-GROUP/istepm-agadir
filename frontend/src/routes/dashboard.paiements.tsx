@@ -27,8 +27,7 @@ import {
 } from "@/lib/dash-ui";
 import {
   PageHeader,
-  FilterBar,
-  FilterSelect,
+  FilterPanel,
   DataTable,
   DetailShell,
   DetailSection,
@@ -137,26 +136,29 @@ function PaiementsPage() {
         ))}
       </div>
 
-      <FilterBar
+      <FilterPanel
         search={search}
         onSearch={setSearch}
         placeholder="Rechercher par CNE, étudiant, reçu, période…"
-      >
-        <FilterSelect
-          value={filiere}
-          onChange={setFiliere}
-          options={FILIERES}
-          allLabel="Toutes les filières"
-          width="w-[15rem]"
-        />
-        <FilterSelect
-          value={statut}
-          onChange={setStatut}
-          options={STATUTS.map((s) => STATUT_PAIEMENT_LABEL[s])}
-          allLabel="Tous les statuts"
-          width="w-[12rem]"
-        />
-      </FilterBar>
+        filters={[
+          {
+            id: "filiere",
+            label: "Filière",
+            value: filiere,
+            onChange: setFiliere,
+            options: FILIERES,
+            allLabel: "Toutes les filières",
+          },
+          {
+            id: "statut",
+            label: "Statut",
+            value: statut,
+            onChange: setStatut,
+            options: STATUTS.map((s) => STATUT_PAIEMENT_LABEL[s]),
+            allLabel: "Tous les statuts",
+          },
+        ]}
+      />
 
       <DataTable
         minWidth="min-w-[950px]"

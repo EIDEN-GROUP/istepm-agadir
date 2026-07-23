@@ -66,6 +66,7 @@ type Snapshot = {
   bulletins: Bulletin[];
   stages: Stage[];
   activite: ActiviteItem[];
+  filieres: string[];
 };
 
 function seed(): Snapshot {
@@ -77,6 +78,7 @@ function seed(): Snapshot {
     bulletins: BULLETINS,
     stages: STAGES,
     activite: ACTIVITE_RECENTE,
+    filieres: [...FILIERES],
   }) as Snapshot;
 }
 
@@ -162,6 +164,7 @@ type IstpmCtx = {
   bulletins: Bulletin[];
   stages: Stage[];
   activite: ActiviteItem[];
+  filieres: string[];
 
   /* Dérivés */
   paiements: PaiementLigne[];
@@ -218,6 +221,9 @@ type IstpmCtx = {
   deleteStage: (id: string) => void;
 
   addPaiement: (etudiantId: string, ligne: Omit<LignePaiement, "recu">) => void;
+
+  addFiliere: (nom: string) => void;
+  deleteFiliere: (nom: string) => void;
 
   reset: () => void;
 };
@@ -402,11 +408,22 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     const docId = uid("doc");
     await putDoc(docId, file);
 
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const detectedMime =
+      file.type ||
+      (ext === "pdf"
+        ? "application/pdf"
+        : ext === "doc"
+          ? "application/msword"
+          : ext === "docx"
+            ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            : "application/octet-stream");
+
     const meta: ExamDocument = {
       id: docId,
       nom: file.name,
       taille: file.size,
-      mime: file.type || "application/octet-stream",
+      mime: detectedMime,
       uploadedAt: today(),
     };
 
@@ -474,7 +491,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
             ? e.notes.map((n) =>
                 n.module === examen.module ? { ...n, note } : n,
               )
-            : [...e.notes, { module: examen.module, note, coef: 2, credits: 4 }];
+            : [...e.notes, { module: examen.module, note, coef: 3, credits: 6 }];
 
           return { ...e, notes, moyenne: moyennePonderee(notes) };
         });
@@ -485,11 +502,12 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           examens: s.examens.map((x) =>
             x.id === examenId ? { ...x, statut: "notes_saisies" as const } : x,
           ),
-          formateurs: s.formateurs.map((f) =>
-            examen.surveillants.some((sv) => sv.includes(f.nom))
+          formateurs: s.formateurs.map((f) => {
+            const svName = `${f.prenom[0]}. ${f.nom}`;
+            return examen.surveillants.includes(svName)
               ? { ...f, notesSaisies: f.notesSaisies + retenues.length }
-              : f,
-          ),
+              : f;
+          }),
           activite: [
             {
               type: "note" as const,
@@ -606,6 +624,24 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         };
       });
     },
+    [],
+  );
+
+  const addFiliere = useCallback(
+    (nom: string) =>
+      setSnap((s) => ({
+        ...s,
+        filieres: s.filieres.includes(nom) ? s.filieres : [...s.filieres, nom],
+      })),
+    [],
+  );
+
+  const deleteFiliere = useCallback(
+    (nom: string) =>
+      setSnap((s) => ({
+        ...s,
+        filieres: s.filieres.filter((f) => f !== nom),
+      })),
     [],
   );
 
@@ -733,6 +769,24 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [snap.examens, snap.bulletins, snap.stages],
   );
 
+  const reussiteFiliere = useMemo(
+    () =>
+      FILIERES.map((f) => {
+        const inscrits = snap.etudiants.filter(
+          (e) => e.filiere === f && e.moyenne > 0,
+        );
+        const reussite = inscrits.length
+          ? Math.round(
+              (inscrits.filter((e) => e.moyenne >= 10).length /
+                inscrits.length) *
+                100,
+            )
+          : 0;
+        return { name: FILIERE_COURT[f], filiere: f, value: reussite };
+      }),
+    [snap.etudiants],
+  );
+
   const value: IstpmCtx = {
     ...snap,
     paiements,
@@ -740,7 +794,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     financier,
     repartitionFiliere,
     repartitionNiveau,
-    reussiteFiliere: REUSSITE_FILIERE,
+    reussiteFiliere,
     etudiantsARisque,
     aRelancer,
     aTraiter,
@@ -763,6 +817,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     updateStage,
     deleteStage,
     addPaiement,
+    addFiliere,
+    deleteFiliere,
     reset,
   };
 

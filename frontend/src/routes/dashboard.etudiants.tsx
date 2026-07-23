@@ -35,8 +35,7 @@ import {
 } from "@/lib/dash-ui";
 import {
   PageHeader,
-  FilterBar,
-  FilterSelect,
+  FilterPanel,
   DataTable,
   DetailSection,
   DetailGrid,
@@ -167,38 +166,45 @@ function EtudiantsPage() {
         }
       />
 
-      <FilterBar
+      <FilterPanel
         search={search}
         onSearch={setSearch}
         placeholder="Rechercher par CNE, nom, groupe, ville…"
-      >
-        <FilterSelect
-          value={filiere}
-          onChange={setFiliere}
-          options={FILIERES}
-          allLabel="Toutes les filières"
-          width="w-[15rem]"
-        />
-        <FilterSelect
-          value={niveau}
-          onChange={setNiveau}
-          options={NIVEAUX}
-          allLabel="Tous les semestres"
-          width="w-[11rem]"
-        />
-        <FilterSelect
-          value={statut}
-          onChange={setStatut}
-          options={STATUTS.map((s) => STATUT_ETUDIANT_LABEL[s])}
-          allLabel="Tous les statuts"
-          width="w-[11rem]"
-        />
-      </FilterBar>
-
-      <p className="text-xs text-muted-foreground">
-        {filtered.length} étudiant{filtered.length > 1 ? "s" : ""} affiché
-        {filtered.length > 1 ? "s" : ""} sur {etudiants.length}
-      </p>
+        filters={[
+          {
+            id: "filiere",
+            label: "Filière",
+            value: filiere,
+            onChange: setFiliere,
+            options: FILIERES,
+            allLabel: "Toutes les filières",
+          },
+          {
+            id: "niveau",
+            label: "Semestre",
+            value: niveau,
+            onChange: setNiveau,
+            options: NIVEAUX,
+            allLabel: "Tous les semestres",
+          },
+          {
+            id: "statut",
+            label: "Statut",
+            value: statut,
+            onChange: setStatut,
+            options: STATUTS.map((s) => STATUT_ETUDIANT_LABEL[s]),
+            allLabel: "Tous les statuts",
+          },
+        ]}
+        summary={
+          <>
+            <strong className="font-semibold text-foreground">
+              {filtered.length}
+            </strong>{" "}
+            étudiant{filtered.length > 1 ? "s" : ""} sur {etudiants.length}
+          </>
+        }
+      />
 
       <DataTable
         isEmpty={filtered.length === 0}

@@ -19,7 +19,7 @@ import {
   AlertTriangle,
   ArrowRight,
 } from "lucide-react";
-import { useAuth, ROLE_META } from "@/lib/auth";
+import { useAuth, ROLE_META, DEMO_FORMATEUR_ID } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
 import { fmtMAD, fmtDate, type ActiviteItem } from "@/lib/istpm-data";
 import {
@@ -421,8 +421,7 @@ function DashboardDirecteur() {
 /** Vue enseignant : uniquement ses groupes, ses examens et ses modules. */
 function DashboardEnseignant() {
   const { formateurs, examens, reussiteFiliere } = useIstpm();
-  // Demo scoping: the signed-in teacher is the first formateur on file.
-  const moi = formateurs[0];
+  const moi = formateurs.find((f) => f.id === DEMO_FORMATEUR_ID);
 
   if (!moi) {
     return (

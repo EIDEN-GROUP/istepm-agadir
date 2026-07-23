@@ -31,26 +31,9 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-type FiliereConfig = {
-  nom: string;
-  duree: string;
-  fraisAnnuels: number;
-  effectif: number;
-};
-
 function SettingsPage() {
-  const { etudiants, reset } = useIstpm();
+  const { etudiants, filieres, addFiliere, deleteFiliere, reset } = useIstpm();
 
-  // Effectifs come from the live store; the filière list itself is local
-  // config, seeded once from the reference list.
-  const [filieres, setFilieres] = useState<FiliereConfig[]>(() =>
-    FILIERES.map((f) => ({
-      nom: f,
-      duree: "3 ans (S1–S6)",
-      fraisAnnuels: 34000,
-      effectif: 0,
-    })),
-  );
   const [addOpen, setAddOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [form, setForm] = useState({
@@ -76,24 +59,23 @@ function SettingsPage() {
           </p>
         ) : (
           <div className="divide-y divide-brand/8">
-            {filieres.map((f) => (
+            {filieres.map((nom) => (
               <div
-                key={f.nom}
+                key={nom}
                 className="flex items-center justify-between gap-3 py-3"
               >
                 <div className="min-w-0">
-                  <p className="font-semibold text-foreground">{f.nom}</p>
+                  <p className="font-semibold text-foreground">{nom}</p>
                   <p className="text-xs text-muted-foreground">
-                    {f.duree} · {fmtMAD(f.fraisAnnuels)} / an ·{" "}
-                    {etudiants.filter((e) => e.filiere === f.nom).length}{" "}
+                    {etudiants.filter((e) => e.filiere === nom).length}{" "}
                     étudiant(s)
                   </p>
                 </div>
                 <button
                   aria-label="Supprimer la filière"
                   onClick={() => {
-                    setFilieres((prev) => prev.filter((x) => x.nom !== f.nom));
-                    toast.success(`Filière supprimée — ${f.nom}`);
+                    deleteFiliere(nom);
+                    toast.success(`Filière supprimée — ${nom}`);
                   }}
                   className={iconButtonDanger}
                 >
@@ -184,14 +166,11 @@ function SettingsPage() {
                     toast.error("Le nom de la filière est obligatoire");
                     return;
                   }
-                  if (filieres.some((f) => f.nom === nom)) {
+                  if (filieres.includes(nom)) {
                     toast.error("Cette filière existe déjà");
                     return;
                   }
-                  setFilieres((prev) => [
-                    ...prev,
-                    { ...form, nom, effectif: 0 },
-                  ]);
+                  addFiliere(nom);
                   setForm({ nom: "", duree: "3 ans (S1–S6)", fraisAnnuels: 34000 });
                   setAddOpen(false);
                   toast.success(`Filière ajoutée — ${nom}`);

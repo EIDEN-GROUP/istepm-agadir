@@ -27,8 +27,7 @@ import {
 } from "@/lib/dash-ui";
 import {
   PageHeader,
-  FilterBar,
-  FilterSelect,
+  FilterPanel,
   DataTable,
   DetailSection,
   DetailGrid,
@@ -101,26 +100,29 @@ function FormateursPage() {
         }
       />
 
-      <FilterBar
+      <FilterPanel
         search={search}
         onSearch={setSearch}
         placeholder="Rechercher par matricule, CIN, nom, module, groupe…"
-      >
-        <FilterSelect
-          value={departement}
-          onChange={setDepartement}
-          options={FILIERES}
-          allLabel="Tous les départements"
-          width="w-[15rem]"
-        />
-        <FilterSelect
-          value={grade}
-          onChange={setGrade}
-          options={GRADES.map((g) => GRADE_LABEL[g])}
-          allLabel="Tous les grades"
-          width="w-[13rem]"
-        />
-      </FilterBar>
+        filters={[
+          {
+            id: "departement",
+            label: "Département",
+            value: departement,
+            onChange: setDepartement,
+            options: FILIERES,
+            allLabel: "Tous les départements",
+          },
+          {
+            id: "grade",
+            label: "Grade",
+            value: grade,
+            onChange: setGrade,
+            options: GRADES.map((g) => GRADE_LABEL[g]),
+            allLabel: "Tous les grades",
+          },
+        ]}
+      />
 
       <DataTable
         isEmpty={filtered.length === 0}
