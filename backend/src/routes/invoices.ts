@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { invoices } from "@/db/schema/invoices";
 import { clients } from "@/db/schema/clients";
@@ -93,7 +93,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
     return results;
   });
 
-  app.post("/generate", { preHandler: [authenticate] }, async (request) => {
+  app.post("/generate", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { period } = generateSchema.parse(request.body);
     const db = getDb();
 

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { planifications } from "@/db/schema/planifications";
 import { eq, desc } from "drizzle-orm";
@@ -22,14 +22,14 @@ export async function planificationRoutes(app: FastifyInstance) {
     return db.select().from(planifications).orderBy(desc(planifications.date));
   });
 
-  app.post("/", { preHandler: [authenticate] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = planifSchema.parse(request.body);
     const db = getDb();
     const [plan] = await db.insert(planifications).values(input).returning();
     return plan;
   });
 
-  app.put("/:id", { preHandler: [authenticate] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = planifSchema.partial().parse(request.body);
     const db = getDb();
@@ -43,7 +43,7 @@ export async function planificationRoutes(app: FastifyInstance) {
     return plan;
   });
 
-  app.delete("/:id", { preHandler: [authenticate] }, async (request, reply) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(planifications).where(eq(planifications.id, id));

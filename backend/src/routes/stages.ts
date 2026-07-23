@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { stages } from "@/db/schema/stages";
 import { eq, desc, sql, or } from "drizzle-orm";
@@ -74,7 +74,7 @@ export async function stageRoutes(app: FastifyInstance) {
     return stage;
   });
 
-  app.post("/", { preHandler: [authenticate] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = stageSchema.parse(request.body);
     const db = getDb();
     const [stage] = await db
@@ -90,7 +90,7 @@ export async function stageRoutes(app: FastifyInstance) {
     return stage;
   });
 
-  app.put("/:id", { preHandler: [authenticate] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = stageSchema.partial().parse(request.body);
     const db = getDb();
@@ -113,7 +113,7 @@ export async function stageRoutes(app: FastifyInstance) {
     return stage;
   });
 
-  app.delete("/:id", { preHandler: [authenticate] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(stages).where(eq(stages.id, id));
@@ -122,7 +122,7 @@ export async function stageRoutes(app: FastifyInstance) {
 
   app.post(
     "/:id/valider",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { payments } from "@/db/schema/payments";
 import { clients } from "@/db/schema/clients";
@@ -37,7 +37,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     return rows.map((r) => ({ ...r.payments, client: r.clients }));
   });
 
-  app.post("/", { preHandler: [authenticate] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = paymentSchema.parse(request.body);
     const now = new Date();
     const db = getDb();
@@ -66,7 +66,7 @@ export async function paymentRoutes(app: FastifyInstance) {
 
   app.put(
     "/:id/invoice-sent",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();
@@ -81,7 +81,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     },
   );
 
-  app.delete("/:id", { preHandler: [authenticate] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [payment] = await db

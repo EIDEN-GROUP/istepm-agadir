@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { settings } from "@/db/schema/settings";
 import { levels } from "@/db/schema/levels";
@@ -34,7 +34,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return map;
   });
 
-  app.put("/:key", { preHandler: [authenticate] }, async (request, reply) => {
+  app.put("/:key", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { key } = request.params as { key: string };
     const { value } = settingSchema.parse(request.body);
     const db = getDb();
@@ -65,7 +65,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return db.select().from(levels).orderBy(desc(levels.createdAt));
   });
 
-  app.post("/levels", { preHandler: [authenticate] }, async (request) => {
+  app.post("/levels", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = levelSchema.parse(request.body);
     const db = getDb();
     const [level] = await db
@@ -80,7 +80,7 @@ export async function settingsRoutes(app: FastifyInstance) {
 
   app.put(
     "/levels/:id",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const input = levelSchema.partial().parse(request.body);
@@ -102,7 +102,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     },
   );
 
-  app.delete("/levels/:id", { preHandler: [authenticate] }, async (request) => {
+  app.delete("/levels/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(levels).where(eq(levels.id, id));
@@ -119,7 +119,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return row?.value ?? [];
   });
 
-  app.post("/filieres", { preHandler: [authenticate] }, async (request, reply) => {
+  app.post("/filieres", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { nom } = z.object({ nom: z.string().min(1) }).parse(request.body);
     const db = getDb();
     const [row] = await db
@@ -146,7 +146,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { filieres: list };
   });
 
-  app.delete("/filieres/:nom", { preHandler: [authenticate] }, async (request, reply) => {
+  app.delete("/filieres/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { nom } = request.params as { nom: string };
     const db = getDb();
     const [row] = await db
@@ -168,7 +168,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { filieres: list };
   });
 
-  app.post("/reset", { preHandler: [authenticate] }, async () => {
+  app.post("/reset", { preHandler: [authenticate, requireRole("directeur")] }, async () => {
     const db = getDb();
     await db.delete(historiquePaiements);
     await db.delete(notesEtudiant);

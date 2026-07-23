@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { emailLogs } from "@/db/schema/email-logs";
 import nodemailer from "nodemailer";
@@ -47,7 +47,7 @@ function getTransporter() {
 }
 
 export async function emailRoutes(app: FastifyInstance) {
-  app.post("/send", { preHandler: [authenticate] }, async (request) => {
+  app.post("/send", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = sendSchema.parse(request.body);
     const env = getEnv();
     const transporter = getTransporter();
@@ -86,7 +86,7 @@ export async function emailRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/send-receipt", { preHandler: [authenticate] }, async (request) => {
+  app.post("/send-receipt", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = receiptSchema.parse(request.body);
     const env = getEnv();
     const transporter = getTransporter();

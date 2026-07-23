@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { etudiants } from "@/db/schema/etudiants";
 import { historiquePaiements } from "@/db/schema/historique-paiements";
@@ -57,7 +57,7 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
     return rows;
   });
 
-  app.post("/", { preHandler: [authenticate] }, async (request, reply) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const input = paiementSchema.parse(request.body);
     const db = getDb();
 

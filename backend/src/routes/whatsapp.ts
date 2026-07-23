@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { clients } from "@/db/schema/clients";
 import { whatsappMessages } from "@/db/schema/whatsapp-messages";
@@ -19,7 +19,7 @@ const broadcastSchema = z.object({
 });
 
 export async function whatsappRoutes(app: FastifyInstance) {
-  app.post("/send", { preHandler: [authenticate] }, async (request, reply) => {
+  app.post("/send", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const input = sendSchema.parse(request.body);
     const db = getDb();
 
@@ -54,7 +54,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
     return result;
   });
 
-  app.post("/broadcast", { preHandler: [authenticate] }, async (request) => {
+  app.post("/broadcast", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = broadcastSchema.parse(request.body);
     const db = getDb();
 
@@ -123,7 +123,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
   app.delete(
     "/messages/:id",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();

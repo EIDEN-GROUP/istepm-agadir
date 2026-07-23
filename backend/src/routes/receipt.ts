@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { settings } from "@/db/schema/settings";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
@@ -13,7 +13,7 @@ const generateSchema = z.object({
 });
 
 export async function receiptRoutes(app: FastifyInstance) {
-  app.post("/generate", { preHandler: [authenticate] }, async (request) => {
+  app.post("/generate", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = generateSchema.parse(request.body);
     const db = getDb();
 

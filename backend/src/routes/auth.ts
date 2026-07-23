@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import {
   login,
   createUser,
@@ -54,7 +54,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post(
     "/register",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async (request, reply) => {
       const input = createUserSchema.parse(request.body);
       const existing = await findByEmail(input.email);
@@ -72,7 +72,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.put(
     "/users/:id",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const input = updateUserSchema.parse(request.body);
@@ -86,7 +86,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.delete(
     "/users/:id",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       await deleteUser(id);

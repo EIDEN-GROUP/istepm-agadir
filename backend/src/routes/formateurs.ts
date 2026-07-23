@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { formateurs } from "@/db/schema/formateurs";
 import { eq, desc, sql, or } from "drizzle-orm";
@@ -68,7 +68,7 @@ export async function formateurRoutes(app: FastifyInstance) {
     return formateur;
   });
 
-  app.post("/", { preHandler: [authenticate] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = formateurSchema.parse(request.body);
     const db = getDb();
     const [formateur] = await db
@@ -78,7 +78,7 @@ export async function formateurRoutes(app: FastifyInstance) {
     return formateur;
   });
 
-  app.put("/:id", { preHandler: [authenticate] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = formateurSchema.partial().parse(request.body);
     const db = getDb();
@@ -95,7 +95,7 @@ export async function formateurRoutes(app: FastifyInstance) {
     return formateur;
   });
 
-  app.delete("/:id", { preHandler: [authenticate] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(formateurs).where(eq(formateurs.id, id));

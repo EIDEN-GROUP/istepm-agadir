@@ -51,3 +51,16 @@ export async function authenticate(
     return reply.status(401).send({ error: "Token invalide ou expiré" });
   }
 }
+
+/** Restrict access to one or more roles. Must be chained after `authenticate`. */
+export function requireRole(...roles: string[]) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    const userRole = request.user?.role;
+    if (!userRole || !roles.includes(userRole)) {
+      return reply.status(403).send({
+        error: "Accès refusé : rôle insuffisant",
+        allowedRoles: roles,
+      });
+    }
+  };
+}

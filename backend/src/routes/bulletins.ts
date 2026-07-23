@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { bulletins } from "@/db/schema/bulletins";
 import { eq, desc, sql } from "drizzle-orm";
@@ -79,7 +79,7 @@ export async function bulletinRoutes(app: FastifyInstance) {
     return bulletin;
   });
 
-  app.post("/", { preHandler: [authenticate] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = bulletinSchema.parse(request.body);
     const db = getDb();
     const [bulletin] = await db
@@ -93,7 +93,7 @@ export async function bulletinRoutes(app: FastifyInstance) {
     return bulletin;
   });
 
-  app.put("/:id", { preHandler: [authenticate] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = bulletinUpdateSchema.parse(request.body);
     const db = getDb();
@@ -113,7 +113,7 @@ export async function bulletinRoutes(app: FastifyInstance) {
     return bulletin;
   });
 
-  app.delete("/:id", { preHandler: [authenticate] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(bulletins).where(eq(bulletins.id, id));
@@ -122,7 +122,7 @@ export async function bulletinRoutes(app: FastifyInstance) {
 
   app.post(
     "/:id/publier",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();
@@ -138,7 +138,7 @@ export async function bulletinRoutes(app: FastifyInstance) {
 
   app.post(
     "/publier-tout",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async () => {
       const db = getDb();
       const result = await db

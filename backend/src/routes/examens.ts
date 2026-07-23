@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { examens } from "@/db/schema/examens";
 import { notesExamen } from "@/db/schema/notes-examen";
@@ -102,7 +102,7 @@ export async function examenRoutes(app: FastifyInstance) {
     return { ...examen, notes };
   });
 
-  app.post("/", { preHandler: [authenticate] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = examenSchema.parse(request.body);
     const db = getDb();
     const [examen] = await db
@@ -112,7 +112,7 @@ export async function examenRoutes(app: FastifyInstance) {
     return examen;
   });
 
-  app.put("/:id", { preHandler: [authenticate] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = examenSchema.partial().parse(request.body);
     const db = getDb();
@@ -129,7 +129,7 @@ export async function examenRoutes(app: FastifyInstance) {
     return examen;
   });
 
-  app.delete("/:id", { preHandler: [authenticate] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(examens).where(eq(examens.id, id));
@@ -138,7 +138,7 @@ export async function examenRoutes(app: FastifyInstance) {
 
   app.post(
     "/:id/notes",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "enseignant")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const { saisies } = saveNotesSchema.parse(request.body);

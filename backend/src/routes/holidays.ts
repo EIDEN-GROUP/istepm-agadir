@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { holidays } from "@/db/schema/holidays";
 import { schoolVacations } from "@/db/schema/vacations";
@@ -33,21 +33,21 @@ export async function holidayRoutes(app: FastifyInstance) {
     return db.select().from(holidays).orderBy(desc(holidays.date));
   });
 
-  app.post("/", { preHandler: [authenticate] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = holidaySchema.parse(request.body);
     const db = getDb();
     const [holiday] = await db.insert(holidays).values(input).returning();
     return holiday;
   });
 
-  app.delete("/:id", { preHandler: [authenticate] }, async (request, reply) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(holidays).where(eq(holidays.id, id));
     return { ok: true };
   });
 
-  app.post("/sync", { preHandler: [authenticate] }, async (request) => {
+  app.post("/sync", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { years } = syncSchema.parse(request.body);
     const db = getDb();
     let imported = 0;
@@ -90,7 +90,7 @@ export async function holidayRoutes(app: FastifyInstance) {
       .orderBy(desc(schoolVacations.startDate));
   });
 
-  app.post("/vacations", { preHandler: [authenticate] }, async (request) => {
+  app.post("/vacations", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = vacationSchema.parse(request.body);
     const db = getDb();
     const [vacation] = await db
@@ -102,7 +102,7 @@ export async function holidayRoutes(app: FastifyInstance) {
 
   app.delete(
     "/vacations/:id",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();
@@ -119,7 +119,7 @@ export async function holidayRoutes(app: FastifyInstance) {
       .orderBy(desc(calendarExceptions.date));
   });
 
-  app.post("/exceptions", { preHandler: [authenticate] }, async (request) => {
+  app.post("/exceptions", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = exceptionSchema.parse(request.body);
     const db = getDb();
     const [exc] = await db.insert(calendarExceptions).values(input).returning();
@@ -128,7 +128,7 @@ export async function holidayRoutes(app: FastifyInstance) {
 
   app.delete(
     "/exceptions/:id",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();

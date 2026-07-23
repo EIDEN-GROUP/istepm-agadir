@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authenticate } from "@/middleware/auth";
+import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { clients } from "@/db/schema/clients";
 import { eq, desc, sql, or } from "drizzle-orm";
@@ -84,7 +84,7 @@ export async function clientRoutes(app: FastifyInstance) {
     return client;
   });
 
-  app.post("/", { preHandler: [authenticate] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = clientSchema.parse(request.body);
     const db = getDb();
     const [client] = await db
@@ -98,7 +98,7 @@ export async function clientRoutes(app: FastifyInstance) {
     return client;
   });
 
-  app.put("/:id", { preHandler: [authenticate] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = clientSchema.partial().parse(request.body);
     const db = getDb();
@@ -118,14 +118,14 @@ export async function clientRoutes(app: FastifyInstance) {
     return client;
   });
 
-  app.delete("/:id", { preHandler: [authenticate] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(clients).where(eq(clients.id, id));
     return { ok: true };
   });
 
-  app.post("/import-csv", { preHandler: [authenticate] }, async (request) => {
+  app.post("/import-csv", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { csvText } = z.object({ csvText: z.string() }).parse(request.body);
     const rows = parseCsv(csvText);
     let imported = 0;
