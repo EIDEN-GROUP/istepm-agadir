@@ -2,9 +2,9 @@
  * Sidebar application shell.
  *
  * Replaces the previous horizontal top-nav. Layout:
- *   · lg and up — a persistent left rail that collapses to icons only,
+ *   · lg and up   a persistent left rail that collapses to icons only,
  *     with the collapsed state remembered across sessions.
- *   · below lg — a slim top bar with a hamburger that slides the same rail
+ *   · below lg   a slim top bar with a hamburger that slides the same rail
  *     in as an overlay drawer.
  *
  * Direction-aware throughout: the rail is the first flex child and uses

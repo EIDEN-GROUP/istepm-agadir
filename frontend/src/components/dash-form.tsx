@@ -1,12 +1,6 @@
-/**
- * Form controls shared by the create/edit dialogs.
- *
- * Every entity form (étudiant, formateur, examen, stage, paiement…) is built
- * from these so validation, spacing and error styling stay identical across
- * the app, and each page's form stays a short declarative list of fields.
- */
 import { useRef, type ReactNode } from "react";
 import { FileText, Upload, X } from "lucide-react";
+import { motion } from "framer-motion";
 import {
   Dialog,
   DialogContent,
@@ -35,10 +29,6 @@ import {
 import { DetailShell } from "@/components/dash-page";
 import { cn } from "@/lib/utils";
 
-/* ------------------------------------------------------------------ */
-/*  Champs                                                             */
-/* ------------------------------------------------------------------ */
-
 function FieldShell({
   label,
   error,
@@ -57,7 +47,15 @@ function FieldShell({
         {required ? <span className="ml-0.5 text-alert">*</span> : null}
       </Label>
       {children}
-      {error ? <p className="text-[11px] text-alert">{error}</p> : null}
+      {error ? (
+        <motion.p
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-[11px] text-alert"
+        >
+          {error}
+        </motion.p>
+      ) : null}
     </div>
   );
 }
@@ -153,7 +151,6 @@ export function SelectField<T extends string>({
   label: string;
   value: T | "";
   onChange: (v: T) => void;
-  /** Either plain strings, or {value,label} when the two differ. */
   options: readonly T[] | readonly { value: T; label: string }[];
   placeholder?: string;
   error?: string;
@@ -186,11 +183,6 @@ export function SelectField<T extends string>({
   );
 }
 
-/**
- * Comma-separated list field (modules enseignés, groupes, surveillants…).
- * Kept as free text while editing so commas can be typed naturally; the
- * caller splits on submit via `parseList`.
- */
 export function ListField({
   label,
   value,
@@ -228,14 +220,6 @@ export function parseList(v: string): string[] {
     .filter(Boolean);
 }
 
-/**
- * Dépôt de fichier.
- *
- * Gère deux états : un document déjà enregistré (`existing`) et une sélection
- * en attente d'enregistrement (`file`). La création d'un examen n'ayant pas
- * encore d'identifiant, le fichier est retenu ici puis écrit par l'appelant
- * une fois l'examen créé.
- */
 export function FileField({
   label,
   file,
@@ -327,14 +311,6 @@ function formatBytes(n: number) {
   return `${(n / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Dialogue de formulaire                                             */
-/* ------------------------------------------------------------------ */
-
-/**
- * Create/edit dialog shell. Renders nothing until `open`, so each form's
- * internal state is fresh on every open without needing a manual reset.
- */
 export function FormDialog({
   open,
   onOpenChange,
@@ -373,27 +349,35 @@ export function FormDialog({
               >
                 Annuler
               </button>
-              <button type="button" className={primaryPill} onClick={onSubmit}>
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={primaryPill}
+                onClick={onSubmit}
+              >
                 {submitLabel}
-              </button>
+              </motion.button>
             </div>
           }
         >
-          <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ staggerChildren: 0.03, delayChildren: 0.1 }}
+            className="grid gap-4 sm:grid-cols-2"
+          >
+            {children}
+          </motion.div>
         </DetailShell>
       </DialogContent>
     </Dialog>
   );
 }
 
-/** Makes a field span both columns of FormDialog's two-column grid. */
 export function FullWidth({ children }: { children: ReactNode }) {
   return <div className="sm:col-span-2">{children}</div>;
 }
-
-/* ------------------------------------------------------------------ */
-/*  Confirmation de suppression                                        */
-/* ------------------------------------------------------------------ */
 
 export function ConfirmDialog({
   open,
@@ -426,8 +410,10 @@ export function ConfirmDialog({
               >
                 Annuler
               </button>
-              <button
+              <motion.button
                 type="button"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 className="inline-flex items-center gap-2 rounded-full bg-alert px-5 py-2.5 text-sm font-bold text-white transition hover:bg-alert-dk"
                 onClick={() => {
                   onConfirm();
@@ -435,11 +421,17 @@ export function ConfirmDialog({
                 }}
               >
                 {confirmLabel}
-              </button>
+              </motion.button>
             </div>
           }
         >
-          <p className="text-sm text-foreground">{message}</p>
+          <motion.p
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-sm text-foreground"
+          >
+            {message}
+          </motion.p>
         </DetailShell>
       </DialogContent>
     </Dialog>

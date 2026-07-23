@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Eye, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useIstpm } from "@/lib/istpm-store";
 import {
@@ -139,8 +140,15 @@ function FormateursPage() {
           </>
         }
       >
-        {filtered.map((f) => (
-          <tr key={f.id} onClick={() => setDetail(f)} className={tableRow}>
+        {filtered.map((f, i) => (
+          <motion.tr
+            key={f.id}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
+            onClick={() => setDetail(f)}
+            className={tableRow}
+          >
             <td className="font-medium tabular-nums">{f.matricule}</td>
             <td>
               <span className="flex items-center gap-2.5">
@@ -195,7 +203,7 @@ function FormateursPage() {
                 </button>
               </div>
             </td>
-          </tr>
+          </motion.tr>
         ))}
       </DataTable>
 
@@ -301,10 +309,10 @@ function FormateursPage() {
           onSubmit={(data) => {
             if (editing) {
               updateFormateur(editing.id, data);
-              toast.success(`Fiche mise à jour — ${data.prenom} ${data.nom}`);
+              toast.success(`Fiche mise à jour   ${data.prenom} ${data.nom}`);
             } else {
               addFormateur(data);
-              toast.success(`Formateur ajouté — ${data.prenom} ${data.nom}`);
+              toast.success(`Formateur ajouté   ${data.prenom} ${data.nom}`);
             }
             setFormOpen(false);
           }}
@@ -324,7 +332,7 @@ function FormateursPage() {
           if (!toDelete) return;
           deleteFormateur(toDelete.id);
           toast.success(
-            `Formateur supprimé — ${toDelete.prenom} ${toDelete.nom}`,
+            `Formateur supprimé   ${toDelete.prenom} ${toDelete.nom}`,
           );
           setToDelete(null);
         }}
@@ -420,7 +428,7 @@ function FormateurForm({
       title={initial ? "Modifier la fiche formateur" : "Nouveau formateur"}
       subtitle={
         initial
-          ? `${initial.prenom} ${initial.nom} — ${initial.matricule}`
+          ? `${initial.prenom} ${initial.nom}   ${initial.matricule}`
           : "Renseigner les informations du formateur"
       }
       submitLabel={initial ? "Enregistrer les modifications" : "Ajouter"}

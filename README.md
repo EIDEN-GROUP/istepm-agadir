@@ -1,6 +1,6 @@
 # school-CRM
 
-Gestion scolaire — application de gestion d'établissement scolaire (facturation, paiements, employés, planning, support). Architecture full-stack avec backend Fastify + frontend React SPA.
+Gestion scolaire   application de gestion d'établissement scolaire (facturation, paiements, employés, planning, support). Architecture full-stack avec backend Fastify + frontend React SPA.
 
 ## Architecture
 
@@ -52,7 +52,7 @@ Pure Vite + React SPA. No SSR. TanStack Router file-based routing with auth guar
 | `/` | Redirects to `/login` |
 | `/login` | Login form |
 | `/dashboard` | Dashboard (auth required) |
-| `/dashboard/` | Dashboard home — stats, charts, recent payments |
+| `/dashboard/` | Dashboard home   stats, charts, recent payments |
 | `/dashboard/familles` | Client management |
 | `/dashboard/paiements` | Payment tracking |
 | `/dashboard/calendar` | Calendar with holidays/vacations |
@@ -141,7 +141,7 @@ docker stack deploy -c docker-compose.production.yml school-crm
 | `redis` | 6379 | Cache + BullMQ |
 | `minio` | 9000 (API), 9001 (Console) | S3 storage |
 | `backend` | 3000 | Fastify API |
-| `backend-worker` | — | BullMQ background jobs |
+| `backend-worker` |   | BullMQ background jobs |
 | `traefik` (prod) | 80, 443 | Reverse proxy + SSL |
 
 ## Data migration (Supabase → self-hosted)
@@ -152,7 +152,7 @@ export DATABASE_URL="postgres://postgres:postgres@localhost:5432/school_crm"
 npx tsx backend/scripts/migrate-from-supabase.ts
 ```
 
-Migrates all 19 tables in dependency order. Batched inserts with `ON CONFLICT DO NOTHING` — safe to re-run.
+Migrates all 19 tables in dependency order. Batched inserts with `ON CONFLICT DO NOTHING`   safe to re-run.
 
 ## Admin API (multi-product integration)
 
@@ -179,17 +179,17 @@ Set the `ADMIN_API_KEY` environment variable on the backend and provide it to th
 | `PORT` | 3000 | API port |
 | `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/school_crm` | PostgreSQL connection |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection |
-| `JWT_SECRET` | — | JWT signing key |
+| `JWT_SECRET` |   | JWT signing key |
 | `JWT_EXPIRES_IN` | `7d` | Token lifetime |
 | `MINIO_ENDPOINT` | `localhost` | MinIO host |
 | `MINIO_PORT` | 9000 | MinIO port |
 | `MINIO_ACCESS_KEY` | `minioadmin` | MinIO user |
 | `MINIO_SECRET_KEY` | `minioadmin` | MinIO password |
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
-| `ADMIN_API_KEY` | — | API key for multi-product Admin API access |
-| `SMTP_HOST` | — | SMTP server (email) |
-| `WHATSAPP_PHONE_NUMBER_ID` | — | WhatsApp Cloud API |
-| `N8N_WEBHOOK_URL` | — | n8n automation webhook |
+| `ADMIN_API_KEY` |   | API key for multi-product Admin API access |
+| `SMTP_HOST` |   | SMTP server (email) |
+| `WHATSAPP_PHONE_NUMBER_ID` |   | WhatsApp Cloud API |
+| `N8N_WEBHOOK_URL` |   | n8n automation webhook |
 | `LOG_LEVEL` | `info` | Pino log level |
 
 ### Frontend (`frontend/.env`)

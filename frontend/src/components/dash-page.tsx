@@ -1,11 +1,6 @@
-/**
- * Small building blocks shared by the ISTPM list pages (étudiants, formateurs,
- * examens, bulletins, stages). They exist so those five pages stay short and
- * visually identical   header, filter bar, table shell and detail-dialog rows
- * are declared once here instead of copy-pasted per page.
- */
 import type { ReactNode } from "react";
 import { Search, X, RotateCcw } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -37,7 +32,12 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4">
+    <motion.header
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="flex flex-wrap items-end justify-between gap-4"
+    >
       <div>
         <p className={eyebrowClass}>{eyebrow}</p>
         <h1 className="mt-1 font-display text-3xl tracking-tight text-foreground md:text-4xl">
@@ -47,11 +47,10 @@ export function PageHeader({
       {actions ? (
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
       ) : null}
-    </header>
+    </motion.header>
   );
 }
 
-/** Search box + any number of dropdown filters, on one wrapping row. */
 export function FilterBar({
   search,
   onSearch,
@@ -79,10 +78,6 @@ export function FilterBar({
   );
 }
 
-/**
- * Dropdown filter with a built-in "all" option.
- * The sentinel is a non-empty string because Radix Select reserves `""`.
- */
 export const ALL = "__all__";
 
 export function FilterSelect({
@@ -115,32 +110,15 @@ export function FilterSelect({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Panneau de filtres                                                 */
-/* ------------------------------------------------------------------ */
-
 export type FilterDef = {
   id: string;
-  /** Libellé court affiché au-dessus du menu, ex. « Formateur ». */
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: readonly string[];
-  /** Option « tout » — sert aussi de texte par défaut. */
   allLabel: string;
 };
 
-/**
- * Recherche + filtres regroupés dans une seule surface.
- *
- * Chaque menu porte son libellé au-dessus : passé trois filtres, un menu qui
- * affiche « Karim Tahiri » ne dit plus sur quoi il porte, et le texte par
- * défaut qui jouait ce rôle a disparu dès la sélection.
- *
- * Les filtres actifs sont repris en pastilles retirables sous le panneau, avec
- * une remise à zéro globale : sans cela, un tableau vide n'explique pas
- * lequel des cinq critères l'a vidé.
- */
 export function FilterPanel({
   search,
   onSearch,
@@ -153,9 +131,7 @@ export function FilterPanel({
   onSearch: (v: string) => void;
   placeholder: string;
   filters: FilterDef[];
-  /** Décompte des résultats, affiché dans le pied du panneau. */
   summary?: ReactNode;
-  /** Actions optionnelles alignées à droite du pied. */
   trailing?: ReactNode;
 }) {
   const active = filters.filter((f) => f.value !== ALL);
@@ -168,9 +144,13 @@ export function FilterPanel({
   };
 
   return (
-    <section className={cn(softCard, "overflow-hidden")}>
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: 0.05, ease: "easeOut" }}
+      className={cn(softCard, "overflow-hidden")}
+    >
       <div className="space-y-4 p-4 md:p-5">
-        {/* Recherche */}
         <div className="relative">
           <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
           <Input
@@ -191,7 +171,6 @@ export function FilterPanel({
           ) : null}
         </div>
 
-        {/* Menus — la grille s'ajuste au nombre de filtres et à la largeur. */}
         <div className="grid grid-cols-[repeat(auto-fit,minmax(11.5rem,1fr))] gap-3">
           {filters.map((f) => {
             const isActive = f.value !== ALL;
@@ -237,7 +216,6 @@ export function FilterPanel({
         </div>
       </div>
 
-      {/* Pied : décompte, pastilles actives, remise à zéro */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-brand/12 bg-muted/60 px-4 py-3 md:px-5">
         {summary ? (
           <span className="text-xs font-medium text-muted-foreground">
@@ -277,7 +255,7 @@ export function FilterPanel({
 
         {trailing ? <span className="ms-auto">{trailing}</span> : null}
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -308,7 +286,6 @@ function FilterChip({
   );
 }
 
-/** Card-wrapped scrollable table. `head` is a <tr>, `children` are <tr>s. */
 export function DataTable({
   head,
   children,
@@ -323,36 +300,38 @@ export function DataTable({
   minWidth?: string;
 }) {
   return (
-    <section className={cn(softCard, "overflow-hidden")}>
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: 0.1, ease: "easeOut" }}
+      className={cn(softCard, "overflow-hidden")}
+    >
       <div className={tableWrap}>
         <table className={cn(tableEl, minWidth)}>
           <thead>
             <tr className={tableHead}>{head}</tr>
           </thead>
+          {/* L'entrée des lignes est gérée par `motion.tr` dans chaque page :
+              pas d'animation CSS ici, sinon les deux se superposeraient. */}
           <tbody className={tableBody}>{children}</tbody>
         </table>
-        {isEmpty ? (
-          <p className="px-5 py-8 text-center text-sm text-muted-foreground">
-            {empty}
-          </p>
-        ) : null}
+        <AnimatePresence>
+          {isEmpty ? (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="px-5 py-8 text-center text-sm text-muted-foreground"
+            >
+              {empty}
+            </motion.p>
+          ) : null}
+        </AnimatePresence>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Fiches détaillées                                                  */
-/* ------------------------------------------------------------------ */
-
-/**
- * Chrome d'une fiche : en-tête d'identité figé, corps défilant, pied figé.
- *
- * L'en-tête porte une pastille (initiales ou icône), le titre, une ligne de
- * contexte et les badges d'état. Les tableaux de liste n'affichant plus qu'une
- * seule ligne par enregistrement, c'est ici que se lit le détail : l'identité
- * doit donc rester visible pendant le défilement du corps.
- */
 export function DetailShell({
   icon,
   title,
@@ -361,7 +340,6 @@ export function DetailShell({
   children,
   footer,
 }: {
-  /** Initiales ou icône affichée dans la pastille de gauche. */
   icon?: ReactNode;
   title: string;
   subtitle?: string;
@@ -370,7 +348,11 @@ export function DetailShell({
   footer?: ReactNode;
 }) {
   return (
-    <>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+    >
       <header className="shrink-0 border-b border-brand/12 bg-brand-wash px-6 py-5">
         <div className="flex items-start gap-3.5">
           {icon ? (
@@ -378,7 +360,6 @@ export function DetailShell({
               {icon}
             </span>
           ) : null}
-          {/* pe-10 réserve la place du bouton de fermeture du dialogue. */}
           <div className="min-w-0 flex-1 pe-10">
             <h2 className="font-display text-lg font-bold leading-tight tracking-tight text-foreground">
               {title}
@@ -404,44 +385,41 @@ export function DetailShell({
           {footer}
         </footer>
       ) : null}
-    </>
+    </motion.div>
   );
 }
 
-/** Bloc titré dans une fiche. */
 export function DetailSection({
   title,
   action,
   children,
 }: {
   title: string;
-  /** Contrôle optionnel aligné à droite du titre. */
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-2.5">
+    <motion.section
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="space-y-2.5"
+    >
       <div className="flex items-center gap-3">
         <h3 className={cn(eyebrowClass, "shrink-0")}>{title}</h3>
         <span className="h-px flex-1 bg-brand/12" />
         {action}
       </div>
       {children}
-    </section>
+    </motion.section>
   );
 }
 
-/**
- * Grille de champs — deux colonnes dès que la largeur le permet.
- * Chaque champ empile son libellé au-dessus de sa valeur : plus lisible en
- * lecture rapide qu'une longue suite de lignes libellé-à-gauche.
- */
 export function DetailGrid({
   children,
   single,
 }: {
   children: ReactNode;
-  /** Force une seule colonne (valeurs longues : adresses, listes). */
   single?: boolean;
 }) {
   return (
@@ -456,7 +434,6 @@ export function DetailGrid({
   );
 }
 
-/** Champ d'une `DetailGrid` : libellé discret au-dessus, valeur lisible. */
 export function DetailField({
   label,
   value,
@@ -465,9 +442,7 @@ export function DetailField({
 }: {
   label: string;
   value: ReactNode;
-  /** Colore la valeur pour un état positif ou négatif. */
   tone?: "default" | "positive" | "negative" | "muted";
-  /** Occupe les deux colonnes. */
   full?: boolean;
 }) {
   const toneClass =
@@ -486,7 +461,7 @@ export function DetailField({
       </dt>
       <dd className={cn("mt-1 text-sm font-medium leading-snug", toneClass)}>
         {value === "" || value === null || value === undefined ? (
-          <span className="text-muted-foreground/60">—</span>
+          <span className="text-muted-foreground/60"> </span>
         ) : (
           value
         )}
@@ -495,7 +470,6 @@ export function DetailField({
   );
 }
 
-/** Ligne libellé-à-gauche / valeur-à-droite — pour les totaux et synthèses. */
 export function DetailRow({
   label,
   value,
@@ -520,7 +494,6 @@ export function DetailRow({
   );
 }
 
-/** Tableau compact intégré à une fiche. */
 export function DetailTable({
   head,
   children,
@@ -544,7 +517,6 @@ export function DetailTable({
   );
 }
 
-/** État vide d'une section de fiche. */
 export function DetailEmpty({
   children,
   tone = "neutral",

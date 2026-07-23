@@ -539,3 +539,170 @@ html[dir="rtl"] .landing-page {
 html[dir="rtl"] [data-dashboard-main] {
   direction: rtl;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Animation utilities   smooth CRM transitions                        */
+/* ------------------------------------------------------------------ */
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes kpi-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out both;
+}
+
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.3s ease-out both;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.35s ease-out both;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.35s ease-out both;
+}
+
+.animate-kpi-enter {
+  animation: kpi-enter 0.5s ease-out both;
+}
+
+.animate-stagger-1 { animation-delay: 0.05s; }
+.animate-stagger-2 { animation-delay: 0.1s; }
+.animate-stagger-3 { animation-delay: 0.15s; }
+.animate-stagger-4 { animation-delay: 0.2s; }
+.animate-stagger-5 { animation-delay: 0.25s; }
+.animate-stagger-6 { animation-delay: 0.3s; }
+.animate-stagger-7 { animation-delay: 0.35s; }
+.animate-stagger-8 { animation-delay: 0.4s; }
+.animate-stagger-9 { animation-delay: 0.45s; }
+.animate-stagger-10 { animation-delay: 0.5s; }
+
+.table-row-enter {
+  animation: fade-in-up 0.35s ease-out both;
+}
+
+.dialog-enter {
+  animation: fade-in-scale 0.25s ease-out both;
+}
+
+/* ==================================================================
+ * Animations   système de mouvement partagé
+ *
+ * Une seule courbe d'accélération (« ease-out » prononcée) et des durées
+ * courtes : le mouvement doit accompagner la lecture, pas la retarder.
+ * Tout est désactivé si l'utilisateur a demandé moins d'animations.
+ * ================================================================== */
+
+@keyframes istpm-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes istpm-rise-sm {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes istpm-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes istpm-scale {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes istpm-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+@keyframes istpm-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50%      { transform: translate3d(0, -20px, 0) rotate(3deg); }
+}
+@keyframes istpm-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+
+.anim-rise     { animation: istpm-rise .55s cubic-bezier(.16, 1, .3, 1) both; }
+.anim-rise-sm  { animation: istpm-rise-sm .5s cubic-bezier(.16, 1, .3, 1) .08s both; }
+.anim-fade     { animation: istpm-fade .6s ease both; }
+.anim-scale    { animation: istpm-scale .4s cubic-bezier(.16, 1, .3, 1) both; }
+.anim-shake    { animation: istpm-shake .5s both; }
+.anim-pop      { animation: istpm-pop .45s cubic-bezier(.16, 1, .3, 1); }
+.anim-drift      { animation: istpm-drift 18s ease-in-out infinite; }
+.anim-drift-slow { animation: istpm-drift 26s ease-in-out infinite reverse; }
+
+/* Note : à l'intérieur du CRM, l'entrée des en-têtes, panneaux, tableaux et
+ * lignes est animée par framer-motion (voir dash-page.tsx et les pages). Les
+ * classes ci-dessus servent à l'écran de connexion, hors de ce système. */
+
+/* Survol de carte cliquable. */
+.hover-lift {
+  transition: transform .3s cubic-bezier(.16, 1, .3, 1),
+              box-shadow .3s cubic-bezier(.16, 1, .3, 1);
+}
+.hover-lift:hover { transform: translateY(-3px); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Eye, FileDown, Send, Pencil, SendHorizontal } from "lucide-react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm, mentionFor, decisionFor } from "@/lib/istpm-store";
@@ -66,7 +67,7 @@ const STATUTS: StatutBulletin[] = ["genere", "valide", "publie"];
 
 /**
  * Render the transcript into a hidden iframe and open the browser's print
- * dialog — "Enregistrer au format PDF" there produces the real document.
+ * dialog   "Enregistrer au format PDF" there produces the real document.
  * An iframe avoids the popup blocker that `window.open` would trip.
  */
 function printBulletin(b: Bulletin) {
@@ -78,7 +79,7 @@ function printBulletin(b: Bulletin) {
     .join("");
 
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
-<title>Bulletin — ${b.prenom} ${b.nom}</title>
+<title>Bulletin   ${b.prenom} ${b.nom}</title>
 <style>
   body{font-family:system-ui,sans-serif;color:#123b3a;margin:40px;}
   h1{color:#029994;font-size:20px;margin:0 0 4px;}
@@ -93,13 +94,13 @@ function printBulletin(b: Bulletin) {
            border-bottom:1px solid #d6efee;padding:6px 0;}
   .clin{background:#f1f9f9;font-weight:600;}
 </style></head><body>
-<h1>ISTEPM Agadir  — Bulletin de notes</h1>
+<h1>ISTEPM Agadir    Bulletin de notes</h1>
 <div class="sub">Institut spécialisé des techniques paramédicales</div>
 <div class="sum">
   <div><span>Étudiant</span><strong>${b.prenom} ${b.nom}</strong></div>
   <div><span>CNE</span><strong>${b.cne}</strong></div>
   <div><span>Filière</span><strong>${b.filiere}</strong></div>
-  <div><span>Niveau / session</span><strong>${b.niveau} — session ${b.session}</strong></div>
+  <div><span>Niveau / session</span><strong>${b.niveau}   session ${b.session}</strong></div>
 </div>
 <table><thead><tr><th>Module</th><th class="r">Note</th><th class="r">Coef.</th><th class="r">Crédits</th></tr></thead>
 <tbody>${rows}
@@ -228,8 +229,15 @@ function BulletinsPage() {
           </>
         }
       >
-        {filtered.map((b) => (
-          <tr key={b.id} onClick={() => setDetail(b)} className={tableRow}>
+        {filtered.map((b, i) => (
+          <motion.tr
+            key={b.id}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
+            onClick={() => setDetail(b)}
+            className={tableRow}
+          >
             <td
               className={cn("border-l-[3px] font-medium", cellTruncate)}
               style={{ borderLeftColor: TONE_COLORS[DECISION_TONE[b.decision]] }}
@@ -297,7 +305,7 @@ function BulletinsPage() {
                       onClick={() => {
                         publierBulletin(b.id);
                         toast.success(
-                          `Bulletin publié — ${b.prenom} ${b.nom} (${b.niveau})`,
+                          `Bulletin publié   ${b.prenom} ${b.nom} (${b.niveau})`,
                         );
                       }}
                     >
@@ -307,7 +315,7 @@ function BulletinsPage() {
                 ) : null}
               </div>
             </td>
-          </tr>
+          </motion.tr>
         ))}
       </DataTable>
 
@@ -323,7 +331,7 @@ function BulletinsPage() {
               canPublish={canPublish}
               onPublish={(b) => {
                 publierBulletin(b.id);
-                toast.success(`Bulletin publié — ${b.prenom} ${b.nom}`);
+                toast.success(`Bulletin publié   ${b.prenom} ${b.nom}`);
               }}
             />
           ) : null}
@@ -338,7 +346,7 @@ function BulletinsPage() {
           onSubmit={(patch) => {
             updateBulletin(editing.id, patch);
             toast.success(
-              `Bulletin mis à jour — ${editing.prenom} ${editing.nom}`,
+              `Bulletin mis à jour   ${editing.prenom} ${editing.nom}`,
             );
             setEditing(null);
           }}
@@ -405,7 +413,7 @@ function BulletinForm({
       open
       onOpenChange={(o) => !o && onCancel()}
       title="Modifier le bulletin"
-      subtitle={`${initial.prenom} ${initial.nom} — ${initial.cne}`}
+      subtitle={`${initial.prenom} ${initial.nom}   ${initial.cne}`}
       onSubmit={submit}
     >
       <FullWidth>

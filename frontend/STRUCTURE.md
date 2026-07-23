@@ -1,4 +1,4 @@
-# Frontend — school-CRM
+# Frontend   school-CRM
 
 ```
 frontend/
@@ -28,7 +28,7 @@ frontend/
 │   │   ├── __root.tsx              # Root layout (Outlet, language toggle, 404)
 │   │   ├── index.tsx               # Redirects to /login
 │   │   ├── login.tsx               # Login page (/login)
-│   │   ├── dashboard.tsx           # Dashboard layout (/dashboard) — auth guard
+│   │   ├── dashboard.tsx           # Dashboard layout (/dashboard)   auth guard
 │   │   ├── dashboard.index.tsx     # Dashboard home (/dashboard/)
 │   │   ├── dashboard.familles.tsx  # Client list (/dashboard/familles)
 │   │   ├── dashboard.paiements.tsx # Payments (/dashboard/paiements)

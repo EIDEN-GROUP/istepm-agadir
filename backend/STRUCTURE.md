@@ -1,4 +1,4 @@
-# Backend — school-CRM API
+# Backend   school-CRM API
 
 ```
 backend/
@@ -45,7 +45,7 @@ backend/
 │   │   ├── dashboard.ts         # Dashboard stats + revenue charts
 │   │   ├── settings.ts          # Centre settings + levels CRUD
 │   │   ├── holidays.ts          # Holidays, vacations, exceptions
-│   │   ├── admin.ts             # Admin API (/api/admin/*) — multi-product integration
+│   │   ├── admin.ts             # Admin API (/api/admin/*)   multi-product integration
 │   │   ├── support.ts           # Support sessions + messages
 │   │   ├── whatsapp.ts          # Send + broadcast + message log
 │   │   ├── email.ts             # Send email + receipt + demo
@@ -108,6 +108,6 @@ Protected by `X-API-Key` header (not JWT). Used by external platforms like Super
 
 ## Middleware
 
-- `authenticate` — verifies JWT, attaches `request.user`
-- `verifyApiKey` — validates `X-API-Key` header for Admin API routes
-- Global error handler — catches all unhandled errors, returns `{ error: string }`
+- `authenticate`   verifies JWT, attaches `request.user`
+- `verifyApiKey`   validates `X-API-Key` header for Admin API routes
+- Global error handler   catches all unhandled errors, returns `{ error: string }`

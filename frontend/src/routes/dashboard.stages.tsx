@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Eye, FileDown, FileText, Plus, Pencil, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
+import { makePlaceholderPdf } from "@/lib/doc-store";
 import {
   FILIERES,
   NIVEAUX,
@@ -62,6 +64,65 @@ const STATUTS: StatutStage[] = [
   "soutenance",
   "valide",
 ];
+
+/**
+ * Produit et télécharge réellement la convention ou le rapport.
+ *
+ * Ces deux boutons se contentaient d'afficher un message de réussite sans rien
+ * livrer. Le document est maintenant généré localement, au même format que les
+ * sujets d'examen.
+ */
+function downloadStageDoc(s: Stage, kind: "convention" | "rapport") {
+  const titre =
+    kind === "convention"
+      ? "Convention de stage clinique"
+      : "Rapport de stage clinique";
+
+  const lignes = [
+    "ISTEPM Agadir - Institut specialise des techniques paramedicales",
+    "",
+    titre,
+    "",
+    `Etudiant : ${s.prenom} ${s.nom}`,
+    `CNE : ${s.cne}`,
+    `Filiere : ${s.filiere} (${s.niveau})`,
+    "",
+    `Structure d'accueil : ${s.structure}`,
+    `Service : ${s.service}`,
+    `Periode : ${fmtDate(s.debut)} au ${fmtDate(s.fin)}`,
+    "",
+    `Tuteur clinique : ${s.encadrantClinique || "-"}`,
+    `Tuteur academique : ${s.tuteurAcademique || "-"}`,
+  ];
+
+  if (kind === "rapport") {
+    lignes.push(
+      "",
+      `Note de soutenance : ${
+        s.noteSoutenance !== undefined
+          ? `${s.noteSoutenance.toFixed(2)} / 20`
+          : "non soutenu"
+      }`,
+    );
+  } else {
+    lignes.push(
+      "",
+      `Convention : ${s.conventionSignee ? "signee" : "en attente de signature"}`,
+    );
+  }
+
+  lignes.push("", "Document de demonstration genere localement.");
+
+  const blob = makePlaceholderPdf(lignes);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${kind}-${s.nom.toLowerCase()}-${s.cne}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
 
 function StagesPage() {
   const { role } = useAuth();
@@ -160,8 +221,15 @@ function StagesPage() {
           </>
         }
       >
-        {filtered.map((s) => (
-          <tr key={s.id} onClick={() => setDetail(s)} className={tableRow}>
+        {filtered.map((s, i) => (
+          <motion.tr
+            key={s.id}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
+            onClick={() => setDetail(s)}
+            className={tableRow}
+          >
             <td
               className={cn("border-l-[3px] font-medium", cellTruncate)}
               style={{
@@ -217,7 +285,7 @@ function StagesPage() {
                 ) : null}
               </div>
             </td>
-          </tr>
+          </motion.tr>
         ))}
       </DataTable>
 
@@ -257,7 +325,8 @@ function StagesPage() {
                           className={iconButton + " w-auto gap-1.5 px-3 text-xs"}
                           onClick={() =>
                             s.conventionSignee
-                              ? toast.success("Convention (PDF) téléchargée")
+                              ? (downloadStageDoc(s, "convention"),
+                                toast.success("Convention téléchargée (PDF)"))
                               : toast.error("Convention non encore signée")
                           }
                         >
@@ -267,7 +336,8 @@ function StagesPage() {
                           className={iconButton + " w-auto gap-1.5 px-3 text-xs"}
                           onClick={() =>
                             s.noteSoutenance !== undefined
-                              ? toast.success("Rapport de stage téléchargé")
+                              ? (downloadStageDoc(s, "rapport"),
+                                toast.success("Rapport téléchargé (PDF)"))
                               : toast.error("Rapport de stage non encore déposé")
                           }
                         >
@@ -279,7 +349,7 @@ function StagesPage() {
                             onClick={() => {
                               updateStage(s.id, { statut: "valide" });
                               toast.success(
-                                `Stage validé — ${s.prenom} ${s.nom}`,
+                                `Stage validé   ${s.prenom} ${s.nom}`,
                               );
                             }}
                           >
@@ -351,10 +421,10 @@ function StagesPage() {
           onSubmit={(data) => {
             if (editing) {
               updateStage(editing.id, data);
-              toast.success(`Stage mis à jour — ${data.prenom} ${data.nom}`);
+              toast.success(`Stage mis à jour   ${data.prenom} ${data.nom}`);
             } else {
               addStage(data);
-              toast.success(`Convention créée — ${data.prenom} ${data.nom}`);
+              toast.success(`Convention créée   ${data.prenom} ${data.nom}`);
             }
             setFormOpen(false);
           }}
@@ -373,7 +443,7 @@ function StagesPage() {
         onConfirm={() => {
           if (!toDelete) return;
           deleteStage(toDelete.id);
-          toast.success(`Stage supprimé — ${toDelete.prenom} ${toDelete.nom}`);
+          toast.success(`Stage supprimé   ${toDelete.prenom} ${toDelete.nom}`);
           setToDelete(null);
         }}
       />
@@ -466,7 +536,7 @@ function StageForm({
       title={initial ? "Modifier le stage" : "Nouvelle convention de stage"}
       subtitle={
         initial
-          ? `${initial.prenom} ${initial.nom} — ${initial.structure}`
+          ? `${initial.prenom} ${initial.nom}   ${initial.structure}`
           : "Affecter un étudiant à une structure d'accueil"
       }
       submitLabel={initial ? "Enregistrer les modifications" : "Créer"}
@@ -480,7 +550,7 @@ function StageForm({
           onChange={(v) => set("etudiantId", v)}
           options={etudiants.map((e) => ({
             value: e.id,
-            label: `${e.prenom} ${e.nom} — ${e.cne} (${e.niveau})`,
+            label: `${e.prenom} ${e.nom}   ${e.cne} (${e.niveau})`,
           }))}
           error={errors.etudiantId}
         />

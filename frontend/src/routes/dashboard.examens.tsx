@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Lock,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
@@ -91,7 +92,7 @@ const TYPES: TypeExamen[] = [
 ];
 const STATUTS: StatutExamen[] = ["planifie", "en_cours", "notes_saisies"];
 const COMPOSANTES = ["Théorique", "Pratique", "Théorique + Pratique"] as const;
-/** Filtre « le sujet est-il déposé ? » — les libellés servent aussi de valeur. */
+/** Filtre « le sujet est-il déposé ? »   les libellés servent aussi de valeur. */
 const ETAT_SUJET = ["Déposé", "Manquant"] as const;
 
 /* ------------------------------------------------------------------ */
@@ -100,7 +101,7 @@ const ETAT_SUJET = ["Déposé", "Manquant"] as const;
 
 function nomFormateur(formateurs: Formateur[], id: string) {
   const f = formateurs.find((x) => x.id === id);
-  return f ? `${f.prenom} ${f.nom}` : "—";
+  return f ? `${f.prenom} ${f.nom}` : " ";
 }
 
 /** Pastille d'état du sujet déposé. */
@@ -138,7 +139,7 @@ function DocumentActions({
         onClick={async () => {
           if (!doc) return;
           const ok = await downloadDoc(doc.id, doc.nom);
-          if (ok) toast.success(`Téléchargement — ${doc.nom}`);
+          if (ok) toast.success(`Téléchargement   ${doc.nom}`);
           else toast.error("Fichier introuvable dans ce navigateur");
         }}
       >
@@ -214,7 +215,7 @@ function DocumentPreview({
                   className={cn(ghostPill, "gap-1.5")}
                   onClick={async () => {
                     const ok = await downloadDoc(doc.id, doc.nom);
-                    if (ok) toast.success(`Téléchargement — ${doc.nom}`);
+                    if (ok) toast.success(`Téléchargement   ${doc.nom}`);
                     else toast.error("Fichier introuvable");
                   }}
                 >
@@ -251,7 +252,7 @@ function DocumentPreview({
                   Aperçu indisponible pour ce format
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Les documents Word ne s'affichent pas dans le navigateur —
+                  Les documents Word ne s'affichent pas dans le navigateur  
                   utilisez « Télécharger ».
                 </p>
               </div>
@@ -349,7 +350,7 @@ function ExamensPage() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Espace formateur — mes examens, création / édition / dépôt         */
+/*  Espace formateur   mes examens, création / édition / dépôt         */
 /* ------------------------------------------------------------------ */
 
 function EspaceFormateur() {
@@ -487,8 +488,15 @@ function EspaceFormateur() {
           </>
         }
       >
-        {filtered.map((x) => (
-          <tr key={x.id} onClick={() => setDetail(x)} className={tableRow}>
+        {filtered.map((x, i) => (
+          <motion.tr
+            key={x.id}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
+            onClick={() => setDetail(x)}
+            className={tableRow}
+          >
             <td className={cn("font-medium", cellTruncate)}>{x.titre}</td>
             <td className="text-muted-foreground">{x.classe}</td>
             <td className="text-muted-foreground">
@@ -534,7 +542,7 @@ function EspaceFormateur() {
                 </button>
               </div>
             </td>
-          </tr>
+          </motion.tr>
         ))}
       </DataTable>
 
@@ -571,7 +579,7 @@ function EspaceFormateur() {
             // Retrait explicite sans remplacement : passer par le store efface
             // aussi le fichier dans IndexedDB, là où un simple patch du champ
             // laisserait le blob orphelin. Inutile si un nouveau fichier est
-            // déposé — `attachDocument` remplace déjà l'ancien.
+            // déposé   `attachDocument` remplace déjà l'ancien.
             if (removeExisting && editing && !file) {
               await removeDocument(editing.id);
             }
@@ -588,8 +596,8 @@ function EspaceFormateur() {
             }
             toast.success(
               editing
-                ? `Examen mis à jour — ${data.titre}`
-                : `Examen créé — ${data.titre}`,
+                ? `Examen mis à jour   ${data.titre}`
+                : `Examen créé   ${data.titre}`,
             );
             setFormOpen(false);
           }}
@@ -608,7 +616,7 @@ function EspaceFormateur() {
         onConfirm={() => {
           if (!toDelete) return;
           deleteExamen(toDelete.id);
-          toast.success(`Examen supprimé — ${toDelete.titre}`);
+          toast.success(`Examen supprimé   ${toDelete.titre}`);
           setToDelete(null);
         }}
       />
@@ -617,7 +625,7 @@ function EspaceFormateur() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Espace directeur — lecture seule sur tous les examens              */
+/*  Espace directeur   lecture seule sur tous les examens              */
 /* ------------------------------------------------------------------ */
 
 function EspaceDirecteur() {
@@ -758,8 +766,15 @@ function EspaceDirecteur() {
           </>
         }
       >
-        {filtered.map((x) => (
-          <tr key={x.id} onClick={() => setDetail(x)} className={tableRow}>
+        {filtered.map((x, i) => (
+          <motion.tr
+            key={x.id}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
+            onClick={() => setDetail(x)}
+            className={tableRow}
+          >
             <td className={cn("font-medium", cellTruncate)}>{x.titre}</td>
             <td className={cn("text-muted-foreground", cellTruncate)}>
               {x.module}
@@ -781,7 +796,7 @@ function EspaceDirecteur() {
             >
               <DocumentActions examen={x} onPreview={setPreview} />
             </td>
-          </tr>
+          </motion.tr>
         ))}
       </DataTable>
 
@@ -883,7 +898,7 @@ function ExamenDetailFormateur({
       const pr = hasPratique ? parseNote(n.pratique) : undefined;
       if (th === "invalid" || pr === "invalid") {
         toast.error(
-          `Note invalide pour ${e.prenom} ${e.nom} — saisir une valeur entre 0 et 20`,
+          `Note invalide pour ${e.prenom} ${e.nom}   saisir une valeur entre 0 et 20`,
         );
         return;
       }
@@ -898,7 +913,7 @@ function ExamenDetailFormateur({
 
     const count = saveNotesExamen(examen.id, payload);
     toast.success(
-      `Notes enregistrées pour ${count} étudiant(s) — ${examen.module}`,
+      `Notes enregistrées pour ${count} étudiant(s)   ${examen.module}`,
     );
     onClose();
   };
@@ -1114,7 +1129,7 @@ function ExamenForm({
           required
           value={f.titre}
           onChange={(v) => set("titre", v)}
-          placeholder="Examen final — Soins infirmiers en médecine"
+          placeholder="Examen final   Soins infirmiers en médecine"
           error={errors.titre}
         />
       </FullWidth>

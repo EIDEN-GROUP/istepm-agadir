@@ -4,7 +4,7 @@
  * `istpm-data.ts` provides the immutable seed (sample records + reference
  * lists). This provider copies that seed into React state so the UI can
  * actually create, edit and delete records, and recomputes every dashboard
- * aggregate from the live state — so adding a student immediately moves the
+ * aggregate from the live state   so adding a student immediately moves the
  * KPIs, the donut and the "à traiter" counters.
  *
  * There is no backend: state lives in memory and is mirrored to localStorage
@@ -37,6 +37,10 @@ import {
   type Bulletin,
   type Stage,
   type ActiviteItem,
+  type Seance,
+  SEANCES,
+  minutesDepuisMinuit,
+  ajouterMinutes,
   type LignePaiement,
   type NoteModule,
   type PaiementLigne,
@@ -57,7 +61,7 @@ import {
 
 /** Bump when the record shape changes: stored data on an old version is
  *  discarded rather than loaded into a UI that no longer understands it. */
-const STORAGE_KEY = "istpm-data-v1";
+const STORAGE_KEY = "istpm-data-v2";
 
 type Snapshot = {
   etudiants: Etudiant[];
@@ -66,6 +70,7 @@ type Snapshot = {
   bulletins: Bulletin[];
   stages: Stage[];
   activite: ActiviteItem[];
+  seances: Seance[];
   filieres: string[];
 };
 
@@ -78,6 +83,7 @@ function seed(): Snapshot {
     bulletins: BULLETINS,
     stages: STAGES,
     activite: ACTIVITE_RECENTE,
+    seances: SEANCES,
     filieres: [...FILIERES],
   }) as Snapshot;
 }
@@ -157,6 +163,17 @@ export type SaisieNote = {
 /*  Contexte                                                           */
 /* ------------------------------------------------------------------ */
 
+export type NouvelleSeance = Omit<Seance, 'id'>;
+
+/** Ressource déjà occupée sur le créneau visé. */
+export type Conflit = { type: 'professeur' | 'salle' | 'groupe'; seance: Seance };
+
+/** Séance projetée, avant enregistrement. */
+export type ConflitCandidate = Pick<
+  Seance,
+  'date' | 'debut' | 'fin' | 'professeurId' | 'salle' | 'groupe'
+>;
+
 type IstpmCtx = {
   etudiants: Etudiant[];
   formateurs: Formateur[];
@@ -164,6 +181,7 @@ type IstpmCtx = {
   bulletins: Bulletin[];
   stages: Stage[];
   activite: ActiviteItem[];
+  seances: Seance[];
   filieres: string[];
 
   /* Dérivés */
@@ -203,7 +221,7 @@ type IstpmCtx = {
   updateFormateur: (id: string, patch: Partial<Formateur>) => void;
   deleteFormateur: (id: string) => void;
 
-  /** `createdBy` reçoit `auteurId` — l'auteur est toujours enregistré. */
+  /** `createdBy` reçoit `auteurId`   l'auteur est toujours enregistré. */
   addExamen: (data: NouvelExamen, auteurId: string) => Examen;
   updateExamen: (id: string, patch: Partial<Examen>) => void;
   deleteExamen: (id: string) => void;
@@ -224,6 +242,13 @@ type IstpmCtx = {
 
   addFiliere: (nom: string) => void;
   deleteFiliere: (nom: string) => void;
+
+  addSeance: (data: NouvelleSeance) => Seance;
+  updateSeance: (id: string, patch: Partial<Seance>) => void;
+  deleteSeance: (id: string) => void;
+  /** Glisser-déposer : conserve la durée, ne change que le départ. */
+  moveSeance: (id: string, date: string, debut: string) => void;
+  conflitsSeance: (c: ConflitCandidate, ignorerId?: string) => Conflit[];
 
   reset: () => void;
 };
@@ -307,7 +332,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
       setSnap((s) => ({ ...s, etudiants: [etudiant, ...s.etudiants] }));
       log(
         "inscription",
-        `Nouvelle inscription — ${etudiant.prenom} ${etudiant.nom} (${etudiant.filiere}, ${etudiant.niveau})`,
+        `Nouvelle inscription   ${etudiant.prenom} ${etudiant.nom} (${etudiant.filiere}, ${etudiant.niveau})`,
       );
       return etudiant;
     },
@@ -511,7 +536,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           activite: [
             {
               type: "note" as const,
-              texte: `Notes saisies — ${examen.module} (${examen.niveau}, ${examen.filiere})`,
+              texte: `Notes saisies   ${examen.module} (${examen.niveau}, ${examen.filiere})`,
               date: today(),
             },
             ...s.activite,
@@ -616,7 +641,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           activite: [
             {
               type: "paiement" as const,
-              texte: `Paiement reçu — ${etudiant.prenom} ${etudiant.nom}, ${ligne.montant.toLocaleString("fr-FR")} MAD (${ligne.periode})`,
+              texte: `Paiement reçu   ${etudiant.prenom} ${etudiant.nom}, ${ligne.montant.toLocaleString("fr-FR")} MAD (${ligne.periode})`,
               date: today(),
             },
             ...s.activite,
@@ -643,6 +668,80 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         filieres: s.filieres.filter((f) => f !== nom),
       })),
     [],
+  );
+
+  /* ---------------- Planning ---------------- */
+
+  const addSeance = useCallback((data: NouvelleSeance) => {
+    const seance: Seance = { ...data, id: uid("se") };
+    setSnap((s) => ({ ...s, seances: [...s.seances, seance] }));
+    return seance;
+  }, []);
+
+  const updateSeance = useCallback(
+    (id: string, patch: Partial<Seance>) =>
+      setSnap((s) => ({
+        ...s,
+        seances: s.seances.map((x) => (x.id === id ? { ...x, ...patch } : x)),
+      })),
+    [],
+  );
+
+  const deleteSeance = useCallback(
+    (id: string) =>
+      setSnap((s) => ({ ...s, seances: s.seances.filter((x) => x.id !== id) })),
+    [],
+  );
+
+  /** Déplacement par glisser-déposer : nouvelle date et/ou nouvel horaire. */
+  const moveSeance = useCallback(
+    (id: string, date: string, debut: string) =>
+      setSnap((s) => ({
+        ...s,
+        seances: s.seances.map((x) => {
+          if (x.id !== id) return x;
+          // La durée est préservée : on ne déplace que le point de départ.
+          const duree = minutesDepuisMinuit(x.fin) - minutesDepuisMinuit(x.debut);
+          return { ...x, date, debut, fin: ajouterMinutes(debut, duree) };
+        }),
+      })),
+    [],
+  );
+
+  /**
+   * Conflits d'une séance projetée.
+   *
+   * Trois ressources ne peuvent pas être à deux endroits en même temps : le
+   * professeur, la salle et le groupe. `ignorerId` exclut la séance en cours
+   * d'édition, sinon elle entrerait en conflit avec elle-même.
+   */
+  const conflitsSeance = useCallback(
+    (candidate: ConflitCandidate, ignorerId?: string): Conflit[] => {
+      const debut = minutesDepuisMinuit(candidate.debut);
+      const fin = minutesDepuisMinuit(candidate.fin);
+      const out: Conflit[] = [];
+
+      for (const s of snap.seances) {
+        if (s.id === ignorerId) continue;
+        if (s.date !== candidate.date) continue;
+        // Chevauchement strict : deux séances qui se touchent ne gênent pas.
+        const d = minutesDepuisMinuit(s.debut);
+        const f = minutesDepuisMinuit(s.fin);
+        if (fin <= d || debut >= f) continue;
+
+        if (s.professeurId === candidate.professeurId) {
+          out.push({ type: "professeur", seance: s });
+        }
+        if (s.salle === candidate.salle) {
+          out.push({ type: "salle", seance: s });
+        }
+        if (s.groupe === candidate.groupe) {
+          out.push({ type: "groupe", seance: s });
+        }
+      }
+      return out;
+    },
+    [snap.seances],
   );
 
   const reset = useCallback(() => {
@@ -813,6 +912,11 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     updateBulletin,
     publierBulletin,
     publierTousBulletins,
+addSeance,
+    updateSeance,
+    deleteSeance,
+    moveSeance,
+    conflitsSeance,
     addStage,
     updateStage,
     deleteStage,

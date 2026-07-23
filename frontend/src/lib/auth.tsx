@@ -1,11 +1,3 @@
-/**
- * Frontend-only "auth" for the ISTPM demo.
- *
- * There is no backend and no real authentication: the three roles below are
- * purely UI states that decide which navigation items, dashboard sections and
- * actions are visible. The selected role is persisted to localStorage so a
- * refresh keeps you in the same interface.
- */
 import {
   createContext,
   useCallback,
@@ -20,7 +12,6 @@ export type UserRole = "directeur" | "enseignant" | "responsable";
 
 export const ROLES: UserRole[] = ["directeur", "enseignant", "responsable"];
 
-/** Display metadata for the login picker and the header role switcher. */
 export const ROLE_META: Record<
   UserRole,
   { label: string; short: string; description: string }
@@ -42,18 +33,10 @@ export const ROLE_META: Record<
   },
 };
 
-/**
- * Formateur incarné par le rôle « enseignant ».
- *
- * Les examens enregistrent leur auteur : il faut donc que l'enseignant connecté
- * corresponde à un formateur réel du jeu de données, sinon « créé par » ne
- * pointerait vers personne.
- */
 export const DEMO_FORMATEUR_ID = "fo-1";
 
 const demoFormateur = FORMATEURS.find((f) => f.id === DEMO_FORMATEUR_ID);
 
-/** Sample identity shown in the header for each role. */
 const ROLE_USER: Record<UserRole, { name: string; email: string }> = {
   directeur: { name: "Dr. Youssef Benali", email: "direction@istpm-agadir.ma" },
   enseignant: {
@@ -65,7 +48,11 @@ const ROLE_USER: Record<UserRole, { name: string; email: string }> = {
   responsable: { name: "M. Rachid El Ouafi", email: "scolarite@istpm-agadir.ma" },
 };
 
-const STORAGE_KEY = "istpm-role";
+const ROLE_STORAGE_KEY = "istpm-role";
+const TOKEN_STORAGE_KEY = "istpm-token";
+const USER_STORAGE_KEY = "istpm-user";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
 function isRole(value: string | null): value is UserRole {
   return value !== null && (ROLES as string[]).includes(value);
@@ -73,13 +60,25 @@ function isRole(value: string | null): value is UserRole {
 
 function readStoredRole(): UserRole | null {
   if (typeof window === "undefined") return null;
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  return isRole(stored) ? stored : null;
+  const stored = window.localStorage.getItem(ROLE_STORAGE_KEY);
+  if (isRole(stored)) return stored;
+  const userData = window.localStorage.getItem(USER_STORAGE_KEY);
+  if (userData) {
+    try {
+      const u = JSON.parse(userData);
+      if (isRole(u.role)) return u.role;
+    } catch {}
+  }
+  return null;
 }
 
-/** Read the persisted role outside React (used by the route guard). */
 export function getStoredRole(): UserRole | null {
   return readStoredRole();
+}
+
+export function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(TOKEN_STORAGE_KEY);
 }
 
 type AuthUser = {
@@ -93,9 +92,7 @@ type AuthCtx = {
   user: AuthUser | null;
   role: UserRole | null;
   loading: boolean;
-  /** Sign in as a role. No network, no credentials checked. */
-  login: (role: UserRole) => void;
-  /** Switch interface without signing out. */
+  login: (email: string, password: string) => Promise<void>;
   setRole: (role: UserRole) => void;
   logout: () => void;
 };
@@ -104,7 +101,7 @@ const Ctx = createContext<AuthCtx>({
   user: null,
   role: null,
   loading: true,
-  login: () => {},
+  login: async () => {},
   setRole: () => {},
   logout: () => {},
 });
@@ -115,32 +112,87 @@ function userFor(role: UserRole): AuthUser {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRoleState] = useState<UserRole | null>(null);
+  const [user, setUserState] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Read storage in an effect rather than in the initial state so the first
-  // render is identical every time (matches the locale provider's pattern).
   useEffect(() => {
-    setRoleState(readStoredRole());
+    const stored = readStoredRole();
+    if (stored) {
+      setRoleState(stored);
+      const userData = window.localStorage.getItem(USER_STORAGE_KEY);
+      if (userData) {
+        try {
+          setUserState(JSON.parse(userData));
+        } catch {
+          setUserState(userFor(stored));
+        }
+      } else {
+        setUserState(userFor(stored));
+      }
+    }
     setLoading(false);
   }, []);
 
-  const setRole = useCallback((next: UserRole) => {
-    window.localStorage.setItem(STORAGE_KEY, next);
+  const persistRole = useCallback((next: UserRole, userData?: AuthUser) => {
+    window.localStorage.setItem(ROLE_STORAGE_KEY, next);
     setRoleState(next);
+    if (userData) {
+      window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+      setUserState(userData);
+    } else {
+      const u = userFor(next);
+      window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(u));
+      setUserState(u);
+    }
   }, []);
 
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Erreur de connexion" }));
+        throw new Error(err.error || "Email ou mot de passe incorrect");
+      }
+      const data = await res.json();
+      const token: string = data.token;
+      const backendUser: { id: string; email: string; name: string; role: string } = data.user;
+      const mappedRole = mapBackendRole(backendUser.role);
+      const authUser: AuthUser = {
+        id: backendUser.id,
+        email: backendUser.email,
+        name: backendUser.name,
+        role: mappedRole,
+      };
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      persistRole(mappedRole, authUser);
+    },
+    [persistRole],
+  );
+
+  const setRole = useCallback(
+    (next: UserRole) => persistRole(next),
+    [persistRole],
+  );
+
   const logout = useCallback(() => {
-    window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(ROLE_STORAGE_KEY);
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    window.localStorage.removeItem(USER_STORAGE_KEY);
     setRoleState(null);
+    setUserState(null);
   }, []);
 
   return (
     <Ctx.Provider
       value={{
-        user: role ? userFor(role) : null,
+        user,
         role,
         loading,
-        login: setRole,
+        login,
         setRole,
         logout,
       }}
@@ -148,6 +200,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </Ctx.Provider>
   );
+}
+
+function mapBackendRole(backendRole: string): UserRole {
+  switch (backendRole) {
+    case "admin":
+    case "superadmin":
+    case "directeur":
+      return "directeur";
+    case "enseignant":
+      return "enseignant";
+    case "responsable":
+      return "responsable";
+    default:
+      return "directeur";
+  }
 }
 
 export const useAuth = () => useContext(Ctx);

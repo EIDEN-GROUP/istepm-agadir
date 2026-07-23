@@ -125,7 +125,7 @@ function toAscii(s: string) {
  * Construit un PDF d'une page, valide et minimal, à partir de lignes de texte.
  *
  * Utilisé uniquement pour donner un contenu ouvrable aux sujets fournis avec
- * le jeu de démonstration — les dépôts réels sont les fichiers de l'utilisateur.
+ * le jeu de démonstration   les dépôts réels sont les fichiers de l'utilisateur.
  * Le contenu est en ASCII, donc longueur de chaîne = nombre d'octets, ce qui
  * permet de calculer les décalages de la table xref directement.
  */

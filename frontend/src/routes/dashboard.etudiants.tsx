@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Eye, Download, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
@@ -221,8 +222,15 @@ function EtudiantsPage() {
           </>
         }
       >
-        {filtered.map((e) => (
-          <tr key={e.id} onClick={() => setDetail(e)} className={tableRow}>
+        {filtered.map((e, i) => (
+          <motion.tr
+            key={e.id}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
+            onClick={() => setDetail(e)}
+            className={tableRow}
+          >
             <td
               className="border-l-[3px] font-medium tabular-nums"
               style={{
@@ -287,7 +295,7 @@ function EtudiantsPage() {
                 ) : null}
               </div>
             </td>
-          </tr>
+          </motion.tr>
         ))}
       </DataTable>
 
@@ -315,10 +323,10 @@ function EtudiantsPage() {
           onSubmit={(data) => {
             if (editing) {
               updateEtudiant(editing.id, data);
-              toast.success(`Fiche mise à jour — ${data.prenom} ${data.nom}`);
+              toast.success(`Fiche mise à jour   ${data.prenom} ${data.nom}`);
             } else {
               addEtudiant(data);
-              toast.success(`Étudiant inscrit — ${data.prenom} ${data.nom}`);
+              toast.success(`Étudiant inscrit   ${data.prenom} ${data.nom}`);
             }
             setFormOpen(false);
           }}
@@ -337,7 +345,7 @@ function EtudiantsPage() {
         onConfirm={() => {
           if (!toDelete) return;
           deleteEtudiant(toDelete.id);
-          toast.success(`Étudiant supprimé — ${toDelete.prenom} ${toDelete.nom}`);
+          toast.success(`Étudiant supprimé   ${toDelete.prenom} ${toDelete.nom}`);
           setToDelete(null);
         }}
       />
@@ -457,7 +465,7 @@ function EtudiantForm({
       title={initial ? "Modifier la fiche étudiant" : "Nouvelle inscription"}
       subtitle={
         initial
-          ? `${initial.prenom} ${initial.nom} — ${initial.cne}`
+          ? `${initial.prenom} ${initial.nom}   ${initial.cne}`
           : "Renseigner les informations de l'étudiant"
       }
       submitLabel={initial ? "Enregistrer les modifications" : "Inscrire"}
@@ -620,7 +628,7 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
           <DetailField label="Année universitaire" value={e.annee} />
           <DetailField
             label="Moyenne générale"
-            value={e.moyenne > 0 ? `${e.moyenne.toFixed(2)} / 20` : "—"}
+            value={e.moyenne > 0 ? `${e.moyenne.toFixed(2)} / 20` : " "}
             tone={e.moyenne > 0 && e.moyenne < 10 ? "negative" : "positive"}
           />
         </DetailGrid>

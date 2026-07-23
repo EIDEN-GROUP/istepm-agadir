@@ -1,6 +1,6 @@
 /**
  * Central sample data for the ISTPM CRM (Institut spécialisé des techniques
- * paramédicales — Agadir). Frontend-only, hardcoded placeholder data — no API.
+ * paramédicales   Agadir). Frontend-only, hardcoded placeholder data   no API.
  *
  * All money is in MAD. All labels in French.
  */
@@ -37,13 +37,13 @@ export type Niveau = (typeof NIVEAUX)[number];
 
 /** CHU / hôpitaux / cliniques d'accueil (structures de stage réelles au Maroc). */
 export const STRUCTURES_ACCUEIL = [
-  "CHR Hassan II — Agadir",
-  "CHU Ibn Rochd — Casablanca",
-  "CHU Mohammed VI — Marrakech",
-  "Hôpital Hassan II — Agadir",
-  "Clinique Al Massira — Agadir",
+  "CHR Hassan II   Agadir",
+  "CHU Ibn Rochd   Casablanca",
+  "CHU Mohammed VI   Marrakech",
+  "Hôpital Hassan II   Agadir",
+  "Clinique Al Massira   Agadir",
   "Hôpital préfectoral Inezgane",
-  "Clinique Ennakhil — Agadir",
+  "Clinique Ennakhil   Agadir",
 ] as const;
 
 /* ------------------------------------------------------------------ */
@@ -155,11 +155,11 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Éthique et déontologie", note: 16.0, coef: 1, credits: 2 },
     ],
     historique: [
-      { date: "2025-10-05", montant: 12000, mode: "Virement", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2510-018", statut: "paye" },
-      { date: "2026-01-14", montant: 11000, mode: "Chèque", periode: "Tranche 2 — 2025/26", recu: "ISTPM-R-2601-051", statut: "paye" },
-      { date: "2026-04-10", montant: 11000, mode: "Virement", periode: "Tranche 3 — 2025/26", recu: "ISTPM-R-2604-077", statut: "paye" },
+      { date: "2025-10-05", montant: 12000, mode: "Virement", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-018", statut: "paye" },
+      { date: "2026-01-14", montant: 11000, mode: "Chèque", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-051", statut: "paye" },
+      { date: "2026-04-10", montant: 11000, mode: "Virement", periode: "Tranche 3   2025/26", recu: "ISTPM-R-2604-077", statut: "paye" },
     ],
-    stageEnCours: "CHR Hassan II — Service de Médecine interne",
+    stageEnCours: "CHR Hassan II   Service de Médecine interne",
   },
   {
     id: "et-2",
@@ -186,11 +186,11 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Physiologie appliquée", note: 12.25, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "2025-10-09", montant: 13000, mode: "Espèces", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2510-033", statut: "paye" },
-      { date: "2026-01-20", montant: 12000, mode: "Virement", periode: "Tranche 2 — 2025/26", recu: "ISTPM-R-2601-064", statut: "paye" },
-      { date: "—", montant: 13000, mode: "Virement", periode: "Tranche 3 — 2025/26", recu: "—", statut: "retard" },
+      { date: "2025-10-09", montant: 13000, mode: "Espèces", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-033", statut: "paye" },
+      { date: "2026-01-20", montant: 12000, mode: "Virement", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-064", statut: "paye" },
+      { date: " ", montant: 13000, mode: "Virement", periode: "Tranche 3   2025/26", recu: " ", statut: "retard" },
     ],
-    stageEnCours: "CHR Hassan II — Bloc opératoire",
+    stageEnCours: "CHR Hassan II   Bloc opératoire",
   },
   {
     id: "et-3",
@@ -217,10 +217,10 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Néonatologie", note: 16.25, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "2025-09-28", montant: 16000, mode: "Virement", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2509-004", statut: "paye" },
-      { date: "2026-02-02", montant: 16000, mode: "Carte", periode: "Tranche 2 — 2025/26", recu: "ISTPM-R-2602-088", statut: "paye" },
+      { date: "2025-09-28", montant: 16000, mode: "Virement", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2509-004", statut: "paye" },
+      { date: "2026-02-02", montant: 16000, mode: "Carte", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2602-088", statut: "paye" },
     ],
-    stageEnCours: "Hôpital Hassan II — Maternité",
+    stageEnCours: "Hôpital Hassan II   Maternité",
   },
   {
     id: "et-4",
@@ -247,10 +247,10 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Kinésithérapie respiratoire", note: 11.0, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "2025-10-15", montant: 16500, mode: "Chèque", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2510-045", statut: "paye" },
-      { date: "—", montant: 16500, mode: "Virement", periode: "Tranche 2 — 2025/26", recu: "—", statut: "en_attente" },
+      { date: "2025-10-15", montant: 16500, mode: "Chèque", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-045", statut: "paye" },
+      { date: " ", montant: 16500, mode: "Virement", periode: "Tranche 2   2025/26", recu: " ", statut: "en_attente" },
     ],
-    stageEnCours: "Clinique Al Massira — Rééducation",
+    stageEnCours: "Clinique Al Massira   Rééducation",
   },
   {
     id: "et-5",
@@ -277,10 +277,10 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Radioprotection", note: 13.0, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "2025-09-30", montant: 17500, mode: "Virement", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2509-011", statut: "paye" },
-      { date: "2026-01-30", montant: 17500, mode: "Virement", periode: "Tranche 2 — 2025/26", recu: "ISTPM-R-2601-072", statut: "paye" },
+      { date: "2025-09-30", montant: 17500, mode: "Virement", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2509-011", statut: "paye" },
+      { date: "2026-01-30", montant: 17500, mode: "Virement", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-072", statut: "paye" },
     ],
-    stageEnCours: "CHR Hassan II — Service d'imagerie",
+    stageEnCours: "CHR Hassan II   Service d'imagerie",
   },
   {
     id: "et-6",
@@ -307,9 +307,9 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Microbiologie", note: 9.75, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "—", montant: 16500, mode: "Virement", periode: "Tranche 1 — 2025/26", recu: "—", statut: "impaye" },
+      { date: " ", montant: 16500, mode: "Virement", periode: "Tranche 1   2025/26", recu: " ", statut: "impaye" },
     ],
-    stageEnCours: "Hôpital Hassan II — Laboratoire d'analyses",
+    stageEnCours: "Hôpital Hassan II   Laboratoire d'analyses",
   },
   {
     id: "et-7",
@@ -336,8 +336,8 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Prothèse fixe (TP)", note: 13.0, coef: 3, credits: 6 },
     ],
     historique: [
-      { date: "2025-10-02", montant: 15000, mode: "Espèces", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2510-002", statut: "paye" },
-      { date: "2026-02-10", montant: 15000, mode: "Carte", periode: "Tranche 2 — 2025/26", recu: "ISTPM-R-2602-095", statut: "paye" },
+      { date: "2025-10-02", montant: 15000, mode: "Espèces", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-002", statut: "paye" },
+      { date: "2026-02-10", montant: 15000, mode: "Carte", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2602-095", statut: "paye" },
     ],
   },
   {
@@ -365,9 +365,9 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Hygiène hospitalière", note: 11.25, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "2025-10-12", montant: 12000, mode: "Espèces", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2510-058", statut: "paye" },
-      { date: "2026-01-25", montant: 11000, mode: "Virement", periode: "Tranche 2 — 2025/26", recu: "ISTPM-R-2601-081", statut: "paye" },
-      { date: "—", montant: 11000, mode: "Virement", periode: "Tranche 3 — 2025/26", recu: "—", statut: "retard" },
+      { date: "2025-10-12", montant: 12000, mode: "Espèces", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-058", statut: "paye" },
+      { date: "2026-01-25", montant: 11000, mode: "Virement", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-081", statut: "paye" },
+      { date: " ", montant: 11000, mode: "Virement", periode: "Tranche 3   2025/26", recu: " ", statut: "retard" },
     ],
   },
   {
@@ -394,11 +394,11 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Pathologies de la grossesse", note: 13.5, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "2025-10-01", montant: 12000, mode: "Virement", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2510-009", statut: "paye" },
-      { date: "2026-01-18", montant: 12000, mode: "Chèque", periode: "Tranche 2 — 2025/26", recu: "ISTPM-R-2601-060", statut: "paye" },
-      { date: "—", montant: 8000, mode: "Virement", periode: "Tranche 3 — 2025/26", recu: "—", statut: "en_attente" },
+      { date: "2025-10-01", montant: 12000, mode: "Virement", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-009", statut: "paye" },
+      { date: "2026-01-18", montant: 12000, mode: "Chèque", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-060", statut: "paye" },
+      { date: " ", montant: 8000, mode: "Virement", periode: "Tranche 3   2025/26", recu: " ", statut: "en_attente" },
     ],
-    stageEnCours: "Hôpital préfectoral Inezgane — Maternité",
+    stageEnCours: "Hôpital préfectoral Inezgane   Maternité",
   },
   {
     id: "et-10",
@@ -424,8 +424,8 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Électrothérapie", note: 13.0, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "2025-09-29", montant: 16500, mode: "Virement", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2509-007", statut: "paye" },
-      { date: "2026-02-05", montant: 16500, mode: "Virement", periode: "Tranche 2 — 2025/26", recu: "ISTPM-R-2602-090", statut: "paye" },
+      { date: "2025-09-29", montant: 16500, mode: "Virement", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2509-007", statut: "paye" },
+      { date: "2026-02-05", montant: 16500, mode: "Virement", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2602-090", statut: "paye" },
     ],
   },
   {
@@ -452,8 +452,8 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Introduction à l'imagerie", note: 13.25, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "2025-10-18", montant: 17500, mode: "Chèque", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2510-062", statut: "paye" },
-      { date: "—", montant: 17500, mode: "Virement", periode: "Tranche 2 — 2025/26", recu: "—", statut: "en_attente" },
+      { date: "2025-10-18", montant: 17500, mode: "Chèque", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-062", statut: "paye" },
+      { date: " ", montant: 17500, mode: "Virement", periode: "Tranche 2   2025/26", recu: " ", statut: "en_attente" },
     ],
   },
   {
@@ -480,8 +480,8 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Prise en charge de la douleur", note: 15.0, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "2025-09-25", montant: 19000, mode: "Virement", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2509-001", statut: "paye" },
-      { date: "2026-01-15", montant: 19000, mode: "Virement", periode: "Tranche 2 — 2025/26", recu: "ISTPM-R-2601-052", statut: "paye" },
+      { date: "2025-09-25", montant: 19000, mode: "Virement", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2509-001", statut: "paye" },
+      { date: "2026-01-15", montant: 19000, mode: "Virement", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-052", statut: "paye" },
     ],
   },
   {
@@ -508,7 +508,7 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Techniques de laboratoire", note: 8.5, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "—", montant: 16500, mode: "Virement", periode: "Tranche 1 — 2025/26", recu: "—", statut: "impaye" },
+      { date: " ", montant: 16500, mode: "Virement", periode: "Tranche 1   2025/26", recu: " ", statut: "impaye" },
     ],
   },
   {
@@ -535,8 +535,8 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Occlusodontie", note: 7.5, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "2025-10-08", montant: 8000, mode: "Espèces", periode: "Tranche 1 — 2025/26", recu: "ISTPM-R-2510-040", statut: "paye" },
-      { date: "—", montant: 22000, mode: "Virement", periode: "Solde 2025/26", recu: "—", statut: "impaye" },
+      { date: "2025-10-08", montant: 8000, mode: "Espèces", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-040", statut: "paye" },
+      { date: " ", montant: 22000, mode: "Virement", periode: "Solde 2025/26", recu: " ", statut: "impaye" },
     ],
   },
 ];
@@ -748,7 +748,7 @@ export type ExamDocument = {
   /** Taille en octets. */
   taille: number;
   mime: string;
-  /** ISO — date de dépôt. */
+  /** ISO   date de dépôt. */
   uploadedAt: string;
 };
 
@@ -780,7 +780,7 @@ export type Examen = {
   etudiantsConvoques: number;
   composante: "Théorique" | "Pratique" | "Théorique + Pratique";
   description?: string;
-  /** Identifiant du formateur auteur — renseigné automatiquement. */
+  /** Identifiant du formateur auteur   renseigné automatiquement. */
   createdBy: string;
   document?: ExamDocument;
 };
@@ -789,7 +789,7 @@ export type Examen = {
 export const DUREES_EXAMEN = [30, 45, 60, 90, 120, 150, 180, 240] as const;
 
 export function fmtDuree(minutes: number): string {
-  if (!minutes) return "—";
+  if (!minutes) return " ";
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (!h) return `${m} min`;
@@ -805,7 +805,7 @@ export function fmtTaille(octets: number): string {
 export const EXAMENS: Examen[] = [
   {
     id: "ex-1",
-    titre: "Examen final — Soins infirmiers en médecine",
+    titre: "Examen final   Soins infirmiers en médecine",
     module: "Soins infirmiers en médecine",
     filiere: "Infirmier polyvalent",
     niveau: "S5",
@@ -833,7 +833,7 @@ export const EXAMENS: Examen[] = [
   },
   {
     id: "ex-2",
-    titre: "Évaluation pratique — Réanimation et soins intensifs",
+    titre: "Évaluation pratique   Réanimation et soins intensifs",
     module: "Réanimation et soins intensifs",
     filiere: "Infirmier en anesthésie-réanimation",
     niveau: "S5",
@@ -860,7 +860,7 @@ export const EXAMENS: Examen[] = [
   },
   {
     id: "ex-3",
-    titre: "Contrôle continu — Obstétrique",
+    titre: "Contrôle continu   Obstétrique",
     module: "Obstétrique",
     filiere: "Sage-femme",
     niveau: "S3",
@@ -886,7 +886,7 @@ export const EXAMENS: Examen[] = [
   },
   {
     id: "ex-4",
-    titre: "Évaluation pratique — Rééducation fonctionnelle",
+    titre: "Évaluation pratique   Rééducation fonctionnelle",
     module: "Rééducation fonctionnelle",
     filiere: "Kinésithérapie",
     niveau: "S3",
@@ -905,7 +905,7 @@ export const EXAMENS: Examen[] = [
   },
   {
     id: "ex-5",
-    titre: "Examen final — Techniques de radiologie",
+    titre: "Examen final   Techniques de radiologie",
     module: "Techniques de radiologie",
     filiere: "Radiologie / Imagerie médicale",
     niveau: "S6",
@@ -932,7 +932,7 @@ export const EXAMENS: Examen[] = [
   },
   {
     id: "ex-6",
-    titre: "Évaluation pratique — Hématologie",
+    titre: "Évaluation pratique   Hématologie",
     module: "Hématologie",
     filiere: "Laboratoire / Biologie médicale",
     niveau: "S6",
@@ -951,7 +951,7 @@ export const EXAMENS: Examen[] = [
   },
   {
     id: "ex-7",
-    titre: "Contrôle continu — Anatomie dentaire",
+    titre: "Contrôle continu   Anatomie dentaire",
     module: "Anatomie dentaire",
     filiere: "Prothèse dentaire",
     niveau: "S1",
@@ -977,7 +977,7 @@ export const EXAMENS: Examen[] = [
   },
   {
     id: "ex-8",
-    titre: "Rattrapage — Biochimie clinique",
+    titre: "Rattrapage   Biochimie clinique",
     module: "Biochimie clinique",
     filiere: "Laboratoire / Biologie médicale",
     niveau: "S6",
@@ -997,7 +997,7 @@ export const EXAMENS: Examen[] = [
   },
   {
     id: "ex-9",
-    titre: "Examen final — Anesthésie clinique",
+    titre: "Examen final   Anesthésie clinique",
     module: "Anesthésie clinique",
     filiere: "Infirmier en anesthésie-réanimation",
     niveau: "S5",
@@ -1023,7 +1023,7 @@ export const EXAMENS: Examen[] = [
   },
   {
     id: "ex-10",
-    titre: "Évaluation pratique — Prothèse fixe (TP)",
+    titre: "Évaluation pratique   Prothèse fixe (TP)",
     module: "Prothèse fixe (TP)",
     filiere: "Prothèse dentaire",
     niveau: "S1",
@@ -1042,7 +1042,7 @@ export const EXAMENS: Examen[] = [
   },
   {
     id: "ex-11",
-    titre: "Contrôle continu — Hygiène hospitalière",
+    titre: "Contrôle continu   Hygiène hospitalière",
     module: "Hygiène hospitalière",
     filiere: "Infirmier polyvalent",
     niveau: "S5",
@@ -1070,7 +1070,7 @@ export const EXAMENS: Examen[] = [
   },
   {
     id: "ex-12",
-    titre: "Contrôle continu — Éthique et déontologie",
+    titre: "Contrôle continu   Éthique et déontologie",
     module: "Éthique et déontologie",
     filiere: "Infirmier polyvalent",
     niveau: "S1",
@@ -1370,7 +1370,7 @@ export const STAGES: Stage[] = [
     nom: "El Amrani",
     filiere: "Infirmier polyvalent",
     niveau: "S5",
-    structure: "CHR Hassan II — Agadir",
+    structure: "CHR Hassan II   Agadir",
     service: "Médecine interne",
     encadrantClinique: "Dr. A. Bennis (Cadre infirmier)",
     tuteurAcademique: "S. El Idrissi",
@@ -1387,7 +1387,7 @@ export const STAGES: Stage[] = [
     nom: "Ait Taleb",
     filiere: "Infirmier en anesthésie-réanimation",
     niveau: "S5",
-    structure: "CHR Hassan II — Agadir",
+    structure: "CHR Hassan II   Agadir",
     service: "Bloc opératoire",
     encadrantClinique: "Dr. R. Mansouri (Médecin anesthésiste)",
     tuteurAcademique: "R. Benjelloun",
@@ -1404,7 +1404,7 @@ export const STAGES: Stage[] = [
     nom: "Benkirane",
     filiere: "Sage-femme",
     niveau: "S3",
-    structure: "Hôpital Hassan II — Agadir",
+    structure: "Hôpital Hassan II   Agadir",
     service: "Maternité",
     encadrantClinique: "Mme F. Oubella (Sage-femme major)",
     tuteurAcademique: "N. Ait Hammou",
@@ -1422,7 +1422,7 @@ export const STAGES: Stage[] = [
     nom: "Ouhssaine",
     filiere: "Radiologie / Imagerie médicale",
     niveau: "S6",
-    structure: "CHR Hassan II — Agadir",
+    structure: "CHR Hassan II   Agadir",
     service: "Service d'imagerie",
     encadrantClinique: "M. T. Fadel (Manipulateur en chef)",
     tuteurAcademique: "L. Sekkat",
@@ -1440,7 +1440,7 @@ export const STAGES: Stage[] = [
     nom: "Bennani",
     filiere: "Laboratoire / Biologie médicale",
     niveau: "S6",
-    structure: "Hôpital Hassan II — Agadir",
+    structure: "Hôpital Hassan II   Agadir",
     service: "Laboratoire d'analyses",
     encadrantClinique: "Dr. S. Haddad (Biologiste)",
     tuteurAcademique: "K. Tahiri",
@@ -1474,7 +1474,7 @@ export const STAGES: Stage[] = [
     nom: "Moutaouakil",
     filiere: "Kinésithérapie",
     niveau: "S4",
-    structure: "Clinique Al Massira — Agadir",
+    structure: "Clinique Al Massira   Agadir",
     service: "Rééducation fonctionnelle",
     encadrantClinique: "M. Y. Ouhadi (Kinésithérapeute chef)",
     tuteurAcademique: "H. Bouzid",
@@ -1491,7 +1491,7 @@ export const STAGES: Stage[] = [
     nom: "Naciri",
     filiere: "Infirmier en anesthésie-réanimation",
     niveau: "S6",
-    structure: "CHU Ibn Rochd — Casablanca",
+    structure: "CHU Ibn Rochd   Casablanca",
     service: "Réanimation polyvalente",
     encadrantClinique: "Pr. H. El Alaoui (Réanimateur)",
     tuteurAcademique: "R. Benjelloun",
@@ -1509,7 +1509,7 @@ export const STAGES: Stage[] = [
     nom: "Chafik",
     filiere: "Kinésithérapie",
     niveau: "S3",
-    structure: "Clinique Ennakhil — Agadir",
+    structure: "Clinique Ennakhil   Agadir",
     service: "Kinésithérapie respiratoire",
     encadrantClinique: "M. R. Belmekki (Kinésithérapeute)",
     tuteurAcademique: "H. Bouzid",
@@ -1557,7 +1557,7 @@ export const PAIEMENTS: PaiementLigne[] = ETUDIANTS.flatMap((e) =>
 );
 
 /* ------------------------------------------------------------------ */
-/*  Agrégats — Tableau de bord                                         */
+/*  Agrégats   Tableau de bord                                         */
 /* ------------------------------------------------------------------ */
 
 const inscrits = ETUDIANTS.filter(
@@ -1646,12 +1646,12 @@ export type ActiviteItem = {
 };
 
 export const ACTIVITE_RECENTE: ActiviteItem[] = [
-  { type: "inscription", texte: "Nouvelle inscription — Fatima Zahra Lahlou (Prothèse dentaire, S1)", date: "2026-07-21" },
-  { type: "paiement", texte: "Paiement reçu — Salma El Amrani, 11 000 MAD (Tranche 3)", date: "2026-07-20" },
-  { type: "note", texte: "Notes saisies — Anatomie dentaire (S1, Prothèse dentaire)", date: "2026-07-19" },
-  { type: "note", texte: "Notes saisies — Rééducation fonctionnelle (S3, Kinésithérapie)", date: "2026-07-18" },
-  { type: "paiement", texte: "Relance envoyée — Omar Bennani, solde 33 000 MAD", date: "2026-07-17" },
-  { type: "inscription", texte: "Réinscription confirmée — Zakaria Moutaouakil (Kinésithérapie, S4)", date: "2026-07-16" },
+  { type: "inscription", texte: "Nouvelle inscription   Fatima Zahra Lahlou (Prothèse dentaire, S1)", date: "2026-07-21" },
+  { type: "paiement", texte: "Paiement reçu   Salma El Amrani, 11 000 MAD (Tranche 3)", date: "2026-07-20" },
+  { type: "note", texte: "Notes saisies   Anatomie dentaire (S1, Prothèse dentaire)", date: "2026-07-19" },
+  { type: "note", texte: "Notes saisies   Rééducation fonctionnelle (S3, Kinésithérapie)", date: "2026-07-18" },
+  { type: "paiement", texte: "Relance envoyée   Omar Bennani, solde 33 000 MAD", date: "2026-07-17" },
+  { type: "inscription", texte: "Réinscription confirmée   Zakaria Moutaouakil (Kinésithérapie, S4)", date: "2026-07-16" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -1663,10 +1663,190 @@ export function fmtMAD(n: number): string {
 }
 
 export function fmtDate(iso: string): string {
-  if (!iso || iso === "—") return "—";
+  if (!iso || iso === " ") return " ";
   return new Date(iso).toLocaleDateString("fr-FR", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
 }
+
+/* ------------------------------------------------------------------ */
+/*  Planning — séances d'enseignement                                  */
+/* ------------------------------------------------------------------ */
+
+/** Salles et espaces pédagogiques de l'institut. */
+export const SALLES = [
+  "Amphi A",
+  "Amphi B",
+  "Salle 3",
+  "Salle 5",
+  "Salle 8",
+  "Salle 9",
+  "Salle 12",
+  "Labo simulation 1",
+  "Labo simulation 2",
+  "Labo biologie",
+  "Salle de rééducation",
+  "Atelier prothèse",
+] as const;
+
+/** Groupes / classes constitués. */
+export const GROUPES = [
+  "S1-A",
+  "S1-B",
+  "S2-A",
+  "S2-B",
+  "S3-G1",
+  "S3-G2",
+  "S4-G1",
+  "S4-G2",
+  "S5-G1",
+  "S5-G2",
+  "S6-G1",
+  "S6-G2",
+] as const;
+
+/** Créneaux horaires standards de l'emploi du temps. */
+export const CRENEAUX = [
+  { debut: "08:30", fin: "10:00" },
+  { debut: "10:15", fin: "11:45" },
+  { debut: "12:00", fin: "13:30" },
+  { debut: "14:00", fin: "15:30" },
+  { debut: "15:45", fin: "17:15" },
+  { debut: "17:30", fin: "19:00" },
+] as const;
+
+/** Bornes de la grille horaire (heures pleines). */
+export const PLANNING_HEURE_DEBUT = 8;
+export const PLANNING_HEURE_FIN = 19;
+
+export type TypeSeance = "cours" | "td" | "tp" | "stage";
+
+export const TYPE_SEANCE_LABEL: Record<TypeSeance, string> = {
+  cours: "Cours",
+  td: "TD",
+  tp: "TP",
+  stage: "Encadrement stage",
+};
+
+export type Seance = {
+  id: string;
+  module: string;
+  /** Identifiant du formateur (voir FORMATEURS). */
+  professeurId: string;
+  groupe: string;
+  salle: string;
+  /** ISO `YYYY-MM-DD`. */
+  date: string;
+  /** `HH:MM` sur 24 h. */
+  debut: string;
+  fin: string;
+  anneeUniversitaire: string;
+  semestre: Niveau;
+  type: TypeSeance;
+  notes?: string;
+};
+
+/**
+ * Palette des séances — une teinte stable par module.
+ *
+ * La couleur est dérivée du nom du module plutôt que stockée : deux séances du
+ * même module se ressemblent toujours, sans champ à maintenir.
+ */
+export const SEANCE_COULEURS = [
+  { bg: "#029994", soft: "#d6efee", text: "#015b58" },
+  { bg: "#2f6fb0", soft: "#dfeaf6", text: "#1d4a78" },
+  { bg: "#7b5ea7", soft: "#ece5f5", text: "#523d73" },
+  { bg: "#d98324", soft: "#fbebd6", text: "#8f5413" },
+  { bg: "#2f8f5b", soft: "#daf0e4", text: "#1d5c3a" },
+  { bg: "#c2436b", soft: "#f8dde5", text: "#8a2b49" },
+  { bg: "#0f7b8a", soft: "#d5eef1", text: "#0a505a" },
+  { bg: "#8a6d3b", soft: "#efe6d4", text: "#5c4826" },
+] as const;
+
+export function couleurSeance(module: string) {
+  let hash = 0;
+  for (let i = 0; i < module.length; i += 1) {
+    hash = (hash * 31 + module.charCodeAt(i)) >>> 0;
+  }
+  return SEANCE_COULEURS[hash % SEANCE_COULEURS.length];
+}
+
+/** Minutes écoulées depuis minuit, pour positionner une séance. */
+export function minutesDepuisMinuit(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + (m || 0);
+}
+
+export function ajouterMinutes(hhmm: string, delta: number): string {
+  const total = Math.max(0, minutesDepuisMinuit(hhmm) + delta);
+  const h = Math.floor(total / 60) % 24;
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Lundi de la semaine contenant `d` (semaine ISO, lundi = premier jour). */
+export function lundiDeLaSemaine(d: Date): Date {
+  const copie = new Date(d);
+  const jour = (copie.getDay() + 6) % 7;
+  copie.setDate(copie.getDate() - jour);
+  copie.setHours(0, 0, 0, 0);
+  return copie;
+}
+
+export function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+/**
+ * Gabarit d'une semaine type : jour (0 = lundi) plutôt que date absolue.
+ * Les dates réelles sont calculées à partir de la semaine courante, pour que
+ * le planning soit toujours peuplé quelle que soit la date de consultation.
+ */
+const SEMAINE_TYPE: Array<Omit<Seance, "id" | "date"> & { jour: number }> = [
+  { jour: 0, module: "Soins infirmiers en médecine", professeurId: "fo-1", groupe: "S5-G1", salle: "Amphi A", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
+  { jour: 0, module: "Réanimation et soins intensifs", professeurId: "fo-2", groupe: "S5-G2", salle: "Labo simulation 2", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S5", type: "tp" },
+  { jour: 0, module: "Obstétrique", professeurId: "fo-3", groupe: "S3-G2", salle: "Salle 12", debut: "14:00", fin: "15:30", anneeUniversitaire: "2025/2026", semestre: "S3", type: "cours" },
+  { jour: 0, module: "Anatomie dentaire", professeurId: "fo-7", groupe: "S1-A", salle: "Salle 5", debut: "15:45", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S1", type: "cours" },
+
+  { jour: 1, module: "Hygiène hospitalière", professeurId: "fo-1", groupe: "S5-G1", salle: "Salle 8", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "td" },
+  { jour: 1, module: "Rééducation fonctionnelle", professeurId: "fo-4", groupe: "S3-G1", salle: "Salle de rééducation", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S3", type: "tp" },
+  { jour: 1, module: "Techniques de radiologie", professeurId: "fo-5", groupe: "S6-G1", salle: "Amphi B", debut: "14:00", fin: "15:30", anneeUniversitaire: "2025/2026", semestre: "S6", type: "cours" },
+  { jour: 1, module: "Hématologie", professeurId: "fo-6", groupe: "S6-G2", salle: "Labo biologie", debut: "15:45", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S6", type: "tp" },
+
+  { jour: 2, module: "Éthique et déontologie", professeurId: "fo-1", groupe: "S1-B", salle: "Salle 3", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S1", type: "cours" },
+  { jour: 2, module: "Anesthésie clinique", professeurId: "fo-2", groupe: "S5-G1", salle: "Amphi A", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
+  { jour: 2, module: "Suivi de grossesse", professeurId: "fo-3", groupe: "S3-G2", salle: "Salle 12", debut: "12:00", fin: "13:30", anneeUniversitaire: "2025/2026", semestre: "S3", type: "td" },
+  { jour: 2, module: "Prothèse fixe (TP)", professeurId: "fo-7", groupe: "S1-A", salle: "Atelier prothèse", debut: "14:00", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S1", type: "tp" },
+
+  { jour: 3, module: "Soins infirmiers en médecine", professeurId: "fo-1", groupe: "S5-G1", salle: "Amphi A", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
+  { jour: 3, module: "Physiologie appliquée", professeurId: "fo-2", groupe: "S5-G2", salle: "Salle 9", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
+  { jour: 3, module: "Néonatologie", professeurId: "fo-3", groupe: "S3-G2", salle: "Salle 12", debut: "14:00", fin: "15:30", anneeUniversitaire: "2025/2026", semestre: "S3", type: "cours" },
+  { jour: 3, module: "Biochimie clinique", professeurId: "fo-6", groupe: "S6-G2", salle: "Labo biologie", debut: "15:45", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S6", type: "td" },
+
+  { jour: 4, module: "Kinésithérapie respiratoire", professeurId: "fo-4", groupe: "S4-G1", salle: "Salle de rééducation", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S4", type: "tp" },
+  { jour: 4, module: "Imagerie médicale avancée", professeurId: "fo-5", groupe: "S6-G1", salle: "Amphi B", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S6", type: "cours" },
+  { jour: 4, module: "Santé publique", professeurId: "fo-8", groupe: "S5-G1", salle: "Amphi A", debut: "14:00", fin: "15:30", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
+  { jour: 4, module: "Encadrement de stage", professeurId: "fo-1", groupe: "S5-G1", salle: "Salle 8", debut: "15:45", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S5", type: "stage" },
+
+  { jour: 5, module: "Pharmacologie", professeurId: "fo-8", groupe: "S5-G2", salle: "Salle 9", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
+  { jour: 5, module: "Anatomie dentaire", professeurId: "fo-7", groupe: "S1-B", salle: "Salle 5", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S1", type: "td" },
+];
+
+/** Séances de la semaine courante et de la suivante. */
+export const SEANCES: Seance[] = (() => {
+  const lundi = lundiDeLaSemaine(new Date());
+  const out: Seance[] = [];
+  for (const semaine of [0, 1]) {
+    SEMAINE_TYPE.forEach((s, i) => {
+      const d = new Date(lundi);
+      d.setDate(lundi.getDate() + s.jour + semaine * 7);
+      const { jour: _jour, ...reste } = s;
+      out.push({ ...reste, id: `se-${semaine}-${i}`, date: isoDate(d) });
+    });
+  }
+  return out;
+})();

@@ -76,7 +76,7 @@ export const iconButtonDanger =
 export const dialogSurface =
   "flex flex-col gap-0 overflow-hidden rounded-3xl border border-brand/15 bg-card p-0 shadow-[0_35px_80px_-40px_rgb(var(--istpm-shadow)/0.5)] sm:rounded-3xl " +
   // Les `_` deviennent des espaces : `min()` exige des espaces autour du `-`,
-  // sans quoi la déclaration est invalide et ignorée — le dialogue gardait
+  // sans quoi la déclaration est invalide et ignorée   le dialogue gardait
   // alors 560 px et débordait sur mobile.
   "max-h-[min(90vh,720px)] w-[min(100vw_-_1.5rem,560px)] max-w-[min(100vw_-_1.5rem,560px)] " +
   "[&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-brand/20 [&>button]:bg-card [&>button]:opacity-100 [&>button]:hover:bg-muted [&>button]:focus:ring-0 [&>button]:focus:ring-offset-0";

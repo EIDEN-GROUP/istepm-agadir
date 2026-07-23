@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Plus, BellRing, Eye, Receipt } from "lucide-react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useIstpm } from "@/lib/istpm-store";
 import {
@@ -120,8 +121,14 @@ function PaiementsPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {kpis.map((k) => (
-          <div key={k.label} className={cn(softCard, "p-4")}>
+        {kpis.map((k, i) => (
+          <motion.div
+            key={k.label}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: i * 0.06, ease: "easeOut" }}
+            className={cn(softCard, "p-4")}
+          >
             <div
               className="mb-2.5 h-1.5 w-9 rounded-full"
               style={{ backgroundColor: TONE_COLORS[k.tone] }}
@@ -132,7 +139,7 @@ function PaiementsPage() {
             <p className="mt-1.5 font-display text-lg font-bold tracking-tight text-foreground">
               {k.value}
             </p>
-          </div>
+          </motion.div>
         ))}
       </div>
 
@@ -176,8 +183,15 @@ function PaiementsPage() {
           </>
         }
       >
-        {filtered.map((p) => (
-          <tr key={p.id} onClick={() => setDetail(p)} className={tableRow}>
+        {filtered.map((p, i) => (
+          <motion.tr
+            key={p.id}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
+            onClick={() => setDetail(p)}
+            className={tableRow}
+          >
             <td
               className={cn("border-l-[3px] font-medium", cellTruncate)}
               style={{
@@ -213,7 +227,7 @@ function PaiementsPage() {
                 </button>
               </div>
             </td>
-          </tr>
+          </motion.tr>
         ))}
       </DataTable>
 
@@ -266,14 +280,14 @@ function PaiementsPage() {
             const et = etudiants.find((e) => e.id === etudiantId)!;
             addPaiement(etudiantId, ligne);
             toast.success(
-              `Paiement de ${fmtMAD(ligne.montant)} enregistré — ${et.prenom} ${et.nom}`,
+              `Paiement de ${fmtMAD(ligne.montant)} enregistré   ${et.prenom} ${et.nom}`,
             );
             setAddOpen(false);
           }}
         />
       ) : null}
 
-      {/* Relances — outstanding balances to chase. */}
+      {/* Relances   outstanding balances to chase. */}
       <Dialog open={relanceOpen} onOpenChange={setRelanceOpen}>
         <DialogContent className={dialogSurface}>
           <DialogTitle className="sr-only">Relances</DialogTitle>
@@ -328,7 +342,7 @@ function PaiementsPage() {
               </ul>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Aucun solde en attente — tous les étudiants sont à jour.
+                Aucun solde en attente   tous les étudiants sont à jour.
               </p>
             )}
           </DetailShell>
@@ -418,7 +432,7 @@ function PaiementForm({
           onChange={(v) => set("etudiantId", v)}
           options={etudiants.map((e) => ({
             value: e.id,
-            label: `${e.prenom} ${e.nom} — ${e.cne}`,
+            label: `${e.prenom} ${e.nom}   ${e.cne}`,
           }))}
           error={errors.etudiantId}
         />
@@ -458,7 +472,7 @@ function PaiementForm({
         required
         value={f.periode}
         onChange={(v) => set("periode", v)}
-        placeholder="Tranche 2 — 2025/2026"
+        placeholder="Tranche 2   2025/2026"
         error={errors.periode}
       />
       <TextField

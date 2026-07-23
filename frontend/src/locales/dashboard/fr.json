@@ -21,7 +21,8 @@
     "familles": "Parents",
     "affiches": "Affiches du personnel",
     "rapports": "Rapports",
-    "messagerie": "Messagerie"
+    "messagerie": "Messagerie",
+    "planning": "Planning"
   },
   "navShort": {
     "dashboard": "Accueil",
@@ -36,7 +37,8 @@
     "familles": "Parents",
     "affiches": "Affiches",
     "rapports": "Rapports",
-    "messagerie": "Messages"
+    "messagerie": "Messages",
+    "planning": "Planning"
   },
   "common": {
     "cancel": "Annuler",
@@ -282,7 +284,13 @@
     "demandsNone": "Aucune demande affichée",
     "demandsOne": "1 demande affichée",
     "demandsMany": "{{count}} demandes affichées",
-    "csvHeaders": ["Nom", "Email", "Téléphone", "Date", "Sujet"],
+    "csvHeaders": [
+      "Nom",
+      "Email",
+      "Téléphone",
+      "Date",
+      "Sujet"
+    ],
     "detailModal": {
       "eyebrow": "  Détail   Rendez-vous",
       "childAge": "Âge de l'enfant",
@@ -302,7 +310,20 @@
       "send": "Envoyer la réponse",
       "rePrefix": "Re: "
     },
-    "monthsShort": ["jan.", "fév.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]
+    "monthsShort": [
+      "jan.",
+      "fév.",
+      "mars",
+      "avr.",
+      "mai",
+      "juin",
+      "juil.",
+      "août",
+      "sept.",
+      "oct.",
+      "nov.",
+      "déc."
+    ]
   },
   "paiements": {
     "pageTitle": "Paiements   CRM",
@@ -388,7 +409,15 @@
     "familiesDemoOne": "1 famille   démo",
     "familiesDemoMany": "{{count}} familles   démo",
     "noSearchMatch": "Aucune famille ne correspond à votre recherche.",
-    "months": ["Sept", "Oct", "Nov", "Déc", "Jan", "Fév", "Mar"]
+    "months": [
+      "Sept",
+      "Oct",
+      "Nov",
+      "Déc",
+      "Jan",
+      "Fév",
+      "Mar"
+    ]
   },
   "planifications": {
     "pageTitle": "Planifications   CRM",

@@ -1,4 +1,4 @@
-# ISTEPM Agadir  — Journal des modifications
+# ISTEPM Agadir    Journal des modifications
 
 Transformation du tableau de bord « School CRM » (démo centre d'éducation
 inclusive) en CRM pour l'**Institut spécialisé des techniques paramédicales
@@ -14,9 +14,9 @@ aucune authentification réelle. Toutes les données sont locales.
 1. [Vue d'ensemble](#1-vue-densemble)
 2. [Identité visuelle](#2-identité-visuelle)
 3. [Palette de couleurs](#3-palette-de-couleurs)
-4. [Suppression de l'API — projet frontend uniquement](#4-suppression-de-lapi--projet-frontend-uniquement)
+4. [Suppression de l'API   projet frontend uniquement](#4-suppression-de-lapi--projet-frontend-uniquement)
 5. [Rôles et interfaces](#5-rôles-et-interfaces)
-6. [Navigation — barre latérale](#6-navigation--barre-latérale)
+6. [Navigation   barre latérale](#6-navigation--barre-latérale)
 7. [Pages métier](#7-pages-métier)
 8. [Données modifiables (CRUD)](#8-données-modifiables-crud)
 9. [Composants partagés créés](#9-composants-partagés-créés)
@@ -37,7 +37,7 @@ aucune authentification réelle. Toutes les données sont locales.
 | Navigation | Barre horizontale (6 liens) | Barre latérale (7 entrées + 1 groupe) |
 | Données | Appels API (`useQuery`) vers un backend | Données statiques modifiables en mémoire |
 | Rôles | Aucun | 3 interfaces (directeur, enseignant, responsable) |
-| Actions | — | Création / modification / suppression réelles |
+| Actions |   | Création / modification / suppression réelles |
 
 ### Stack technique (inchangée)
 
@@ -52,7 +52,7 @@ shadcn/ui (Radix) · Recharts · Sonner.
 ### Découverte déterminante
 
 Le fichier **`src/lib/istpm-data.ts`** (~1 470 lignes) contenait déjà
-l'intégralité du modèle de données paramédical — mais **n'était importé par
+l'intégralité du modèle de données paramédical   mais **n'était importé par
 aucun fichier**. Il contient :
 
 - 7 filières, niveaux S1–S6, 7 structures d'accueil (CHU/hôpitaux réels)
@@ -63,7 +63,7 @@ aucun fichier**. Il contient :
   correspondant exactement à la palette demandée
 
 Le travail a donc consisté à **brancher des données déjà écrites**, puis à
-re-styler et compléter — et non à repartir de zéro.
+re-styler et compléter   et non à repartir de zéro.
 
 ---
 
@@ -79,8 +79,8 @@ Le logo SVG fourni a été installé en **deux variantes** :
 | `public/istpm-logo-mark.svg` | Sidebar, écran de connexion | Fond transparent |
 
 **Détail important :** le SVG d'origine contient en premier chemin un carré
-blanc plein format (1254 × 1254). Sur l'écran de connexion — qui a un dégradé
-teal — ce carré serait apparu comme un rectangle blanc autour du logo. La
+blanc plein format (1254 × 1254). Sur l'écran de connexion   qui a un dégradé
+teal   ce carré serait apparu comme un rectangle blanc autour du logo. La
 variante `-mark` supprime uniquement ce chemin.
 
 L'attribut `width="100%"` a également été retiré des deux fichiers pour que le
@@ -91,7 +91,7 @@ dimensionnement CSS fonctionne normalement.
 `index.html` :
 
 ```html
-<title>ISTEPM Agadir  — CRM</title>
+<title>ISTEPM Agadir    CRM</title>
 <link rel="icon" type="image/svg+xml" href="/istpm-logo.svg" />
 ```
 
@@ -118,8 +118,8 @@ seul n'aurait donc rien changé visuellement.
 --istpm-ink: #123b3a;    --istpm-white: #ffffff;
 ```
 
-**b) Jetons sémantiques repointés** — `--primary` devient teal avec texte
-**blanc** (auparavant : vert avec texte bleu marine — l'inversion compte),
+**b) Jetons sémantiques repointés**   `--primary` devient teal avec texte
+**blanc** (auparavant : vert avec texte bleu marine   l'inversion compte),
 `--destructive` devient rouge, `--background`/`--card` deviennent blancs.
 
 **c) Utilitaires Tailwind enregistrés** dans `@theme inline`, pour remplacer
@@ -146,20 +146,20 @@ Le **teal domine** (navigation active, boutons primaires, en-têtes, badges
 payé/admis/validé). Le **rouge est réservé** aux alertes et aux états négatifs
 (impayé, retard, ajourné, à risque, abandon).
 
-Un badge unique gère toutes les couleurs de statut — `toneBadge(tone)` dans
+Un badge unique gère toutes les couleurs de statut   `toneBadge(tone)` dans
 `src/lib/dash-ui.tsx`, piloté par les tables `*_TONE` de `istpm-data.ts`.
 Aucune page ne définit ses propres couleurs de statut.
 
 ---
 
-## 4. Suppression de l'API — projet frontend uniquement
+## 4. Suppression de l'API   projet frontend uniquement
 
 Toutes les pages actives interrogeaient un backend (`/clients`, `/payments`,
 `/dashboard/stats`…). Ces appels ont été supprimés.
 
-- `src/lib/auth.tsx` — réécrit : plus de `POST /auth/login`, plus de jeton.
-- `src/routes/dashboard.tsx` — le garde-fou vérifie le rôle stocké, pas un token.
-- Pages `paiements`, `settings`, `index` — passées aux données locales.
+- `src/lib/auth.tsx`   réécrit : plus de `POST /auth/login`, plus de jeton.
+- `src/routes/dashboard.tsx`   le garde-fou vérifie le rôle stocké, pas un token.
+- Pages `paiements`, `settings`, `index`   passées aux données locales.
 - Le panneau de notifications (messagerie WhatsApp, ~460 lignes) et le widget
   de support ont été **désactivés** : hors périmètre ISTPM, et ils
   interrogeaient un backend absent toutes les 30 secondes.
@@ -174,7 +174,7 @@ if (res.status === 401) { clearToken(); window.location.href = "/login"; }
 ```
 
 Le widget de support continuait d'appeler l'ancien backend, recevait des 401,
-et **éjectait l'utilisateur d'une session valide** — constaté en test. La
+et **éjectait l'utilisateur d'une session valide**   constaté en test. La
 redirection a été remplacée par une simple erreur.
 
 `src/lib/api.ts` est conservé car les anciennes routes non branchées
@@ -184,7 +184,7 @@ l'importent encore.
 
 ## 5. Rôles et interfaces
 
-Trois interfaces, **état d'affichage uniquement** — aucune authentification.
+Trois interfaces, **état d'affichage uniquement**   aucune authentification.
 Le rôle est stocké dans `localStorage["istpm-role"]` et change instantanément
 via le sélecteur en bas de la barre latérale.
 
@@ -192,12 +192,12 @@ via le sélecteur en bas de la barre latérale.
 |---|:---:|:---:|:---:|
 | Tableau de bord | ✅ complet | ✅ allégé | ✅ orienté scolarité |
 | Étudiants | ✅ CRUD | 👁 lecture seule | ✅ CRUD |
-| Scolarité › Examens | ✅ | ✅ saisie notes | — |
+| Scolarité › Examens | ✅ | ✅ saisie notes |   |
 | Scolarité › Bulletins | ✅ | 👁 lecture seule | ✅ publication |
-| Formateurs | ✅ | — | — |
-| Stages cliniques | ✅ | — | ✅ conventions |
-| Paiements | ✅ | — | ✅ + relances |
-| Paramètres | ✅ | — | — |
+| Formateurs | ✅ |   |   |
+| Stages cliniques | ✅ |   | ✅ conventions |
+| Paiements | ✅ |   | ✅ + relances |
+| Paramètres | ✅ |   |   |
 
 Le rôle agit à trois niveaux : les entrées de navigation affichées, le contenu
 du tableau de bord, et les boutons d'action disponibles (un enseignant voit
@@ -206,12 +206,12 @@ du tableau de bord, et les boutons d'action disponibles (un enseignant voit
 ### Écran de connexion
 
 Reconstruit : logo transparent, nom complet de l'institut, dégradé teal, et
-**trois boutons de profil**. Aucun mot de passe — mention explicite
+**trois boutons de profil**. Aucun mot de passe   mention explicite
 « Démonstration hors ligne ».
 
 ---
 
-## 6. Navigation — barre latérale
+## 6. Navigation   barre latérale
 
 La barre horizontale a été remplacée par une **barre latérale** :
 `src/components/dash-sidebar.tsx`.
@@ -252,12 +252,12 @@ accessible disparaît entièrement.
 ### Détails techniques
 
 - L'ouverture du groupe utilise `grid-rows: 0fr → 1fr`, qui s'anime vers la
-  hauteur réelle du contenu — une transition `max-height` ne peut que
+  hauteur réelle du contenu   une transition `max-height` ne peut que
   l'approximer.
 - L'attribut **`inert`** est appliqué au conteneur replié : l'animation garde
   les liens montés, ils seraient donc accessibles au clavier tout en étant
   invisibles.
-- **RTL** : propriétés logiques (`start-*`, `border-e`) et ordre flex — en
+- **RTL** : propriétés logiques (`start-*`, `border-e`) et ordre flex   en
   arabe le rail passe à droite sans feuille de style dédiée. Vérifié.
 
 ---
@@ -279,11 +279,11 @@ Cinq nouvelles pages, **ajoutées** sans renommer ni déplacer l'existant.
 **4 cartes KPI** (étudiants inscrits +delta, formateurs actifs, taux de
 réussite, total à recouvrer) puis trois sections :
 
-1. **Académique** — répartition par filière (donut), par niveau (barres), taux
+1. **Académique**   répartition par filière (donut), par niveau (barres), taux
    de réussite par filière, liste cliquable « Étudiants à risque »
-2. **Financier** — encaissé, encaissé ce mois, en attente, impayé, retard,
+2. **Financier**   encaissé, encaissé ce mois, en attente, impayé, retard,
    taux de recouvrement (en MAD)
-3. **À traiter** — examens à venir, bulletins à publier, stages à valider +
+3. **À traiter**   examens à venir, bulletins à publier, stages à valider +
    flux « Activité récente »
 
 Le contenu change selon le rôle : l'enseignant voit *mes groupes / examens à
@@ -298,7 +298,7 @@ accessibles depuis l'interface. « Emploi du temps » n'apparaît nulle part.
 
 ---
 
-## 7 bis. Examens — espaces formateur et directeur
+## 7 bis. Examens   espaces formateur et directeur
 
 La page Examens est désormais **scindée en deux espaces** selon le rôle.
 
@@ -318,7 +318,7 @@ Ne voit **que ses propres examens** (filtrés sur `createdBy`). Peut créer,
 modifier, supprimer, et **déposer le sujet** (PDF ou Word, 10 Mo max). La
 saisie des notes reste disponible ici.
 
-### Espace directeur — lecture seule
+### Espace directeur   lecture seule
 
 Voit **tous les examens de tous les formateurs**. Aucun bouton de création, de
 modification ou de suppression n'est rendu. Colonnes : titre, module, classe,
@@ -343,7 +343,7 @@ métadonnées et la clé du fichier.
 - `Télécharger` passe par un `<a download>`, qui reste autorisé.
 - Les formats Word ne s'affichent pas dans le navigateur : un message le dit et
   renvoie vers le téléchargement.
-- Supprimer un examen ou remplacer un sujet efface l'ancien fichier — pas de
+- Supprimer un examen ou remplacer un sujet efface l'ancien fichier   pas de
   blob orphelin.
 - Les sujets du jeu de démonstration sont **générés localement** au premier
   lancement (PDF minimal valide, une page), pour que Voir et Télécharger
@@ -369,7 +369,7 @@ les compteurs « à traiter ».
 | **Étudiants** | Créer / modifier / supprimer, avec validation champ par champ. La suppression retire aussi le bulletin et le stage orphelins. Export CSV réel (avec BOM pour Excel). |
 | **Formateurs** | Créer / modifier / supprimer ; modules et groupes en listes séparées par virgules. |
 | **Examens** | Créer / modifier / supprimer. La **saisie des notes est persistée** : écriture d'une note par étudiant, moyenne théorique+pratique, recalcul de la moyenne générale, passage de l'examen à « notes saisies », crédit aux surveillants. |
-| **Bulletins** | Publication réelle (unitaire et « tout publier »), modification décision/session/statut. Le bouton PDF rend le bulletin dans un iframe masqué et ouvre la boîte d'impression — « Enregistrer au format PDF » produit un vrai document. |
+| **Bulletins** | Publication réelle (unitaire et « tout publier »), modification décision/session/statut. Le bouton PDF rend le bulletin dans un iframe masqué et ouvre la boîte d'impression   « Enregistrer au format PDF » produit un vrai document. |
 | **Stages** | Créer / modifier / supprimer une convention + action « Valider le stage ». |
 | **Paiements** | Enregistrement sur l'historique de l'étudiant, réduction du solde, passage automatique à « payé » à zéro, numéro de reçu généré, refus des montants supérieurs au solde. |
 | **Paramètres** | Ajout/suppression de filières + **réinitialisation des données**. |
@@ -389,7 +389,7 @@ en état et écrase le stockage ; les effets doublés de `StrictMode` relisent
 ensuite cette valeur. **Toute modification aurait été perdue au
 rafraîchissement.**
 
-Corrigé par une initialisation paresseuse `useState(load)` — sans risque ici
+Corrigé par une initialisation paresseuse `useState(load)`   sans risque ici
 puisqu'il s'agit d'une SPA sans rendu serveur. Vérifié après correction :
 un enregistrement ajouté survit, et les inscrits passent de 12 à 13, le taux
 de réussite de 79 % à 73 %, le total à recouvrer +40 000 MAD.
@@ -448,7 +448,7 @@ src/lib/istpm-data.ts
 ### Devenus inutilisés
 
 ```
-src/components/dash-shell.tsx      (1 240 lignes — ancienne barre horizontale)
+src/components/dash-shell.tsx      (1 240 lignes   ancienne barre horizontale)
 public/edu-logo.png                (1,2 Mo)
 public/favicon.png                 public/call-qr.svg
 src/lib/dashboard-mirror-data.ts   src/components/ui/chart.tsx
@@ -483,7 +483,7 @@ français en dur, ce qui suit la convention déjà en place dans le projet
 ### Non vérifié
 
 Les listes déroulantes **Radix `Select` ne réagissent pas aux clics
-automatisés** dans l'outil de test utilisé — dans les dialogues comme ailleurs.
+automatisés** dans l'outil de test utilisé   dans les dialogues comme ailleurs.
 Ce qui les entoure a été validé (rendu, validation, liaison des champs, cycle
 de création complet via un formulaire sans liste déroulante), mais **une
 création avec choix de Filière/Niveau mérite un test manuel**. Le composant est
@@ -495,11 +495,11 @@ vérification a été faite par interrogation du DOM, donc l'aspect visuel préc
 
 ### Suggestions
 
-1. **Supprimer le code mort** — `dash-shell.tsx`, `edu-logo.png` (1,2 Mo servi
+1. **Supprimer le code mort**   `dash-shell.tsx`, `edu-logo.png` (1,2 Mo servi
    pour rien), `dashboard-mirror-data.ts` et les routes non branchées.
-2. **Découper le bundle** — 1,07 Mo (309 Ko gzip) ; le build signale la taille.
+2. **Découper le bundle**   1,07 Mo (309 Ko gzip) ; le build signale la taille.
    Un `manualChunks` séparant Recharts suffirait.
-3. **Renommer le projet** — `package.json` s'appelle encore
+3. **Renommer le projet**   `package.json` s'appelle encore
    `school-crm-frontend`.
 4. **Traduire le corps des pages** si le support arabe complet devient
    nécessaire.

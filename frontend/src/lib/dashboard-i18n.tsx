@@ -11,6 +11,7 @@ import {
 import {
   LayoutDashboard,
   GraduationCap,
+  CalendarDays,
   Users,
   BookOpen,
   ClipboardList,
@@ -116,6 +117,7 @@ export function useDashboardI18n() {
 const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
   directeur: [
     "/dashboard",
+    "/dashboard/calendar",
     "/dashboard/etudiants",
     "/dashboard/formateurs",
     "/dashboard/examens",
@@ -126,16 +128,20 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
   ],
   enseignant: [
     "/dashboard",
+    "/dashboard/calendar",
     "/dashboard/etudiants",
     "/dashboard/examens",
     "/dashboard/bulletins",
   ],
+  // Le responsable organise le planning et gère les réglages pédagogiques.
   responsable: [
     "/dashboard",
+    "/dashboard/calendar",
     "/dashboard/etudiants",
     "/dashboard/bulletins",
     "/dashboard/stages",
     "/dashboard/paiements",
+    "/dashboard/settings",
   ],
 };
 
@@ -164,6 +170,12 @@ export function useDashboardNav(role: UserRole | null) {
         t.nav.dashboard,
         t.navShort.dashboard,
         LayoutDashboard,
+      ),
+      item(
+        "/dashboard/calendar",
+        t.nav.planning,
+        t.navShort.planning,
+        CalendarDays,
       ),
       item(
         "/dashboard/etudiants",
