@@ -184,7 +184,7 @@ function ListeEditable({
     }
     onChange([...valeurs, v]);
     setNouveau("");
-    toast.success(`Ajouté — ${v}`);
+    toast.success(`Ajouté   ${v}`);
   };
 
   return (
@@ -202,7 +202,7 @@ function ListeEditable({
                 aria-label={`Retirer ${v}`}
                 onClick={() => {
                   onChange(valeurs.filter((x) => x !== v));
-                  toast.success(`Retiré — ${v}`);
+                  toast.success(`Retiré   ${v}`);
                 }}
                 className="grid h-4 w-4 place-items-center rounded-full transition hover:bg-alert/20 hover:text-alert"
               >
@@ -283,7 +283,7 @@ function SettingsPage() {
   const autorisees = role ? SECTIONS_PAR_ROLE[role] : [];
   const peut = (id: SectionId) => autorisees.includes(id);
 
-  /* État local des réglages — non persisté côté serveur. */
+  /* État local des réglages   non persisté côté serveur. */
   const [annees, setAnnees] = useState<string[]>([...ANNEES_UNIVERSITAIRES]);
   const [semestres, setSemestres] = useState<string[]>([...NIVEAUX]);
   const [groupes, setGroupes] = useState<string[]>([...GROUPES]);
@@ -388,7 +388,7 @@ function SettingsPage() {
         </div>
       ))}
 
-      {/* Données de démonstration — accessible aux deux rôles */}
+      {/* Données de démonstration   accessible aux deux rôles */}
       <section className={cn(softCard, "p-5")}>
         <h3 className="font-display text-sm font-bold tracking-tight text-foreground">
           Données de démonstration
@@ -607,9 +607,9 @@ function SettingsPage() {
                 <tbody className="divide-y divide-brand/8">
                   {(
                     [
-                      ["Directeur", "Lecture", "—", "Complet"],
-                      ["Responsable", "Complet", "—", "Pédagogie"],
-                      ["Enseignant", "Le sien", "Saisie", "—"],
+                      ["Directeur", "Lecture", " ", "Complet"],
+                      ["Responsable", "Complet", " ", "Pédagogie"],
+                      ["Enseignant", "Le sien", "Saisie", " "],
                     ] as const
                   ).map(([r, p, n, s]) => (
                     <tr key={r}>

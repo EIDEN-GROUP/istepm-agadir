@@ -1672,7 +1672,7 @@ export function fmtDate(iso: string): string {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Planning — séances d'enseignement                                  */
+/*  Planning   séances d'enseignement                                  */
 /* ------------------------------------------------------------------ */
 
 /** Salles et espaces pédagogiques de l'institut. */
@@ -1749,7 +1749,7 @@ export type Seance = {
 };
 
 /**
- * Palette des séances — une teinte stable par module.
+ * Palette des séances   une teinte stable par module.
  *
  * La couleur est dérivée du nom du module plutôt que stockée : deux séances du
  * même module se ressemblent toujours, sans champ à maintenir.

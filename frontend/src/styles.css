@@ -309,6 +309,13 @@
     background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 55%, var(--background)) 100%);
   }
   .text-balance { text-wrap: balance; }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 
   /* Lumina-style landing mesh (login keeps dot `bg-grid` above) */
   .hero-mesh-grid {

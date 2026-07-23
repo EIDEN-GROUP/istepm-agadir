@@ -1,5 +1,5 @@
 /**
- * Vues du calendrier — Jour, Semaine, Mois.
+ * Vues du calendrier   Jour, Semaine, Mois.
  *
  * Les vues Jour et Semaine partagent une grille horaire : les séances y sont
  * positionnées en absolu à partir de leur heure de début et de leur durée,

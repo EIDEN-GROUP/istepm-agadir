@@ -2,24 +2,11 @@ import type { ReactNode } from "react";
 import { Search, X, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
 import {
   softCard,
   softInput,
-  softSelectContent,
-  softSelectTrigger,
-  eyebrowClass,
-  tableWrap,
-  tableEl,
-  tableHead,
-  tableBody,
-} from "@/lib/dash-ui";
+  softSelectContent, softSelectTrigger, eyebrowClass, tableWrap, tableEl, tableHead, tableBody, } from "@/lib/dash-ui";
 import { cn } from "@/lib/utils";
 
 export function PageHeader({
@@ -352,6 +339,7 @@ export function DetailShell({
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
+      className="flex flex-col overflow-hidden"
     >
       <header className="shrink-0 border-b border-brand/12 bg-brand-wash px-6 py-5">
         <div className="flex items-start gap-3.5">

@@ -146,7 +146,7 @@ function PlanningPage() {
     const map = new Map(
       formateurs.map((f) => [f.id, `${f.prenom} ${f.nom}`] as const),
     );
-    return (id: string) => map.get(id) ?? "—";
+    return (id: string) => map.get(id) ?? " ";
   }, [formateurs]);
 
   /** L'enseignant ne voit que ses propres séances. */
@@ -255,7 +255,7 @@ function PlanningPage() {
 
     if (conflits.length) {
       toast.warning(
-        `Séance déplacée — ${conflits.length} conflit(s) : ${resumeConflits(conflits)}`,
+        `Séance déplacée   ${conflits.length} conflit(s) : ${resumeConflits(conflits)}`,
       );
     } else {
       toast.success(`Séance déplacée au ${fmtDate(date)} à ${debut}`);
@@ -485,10 +485,10 @@ function PlanningPage() {
           onSubmit={(data) => {
             if (editing) {
               updateSeance(editing.id, data);
-              toast.success(`Séance mise à jour — ${data.module}`);
+              toast.success(`Séance mise à jour   ${data.module}`);
             } else {
               addSeance(data);
-              toast.success(`Séance créée — ${data.module}`);
+              toast.success(`Séance créée   ${data.module}`);
             }
             setFormOpen(false);
           }}
@@ -507,7 +507,7 @@ function PlanningPage() {
         onConfirm={() => {
           if (!toDelete) return;
           deleteSeance(toDelete.id);
-          toast.success(`Séance supprimée — ${toDelete.module}`);
+          toast.success(`Séance supprimée   ${toDelete.module}`);
           setToDelete(null);
         }}
       />
@@ -585,7 +585,7 @@ function SeanceDetail({
           <ul className="space-y-1 text-xs text-alert-dk">
             {conflits.map((cf, i) => (
               <li key={i}>
-                {LIBELLE_CONFLIT[cf.type]} — {cf.seance.module} (
+                {LIBELLE_CONFLIT[cf.type]}   {cf.seance.module} (
                 {cf.seance.debut}–{cf.seance.fin}, {cf.seance.salle})
               </li>
             ))}
@@ -745,7 +745,7 @@ function SeanceForm({
       title={initial ? "Modifier la séance" : "Nouvelle séance"}
       subtitle={
         initial
-          ? `${initial.module} — ${fmtDate(initial.date)}`
+          ? `${initial.module}   ${fmtDate(initial.date)}`
           : "Planifier un enseignement"
       }
       submitLabel={
@@ -767,7 +767,7 @@ function SeanceForm({
             <ul className="space-y-0.5 text-xs text-alert-dk">
               {conflits.map((c, i) => (
                 <li key={i}>
-                  {LIBELLE_CONFLIT[c.type]} — {c.seance.module} (
+                  {LIBELLE_CONFLIT[c.type]}   {c.seance.module} (
                   {c.seance.debut}–{c.seance.fin}, {c.seance.salle},{" "}
                   {nomProf(c.seance.professeurId)})
                 </li>
@@ -795,7 +795,7 @@ function SeanceForm({
           onChange={(v) => set("professeurId", v)}
           options={formateurs.map((p) => ({
             value: p.id,
-            label: `${p.prenom} ${p.nom} — ${p.departement}`,
+            label: `${p.prenom} ${p.nom}   ${p.departement}`,
           }))}
           error={errors.professeurId}
         />
