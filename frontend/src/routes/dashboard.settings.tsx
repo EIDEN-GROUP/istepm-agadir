@@ -17,6 +17,9 @@ import {
   Building2,
   SlidersHorizontal,
   Lock,
+  Eye,
+  PenLine,
+  Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth, ROLE_META, type UserRole } from "@/lib/auth";
@@ -36,6 +39,16 @@ import {
   createFiliereApi,
   deleteFiliereApi,
   resetSettings,
+  fetchRoles,
+  createRole,
+  updateRole,
+  deleteRole,
+  fetchUsers,
+  createUser,
+  deleteUser,
+  assignUserRole,
+  type RoleRecord,
+  type UserRecord,
 } from "@/lib/istpm-api";
 import { ConfirmDialog } from "@/components/dash-form";
 import {
@@ -281,6 +294,296 @@ function ChampReglage({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Role editor sub-component                                           */
+/* ------------------------------------------------------------------ */
+
+function RoleEditor({
+  role,
+  permGroups,
+  permLabel,
+  permIcon,
+  onSave,
+}: {
+  role: RoleRecord;
+  permGroups: readonly { readonly label: string; readonly perms: readonly string[] }[];
+  permLabel: Record<string, string>;
+  permIcon: Record<string, ReactNode>;
+  onSave: (data: { name?: string; description?: string; permissions?: string[] }) => void;
+}) {
+  const [name, setName] = useState(role.name);
+  const [description, setDescription] = useState(role.description);
+  const [permissions, setPermissions] = useState<string[]>([...role.permissions]);
+
+  const togglePerm = (perm: string) => {
+    setPermissions((prev) =>
+      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm],
+    );
+  };
+
+  const selectAll = (perms: readonly string[]) => {
+    const allSelected = perms.every((p) => permissions.includes(p));
+    if (allSelected) {
+      setPermissions((prev) => prev.filter((p) => !perms.includes(p)));
+    } else {
+      setPermissions((prev) => [...new Set([...prev, ...perms])]);
+    }
+  };
+
+  return (
+    <div className="border-t border-brand/12 px-4 py-3">
+      <div className="mb-3 flex gap-2">
+        <div className="flex-1">
+          <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Nom</label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} className={cn(softInput, "h-8 text-sm")} />
+        </div>
+        <div className="flex-[2]">
+          <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Description</label>
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} className={cn(softInput, "h-8 text-sm")} />
+        </div>
+      </div>
+
+      <label className="mb-1.5 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Permissions</label>
+      <div className="grid gap-1.5 sm:grid-cols-2">
+        {permGroups.map((g) => (
+          <div key={g.label} className="rounded-lg border border-brand/8 bg-brand/3 p-2">
+            <button
+              type="button"
+              onClick={() => selectAll(g.perms)}
+              className="mb-1 block text-[11px] font-bold text-foreground hover:text-brand-dk transition-colors"
+            >
+              {g.label}
+              <span className="ml-1.5 text-[9px] text-muted-foreground">
+                {g.perms.every((p) => permissions.includes(p)) ? "✓" : "(sélectionner)"}
+              </span>
+            </button>
+            <div className="flex flex-wrap gap-1">
+              {g.perms.map((perm) => {
+                const suffix = perm.split(".")[1];
+                const active = permissions.includes(perm);
+                return (
+                  <button
+                    key={perm}
+                    type="button"
+                    onClick={() => togglePerm(perm)}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors",
+                      active
+                        ? "bg-brand/20 text-brand-dk"
+                        : "bg-brand/5 text-muted-foreground hover:bg-brand/10",
+                    )}
+                  >
+                    {permIcon[suffix]}
+                    {permLabel[suffix] ?? suffix}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex justify-end gap-2">
+        <span className="text-[10px] text-muted-foreground self-center">
+          {permissions.length} permission(s)
+        </span>
+        <button
+          type="button"
+          onClick={() => onSave({ name, description, permissions })}
+          disabled={!name.trim()}
+          className={cn(primaryPill, "h-7 px-3 text-[11px]")}
+        >
+          Enregistrer
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  New Role form                                                      */
+/* ------------------------------------------------------------------ */
+
+function NewRoleForm({
+  permGroups,
+  permLabel,
+  permIcon,
+  onClose,
+  onCreated,
+}: {
+  permGroups: readonly { readonly label: string; readonly perms: readonly string[] }[];
+  permLabel: Record<string, string>;
+  permIcon: Record<string, ReactNode>;
+  onClose: () => void;
+  onCreated: (role: RoleRecord) => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [permissions, setPermissions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const togglePerm = (perm: string) => {
+    setPermissions((prev) =>
+      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm],
+    );
+  };
+
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    setLoading(true);
+    try {
+      const role = await createRole({ name: name.trim(), description, permissions });
+      onCreated(role);
+      toast.success(`Rôle "${name}" créé`);
+    } catch {
+      toast.error("Erreur lors de la création");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-brand/12 p-4">
+      <h4 className="mb-3 text-xs font-bold text-foreground">Nouveau rôle</h4>
+      <div className="mb-3 flex gap-2">
+        <div className="flex-1">
+          <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Nom *</label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Assistant" className={cn(softInput, "h-8 text-sm")} />
+        </div>
+        <div className="flex-[2]">
+          <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Description</label>
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Accès limité..." className={cn(softInput, "h-8 text-sm")} />
+        </div>
+      </div>
+
+      <label className="mb-1.5 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Permissions</label>
+      <div className="grid gap-1.5 sm:grid-cols-2">
+        {permGroups.map((g) => (
+          <div key={g.label} className="rounded-lg border border-brand/8 bg-brand/3 p-2">
+            <span className="mb-1 block text-[11px] font-bold text-foreground">{g.label}</span>
+            <div className="flex flex-wrap gap-1">
+              {g.perms.map((perm) => {
+                const suffix = perm.split(".")[1];
+                const active = permissions.includes(perm);
+                return (
+                  <button
+                    key={perm}
+                    type="button"
+                    onClick={() => togglePerm(perm)}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors",
+                      active
+                        ? "bg-brand/20 text-brand-dk"
+                        : "bg-brand/5 text-muted-foreground hover:bg-brand/10",
+                    )}
+                  >
+                    {permIcon[suffix]}
+                    {permLabel[suffix] ?? suffix}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex justify-end gap-2">
+        <button type="button" onClick={onClose} className={cn(ghostPill, "h-7 px-3 text-[11px]")}>
+          Annuler
+        </button>
+        <button
+          type="button"
+          onClick={handleCreate}
+          disabled={!name.trim() || loading}
+          className={cn(primaryPill, "h-7 px-3 text-[11px]")}
+        >
+          {loading ? "Création..." : "Créer le rôle"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  New User form                                                      */
+/* ------------------------------------------------------------------ */
+
+function NewUserForm({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (user: UserRecord) => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("enseignant");
+  const [loading, setLoading] = useState(false);
+
+  const handleCreate = async () => {
+    if (!name.trim() || !email.trim() || !password.trim()) return;
+    setLoading(true);
+    try {
+      const user = await createUser({ name: name.trim(), email: email.trim(), password, role });
+      onCreated(user);
+      toast.success(`Utilisateur "${name}" créé`);
+    } catch {
+      toast.error("Erreur lors de la création");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-brand/12 p-4">
+      <h4 className="mb-3 text-xs font-bold text-foreground">Nouvel utilisateur</h4>
+      <div className="mb-3 grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Nom *</label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom complet" className={cn(softInput, "h-8 text-sm")} />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Email *</label>
+          <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@istpm.ma" className={cn(softInput, "h-8 text-sm")} />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Mot de passe *</label>
+          <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="••••••" className={cn(softInput, "h-8 text-sm")} />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Rôle</label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className={cn(
+              "h-8 w-full rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none",
+              "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
+            )}
+          >
+            {["directeur", "responsable", "enseignant", "admin"].map((r) => (
+              <option key={r} value={r}>{ROLE_META[r as UserRole]?.label ?? r}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className={cn(ghostPill, "h-7 px-3 text-[11px]")}>
+          Annuler
+        </button>
+        <button
+          type="button"
+          onClick={handleCreate}
+          disabled={!name.trim() || !email.trim() || !password.trim() || loading}
+          className={cn(primaryPill, "h-7 px-3 text-[11px]")}
+        >
+          {loading ? "Création..." : "Créer l'utilisateur"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 
 function SettingsPage() {
   const { role } = useAuth();
@@ -382,6 +685,50 @@ function SettingsPage() {
       .catch(() => {});
   }, []);
 
+  /* --------- Roles & Users state --------- */
+  const [rolesList, setRolesList] = useState<RoleRecord[]>([]);
+  const [usersList, setUsersList] = useState<UserRecord[]>([]);
+  const [editRole, setEditRole] = useState<RoleRecord | null>(null);
+  const [showNewRole, setShowNewRole] = useState(false);
+  const [showNewUser, setShowNewUser] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: "role" | "user"; id: string; name: string } | null>(null);
+
+  useEffect(() => {
+    fetchRoles()
+      .then(setRolesList)
+      .catch(() => {});
+    fetchUsers()
+      .then(setUsersList)
+      .catch(() => {});
+  }, []);
+
+  const PERM_GROUPS = [
+    { label: "Étudiants", perms: ["etudiants.read", "etudiants.write", "etudiants.delete"] },
+    { label: "Formateurs", perms: ["formateurs.read", "formateurs.write", "formateurs.delete"] },
+    { label: "Examens", perms: ["examens.read", "examens.write", "examens.delete"] },
+    { label: "Bulletins", perms: ["bulletins.read", "bulletins.write", "bulletins.delete"] },
+    { label: "Stages", perms: ["stages.read", "stages.write", "stages.delete"] },
+    { label: "Paiements", perms: ["paiements.read", "paiements.write", "paiements.delete"] },
+    { label: "Paramètres", perms: ["settings.read", "settings.write"] },
+    { label: "Utilisateurs", perms: ["users.read", "users.write", "users.delete"] },
+    { label: "Rôles", perms: ["roles.read", "roles.manage"] },
+    { label: "Dashboard", perms: ["dashboard.read"] },
+  ] as const;
+
+  const PERM_LABEL: Record<string, string> = {
+    read: "Voir",
+    write: "Écrire",
+    delete: "Supprimer",
+    manage: "Gérer",
+  };
+
+  const PERM_ICON: Record<string, ReactNode> = {
+    read: <Eye className="h-3 w-3" />,
+    write: <PenLine className="h-3 w-3" />,
+    delete: <Trash2 className="h-3 w-3" />,
+    manage: <Settings className="h-3 w-3" />,
+  };
+
   /** Modules réellement enseignés, dérivés du corps enseignant. */
   const modules = useMemo(
     () => [...new Set(formateurs.flatMap((f) => f.modules))].sort(),
@@ -474,6 +821,29 @@ function SettingsPage() {
           resetSettings().catch(() => {});
           reset();
           toast.success("Données réinitialisées");
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}
+        title={deleteTarget ? `Supprimer ${deleteTarget.type === "role" ? "le rôle" : "l'utilisateur"} "${deleteTarget.name}" ?` : ""}
+        message={`Cette action est irréversible. ${deleteTarget?.type === "role" ? "Les utilisateurs ayant ce rôle conserveront leur rôle actuel." : ""}`}
+        confirmLabel="Supprimer"
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          const t = deleteTarget;
+          setDeleteTarget(null);
+          const del = t.type === "role" ? deleteRole(t.id) : deleteUser(t.id);
+          del.then(() => {
+            if (t.type === "role") {
+              setRolesList((prev) => prev.filter((r) => r.id !== t.id));
+              if (editRole?.id === t.id) setEditRole(null);
+            } else {
+              setUsersList((prev) => prev.filter((u) => u.id !== t.id));
+            }
+            toast.success(`${t.type === "role" ? "Rôle" : "Utilisateur"} supprimé`);
+          }).catch(() => toast.error("Erreur lors de la suppression"));
         }}
       />
     </div>
@@ -631,64 +1001,171 @@ function SettingsPage() {
 
       case "utilisateurs":
         return (
-          <Carte id="utilisateurs">
-            <ul className="space-y-1.5">
-              {(["directeur", "responsable", "enseignant"] as UserRole[]).map(
-                (r) => (
-                  <li
-                    key={r}
+          <Carte
+            id="utilisateurs"
+            action={
+              <button
+                type="button"
+                onClick={() => setShowNewUser(true)}
+                className={cn(ghostPill, "h-7 gap-1 px-2.5 text-[11px]")}
+              >
+                <Plus className="h-3 w-3" /> Ajouter
+              </button>
+            }
+          >
+            <div className="space-y-1.5">
+              {usersList.length === 0 ? (
+                <p className="py-3 text-center text-xs text-muted-foreground">Aucun utilisateur.</p>
+              ) : (
+                usersList.map((u) => (
+                  <div
+                    key={u.id}
                     className="flex items-center justify-between gap-3 rounded-xl border border-brand/12 px-3 py-2"
                   >
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-foreground">
-                        {ROLE_META[r].label}
+                        {u.name}
                       </span>
                       <span className="block truncate text-[11px] text-muted-foreground">
-                        {ROLE_META[r].description}
+                        {u.email}
                       </span>
                     </span>
-                    <span className={toneBadge("teal")}>Actif</span>
-                  </li>
-                ),
+                    <select
+                      value={u.role}
+                      onChange={(e) => {
+                        assignUserRole(u.id, e.target.value).then(() => {
+                          setUsersList((prev) =>
+                            prev.map((x) => (x.id === u.id ? { ...x, role: e.target.value } : x)),
+                          );
+                          toast.success(`Rôle de ${u.name} mis à jour`);
+                        }).catch(() => toast.error("Erreur lors du changement de rôle"));
+                      }}
+                      className={cn(
+                        "h-7 rounded-lg border border-brand/12 bg-card px-2 text-xs font-medium text-foreground outline-none",
+                        "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
+                      )}
+                    >
+                      {["directeur", "responsable", "enseignant", "admin"].map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_META[r as UserRole]?.label ?? r}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      aria-label={`Supprimer ${u.name}`}
+                      onClick={() => setDeleteTarget({ type: "user", id: u.id, name: u.name })}
+                      className={cn(iconButtonDanger, "h-7 w-7")}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))
               )}
-            </ul>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Les comptes sont créés côté serveur (authentification backend).
-            </p>
+            </div>
+            {showNewUser ? <NewUserForm onClose={() => setShowNewUser(false)} onCreated={(u) => { setUsersList((prev) => [...prev, u]); setShowNewUser(false); }} /> : null}
           </Carte>
         );
 
       case "roles":
         return (
-          <Carte id="roles">
-            <div className="overflow-hidden rounded-xl border border-brand/12">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2">Profil</th>
-                    <th className="px-3 py-2 text-center">Planning</th>
-                    <th className="px-3 py-2 text-center">Notes</th>
-                    <th className="px-3 py-2 text-center">Réglages</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-brand/8">
-                  {(
-                    [
-                      ["Directeur", "Lecture", " ", "Complet"],
-                      ["Responsable", "Complet", " ", "Pédagogie"],
-                      ["Enseignant", "Le sien", "Saisie", " "],
-                    ] as const
-                  ).map(([r, p, n, s]) => (
-                    <tr key={r}>
-                      <td className="px-3 py-2 font-medium">{r}</td>
-                      <td className="px-3 py-2 text-center text-muted-foreground">{p}</td>
-                      <td className="px-3 py-2 text-center text-muted-foreground">{n}</td>
-                      <td className="px-3 py-2 text-center text-muted-foreground">{s}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <Carte
+            id="roles"
+            action={
+              <button
+                type="button"
+                onClick={() => setShowNewRole(true)}
+                className={cn(ghostPill, "h-7 gap-1 px-2.5 text-[11px]")}
+              >
+                <Plus className="h-3 w-3" /> Nouveau rôle
+              </button>
+            }
+          >
+            <div className="space-y-3">
+              {rolesList.length === 0 ? (
+                <p className="py-3 text-center text-xs text-muted-foreground">Aucun rôle défini.</p>
+              ) : (
+                rolesList.map((role) => (
+                  <div key={role.id} className="rounded-xl border border-brand/12 overflow-hidden">
+                    <div className="flex items-center justify-between gap-3 bg-brand/4 px-4 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-foreground">{role.name}</span>
+                          {role.isSystem ? <span className={cn(toneBadge("neutral"), "text-[10px]")}>Système</span> : null}
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          {role.description || "Aucune description"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditRole(editRole?.id === role.id ? null : role)}
+                          className={cn(ghostPill, "h-7 gap-1 px-2 text-[11px]")}
+                        >
+                          {editRole?.id === role.id ? "Fermer" : "Modifier"}
+                        </button>
+                        {!role.isSystem ? (
+                          <button
+                            type="button"
+                            aria-label={`Supprimer ${role.name}`}
+                            onClick={() => setDeleteTarget({ type: "role", id: role.id, name: role.name })}
+                            className={cn(iconButtonDanger, "h-7 w-7")}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {editRole?.id === role.id ? (
+                      <RoleEditor
+                        role={role}
+                        permGroups={PERM_GROUPS}
+                        permLabel={PERM_LABEL}
+                        permIcon={PERM_ICON}
+                        onSave={(data) => {
+                          updateRole(role.id, data).then((updated) => {
+                            setRolesList((prev) => prev.map((r) => (r.id === role.id ? updated : r)));
+                            setEditRole(null);
+                            toast.success(`Rôle "${role.name}" mis à jour`);
+                          }).catch(() => toast.error("Erreur lors de la mise à jour"));
+                        }}
+                      />
+                    ) : (
+                      <div className="flex flex-wrap gap-1 px-4 py-2.5">
+                        {PERM_GROUPS.map((g) => {
+                          const active = g.perms.filter((p) => role.permissions.includes(p));
+                          if (active.length === 0) return null;
+                          return (
+                            <span key={g.label} className="inline-flex items-center gap-1 rounded-full bg-brand/8 px-2 py-0.5 text-[10px] font-medium text-brand-dk">
+                              {g.label}: {active.map((p) => PERM_LABEL[p.split(".")[1]] ?? p.split(".")[1]).join(", ")}
+                            </span>
+                          );
+                        })}
+                        {role.permissions.length === 0 ? (
+                          <span className="text-[10px] text-muted-foreground">Aucune permission</span>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
+
+            {showNewRole ? (
+              <NewRoleForm
+                permGroups={PERM_GROUPS}
+                permLabel={PERM_LABEL}
+                permIcon={PERM_ICON}
+                onClose={() => setShowNewRole(false)}
+                onCreated={(r) => { setRolesList((prev) => [...prev, r]); setShowNewRole(false); }}
+              />
+            ) : null}
+
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {rolesList.length} rôle(s) · Les rôles système ne peuvent pas être supprimés.
+            </p>
           </Carte>
         );
 

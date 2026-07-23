@@ -294,3 +294,73 @@ export function fetchATraiter() {
     stagesAValider: number;
   }>("/dashboard/istpm-a-traiter");
 }
+
+/* ------------------------------------------------------------------ */
+/*  Roles                                                              */
+/* ------------------------------------------------------------------ */
+
+export interface RoleRecord {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[];
+  isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function fetchRoles() {
+  return api.get<RoleRecord[]>("/roles");
+}
+
+export function fetchRole(id: string) {
+  return api.get<RoleRecord>(`/roles/${id}`);
+}
+
+export function createRole(data: { name: string; description?: string; permissions?: string[] }) {
+  return api.post<RoleRecord>("/roles", data);
+}
+
+export function updateRole(id: string, data: { name?: string; description?: string; permissions?: string[] }) {
+  return api.put<RoleRecord>(`/roles/${id}`, data);
+}
+
+export function deleteRole(id: string) {
+  return api.delete<{ ok: boolean }>(`/roles/${id}`);
+}
+
+export function fetchPermissionsList() {
+  return api.get<string[]>("/roles/permissions/list");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Users                                                              */
+/* ------------------------------------------------------------------ */
+
+export interface UserRecord {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  createdAt: string;
+}
+
+export function fetchUsers() {
+  return api.get<UserRecord[]>("/auth/users");
+}
+
+export function createUser(data: { email: string; password: string; name: string; role?: string }) {
+  return api.post<UserRecord>("/auth/register", data);
+}
+
+export function updateUser(id: string, data: { name?: string; password?: string }) {
+  return api.put<UserRecord>(`/auth/users/${id}`, data);
+}
+
+export function deleteUser(id: string) {
+  return api.delete<{ success: boolean }>(`/auth/users/${id}`);
+}
+
+export function assignUserRole(id: string, role: string) {
+  return api.put<UserRecord>(`/auth/users/${id}/role`, { role });
+}
