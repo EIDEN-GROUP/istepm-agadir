@@ -1,96 +1,101 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
-import { api } from "@/lib/api";
-import { softCard, primaryPill, iconButton } from "@/lib/dash-ui";
+import { Plus, Trash2, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
+import {
+  FILIERES,
+  NIVEAUX,
+  STRUCTURES_ACCUEIL,
+  fmtMAD,
+} from "@/lib/istpm-data";
+import { useIstpm } from "@/lib/istpm-store";
+import { ConfirmDialog } from "@/components/dash-form";
+import {
+  softCard,
+  primaryPill,
+  iconButtonDanger,
+  eyebrowClass,
+  toneBadge,
+  softInput,
+  labelClass,
+  dialogSurface,
+} from "@/lib/dash-ui";
+import { PageHeader, DetailShell } from "@/components/dash-page";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
-type Level = {
-  id: string;
-  name: string;
-  cycle: string;
-  monthlyFee: string;
-  maxStudents: number;
+type FiliereConfig = {
+  nom: string;
+  duree: string;
+  fraisAnnuels: number;
+  effectif: number;
 };
 
-function DashboardSettings() {
-  const qc = useQueryClient();
-  const { data: levels = [] } = useQuery({
-    queryKey: ["levels"],
-    queryFn: () => api.get<Level[]>("/settings/levels"),
-  });
-  const { data: settingsMap } = useQuery({
-    queryKey: ["settings"],
-    queryFn: () => api.get<Record<string, any>>("/settings"),
-  });
+function SettingsPage() {
+  const { etudiants, reset } = useIstpm();
+
+  // Effectifs come from the live store; the filière list itself is local
+  // config, seeded once from the reference list.
+  const [filieres, setFilieres] = useState<FiliereConfig[]>(() =>
+    FILIERES.map((f) => ({
+      nom: f,
+      duree: "3 ans (S1–S6)",
+      fraisAnnuels: 34000,
+      effectif: 0,
+    })),
+  );
   const [addOpen, setAddOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", cycle: "", monthlyFee: 0 });
-
-  const createMutation = useMutation({
-    mutationFn: () => api.post("/settings/levels", form),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["levels"] });
-      setAddOpen(false);
-      toast.success("Niveau ajouté");
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/settings/levels/${id}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["levels"] });
-      toast.success("Supprimé");
-    },
+  const [resetOpen, setResetOpen] = useState(false);
+  const [form, setForm] = useState({
+    nom: "",
+    duree: "3 ans (S1–S6)",
+    fraisAnnuels: 34000,
   });
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          Paramètres
-        </p>
-        <h1 className="mt-1 font-display text-3xl tracking-tight">
-          Configuration
-        </h1>
-      </header>
+      <PageHeader eyebrow="Administration" title="Paramètres" />
 
       <section className={cn(softCard, "p-5")}>
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Niveaux scolaires
-          </p>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className={eyebrowClass}>Filières ({filieres.length})</p>
           <button onClick={() => setAddOpen(true)} className={primaryPill}>
-            <Plus className="h-4 w-4" /> Ajouter
+            <Plus className="h-4 w-4" /> Ajouter une filière
           </button>
         </div>
-        {levels.length === 0 ? (
+        {filieres.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Aucun niveau configuré.
+            Aucune filière configurée.
           </p>
         ) : (
-          <div className="divide-y divide-[#28396C]/8">
-            {levels.map((l) => (
+          <div className="divide-y divide-brand/8">
+            {filieres.map((f) => (
               <div
-                key={l.id}
-                className="flex items-center justify-between py-3"
+                key={f.nom}
+                className="flex items-center justify-between gap-3 py-3"
               >
-                <div>
-                  <p className="font-semibold text-foreground">{l.name}</p>
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground">{f.nom}</p>
                   <p className="text-xs text-muted-foreground">
-                    {l.cycle} · {Number(l.monthlyFee).toLocaleString("fr-FR")}{" "}
-                    MAD/mois
+                    {f.duree} · {fmtMAD(f.fraisAnnuels)} / an ·{" "}
+                    {etudiants.filter((e) => e.filiere === f.nom).length}{" "}
+                    étudiant(s)
                   </p>
                 </div>
                 <button
+                  aria-label="Supprimer la filière"
                   onClick={() => {
-                    if (confirm("Supprimer ?")) deleteMutation.mutate(l.id);
+                    setFilieres((prev) => prev.filter((x) => x.nom !== f.nom));
+                    toast.success(`Filière supprimée — ${f.nom}`);
                   }}
-                  className={cn(iconButton, "text-[#E25C5C]")}
+                  className={iconButtonDanger}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -100,41 +105,134 @@ function DashboardSettings() {
         )}
       </section>
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent>
-          <DialogTitle>Nouveau niveau</DialogTitle>
-          <div className="space-y-4">
-            <div>
-              <Label>Nom</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Cycle</Label>
-              <Input
-                value={form.cycle}
-                onChange={(e) => setForm({ ...form, cycle: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Frais mensuels (MAD)</Label>
-              <Input
-                type="number"
-                value={form.monthlyFee}
-                onChange={(e) =>
-                  setForm({ ...form, monthlyFee: Number(e.target.value) })
-                }
-              />
-            </div>
-            <button
-              onClick={() => createMutation.mutate()}
-              className="w-full rounded-full bg-[#6BA53A] py-2.5 text-sm font-semibold text-white"
+      <section className={cn(softCard, "p-5")}>
+        <p className={eyebrowClass}>Cursus</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Cycle de 3 ans réparti en 6 semestres.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {NIVEAUX.map((n) => (
+            <span
+              key={n}
+              className="rounded-full bg-brand/12 px-4 py-2 text-sm font-semibold text-brand-dk"
             >
-              Ajouter
-            </button>
-          </div>
+              {n}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      <section className={cn(softCard, "p-5")}>
+        <p className={eyebrowClass}>
+          Structures d'accueil conventionnées ({STRUCTURES_ACCUEIL.length})
+        </p>
+        <ul className="mt-3 space-y-2">
+          {STRUCTURES_ACCUEIL.map((s) => (
+            <li
+              key={s}
+              className="flex items-center justify-between gap-3 rounded-2xl border border-brand/12 px-4 py-2.5"
+            >
+              <span className="text-sm text-foreground">{s}</span>
+              <span className={toneBadge("teal")}>Conventionnée</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className={cn(softCard, "p-5")}>
+        <p className={eyebrowClass}>Données de démonstration</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Les créations et modifications sont conservées dans ce navigateur.
+          Réinitialiser restaure le jeu de données d'origine et efface toutes
+          vos saisies.
+        </p>
+        <button
+          onClick={() => setResetOpen(true)}
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-alert/25 bg-card px-5 py-2.5 text-sm font-medium text-alert transition hover:bg-alert/10"
+        >
+          <RotateCcw className="h-4 w-4" /> Réinitialiser les données
+        </button>
+      </section>
+
+      <ConfirmDialog
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        title="Réinitialiser les données ?"
+        message="Toutes les créations, modifications et suppressions effectuées seront perdues, et le jeu de démonstration d'origine sera restauré."
+        confirmLabel="Réinitialiser"
+        onConfirm={() => {
+          reset();
+          toast.success("Données de démonstration restaurées");
+        }}
+      />
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className={dialogSurface}>
+          <DialogTitle className="sr-only">Nouvelle filière</DialogTitle>
+          <DialogDescription className="sr-only">
+            Ajouter une filière au cursus
+          </DialogDescription>
+          <DetailShell
+            title="Nouvelle filière"
+            subtitle="Ajouter une filière au cursus de l'institut"
+            footer={
+              <button
+                className={cn(primaryPill, "w-full justify-center")}
+                onClick={() => {
+                  const nom = form.nom.trim();
+                  if (!nom) {
+                    toast.error("Le nom de la filière est obligatoire");
+                    return;
+                  }
+                  if (filieres.some((f) => f.nom === nom)) {
+                    toast.error("Cette filière existe déjà");
+                    return;
+                  }
+                  setFilieres((prev) => [
+                    ...prev,
+                    { ...form, nom, effectif: 0 },
+                  ]);
+                  setForm({ nom: "", duree: "3 ans (S1–S6)", fraisAnnuels: 34000 });
+                  setAddOpen(false);
+                  toast.success(`Filière ajoutée — ${nom}`);
+                }}
+              >
+                Ajouter
+              </button>
+            }
+          >
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className={labelClass}>Nom de la filière</Label>
+                <Input
+                  value={form.nom}
+                  onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                  placeholder="ex. Orthoptie"
+                  className={softInput}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className={labelClass}>Durée</Label>
+                <Input
+                  value={form.duree}
+                  onChange={(e) => setForm({ ...form, duree: e.target.value })}
+                  className={softInput}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className={labelClass}>Frais annuels (MAD)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.fraisAnnuels}
+                  onChange={(e) =>
+                    setForm({ ...form, fraisAnnuels: Number(e.target.value) })
+                  }
+                  className={softInput}
+                />
+              </div>
+            </div>
+          </DetailShell>
         </DialogContent>
       </Dialog>
     </div>
@@ -142,5 +240,5 @@ function DashboardSettings() {
 }
 
 export const Route = createFileRoute("/dashboard/settings")({
-  component: DashboardSettings,
+  component: SettingsPage,
 });

@@ -1,7 +1,7 @@
 {
   "shell": {
     "platform": "المنصة",
-    "brand": "لوحة التحكم",
+    "brand": "المعهد المتخصص أكادير",
     "logout": "خروج",
     "logoutAria": "خروج",
     "disconnect": "تسجيل الخروج",
@@ -9,23 +9,34 @@
   },
   "nav": {
     "dashboard": "لوحة التحكم",
+    "etudiants": "الطلبة",
+    "scolarite": "الشؤون الدراسية",
+    "formateurs": "المكوّنون",
+    "examens": "الامتحانات",
+    "bulletins": "كشوف النقط",
+    "stages": "التداريب السريرية",
+    "paiements": "الأداءات",
+    "settings": "الإعدادات",
     "calendar": "التقويم",
     "familles": "أولياء الأمور",
-    "paiements": "الأداء",
     "affiches": "ملصقات الموظفين",
     "rapports": "التقارير",
-    "messagerie": "الرسائل",
-    "settings": "الإعدادات"
+    "messagerie": "الرسائل"
   },
   "navShort": {
     "dashboard": "الرئيسية",
+    "etudiants": "الطلبة",
+    "formateurs": "المكوّنون",
+    "examens": "الامتحانات",
+    "bulletins": "كشوف النقط",
+    "stages": "التداريب",
+    "paiements": "الأداءات",
+    "settings": "الإعدادات",
     "calendar": "التقويم",
     "familles": "الأولياء",
-    "paiements": "الأداء",
     "affiches": "الملصقات",
     "rapports": "التقارير",
-    "messagerie": "الرسائل",
-    "settings": "الإعدادات"
+    "messagerie": "الرسائل"
   },
   "common": {
     "cancel": "إلغاء",

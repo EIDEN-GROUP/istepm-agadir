@@ -73,7 +73,7 @@ export function SupportChat() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 grid h-12 w-12 place-items-center rounded-full bg-[#28396C] text-white shadow-lg hover:bg-[#1f2d55]"
+        className="fixed bottom-6 right-6 z-50 grid h-12 w-12 place-items-center rounded-full bg-brand text-white shadow-lg hover:bg-brand-dk"
       >
         <MessageCircle className="h-5 w-5" />
       </button>
@@ -101,7 +101,7 @@ export function SupportChat() {
                   className={cn(
                     "mb-3 max-w-[80%] rounded-xl px-3 py-2 text-sm",
                     m.senderRole === "superadmin"
-                      ? "bg-[#28396C] text-white ml-auto"
+                      ? "bg-brand text-white ml-auto"
                       : "bg-muted text-foreground",
                   )}
                 >
@@ -118,11 +118,11 @@ export function SupportChat() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && send()}
                   placeholder="Votre message..."
-                  className="flex-1 rounded-full border border-border bg-background px-3 py-2 text-xs outline-none focus:border-[#28396C]"
+                  className="flex-1 rounded-full border border-border bg-background px-3 py-2 text-xs outline-none focus:border-brand"
                 />
                 <button
                   onClick={send}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-[#28396C] text-white"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-brand text-white"
                 >
                   <Send className="h-3.5 w-3.5" />
                 </button>

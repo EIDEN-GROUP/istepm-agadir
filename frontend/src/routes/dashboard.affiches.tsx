@@ -72,7 +72,7 @@ function DashboardAffiches() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[500px] text-left text-sm">
             <thead>
-              <tr className="border-b border-[#28396C]/15 bg-muted/60 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b border-brand/15 bg-muted/60 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <th className="px-4 py-3.5">Nom</th>
                 <th className="px-4 py-3.5">Poste</th>
                 <th className="px-4 py-3.5">Département</th>
@@ -81,7 +81,7 @@ function DashboardAffiches() {
                 <th className="w-16 px-4 py-3.5 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#28396C]/8">
+            <tbody className="divide-y divide-brand/8">
               {employees.map((e) => (
                 <tr key={e.id} className="hover:bg-muted/40">
                   <td className="px-4 py-3 font-medium">{e.fullName}</td>
@@ -97,8 +97,8 @@ function DashboardAffiches() {
                       className={cn(
                         "inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase",
                         e.status === "actif"
-                          ? "bg-[#B5E18B]/30 text-[#3E6420]"
-                          : "bg-[#F6D8D8] text-[#9A2F2F]",
+                          ? "bg-brand/15 text-brand-dk"
+                          : "bg-alert-pale text-alert-dk",
                       )}
                     >
                       {e.status}
@@ -109,7 +109,7 @@ function DashboardAffiches() {
                       onClick={() => {
                         if (confirm("Supprimer ?")) deleteMutation.mutate(e.id);
                       }}
-                      className={cn(iconButton, "text-[#E25C5C]")}
+                      className={cn(iconButton, "text-alert")}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -150,7 +150,7 @@ function DashboardAffiches() {
             </div>
             <button
               onClick={() => createMutation.mutate()}
-              className="w-full rounded-full bg-[#6BA53A] py-2.5 text-sm font-semibold text-white hover:bg-[#5a9232]"
+              className="w-full rounded-full bg-brand py-2.5 text-sm font-semibold text-white hover:bg-[#5a9232]"
             >
               Ajouter
             </button>

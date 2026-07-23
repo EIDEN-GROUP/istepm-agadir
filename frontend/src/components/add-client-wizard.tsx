@@ -200,7 +200,7 @@ export function AddClientDialog({
               </p>
               <button
                 onClick={addChild}
-                className="flex items-center gap-1 text-sm text-[#6BA53A] hover:underline"
+                className="flex items-center gap-1 text-sm text-brand-dk hover:underline"
               >
                 <Plus className="h-3.5 w-3.5" /> Ajouter
               </button>
@@ -214,7 +214,7 @@ export function AddClientDialog({
                   {wizard.children.length > 1 && (
                     <button
                       onClick={() => removeChild(i)}
-                      className="text-[#E25C5C]"
+                      className="text-alert"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -275,7 +275,7 @@ export function AddClientDialog({
               </button>
               <button
                 onClick={() => createMutation.mutate()}
-                className={cn(primaryPill, "bg-[#6BA53A] text-white")}
+                className={cn(primaryPill, "bg-brand text-white")}
               >
                 Créer la fiche
               </button>

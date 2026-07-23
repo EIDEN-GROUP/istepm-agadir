@@ -187,9 +187,9 @@ function DashboardFamilles() {
 
       <section className={cn(softCard, "overflow-hidden")}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px] text-left text-sm [&_th]:border-r [&_th]:border-[#28396C]/15 [&_td]:border-r [&_td]:border-[#28396C]/8">
+          <table className="w-full min-w-[800px] text-left text-sm [&_th]:border-r [&_th]:border-brand/15 [&_td]:border-r [&_td]:border-brand/8">
             <thead>
-              <tr className="border-b border-[#28396C]/15 bg-muted/60 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b border-brand/15 bg-muted/60 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <th className="px-4 py-3.5">{t.familles.table.parent}</th>
                 <th className="px-4 py-3.5">Élève(s)</th>
                 <th className="px-4 py-3.5">Niveau</th>
@@ -198,12 +198,12 @@ function DashboardFamilles() {
                 <th className="w-24 px-4 py-3.5 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#28396C]/8">
+            <tbody className="divide-y divide-brand/8">
               {filtered.map((c) => (
                 <tr
                   key={c.id}
                   onClick={() => setDetailId(c.id)}
-                  className="cursor-pointer transition-colors hover:bg-[#B5E18B]/20"
+                  className="cursor-pointer transition-colors hover:bg-brand/10"
                 >
                   <td
                     className="border-l-[3px] px-4 py-3.5 font-medium"
@@ -229,11 +229,11 @@ function DashboardFamilles() {
                       {Number(c.monthlyFee).toLocaleString("fr-FR")} MAD
                     </span>
                     {c.paymentStatus === "paye" ? (
-                      <span className="ml-2 text-xs font-medium text-[#6BA53A]">
+                      <span className="ml-2 text-xs font-medium text-brand-dk">
                         Payé
                       </span>
                     ) : (
-                      <span className="ml-2 text-xs font-medium text-[#E25C5C]">
+                      <span className="ml-2 text-xs font-medium text-alert">
                         Dû: {Number(c.debt).toLocaleString("fr-FR")}
                       </span>
                     )}
@@ -254,7 +254,7 @@ function DashboardFamilles() {
                           if (confirm("Supprimer ?"))
                             deleteMutation.mutate(c.id);
                         }}
-                        className={cn(iconButton, "text-[#E25C5C]")}
+                        className={cn(iconButton, "text-alert")}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

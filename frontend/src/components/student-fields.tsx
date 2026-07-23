@@ -139,7 +139,7 @@ export function StudentFields({
                   onClick={() => toggleService(s.name)}
                   className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-all ${
                     value.services.includes(s.name)
-                      ? "bg-[#B5E18B] text-[#3E6420]"
+                      ? "bg-brand text-brand-dk"
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
@@ -160,7 +160,7 @@ export function StudentFields({
                 onClick={() => toggleFrais(f.name)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-all ${
                   value.frais.includes(f.name)
-                    ? "bg-[#B5E18B] text-[#3E6420]"
+                    ? "bg-brand text-brand-dk"
                     : "bg-muted text-muted-foreground"
                 }`}
               >

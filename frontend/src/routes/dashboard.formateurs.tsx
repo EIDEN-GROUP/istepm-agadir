@@ -1,0 +1,518 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { Plus, Pencil, Eye, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { useIstpm } from "@/lib/istpm-store";
+import {
+  FILIERES,
+  GRADE_LABEL,
+  STATUT_FORMATEUR_LABEL,
+  STATUT_FORMATEUR_TONE,
+  type Formateur,
+  type Filiere,
+  type GradeFormateur,
+  type StatutFormateur,
+} from "@/lib/istpm-data";
+import {
+  primaryPill,
+  iconButton,
+  iconButtonDanger,
+  toneBadge,
+  avatarChip,
+  initials,
+  dialogSurface,
+  tableRow,
+} from "@/lib/dash-ui";
+import {
+  PageHeader,
+  FilterBar,
+  FilterSelect,
+  DataTable,
+  DetailSection,
+  DetailRow,
+  DetailShell,
+  ALL,
+} from "@/components/dash-page";
+import {
+  FormDialog,
+  ConfirmDialog,
+  TextField,
+  SelectField,
+  ListField,
+  FullWidth,
+  parseList,
+} from "@/components/dash-form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+const GRADES: GradeFormateur[] = ["PES", "vacataire", "formateur_clinique"];
+const STATUTS: StatutFormateur[] = ["permanent", "vacataire", "en_conge"];
+
+function FormateursPage() {
+  const { formateurs, addFormateur, updateFormateur, deleteFormateur } =
+    useIstpm();
+
+  const [search, setSearch] = useState("");
+  const [departement, setDepartement] = useState<string>(ALL);
+  const [grade, setGrade] = useState<string>(ALL);
+
+  const [detail, setDetail] = useState<Formateur | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Formateur | null>(null);
+  const [toDelete, setToDelete] = useState<Formateur | null>(null);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return formateurs.filter((f) => {
+      if (departement !== ALL && f.departement !== departement) return false;
+      if (grade !== ALL && GRADE_LABEL[f.grade] !== grade) return false;
+      if (!q) return true;
+      return `${f.matricule} ${f.cin} ${f.prenom} ${f.nom} ${f.modules.join(" ")} ${f.groupes.join(" ")}`
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [formateurs, search, departement, grade]);
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Corps enseignant"
+        title="Formateurs"
+        actions={
+          <button
+            className={primaryPill}
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" /> Ajouter un formateur
+          </button>
+        }
+      />
+
+      <FilterBar
+        search={search}
+        onSearch={setSearch}
+        placeholder="Rechercher par matricule, CIN, nom, module, groupe…"
+      >
+        <FilterSelect
+          value={departement}
+          onChange={setDepartement}
+          options={FILIERES}
+          allLabel="Tous les départements"
+          width="w-[15rem]"
+        />
+        <FilterSelect
+          value={grade}
+          onChange={setGrade}
+          options={GRADES.map((g) => GRADE_LABEL[g])}
+          allLabel="Tous les grades"
+          width="w-[13rem]"
+        />
+      </FilterBar>
+
+      <DataTable
+        isEmpty={filtered.length === 0}
+        empty="Aucun formateur ne correspond à ces critères."
+        head={
+          <>
+            <th className="px-4 py-3.5">Matricule</th>
+            <th className="px-4 py-3.5">Nom &amp; prénom</th>
+            <th className="px-4 py-3.5">Grade</th>
+            <th className="px-4 py-3.5">Département / filière</th>
+            <th className="px-4 py-3.5 text-center">Modules</th>
+            <th className="px-4 py-3.5">Groupes</th>
+            <th className="px-4 py-3.5">Statut</th>
+            <th className="w-28 px-4 py-3.5 text-center">Actions</th>
+          </>
+        }
+      >
+        {filtered.map((f) => (
+          <tr key={f.id} onClick={() => setDetail(f)} className={tableRow}>
+            <td className="px-4 py-3.5">
+              <span className="block font-medium tabular-nums">
+                {f.matricule}
+              </span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                CIN {f.cin || "—"}
+              </span>
+            </td>
+            <td className="px-4 py-3.5">
+              <span className="flex items-center gap-2.5">
+                <span className={avatarChip}>
+                  {initials(`${f.prenom} ${f.nom}`)}
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-medium">
+                    {f.prenom} {f.nom}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {f.email}
+                  </span>
+                </span>
+              </span>
+            </td>
+            <td className="px-4 py-3.5 text-muted-foreground">
+              {GRADE_LABEL[f.grade]}
+            </td>
+            <td className="px-4 py-3.5 text-muted-foreground">
+              {f.departement}
+            </td>
+            <td className="px-4 py-3.5 text-center font-medium tabular-nums">
+              {f.modules.length}
+            </td>
+            <td className="px-4 py-3.5 text-muted-foreground">
+              {f.groupes.join(", ")}
+            </td>
+            <td className="px-4 py-3.5">
+              <span className={toneBadge(STATUT_FORMATEUR_TONE[f.statut])}>
+                {STATUT_FORMATEUR_LABEL[f.statut]}
+              </span>
+            </td>
+            <td
+              className="px-4 py-3.5 text-center"
+              onClick={(ev) => ev.stopPropagation()}
+            >
+              <div className="flex items-center justify-center gap-1">
+                <button
+                  className={iconButton}
+                  aria-label="Voir la fiche"
+                  onClick={() => setDetail(f)}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  className={iconButton}
+                  aria-label="Modifier"
+                  onClick={() => {
+                    setEditing(f);
+                    setFormOpen(true);
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  className={iconButtonDanger}
+                  aria-label="Supprimer"
+                  onClick={() => setToDelete(f)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </DataTable>
+
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className={dialogSurface}>
+          <DialogTitle className="sr-only">Fiche formateur</DialogTitle>
+          <DialogDescription className="sr-only">
+            Détail du formateur sélectionné
+          </DialogDescription>
+          {detail
+            ? (() => {
+                const f = formateurs.find((x) => x.id === detail.id) ?? detail;
+                return (
+                  <DetailShell
+                    title={`${f.prenom} ${f.nom}`}
+                    subtitle={`${f.matricule} · ${GRADE_LABEL[f.grade]} · ${f.departement}`}
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      <span
+                        className={toneBadge(STATUT_FORMATEUR_TONE[f.statut])}
+                      >
+                        {STATUT_FORMATEUR_LABEL[f.statut]}
+                      </span>
+                      <span className={toneBadge("blue")}>
+                        {f.notesSaisies} notes saisies
+                      </span>
+                    </div>
+
+                    <DetailSection title="Identité">
+                      <div>
+                        <DetailRow label="Matricule" value={f.matricule} />
+                        <DetailRow label="CIN" value={f.cin || "—"} />
+                      </div>
+                    </DetailSection>
+
+                    <DetailSection title="Contact">
+                      <div>
+                        <DetailRow label="Téléphone" value={f.telephone || "—"} />
+                        <DetailRow label="E-mail" value={f.email || "—"} />
+                      </div>
+                    </DetailSection>
+
+                    <DetailSection
+                      title={`Modules enseignés (${f.modules.length})`}
+                    >
+                      {f.modules.length ? (
+                        <ul className="space-y-1.5">
+                          {f.modules.map((m) => (
+                            <li
+                              key={m}
+                              className="rounded-xl bg-muted px-3 py-2 text-sm text-foreground"
+                            >
+                              {m}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Aucun module affecté.
+                        </p>
+                      )}
+                    </DetailSection>
+
+                    <DetailSection title={`Groupes (${f.groupes.length})`}>
+                      {f.groupes.length ? (
+                        <div className="flex flex-wrap gap-2">
+                          {f.groupes.map((g) => (
+                            <span
+                              key={g}
+                              className="rounded-full bg-brand/12 px-3 py-1 text-xs font-semibold text-brand-dk"
+                            >
+                              {g}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Aucun groupe affecté.
+                        </p>
+                      )}
+                    </DetailSection>
+                  </DetailShell>
+                );
+              })()
+            : null}
+        </DialogContent>
+      </Dialog>
+
+      {formOpen ? (
+        <FormateurForm
+          key={editing?.id ?? "new"}
+          initial={editing}
+          onCancel={() => setFormOpen(false)}
+          onSubmit={(data) => {
+            if (editing) {
+              updateFormateur(editing.id, data);
+              toast.success(`Fiche mise à jour — ${data.prenom} ${data.nom}`);
+            } else {
+              addFormateur(data);
+              toast.success(`Formateur ajouté — ${data.prenom} ${data.nom}`);
+            }
+            setFormOpen(false);
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={!!toDelete}
+        onOpenChange={(o) => !o && setToDelete(null)}
+        title="Supprimer ce formateur ?"
+        message={
+          toDelete
+            ? `${toDelete.prenom} ${toDelete.nom} (${toDelete.matricule}) sera retiré du corps enseignant. Cette action est irréversible.`
+            : ""
+        }
+        onConfirm={() => {
+          if (!toDelete) return;
+          deleteFormateur(toDelete.id);
+          toast.success(
+            `Formateur supprimé — ${toDelete.prenom} ${toDelete.nom}`,
+          );
+          setToDelete(null);
+        }}
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+function FormateurForm({
+  initial,
+  onSubmit,
+  onCancel,
+}: {
+  initial: Formateur | null;
+  onSubmit: (data: {
+    matricule: string;
+    cin: string;
+    prenom: string;
+    nom: string;
+    grade: GradeFormateur;
+    departement: Filiere;
+    modules: string[];
+    groupes: string[];
+    statut: StatutFormateur;
+    telephone: string;
+    email: string;
+  }) => void;
+  onCancel: () => void;
+}) {
+  const [f, setF] = useState(() => ({
+    matricule:
+      initial?.matricule ??
+      `ENS-${String(Math.floor(Math.random() * 900) + 100)}`,
+    cin: initial?.cin ?? "",
+    prenom: initial?.prenom ?? "",
+    nom: initial?.nom ?? "",
+    grade: (initial?.grade ?? "PES") as GradeFormateur,
+    departement: (initial?.departement ?? "") as Filiere | "",
+    modules: initial?.modules.join(", ") ?? "",
+    groupes: initial?.groupes.join(", ") ?? "",
+    statut: (initial?.statut ?? "permanent") as StatutFormateur,
+    telephone: initial?.telephone ?? "",
+    email: initial?.email ?? "",
+  }));
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => {
+    setF((prev) => ({ ...prev, [k]: v }));
+    setErrors((prev) => ({ ...prev, [k]: undefined }));
+  };
+
+  const submit = () => {
+    const next: Record<string, string> = {};
+    if (!f.prenom.trim()) next.prenom = "Prénom obligatoire";
+    if (!f.nom.trim()) next.nom = "Nom obligatoire";
+    if (!f.cin.trim()) next.cin = "CIN obligatoire";
+    else if (!/^[A-Za-z]{1,2}\d{1,6}$/.test(f.cin.trim()))
+      next.cin = "Format CIN invalide (ex. JB145872)";
+    if (!f.departement) next.departement = "Département obligatoire";
+    if (f.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email))
+      next.email = "Adresse e-mail invalide";
+    if (!parseList(f.modules).length)
+      next.modules = "Au moins un module est requis";
+
+    if (Object.keys(next).length) {
+      setErrors(next);
+      toast.error("Veuillez corriger les champs signalés");
+      return;
+    }
+
+    onSubmit({
+      matricule: f.matricule,
+      cin: f.cin.trim().toUpperCase(),
+      prenom: f.prenom,
+      nom: f.nom,
+      grade: f.grade,
+      departement: f.departement as Filiere,
+      modules: parseList(f.modules),
+      groupes: parseList(f.groupes),
+      statut: f.statut,
+      telephone: f.telephone,
+      email: f.email,
+    });
+  };
+
+  return (
+    <FormDialog
+      open
+      onOpenChange={(o) => !o && onCancel()}
+      wide
+      title={initial ? "Modifier la fiche formateur" : "Nouveau formateur"}
+      subtitle={
+        initial
+          ? `${initial.prenom} ${initial.nom} — ${initial.matricule}`
+          : "Renseigner les informations du formateur"
+      }
+      submitLabel={initial ? "Enregistrer les modifications" : "Ajouter"}
+      onSubmit={submit}
+    >
+      <TextField
+        label="Matricule"
+        value={f.matricule}
+        onChange={(v) => set("matricule", v)}
+      />
+      <TextField
+        label="CIN"
+        required
+        value={f.cin}
+        onChange={(v) => set("cin", v)}
+        placeholder="JB145872"
+        error={errors.cin}
+      />
+      <TextField
+        label="Prénom"
+        required
+        value={f.prenom}
+        onChange={(v) => set("prenom", v)}
+        error={errors.prenom}
+      />
+      <TextField
+        label="Nom"
+        required
+        value={f.nom}
+        onChange={(v) => set("nom", v)}
+        error={errors.nom}
+      />
+      <FullWidth>
+        <SelectField
+          label="Département / filière"
+          required
+          value={f.departement}
+          onChange={(v) => set("departement", v)}
+          options={FILIERES}
+          error={errors.departement}
+        />
+      </FullWidth>
+      <FullWidth>
+        <ListField
+          label="Modules enseignés"
+          value={f.modules}
+          onChange={(v) => set("modules", v)}
+          placeholder="Soins infirmiers en médecine, Hygiène hospitalière"
+          error={errors.modules}
+        />
+      </FullWidth>
+      <FullWidth>
+        <ListField
+          label="Groupes"
+          value={f.groupes}
+          onChange={(v) => set("groupes", v)}
+          placeholder="S5-G1, S1-B"
+        />
+      </FullWidth>
+      <SelectField
+        label="Grade"
+        value={f.grade}
+        onChange={(v) => set("grade", v)}
+        options={GRADES.map((g) => ({ value: g, label: GRADE_LABEL[g] }))}
+      />
+      <SelectField
+        label="Statut"
+        value={f.statut}
+        onChange={(v) => set("statut", v)}
+        options={STATUTS.map((s) => ({
+          value: s,
+          label: STATUT_FORMATEUR_LABEL[s],
+        }))}
+      />
+      <TextField
+        label="Téléphone"
+        value={f.telephone}
+        onChange={(v) => set("telephone", v)}
+        placeholder="06 12 34 56 78"
+      />
+      <TextField
+        label="E-mail"
+        type="email"
+        value={f.email}
+        onChange={(v) => set("email", v)}
+        error={errors.email}
+      />
+    </FormDialog>
+  );
+}
+
+export const Route = createFileRoute("/dashboard/formateurs")({
+  component: FormateursPage,
+});

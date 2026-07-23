@@ -1,7 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
 import { Languages } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SupportChat } from "@/components/support-chat";
 import { useDashboardI18n, type DashboardLocale } from "@/lib/dashboard-i18n";
 
 function LanguageToggleButton({
@@ -59,7 +58,10 @@ export function LanguageToggleFloating() {
           : "bottom-[max(1rem,env(safe-area-inset-bottom))]",
       )}
     >
-      {onDashboard ? <SupportChat /> : null}
+      {/* The support-chat widget was removed from the ISTPM shell: it is out of
+          scope and its polling hit a backend this frontend-only build no
+          longer has. The dashboard offset above is kept so the toggle still
+          clears the mobile tab bar. */}
       <LanguageToggleButton
         locale={locale}
         onToggle={toggleLocale}

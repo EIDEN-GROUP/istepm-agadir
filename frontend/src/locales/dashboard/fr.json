@@ -1,7 +1,7 @@
 {
   "shell": {
     "platform": "Plateforme",
-    "brand": "Tableau de bord",
+    "brand": "ISTPM Agadir",
     "logout": "Sortir",
     "logoutAria": "Sortir",
     "disconnect": "Déconnexion",
@@ -9,23 +9,34 @@
   },
   "nav": {
     "dashboard": "Tableau de bord",
+    "etudiants": "Étudiants",
+    "scolarite": "Scolarité",
+    "formateurs": "Formateurs",
+    "examens": "Examens",
+    "bulletins": "Bulletins",
+    "stages": "Stages cliniques",
+    "paiements": "Paiements",
+    "settings": "Paramètres",
     "calendar": "Calendrier",
     "familles": "Parents",
-    "paiements": "Paiement",
     "affiches": "Affiches du personnel",
     "rapports": "Rapports",
-    "messagerie": "Messagerie",
-    "settings": "Paramètres"
+    "messagerie": "Messagerie"
   },
   "navShort": {
     "dashboard": "Accueil",
+    "etudiants": "Étudiants",
+    "formateurs": "Formateurs",
+    "examens": "Examens",
+    "bulletins": "Bulletins",
+    "stages": "Stages",
+    "paiements": "Paiements",
+    "settings": "Réglages",
     "calendar": "Agenda",
     "familles": "Parents",
-    "paiements": "Paiement",
     "affiches": "Affiches",
     "rapports": "Rapports",
-    "messagerie": "Messages",
-    "settings": "Réglages"
+    "messagerie": "Messages"
   },
   "common": {
     "cancel": "Annuler",

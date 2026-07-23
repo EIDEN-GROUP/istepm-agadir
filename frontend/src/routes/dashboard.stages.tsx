@@ -1,0 +1,570 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { Eye, FileDown, FileText, Plus, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
+import { useIstpm } from "@/lib/istpm-store";
+import {
+  FILIERES,
+  NIVEAUX,
+  STRUCTURES_ACCUEIL,
+  STATUT_STAGE_LABEL,
+  STATUT_STAGE_TONE,
+  fmtDate,
+  type Stage,
+  type Filiere,
+  type Niveau,
+  type StatutStage,
+} from "@/lib/istpm-data";
+import {
+  primaryPill,
+  iconButton,
+  iconButtonDanger,
+  toneBadge,
+  dialogSurface,
+  tableRow,
+  TONE_COLORS,
+} from "@/lib/dash-ui";
+import {
+  PageHeader,
+  FilterBar,
+  FilterSelect,
+  DataTable,
+  DetailSection,
+  DetailRow,
+  DetailShell,
+  ALL,
+} from "@/components/dash-page";
+import {
+  FormDialog,
+  ConfirmDialog,
+  TextField,
+  NumberField,
+  SelectField,
+  FullWidth,
+} from "@/components/dash-form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+const STATUTS: StatutStage[] = [
+  "recherche",
+  "convention_signee",
+  "en_cours",
+  "soutenance",
+  "valide",
+];
+
+function StagesPage() {
+  const { role } = useAuth();
+  const { stages, etudiants, addStage, updateStage, deleteStage } = useIstpm();
+  // Conventions are handled by student administration.
+  const canManage = role === "directeur" || role === "responsable";
+
+  const [search, setSearch] = useState("");
+  const [filiere, setFiliere] = useState<string>(ALL);
+  const [structure, setStructure] = useState<string>(ALL);
+  const [statut, setStatut] = useState<string>(ALL);
+
+  const [detail, setDetail] = useState<Stage | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Stage | null>(null);
+  const [toDelete, setToDelete] = useState<Stage | null>(null);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return stages.filter((s) => {
+      if (filiere !== ALL && s.filiere !== filiere) return false;
+      if (structure !== ALL && s.structure !== structure) return false;
+      if (statut !== ALL && STATUT_STAGE_LABEL[s.statut] !== statut)
+        return false;
+      if (!q) return true;
+      return `${s.cne} ${s.prenom} ${s.nom} ${s.structure} ${s.service} ${s.encadrantClinique}`
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [stages, search, filiere, structure, statut]);
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Formation pratique"
+        title="Stages cliniques"
+        actions={
+          canManage ? (
+            <button
+              className={primaryPill}
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" /> Nouvelle convention
+            </button>
+          ) : undefined
+        }
+      />
+
+      <FilterBar
+        search={search}
+        onSearch={setSearch}
+        placeholder="Rechercher par CNE, nom, structure, service…"
+      >
+        <FilterSelect
+          value={filiere}
+          onChange={setFiliere}
+          options={FILIERES}
+          allLabel="Toutes les filières"
+          width="w-[15rem]"
+        />
+        <FilterSelect
+          value={structure}
+          onChange={setStructure}
+          options={STRUCTURES_ACCUEIL}
+          allLabel="Toutes les structures"
+          width="w-[16rem]"
+        />
+        <FilterSelect
+          value={statut}
+          onChange={setStatut}
+          options={STATUTS.map((s) => STATUT_STAGE_LABEL[s])}
+          allLabel="Tous les statuts"
+          width="w-[13rem]"
+        />
+      </FilterBar>
+
+      <DataTable
+        minWidth="min-w-[1150px]"
+        isEmpty={filtered.length === 0}
+        empty="Aucun stage ne correspond à ces critères."
+        head={
+          <>
+            <th className="px-4 py-3.5">Étudiant</th>
+            <th className="px-4 py-3.5">Filière / niveau</th>
+            <th className="px-4 py-3.5">Structure d'accueil</th>
+            <th className="px-4 py-3.5">Service</th>
+            <th className="px-4 py-3.5">Encadrant clinique</th>
+            <th className="px-4 py-3.5">Période</th>
+            <th className="px-4 py-3.5">Statut</th>
+            <th className="w-28 px-4 py-3.5 text-center">Actions</th>
+          </>
+        }
+      >
+        {filtered.map((s) => (
+          <tr key={s.id} onClick={() => setDetail(s)} className={tableRow}>
+            <td
+              className="border-l-[3px] px-4 py-3.5"
+              style={{
+                borderLeftColor: TONE_COLORS[STATUT_STAGE_TONE[s.statut]],
+              }}
+            >
+              <span className="block font-medium">
+                {s.prenom} {s.nom}
+              </span>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {s.cne}
+              </span>
+            </td>
+            <td className="px-4 py-3.5 text-muted-foreground">
+              <span className="block">{s.filiere}</span>
+              <span className="text-xs">{s.niveau}</span>
+            </td>
+            <td className="px-4 py-3.5">{s.structure}</td>
+            <td className="px-4 py-3.5 text-muted-foreground">{s.service}</td>
+            <td className="px-4 py-3.5 text-muted-foreground">
+              {s.encadrantClinique}
+            </td>
+            <td className="px-4 py-3.5 whitespace-nowrap text-muted-foreground">
+              {fmtDate(s.debut)} → {fmtDate(s.fin)}
+            </td>
+            <td className="px-4 py-3.5">
+              <span className={toneBadge(STATUT_STAGE_TONE[s.statut])}>
+                {STATUT_STAGE_LABEL[s.statut]}
+              </span>
+            </td>
+            <td
+              className="px-4 py-3.5 text-center"
+              onClick={(ev) => ev.stopPropagation()}
+            >
+              <div className="flex items-center justify-center gap-1">
+                <button
+                  className={iconButton}
+                  aria-label="Voir le détail"
+                  onClick={() => setDetail(s)}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+                {canManage ? (
+                  <>
+                    <button
+                      className={iconButton}
+                      aria-label="Modifier"
+                      onClick={() => {
+                        setEditing(s);
+                        setFormOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      className={iconButtonDanger}
+                      aria-label="Supprimer"
+                      onClick={() => setToDelete(s)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </td>
+          </tr>
+        ))}
+      </DataTable>
+
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className={dialogSurface}>
+          <DialogTitle className="sr-only">Détail du stage</DialogTitle>
+          <DialogDescription className="sr-only">
+            Convention, rapport et encadrement
+          </DialogDescription>
+          {detail
+            ? (() => {
+                const s = stages.find((x) => x.id === detail.id) ?? detail;
+                return (
+                  <DetailShell
+                    title={`${s.prenom} ${s.nom}`}
+                    subtitle={`${s.cne} · ${s.filiere} · ${s.niveau}`}
+                    footer={
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          className={iconButton + " w-auto gap-1.5 px-3 text-xs"}
+                          onClick={() =>
+                            s.conventionSignee
+                              ? toast.success("Convention (PDF) téléchargée")
+                              : toast.error("Convention non encore signée")
+                          }
+                        >
+                          <FileDown className="h-3.5 w-3.5" /> Convention
+                        </button>
+                        <button
+                          className={iconButton + " w-auto gap-1.5 px-3 text-xs"}
+                          onClick={() =>
+                            s.noteSoutenance !== undefined
+                              ? toast.success("Rapport de stage téléchargé")
+                              : toast.error("Rapport de stage non encore déposé")
+                          }
+                        >
+                          <FileText className="h-3.5 w-3.5" /> Rapport
+                        </button>
+                        {canManage && s.statut !== "valide" ? (
+                          <button
+                            className={primaryPill + " ms-auto"}
+                            onClick={() => {
+                              updateStage(s.id, { statut: "valide" });
+                              toast.success(
+                                `Stage validé — ${s.prenom} ${s.nom}`,
+                              );
+                            }}
+                          >
+                            Valider le stage
+                          </button>
+                        ) : null}
+                      </div>
+                    }
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      <span className={toneBadge(STATUT_STAGE_TONE[s.statut])}>
+                        {STATUT_STAGE_LABEL[s.statut]}
+                      </span>
+                      <span
+                        className={toneBadge(
+                          s.conventionSignee ? "teal" : "red",
+                        )}
+                      >
+                        {s.conventionSignee
+                          ? "Convention signée"
+                          : "Convention en attente"}
+                      </span>
+                    </div>
+
+                    <DetailSection title="Lieu de stage">
+                      <div>
+                        <DetailRow
+                          label="Structure d'accueil"
+                          value={s.structure}
+                        />
+                        <DetailRow label="Service" value={s.service} />
+                        <DetailRow label="Début" value={fmtDate(s.debut)} />
+                        <DetailRow label="Fin" value={fmtDate(s.fin)} />
+                      </div>
+                    </DetailSection>
+
+                    <DetailSection title="Encadrement">
+                      <div>
+                        <DetailRow
+                          label="Tuteur clinique"
+                          value={s.encadrantClinique}
+                        />
+                        <DetailRow
+                          label="Tuteur académique"
+                          value={s.tuteurAcademique}
+                        />
+                      </div>
+                    </DetailSection>
+
+                    <DetailSection title="Soutenance">
+                      <div>
+                        <DetailRow
+                          label="Note de soutenance"
+                          value={
+                            s.noteSoutenance !== undefined ? (
+                              <span
+                                className={
+                                  s.noteSoutenance < 10
+                                    ? "text-alert"
+                                    : "text-brand-dk"
+                                }
+                              >
+                                {s.noteSoutenance.toFixed(2)} / 20
+                              </span>
+                            ) : (
+                              "Non soutenu"
+                            )
+                          }
+                        />
+                      </div>
+                    </DetailSection>
+                  </DetailShell>
+                );
+              })()
+            : null}
+        </DialogContent>
+      </Dialog>
+
+      {formOpen ? (
+        <StageForm
+          key={editing?.id ?? "new"}
+          initial={editing}
+          etudiants={etudiants}
+          onCancel={() => setFormOpen(false)}
+          onSubmit={(data) => {
+            if (editing) {
+              updateStage(editing.id, data);
+              toast.success(`Stage mis à jour — ${data.prenom} ${data.nom}`);
+            } else {
+              addStage(data);
+              toast.success(`Convention créée — ${data.prenom} ${data.nom}`);
+            }
+            setFormOpen(false);
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={!!toDelete}
+        onOpenChange={(o) => !o && setToDelete(null)}
+        title="Supprimer ce stage ?"
+        message={
+          toDelete
+            ? `Le stage de ${toDelete.prenom} ${toDelete.nom} à ${toDelete.structure} sera supprimé. Cette action est irréversible.`
+            : ""
+        }
+        onConfirm={() => {
+          if (!toDelete) return;
+          deleteStage(toDelete.id);
+          toast.success(`Stage supprimé — ${toDelete.prenom} ${toDelete.nom}`);
+          setToDelete(null);
+        }}
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+function StageForm({
+  initial,
+  etudiants,
+  onSubmit,
+  onCancel,
+}: {
+  initial: Stage | null;
+  etudiants: ReturnType<typeof useIstpm>["etudiants"];
+  onSubmit: (data: Omit<Stage, "id">) => void;
+  onCancel: () => void;
+}) {
+  const [f, setF] = useState(() => ({
+    etudiantId: initial?.etudiantId ?? "",
+    structure: (initial?.structure ?? "") as string,
+    service: initial?.service ?? "",
+    encadrantClinique: initial?.encadrantClinique ?? "",
+    tuteurAcademique: initial?.tuteurAcademique ?? "",
+    debut: initial?.debut ?? "",
+    fin: initial?.fin ?? "",
+    statut: (initial?.statut ?? "recherche") as StatutStage,
+    conventionSignee: initial?.conventionSignee ? "oui" : "non",
+    noteSoutenance:
+      initial?.noteSoutenance !== undefined
+        ? (initial.noteSoutenance as number)
+        : ("" as number | ""),
+  }));
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => {
+    setF((prev) => ({ ...prev, [k]: v }));
+    setErrors((prev) => ({ ...prev, [k]: undefined }));
+  };
+
+  const submit = () => {
+    const next: Record<string, string> = {};
+    const etudiant = etudiants.find((e) => e.id === f.etudiantId);
+    if (!etudiant) next.etudiantId = "Étudiant obligatoire";
+    if (!f.structure) next.structure = "Structure obligatoire";
+    if (!f.service.trim()) next.service = "Service obligatoire";
+    if (!f.debut) next.debut = "Date de début obligatoire";
+    if (!f.fin) next.fin = "Date de fin obligatoire";
+    if (f.debut && f.fin && f.fin < f.debut)
+      next.fin = "La fin doit suivre le début";
+    if (f.noteSoutenance !== "" && (f.noteSoutenance < 0 || f.noteSoutenance > 20))
+      next.noteSoutenance = "Note entre 0 et 20";
+
+    if (Object.keys(next).length || !etudiant) {
+      setErrors(next);
+      toast.error("Veuillez corriger les champs signalés");
+      return;
+    }
+
+    onSubmit({
+      // Student identity is denormalised onto the stage record so the table can
+      // render without a join; it is re-copied on every save.
+      etudiantId: etudiant.id,
+      cne: etudiant.cne,
+      prenom: etudiant.prenom,
+      nom: etudiant.nom,
+      filiere: etudiant.filiere as Filiere,
+      niveau: etudiant.niveau as Niveau,
+      structure: f.structure,
+      service: f.service.trim(),
+      encadrantClinique: f.encadrantClinique.trim(),
+      tuteurAcademique: f.tuteurAcademique.trim(),
+      debut: f.debut,
+      fin: f.fin,
+      statut: f.statut,
+      conventionSignee: f.conventionSignee === "oui",
+      ...(f.noteSoutenance === ""
+        ? {}
+        : { noteSoutenance: Number(f.noteSoutenance) }),
+    });
+  };
+
+  return (
+    <FormDialog
+      open
+      onOpenChange={(o) => !o && onCancel()}
+      wide
+      title={initial ? "Modifier le stage" : "Nouvelle convention de stage"}
+      subtitle={
+        initial
+          ? `${initial.prenom} ${initial.nom} — ${initial.structure}`
+          : "Affecter un étudiant à une structure d'accueil"
+      }
+      submitLabel={initial ? "Enregistrer les modifications" : "Créer"}
+      onSubmit={submit}
+    >
+      <FullWidth>
+        <SelectField
+          label="Étudiant"
+          required
+          value={f.etudiantId}
+          onChange={(v) => set("etudiantId", v)}
+          options={etudiants.map((e) => ({
+            value: e.id,
+            label: `${e.prenom} ${e.nom} — ${e.cne} (${e.niveau})`,
+          }))}
+          error={errors.etudiantId}
+        />
+      </FullWidth>
+      <FullWidth>
+        <SelectField
+          label="Structure d'accueil"
+          required
+          value={f.structure}
+          onChange={(v) => set("structure", v)}
+          options={STRUCTURES_ACCUEIL}
+          error={errors.structure}
+        />
+      </FullWidth>
+      <TextField
+        label="Service"
+        required
+        value={f.service}
+        onChange={(v) => set("service", v)}
+        placeholder="Médecine interne"
+        error={errors.service}
+      />
+      <SelectField
+        label="Statut"
+        value={f.statut}
+        onChange={(v) => set("statut", v)}
+        options={STATUTS.map((s) => ({
+          value: s,
+          label: STATUT_STAGE_LABEL[s],
+        }))}
+      />
+      <TextField
+        label="Encadrant clinique"
+        value={f.encadrantClinique}
+        onChange={(v) => set("encadrantClinique", v)}
+        placeholder="Dr. A. Bennis (Cadre infirmier)"
+      />
+      <TextField
+        label="Tuteur académique"
+        value={f.tuteurAcademique}
+        onChange={(v) => set("tuteurAcademique", v)}
+        placeholder="Mme S. El Idrissi"
+      />
+      <TextField
+        label="Début"
+        required
+        type="date"
+        value={f.debut}
+        onChange={(v) => set("debut", v)}
+        error={errors.debut}
+      />
+      <TextField
+        label="Fin"
+        required
+        type="date"
+        value={f.fin}
+        onChange={(v) => set("fin", v)}
+        error={errors.fin}
+      />
+      <SelectField
+        label="Convention signée"
+        value={f.conventionSignee}
+        onChange={(v) => set("conventionSignee", v)}
+        options={[
+          { value: "oui", label: "Oui" },
+          { value: "non", label: "Non" },
+        ]}
+      />
+      <NumberField
+        label="Note de soutenance"
+        suffix="/20"
+        min={0}
+        max={20}
+        step={0.25}
+        value={f.noteSoutenance}
+        onChange={(v) => set("noteSoutenance", v)}
+        error={errors.noteSoutenance}
+      />
+    </FormDialog>
+  );
+}
+
+export const Route = createFileRoute("/dashboard/stages")({
+  component: StagesPage,
+});

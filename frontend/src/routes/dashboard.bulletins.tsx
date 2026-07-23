@@ -1,0 +1,601 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { Eye, FileDown, Send, Pencil, SendHorizontal } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
+import { useIstpm, mentionFor, decisionFor } from "@/lib/istpm-store";
+import {
+  FILIERES,
+  NIVEAUX,
+  DECISION_TONE,
+  MENTION_TONE,
+  STATUT_BULLETIN_LABEL,
+  STATUT_BULLETIN_TONE,
+  type Bulletin,
+  type Decision,
+  type SessionType,
+  type StatutBulletin,
+} from "@/lib/istpm-data";
+import {
+  primaryPill,
+  ghostPill,
+  iconButton,
+  toneBadge,
+  dialogSurfaceWide,
+  tableRow,
+  TONE_COLORS,
+} from "@/lib/dash-ui";
+import {
+  PageHeader,
+  FilterBar,
+  FilterSelect,
+  DataTable,
+  DetailSection,
+  DetailRow,
+  DetailShell,
+  ALL,
+} from "@/components/dash-page";
+import {
+  FormDialog,
+  ConfirmDialog,
+  NumberField,
+  SelectField,
+  FullWidth,
+} from "@/components/dash-form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+
+const SESSIONS: SessionType[] = ["normale", "rattrapage"];
+const DECISIONS: Decision[] = [
+  "Admis",
+  "Admis avec dette",
+  "Rattrapage",
+  "Ajourné",
+];
+const STATUTS: StatutBulletin[] = ["genere", "valide", "publie"];
+
+/**
+ * Render the transcript into a hidden iframe and open the browser's print
+ * dialog — "Enregistrer au format PDF" there produces the real document.
+ * An iframe avoids the popup blocker that `window.open` would trip.
+ */
+function printBulletin(b: Bulletin) {
+  const rows = b.notes
+    .map(
+      (n) =>
+        `<tr><td>${n.module}</td><td class="r">${n.note.toFixed(2)}</td><td class="r">${n.coef}</td><td class="r">${n.credits}</td></tr>`,
+    )
+    .join("");
+
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<title>Bulletin — ${b.prenom} ${b.nom}</title>
+<style>
+  body{font-family:system-ui,sans-serif;color:#123b3a;margin:40px;}
+  h1{color:#029994;font-size:20px;margin:0 0 4px;}
+  .sub{color:#556;font-size:12px;margin-bottom:24px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
+  th{text-align:left;background:#f1f9f9;color:#017a76;font-size:11px;
+     text-transform:uppercase;letter-spacing:.06em;padding:8px;}
+  td{padding:8px;border-top:1px solid #d6efee;}
+  .r{text-align:right;}
+  .sum{margin-top:24px;font-size:13px;}
+  .sum div{display:flex;justify-content:space-between;
+           border-bottom:1px solid #d6efee;padding:6px 0;}
+  .clin{background:#f1f9f9;font-weight:600;}
+</style></head><body>
+<h1>ISTPM Agadir — Bulletin de notes</h1>
+<div class="sub">Institut spécialisé des techniques paramédicales</div>
+<div class="sum">
+  <div><span>Étudiant</span><strong>${b.prenom} ${b.nom}</strong></div>
+  <div><span>CNE</span><strong>${b.cne}</strong></div>
+  <div><span>Filière</span><strong>${b.filiere}</strong></div>
+  <div><span>Niveau / session</span><strong>${b.niveau} — session ${b.session}</strong></div>
+</div>
+<table><thead><tr><th>Module</th><th class="r">Note</th><th class="r">Coef.</th><th class="r">Crédits</th></tr></thead>
+<tbody>${rows}
+<tr class="clin"><td>Évaluation clinique / pratique</td><td class="r">${b.evaluationClinique.toFixed(2)}</td><td class="r">2</td><td class="r">4</td></tr>
+</tbody></table>
+<div class="sum">
+  <div><span>Moyenne générale</span><strong>${b.moyenne.toFixed(2)} / 20</strong></div>
+  <div><span>Mention</span><strong>${b.mention}</strong></div>
+  <div><span>Décision</span><strong>${b.decision}</strong></div>
+</div>
+</body></html>`;
+
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+  frame.srcdoc = html;
+  frame.onload = () => {
+    frame.contentWindow?.focus();
+    frame.contentWindow?.print();
+    // Give the print dialog time to take its snapshot before teardown.
+    setTimeout(() => frame.remove(), 60_000);
+  };
+  document.body.appendChild(frame);
+}
+
+function BulletinsPage() {
+  const { role } = useAuth();
+  const { bulletins, updateBulletin, publierBulletin, publierTousBulletins } =
+    useIstpm();
+  // Publishing transcripts is a student-administration act.
+  const canPublish = role === "directeur" || role === "responsable";
+
+  const [search, setSearch] = useState("");
+  const [filiere, setFiliere] = useState<string>(ALL);
+  const [niveau, setNiveau] = useState<string>(ALL);
+  const [session, setSession] = useState<string>(ALL);
+
+  const [detail, setDetail] = useState<Bulletin | null>(null);
+  const [editing, setEditing] = useState<Bulletin | null>(null);
+  const [publishAllOpen, setPublishAllOpen] = useState(false);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return bulletins.filter((b) => {
+      if (filiere !== ALL && b.filiere !== filiere) return false;
+      if (niveau !== ALL && b.niveau !== niveau) return false;
+      if (session !== ALL && b.session !== session) return false;
+      if (!q) return true;
+      return `${b.cne} ${b.prenom} ${b.nom}`.toLowerCase().includes(q);
+    });
+  }, [bulletins, search, filiere, niveau, session]);
+
+  const aPublier = bulletins.filter((b) => b.statut !== "publie").length;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Résultats"
+        title="Bulletins"
+        actions={
+          canPublish ? (
+            <>
+              <span className="rounded-full bg-brand/12 px-3 py-1.5 text-xs font-medium text-brand-dk">
+                {aPublier} à publier
+              </span>
+              <button
+                className={cn(ghostPill, "gap-1.5")}
+                disabled={aPublier === 0}
+                onClick={() => setPublishAllOpen(true)}
+              >
+                <SendHorizontal className="h-3.5 w-3.5" /> Tout publier
+              </button>
+            </>
+          ) : (
+            <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              Consultation seule
+            </span>
+          )
+        }
+      />
+
+      <FilterBar
+        search={search}
+        onSearch={setSearch}
+        placeholder="Rechercher par CNE ou nom…"
+      >
+        <FilterSelect
+          value={filiere}
+          onChange={setFiliere}
+          options={FILIERES}
+          allLabel="Toutes les filières"
+          width="w-[15rem]"
+        />
+        <FilterSelect
+          value={niveau}
+          onChange={setNiveau}
+          options={NIVEAUX}
+          allLabel="Tous les semestres"
+          width="w-[11rem]"
+        />
+        <FilterSelect
+          value={session}
+          onChange={setSession}
+          options={SESSIONS}
+          allLabel="Toutes les sessions"
+          width="w-[12rem]"
+        />
+      </FilterBar>
+
+      <DataTable
+        minWidth="min-w-[1100px]"
+        isEmpty={filtered.length === 0}
+        empty="Aucun bulletin ne correspond à ces critères."
+        head={
+          <>
+            <th className="px-4 py-3.5">Étudiant</th>
+            <th className="px-4 py-3.5">Filière / niveau</th>
+            <th className="px-4 py-3.5">Session</th>
+            <th className="px-4 py-3.5 text-right">Moyenne</th>
+            <th className="px-4 py-3.5">Mention</th>
+            <th className="px-4 py-3.5">Décision</th>
+            <th className="px-4 py-3.5">Statut</th>
+            <th className="w-36 px-4 py-3.5 text-center">Actions</th>
+          </>
+        }
+      >
+        {filtered.map((b) => (
+          <tr key={b.id} onClick={() => setDetail(b)} className={tableRow}>
+            <td
+              className="border-l-[3px] px-4 py-3.5"
+              style={{ borderLeftColor: TONE_COLORS[DECISION_TONE[b.decision]] }}
+            >
+              <span className="block font-medium">
+                {b.prenom} {b.nom}
+              </span>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {b.cne}
+              </span>
+            </td>
+            <td className="px-4 py-3.5 text-muted-foreground">
+              <span className="block">{b.filiere}</span>
+              <span className="text-xs">{b.niveau}</span>
+            </td>
+            <td className="px-4 py-3.5 capitalize text-muted-foreground">
+              {b.session}
+            </td>
+            <td
+              className={cn(
+                "px-4 py-3.5 text-right font-semibold tabular-nums",
+                b.moyenne < 10 ? "text-alert" : "text-brand-dk",
+              )}
+            >
+              {b.moyenne.toFixed(2)}
+            </td>
+            <td className="px-4 py-3.5">
+              <span className={toneBadge(MENTION_TONE[b.mention])}>
+                {b.mention}
+              </span>
+            </td>
+            <td className="px-4 py-3.5">
+              <span className={toneBadge(DECISION_TONE[b.decision])}>
+                {b.decision}
+              </span>
+            </td>
+            <td className="px-4 py-3.5">
+              <span className={toneBadge(STATUT_BULLETIN_TONE[b.statut])}>
+                {STATUT_BULLETIN_LABEL[b.statut]}
+              </span>
+            </td>
+            <td
+              className="px-4 py-3.5 text-center"
+              onClick={(ev) => ev.stopPropagation()}
+            >
+              <div className="flex items-center justify-center gap-1">
+                <button
+                  className={iconButton}
+                  aria-label="Voir le bulletin"
+                  onClick={() => setDetail(b)}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  className={iconButton}
+                  aria-label="Imprimer / PDF"
+                  onClick={() => printBulletin(b)}
+                >
+                  <FileDown className="h-3.5 w-3.5" />
+                </button>
+                {canPublish ? (
+                  <>
+                    <button
+                      className={iconButton}
+                      aria-label="Modifier"
+                      onClick={() => setEditing(b)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      className={iconButton}
+                      aria-label="Publier"
+                      disabled={b.statut === "publie"}
+                      onClick={() => {
+                        publierBulletin(b.id);
+                        toast.success(
+                          `Bulletin publié — ${b.prenom} ${b.nom} (${b.niveau})`,
+                        );
+                      }}
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </td>
+          </tr>
+        ))}
+      </DataTable>
+
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className={dialogSurfaceWide}>
+          <DialogTitle className="sr-only">Bulletin</DialogTitle>
+          <DialogDescription className="sr-only">
+            Détail des notes par module
+          </DialogDescription>
+          {detail ? (
+            <BulletinDetail
+              b={bulletins.find((x) => x.id === detail.id) ?? detail}
+              canPublish={canPublish}
+              onPublish={(b) => {
+                publierBulletin(b.id);
+                toast.success(`Bulletin publié — ${b.prenom} ${b.nom}`);
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {editing ? (
+        <BulletinForm
+          key={editing.id}
+          initial={editing}
+          onCancel={() => setEditing(null)}
+          onSubmit={(patch) => {
+            updateBulletin(editing.id, patch);
+            toast.success(
+              `Bulletin mis à jour — ${editing.prenom} ${editing.nom}`,
+            );
+            setEditing(null);
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={publishAllOpen}
+        onOpenChange={setPublishAllOpen}
+        title="Publier tous les bulletins ?"
+        message={`${aPublier} bulletin(s) passeront au statut « Publié » et seront visibles par les étudiants.`}
+        confirmLabel="Tout publier"
+        onConfirm={() => {
+          const n = publierTousBulletins();
+          toast.success(`${n} bulletin(s) publié(s)`);
+        }}
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+function BulletinForm({
+  initial,
+  onSubmit,
+  onCancel,
+}: {
+  initial: Bulletin;
+  onSubmit: (patch: Partial<Bulletin>) => void;
+  onCancel: () => void;
+}) {
+  const [f, setF] = useState({
+    session: initial.session,
+    decision: initial.decision,
+    statut: initial.statut,
+    evaluationClinique: initial.evaluationClinique as number | "",
+  });
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+
+  const submit = () => {
+    if (
+      f.evaluationClinique === "" ||
+      f.evaluationClinique < 0 ||
+      f.evaluationClinique > 20
+    ) {
+      setErrors({ evaluationClinique: "Note entre 0 et 20" });
+      toast.error("Veuillez corriger les champs signalés");
+      return;
+    }
+    onSubmit({
+      session: f.session,
+      decision: f.decision,
+      statut: f.statut,
+      evaluationClinique: Number(f.evaluationClinique),
+    });
+  };
+
+  // Shown as guidance: what the rules would decide from the recorded marks.
+  const suggestion = decisionFor(initial.moyenne, initial.notes);
+
+  return (
+    <FormDialog
+      open
+      onOpenChange={(o) => !o && onCancel()}
+      title="Modifier le bulletin"
+      subtitle={`${initial.prenom} ${initial.nom} — ${initial.cne}`}
+      onSubmit={submit}
+    >
+      <FullWidth>
+        <div className="rounded-2xl bg-muted px-4 py-3 text-xs text-muted-foreground">
+          Moyenne calculée&nbsp;:{" "}
+          <strong className="text-foreground">
+            {initial.moyenne.toFixed(2)}/20
+          </strong>{" "}
+          · mention{" "}
+          <strong className="text-foreground">
+            {mentionFor(initial.moyenne)}
+          </strong>{" "}
+          · décision suggérée{" "}
+          <strong className="text-foreground">{suggestion}</strong>
+        </div>
+      </FullWidth>
+      <SelectField
+        label="Session"
+        value={f.session}
+        onChange={(v) => setF((p) => ({ ...p, session: v }))}
+        options={SESSIONS.map((s) => ({ value: s, label: s }))}
+      />
+      <SelectField
+        label="Décision"
+        value={f.decision}
+        onChange={(v) => setF((p) => ({ ...p, decision: v }))}
+        options={DECISIONS.map((d) => ({ value: d, label: d }))}
+      />
+      <SelectField
+        label="Statut"
+        value={f.statut}
+        onChange={(v) => setF((p) => ({ ...p, statut: v }))}
+        options={STATUTS.map((s) => ({
+          value: s,
+          label: STATUT_BULLETIN_LABEL[s],
+        }))}
+      />
+      <NumberField
+        label="Évaluation clinique"
+        suffix="/20"
+        min={0}
+        max={20}
+        step={0.25}
+        value={f.evaluationClinique}
+        onChange={(v) => {
+          setF((p) => ({ ...p, evaluationClinique: v }));
+          setErrors({});
+        }}
+        error={errors.evaluationClinique}
+      />
+    </FormDialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+function BulletinDetail({
+  b,
+  canPublish,
+  onPublish,
+}: {
+  b: Bulletin;
+  canPublish: boolean;
+  onPublish: (b: Bulletin) => void;
+}) {
+  const totalCredits = b.notes.reduce((s, n) => s + n.credits, 0);
+  const creditsValides = b.notes
+    .filter((n) => n.note >= 10)
+    .reduce((s, n) => s + n.credits, 0);
+
+  return (
+    <DetailShell
+      title={`${b.prenom} ${b.nom}`}
+      subtitle={`${b.cne} · ${b.filiere} · ${b.niveau} · session ${b.session}`}
+      footer={
+        <div className="flex items-center justify-end gap-2">
+          <button
+            className={cn(ghostPill, "gap-1.5")}
+            onClick={() => printBulletin(b)}
+          >
+            <FileDown className="h-3.5 w-3.5" /> Imprimer / PDF
+          </button>
+          {canPublish && b.statut !== "publie" ? (
+            <button className={primaryPill} onClick={() => onPublish(b)}>
+              <Send className="h-4 w-4" /> Publier
+            </button>
+          ) : null}
+        </div>
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        <span className={toneBadge(DECISION_TONE[b.decision])}>
+          {b.decision}
+        </span>
+        <span className={toneBadge(MENTION_TONE[b.mention])}>{b.mention}</span>
+        <span className={toneBadge(STATUT_BULLETIN_TONE[b.statut])}>
+          {STATUT_BULLETIN_LABEL[b.statut]}
+        </span>
+      </div>
+
+      <DetailSection title="Synthèse">
+        <div>
+          <DetailRow
+            label="Moyenne générale"
+            value={
+              <span className={b.moyenne < 10 ? "text-alert" : "text-brand-dk"}>
+                {b.moyenne.toFixed(2)} / 20
+              </span>
+            }
+          />
+          <DetailRow
+            label="Crédits validés"
+            value={`${creditsValides} / ${totalCredits}`}
+          />
+          <DetailRow
+            label="Évaluation clinique / pratique"
+            value={
+              <span
+                className={
+                  b.evaluationClinique < 10 ? "text-alert" : "text-brand-dk"
+                }
+              >
+                {b.evaluationClinique.toFixed(2)} / 20
+              </span>
+            }
+          />
+        </div>
+      </DetailSection>
+
+      <DetailSection title="Notes par module">
+        <div className="overflow-hidden rounded-2xl border border-brand/12">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-brand/12 bg-muted text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="px-3 py-2">Module</th>
+                <th className="px-3 py-2 text-right">Note</th>
+                <th className="px-3 py-2 text-right">Coef.</th>
+                <th className="px-3 py-2 text-right">Crédits</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-brand/8">
+              {b.notes.map((n) => (
+                <tr key={n.module}>
+                  <td className="px-3 py-2">{n.module}</td>
+                  <td
+                    className={cn(
+                      "px-3 py-2 text-right font-semibold tabular-nums",
+                      n.note < 10 ? "text-alert" : "text-brand-dk",
+                    )}
+                  >
+                    {n.note.toFixed(2)}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                    {n.coef}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                    {n.credits}
+                  </td>
+                </tr>
+              ))}
+              {/* The clinical/practical evaluation is graded separately from the
+                  taught modules but appears on the same transcript. */}
+              <tr className="bg-brand/8">
+                <td className="px-3 py-2 font-medium">
+                  Évaluation clinique / pratique
+                </td>
+                <td
+                  className={cn(
+                    "px-3 py-2 text-right font-semibold tabular-nums",
+                    b.evaluationClinique < 10 ? "text-alert" : "text-brand-dk",
+                  )}
+                >
+                  {b.evaluationClinique.toFixed(2)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                  2
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                  4
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </DetailSection>
+    </DetailShell>
+  );
+}
+
+export const Route = createFileRoute("/dashboard/bulletins")({
+  component: BulletinsPage,
+});

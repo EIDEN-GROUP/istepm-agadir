@@ -100,7 +100,7 @@ function DashboardCalendar() {
               setMonth(new Date().getMonth());
               setYear(new Date().getFullYear());
             }}
-            className="rounded-full bg-[#28396C] px-4 py-2 text-sm text-white"
+            className="rounded-full bg-brand px-4 py-2 text-sm text-white"
           >
             Aujourd'hui
           </button>
@@ -145,14 +145,14 @@ function DashboardCalendar() {
                 key={d}
                 className={cn(
                   "min-h-[100px] bg-card p-2",
-                  isToday && "ring-2 ring-[#B5E18B] ring-inset",
+                  isToday && "ring-2 ring-brand ring-inset",
                 )}
               >
                 <span
                   className={cn(
                     "text-sm font-semibold",
                     holiday
-                      ? "text-[#E25C5C]"
+                      ? "text-alert"
                       : vacation
                         ? "text-[#7BA5D9]"
                         : "text-foreground",
@@ -161,7 +161,7 @@ function DashboardCalendar() {
                   {d}
                 </span>
                 {holiday && (
-                  <p className="mt-1 text-[10px] font-medium text-[#E25C5C]">
+                  <p className="mt-1 text-[10px] font-medium text-alert">
                     {holiday.label}
                   </p>
                 )}

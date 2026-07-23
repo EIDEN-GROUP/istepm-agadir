@@ -45,7 +45,7 @@ function DashboardRapports() {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={revenue}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="m" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip
@@ -53,7 +53,7 @@ function DashboardRapports() {
                     `${value.toLocaleString("fr-FR")} MAD`
                   }
                 />
-                <Bar dataKey="v" fill="#28396C" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="v" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -66,7 +66,7 @@ function DashboardRapports() {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={invoiceAnalytics}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="m" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip
@@ -74,7 +74,7 @@ function DashboardRapports() {
                     `${value.toLocaleString("fr-FR")} MAD`
                   }
                 />
-                <Bar dataKey="v" fill="#B5E18B" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="v" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

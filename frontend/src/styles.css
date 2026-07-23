@@ -39,6 +39,22 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  /* ISTPM brand utilities   bg-brand, border-brand/15, text-alert, ... */
+  --color-brand: var(--istpm-teal);
+  --color-brand-dk: var(--istpm-teal-dk);
+  --color-brand-md: var(--istpm-teal-md);
+  --color-brand-lt: var(--istpm-teal-lt);
+  --color-brand-pale: var(--istpm-teal-pale);
+  --color-brand-wash: var(--istpm-teal-wash);
+  --color-alert: var(--istpm-red);
+  --color-alert-dk: var(--istpm-red-dk);
+  --color-alert-pale: var(--istpm-red-pale);
+  --color-warn: var(--istpm-amber);
+  --color-warn-pale: var(--istpm-amber-pale);
+  --color-info: var(--istpm-blue);
+  --color-info-pale: var(--istpm-blue-pale);
+  --color-ink: var(--istpm-ink);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -56,87 +72,118 @@
 :root {
   --radius: 0.875rem;
 
-  /* Color Hunt palette   https://colorhunt.co/palette/b5e18bf0ffc2eae6bc28396c */
-  --eiden-brass: #b5e18b;
-  --eiden-canvas: color-mix(in srgb, #fefdfb 62%, #f0ffc2 38%);
-  --eiden-beige: #eae6bc;
-  --eiden-beige-dk: color-mix(in srgb, #ded9a8 70%, var(--eiden-brass) 30%);
-  --eiden-forest: #28396c;
-  --eiden-forest-md: #32467f;
-  --eiden-deep: #32467f;
-  --eiden-teal: #32467f;
-  --eiden-teal-lt: #46599b;
-  --eiden-gold: #cfc27a;
-  --eiden-gold-dk: color-mix(in srgb, var(--eiden-brass) 58%, #28396c 42%);
-  --eiden-mint: #cdeeae;
-  --eiden-cream: #f6ffdb;
-  --eiden-ink: #141d3a;
-  --eiden-white: #ffffff;
-  --eiden-red: #ef4444;
-  --eiden-blue: #60a5fa;
+  /* ------------------------------------------------------------------
+   * ISTPM Agadir brand palette.
+   * Teal is the dominant brand colour (nav, CTAs, headers, positive
+   * states); red is reserved for alerts and negative states only.
+   * ------------------------------------------------------------------ */
+  --istpm-teal: #029994;
+  --istpm-teal-dk: #017a76;
+  --istpm-teal-md: #02807c;
+  --istpm-teal-lt: #4db8b4;
+  --istpm-teal-pale: #d6efee;
+  --istpm-teal-wash: #f1f9f9;
 
-  /* Landing   match reference hero (flat dark green + emerald CTAs) */
-  --landing-hero-bg: color-mix(in srgb, var(--eiden-forest) 22%, #060908 78%);
-  --landing-cta-primary: #b5e18b;
-  --landing-cta-primary-hover: #9ecf6e;
-  --landing-cta-on-primary: var(--eiden-forest);
+  --istpm-red: #e51e26;
+  --istpm-red-dk: #b3141b;
+  --istpm-red-pale: #fbdcdd;
 
-  --background: var(--eiden-canvas);
-  --foreground: var(--eiden-forest);
-  --hover-menu-foreground: var(--eiden-forest);
+  --istpm-amber: #d98324;
+  --istpm-amber-pale: #fbebd6;
+  --istpm-blue: #2f6fb0;
+  --istpm-blue-pale: #dfeaf6;
 
-  --card: var(--eiden-white);
-  --card-foreground: var(--eiden-forest);
-  --popover: var(--eiden-white);
-  --popover-foreground: var(--eiden-forest);
+  --istpm-ink: #123b3a;
+  --istpm-white: #ffffff;
 
-  /* Brand accent / CTA   brass + forest for strong contrast */
-  --primary: var(--eiden-brass);
-  --primary-foreground: var(--eiden-forest);
+  /* Teal-tinted rgba used by the soft-card shadow language. */
+  --istpm-shadow: 2, 153, 148;
 
-  --secondary: var(--eiden-beige);
-  --secondary-foreground: var(--eiden-forest);
+  /* Legacy --eiden-* names kept as aliases: the landing-page utility
+   * classes further down still reference them. Re-pointed at the ISTPM
+   * palette so nothing renders in the old navy/brass scheme. */
+  --eiden-brass: var(--istpm-teal);
+  --eiden-canvas: var(--istpm-white);
+  --eiden-beige: var(--istpm-teal-pale);
+  --eiden-beige-dk: var(--istpm-teal-lt);
+  --eiden-forest: var(--istpm-teal-dk);
+  --eiden-forest-md: var(--istpm-teal-md);
+  --eiden-deep: var(--istpm-teal-dk);
+  --eiden-teal: var(--istpm-teal);
+  --eiden-teal-lt: var(--istpm-teal-lt);
+  --eiden-gold: var(--istpm-amber);
+  --eiden-gold-dk: var(--istpm-teal-md);
+  --eiden-mint: var(--istpm-teal-pale);
+  --eiden-cream: var(--istpm-teal-wash);
+  --eiden-ink: var(--istpm-ink);
+  --eiden-white: var(--istpm-white);
+  --eiden-red: var(--istpm-red);
+  --eiden-blue: var(--istpm-blue);
 
-  --muted: var(--eiden-cream);
-  --muted-foreground: color-mix(in srgb, var(--eiden-forest) 62%, var(--eiden-deep) 38%);
+  /* Landing */
+  --landing-hero-bg: color-mix(in srgb, var(--istpm-teal-dk) 30%, #04201f 70%);
+  --landing-cta-primary: var(--istpm-teal);
+  --landing-cta-primary-hover: var(--istpm-teal-dk);
+  --landing-cta-on-primary: var(--istpm-white);
 
-  --accent: color-mix(in srgb, var(--eiden-gold) 38%, var(--eiden-beige) 62%);
-  --accent-foreground: var(--eiden-forest);
+  --background: var(--istpm-white);
+  --foreground: var(--istpm-ink);
+  --hover-menu-foreground: var(--istpm-teal-dk);
 
-  --destructive: var(--eiden-red);
-  --destructive-foreground: var(--eiden-white);
+  --card: var(--istpm-white);
+  --card-foreground: var(--istpm-ink);
+  --popover: var(--istpm-white);
+  --popover-foreground: var(--istpm-ink);
 
-  --border: color-mix(in srgb, var(--eiden-beige-dk) 78%, var(--eiden-forest) 22%);
-  --input: var(--eiden-beige-dk);
-  --ring: var(--eiden-deep);
+  /* Brand accent / CTA   solid teal with white text */
+  --primary: var(--istpm-teal);
+  --primary-foreground: var(--istpm-white);
+
+  --secondary: var(--istpm-teal-pale);
+  --secondary-foreground: var(--istpm-teal-dk);
+
+  --muted: var(--istpm-teal-wash);
+  --muted-foreground: color-mix(in srgb, var(--istpm-ink) 62%, var(--istpm-teal) 38%);
+
+  --accent: var(--istpm-teal-pale);
+  --accent-foreground: var(--istpm-teal-dk);
+
+  --destructive: var(--istpm-red);
+  --destructive-foreground: var(--istpm-white);
+
+  --border: color-mix(in srgb, var(--istpm-teal) 22%, var(--istpm-white) 78%);
+  --input: color-mix(in srgb, var(--istpm-teal) 28%, var(--istpm-white) 72%);
+  --ring: var(--istpm-teal);
 
   /* Supporting accents (charts, badges, utilities) */
-  --sun: var(--eiden-gold);
-  --sky: var(--eiden-teal-lt);
-  --leaf: var(--eiden-mint);
-  --coral: var(--eiden-gold-dk);
+  --sun: var(--istpm-amber);
+  --sky: var(--istpm-blue);
+  --leaf: var(--istpm-teal-lt);
+  --coral: var(--istpm-red);
 
-  --chart-1: var(--eiden-brass);
-  --chart-2: var(--eiden-gold);
-  --chart-3: var(--eiden-forest);
-  --chart-4: var(--eiden-teal-lt);
-  --chart-5: var(--eiden-mint);
+  /* Teal-family ramp, red last   keeps red meaningful in charts. */
+  --chart-1: var(--istpm-teal);
+  --chart-2: var(--istpm-teal-lt);
+  --chart-3: var(--istpm-teal-dk);
+  --chart-4: var(--istpm-blue);
+  --chart-5: var(--istpm-amber);
+  --chart-6: var(--istpm-red);
 
-  --sidebar: var(--eiden-canvas);
-  --sidebar-foreground: var(--eiden-forest);
-  --sidebar-primary: var(--eiden-brass);
-  --sidebar-primary-foreground: var(--eiden-forest);
-  --sidebar-accent: var(--eiden-beige);
-  --sidebar-accent-foreground: var(--eiden-forest);
-  --sidebar-border: var(--eiden-beige-dk);
-  --sidebar-ring: var(--eiden-deep);
+  --sidebar: var(--istpm-white);
+  --sidebar-foreground: var(--istpm-ink);
+  --sidebar-primary: var(--istpm-teal);
+  --sidebar-primary-foreground: var(--istpm-white);
+  --sidebar-accent: var(--istpm-teal-pale);
+  --sidebar-accent-foreground: var(--istpm-teal-dk);
+  --sidebar-border: color-mix(in srgb, var(--istpm-teal) 22%, var(--istpm-white) 78%);
+  --sidebar-ring: var(--istpm-teal);
 
-  --scrollbar-thumb: color-mix(in srgb, var(--eiden-brass) 44%, transparent);
-  --scrollbar-thumb-hover: color-mix(in srgb, var(--eiden-gold) 55%, transparent);
+  --scrollbar-thumb: color-mix(in srgb, var(--istpm-teal) 40%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--istpm-teal) 62%, transparent);
 
-  --gradient-hero: linear-gradient(135deg, var(--eiden-forest) 0%, var(--eiden-deep) 42%, color-mix(in srgb, var(--eiden-brass) 55%, var(--eiden-deep) 45%) 100%);
-  --shadow-elegant: 0 20px 60px -20px color-mix(in srgb, var(--eiden-forest) 34%, transparent);
-  --shadow-soft: 0 8px 30px -10px color-mix(in srgb, var(--eiden-brass) 22%, transparent);
+  --gradient-hero: linear-gradient(135deg, var(--istpm-teal-dk) 0%, var(--istpm-teal) 55%, var(--istpm-teal-lt) 100%);
+  --shadow-elegant: 0 20px 60px -20px rgb(var(--istpm-shadow) / 0.34);
+  --shadow-soft: 0 8px 30px -10px rgb(var(--istpm-shadow) / 0.22);
 }
 
 .dark {
@@ -297,11 +344,11 @@
   .text-shimmer-neon {
     background: linear-gradient(
       90deg,
-      #9ecf6e 0%,
+      var(--istpm-teal-lt) 0%,
       var(--landing-cta-primary) 35%,
-      #e2f7c4 52%,
+      var(--istpm-teal-pale) 52%,
       var(--landing-cta-primary) 70%,
-      #9ecf6e 100%
+      var(--istpm-teal-lt) 100%
     );
     background-size: 200% auto;
     -webkit-background-clip: text;
@@ -315,9 +362,9 @@
   .landing-cta-primary {
     background-color: var(--landing-cta-primary);
     color: var(--landing-cta-on-primary);
-    border: 1px solid color-mix(in srgb, var(--landing-cta-primary) 78%, #28396c 22%);
+    border: 1px solid color-mix(in srgb, var(--landing-cta-primary) 78%, var(--istpm-teal-dk) 22%);
     border-radius: 9999px !important;
-    box-shadow: 0 16px 36px -14px color-mix(in srgb, var(--landing-cta-primary) 65%, #28396c 35%);
+    box-shadow: 0 16px 36px -14px color-mix(in srgb, var(--landing-cta-primary) 65%, var(--istpm-teal-dk) 35%);
   }
 
   .landing-cta-primary:hover {
@@ -351,7 +398,7 @@
     border: 1px solid rgb(255 255 255 / 0.65);
     border-radius: 1.4rem;
     box-shadow:
-      0 24px 48px -20px rgb(40 57 108 / 0.28),
+      0 24px 48px -20px rgb(var(--istpm-shadow) / 0.28),
       inset 0 1px 0 rgb(255 255 255 / 0.8);
   }
 

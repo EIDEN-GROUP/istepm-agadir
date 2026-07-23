@@ -1,7 +1,7 @@
 import { Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth";
+import { ROLES, ROLE_META, useAuth } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
 import { cn } from "@/lib/utils";
@@ -40,9 +40,9 @@ import {
   ExternalLink,
   RefreshCw,
   Send,
-  GraduationCap,
   Plus,
   Trash2,
+  UserCog,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import {
@@ -156,9 +156,9 @@ function ShellNotifications() {
       : undefined;
 
   const triggerClass =
-    "relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#28396C]/15 text-muted-foreground transition-colors hover:text-foreground";
+    "relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-brand/15 text-muted-foreground transition-colors hover:text-foreground";
   const rowClass =
-    "flex w-full gap-3 px-5 py-4 text-left transition-colors hover:bg-[#B5E18B]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#6BA53A]";
+    "flex w-full gap-3 px-5 py-4 text-left transition-colors hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
   const actionClass =
     "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition";
 
@@ -172,11 +172,11 @@ function ShellNotifications() {
             ? `Notifications   ${received.length} reçues`
             : "Notifications"
         }
-        className={cn(triggerClass, "hover:bg-[#B5E18B]/15")}
+        className={cn(triggerClass, "hover:bg-brand/10")}
       >
         <Bell className="h-4 w-4" strokeWidth={1.75} />
         {received.length > 0 ? (
-          <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#E25C5C] px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+          <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-alert px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
             {received.length > 9 ? "9+" : received.length}
           </span>
         ) : null}
@@ -197,7 +197,7 @@ function ShellNotifications() {
           <span
             className={cn(
               "absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white",
-              failedCount > 0 ? "bg-[#E25C5C]" : "bg-[#25D366]",
+              failedCount > 0 ? "bg-alert" : "bg-[#25D366]",
             )}
           >
             {(failedCount || sentCount) > 9 ? "9+" : failedCount || sentCount}
@@ -208,9 +208,9 @@ function ShellNotifications() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="right"
-          className="flex w-[min(26rem,100vw-2rem)] flex-col gap-0 border-l-[#28396C]/10 bg-card p-0 sm:max-w-md"
+          className="flex w-[min(26rem,100vw-2rem)] flex-col gap-0 border-l-brand/12 bg-card p-0 sm:max-w-md"
         >
-          <SheetHeader className="space-y-1 border-b border-[#28396C]/10 px-5 pb-4 pt-5 pr-14 text-left">
+          <SheetHeader className="space-y-1 border-b border-brand/12 px-5 pb-4 pt-5 pr-14 text-left">
             <SheetTitle className="font-display text-xl tracking-tight text-foreground">
               Centre de messages
             </SheetTitle>
@@ -220,7 +220,7 @@ function ShellNotifications() {
           </SheetHeader>
 
           {!selected ? (
-            <div className="flex flex-col gap-2.5 border-b border-[#28396C]/10 px-5 py-3">
+            <div className="flex flex-col gap-2.5 border-b border-brand/12 px-5 py-3">
               {/* Tabs and actions sit on separate rows: at the sheet's width, all four
                   controls on one line wrap "Tout effacer" and clip "Envoyer". */}
               <div className="flex gap-1">
@@ -230,13 +230,13 @@ function ShellNotifications() {
                       key: "alertes" as const,
                       label: "Notifications",
                       count: received.length,
-                      dot: "bg-[#E25C5C]",
+                      dot: "bg-alert",
                     },
                     {
                       key: "whatsapp" as const,
                       label: "WhatsApp",
                       count: failedCount || sentCount,
-                      dot: failedCount > 0 ? "bg-[#E25C5C]" : "bg-[#25D366]",
+                      dot: failedCount > 0 ? "bg-alert" : "bg-[#25D366]",
                     },
                   ] as const
                 ).map((tb) => (
@@ -247,7 +247,7 @@ function ShellNotifications() {
                     className={cn(
                       "inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors",
                       tab === tb.key
-                        ? "bg-[#28396C] text-white"
+                        ? "bg-brand text-white"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
                   >
@@ -270,7 +270,7 @@ function ShellNotifications() {
                   <button
                     type="button"
                     onClick={() => clearMutation.mutate()}
-                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#E25C5C]/30 px-3.5 py-1.5 text-xs font-semibold text-[#E25C5C] transition hover:bg-[#E25C5C]/10"
+                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-alert/30 px-3.5 py-1.5 text-xs font-semibold text-alert transition hover:bg-alert/10"
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Tout effacer
                   </button>
@@ -278,18 +278,18 @@ function ShellNotifications() {
                 <button
                   type="button"
                   onClick={() => setSendOpen(true)}
-                  className="ml-auto inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-[#B5E18B] px-4 py-1.5 text-xs font-bold text-[#28396C] transition hover:brightness-105"
+                  className="ml-auto inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-brand px-4 py-1.5 text-xs font-bold text-foreground transition hover:brightness-105"
                 >
                   <Send className="h-3.5 w-3.5" /> Envoyer
                 </button>
               </div>
             </div>
           ) : (
-            <div className="border-b border-[#28396C]/10 px-5 py-3">
+            <div className="border-b border-brand/12 px-5 py-3">
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#28396C] hover:underline"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground hover:underline"
               >
                 <ArrowLeft className="h-3.5 w-3.5" /> Retour à la liste
               </button>
@@ -317,7 +317,7 @@ function ShellNotifications() {
                     onClick={() => setOpen(false)}
                     className={cn(
                       actionClass,
-                      "bg-[#B5E18B] text-[#28396C] hover:brightness-105",
+                      "bg-brand text-foreground hover:brightness-105",
                     )}
                   >
                     <ExternalLink className="h-3.5 w-3.5" /> Voir la fiche
@@ -328,7 +328,7 @@ function ShellNotifications() {
                     onClick={() => setOpen(false)}
                     className={cn(
                       actionClass,
-                      "border border-[#28396C]/15 text-foreground hover:bg-muted",
+                      "border border-brand/15 text-foreground hover:bg-muted",
                     )}
                   >
                     Voir les paiements
@@ -341,7 +341,7 @@ function ShellNotifications() {
                     }}
                     className={cn(
                       actionClass,
-                      "border border-[#E25C5C]/30 text-[#E25C5C] hover:bg-[#E25C5C]/10",
+                      "border border-alert/30 text-alert hover:bg-alert/10",
                     )}
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Supprimer
@@ -367,7 +367,7 @@ function ShellNotifications() {
                       "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
                       selectedSent.status === "sent"
                         ? "bg-[#25D366]/15 text-[#1B7F45]"
-                        : "bg-[#F6D8D8] text-[#9A2F2F]",
+                        : "bg-alert-pale text-alert-dk",
                     )}
                   >
                     {selectedSent.status === "sent" ? (
@@ -383,14 +383,14 @@ function ShellNotifications() {
                     "rounded-2xl border-l-[3px] px-4 py-3 text-sm leading-relaxed text-foreground",
                     selectedSent.status === "sent"
                       ? "border-l-[#25D366] bg-[#25D366]/[0.05]"
-                      : "border-l-[#E25C5C] bg-[#E25C5C]/[0.05]",
+                      : "border-l-alert bg-alert/[0.05]",
                   )}
                 >
                   {selectedSent.content}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {selectedSent.status === "failed" ? (
-                    <p className="text-xs font-medium text-[#9A2F2F]">
+                    <p className="text-xs font-medium text-alert-dk">
                       Le message n'est pas parti.
                     </p>
                   ) : (
@@ -399,7 +399,7 @@ function ShellNotifications() {
                       onClick={() => setOpen(false)}
                       className={cn(
                         actionClass,
-                        "border border-[#28396C]/15 text-foreground hover:bg-muted",
+                        "border border-brand/15 text-foreground hover:bg-muted",
                       )}
                     >
                       <ExternalLink className="h-3.5 w-3.5" /> Voir la fiche
@@ -414,7 +414,7 @@ function ShellNotifications() {
                     }}
                     className={cn(
                       actionClass,
-                      "border border-[#E25C5C]/30 text-[#E25C5C] hover:bg-[#E25C5C]/10",
+                      "border border-alert/30 text-alert hover:bg-alert/10",
                     )}
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Supprimer
@@ -424,7 +424,7 @@ function ShellNotifications() {
             ) : null}
 
             {!selected && tab === "alertes" ? (
-              <ul className="divide-y divide-[#28396C]/8">
+              <ul className="divide-y divide-brand/8">
                 {received.map((m) => (
                   <li key={m.id} className="group relative">
                     <button
@@ -435,7 +435,7 @@ function ShellNotifications() {
                       className={cn(rowClass, "pr-12")}
                     >
                       <span
-                        className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#6BA53A]"
+                        className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand"
                         aria-hidden
                       />
                       <span className="min-w-0 flex-1">
@@ -459,7 +459,7 @@ function ShellNotifications() {
                         e.stopPropagation();
                         deleteMsgMutation.mutate(m.id);
                       }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-[#E25C5C]/10 hover:text-[#E25C5C] transition-all"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-alert/10 hover:text-alert transition-all"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -474,7 +474,7 @@ function ShellNotifications() {
             ) : null}
 
             {!selected && tab === "whatsapp" ? (
-              <ul className="divide-y divide-[#28396C]/8">
+              <ul className="divide-y divide-brand/8">
                 {sent.map((m) => (
                   <li key={m.id} className="group relative">
                     <button
@@ -485,7 +485,7 @@ function ShellNotifications() {
                         "flex-col border-l-[3px] pr-12",
                         m.status === "sent"
                           ? "border-l-[#25D366] bg-[#25D366]/[0.05]"
-                          : "border-l-[#E25C5C] bg-[#E25C5C]/[0.05]",
+                          : "border-l-alert bg-alert/[0.05]",
                       )}
                     >
                       <span className="flex w-full items-baseline justify-between gap-2">
@@ -508,7 +508,7 @@ function ShellNotifications() {
                             "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
                             m.status === "sent"
                               ? "bg-[#25D366]/15 text-[#1B7F45]"
-                              : "bg-[#F6D8D8] text-[#9A2F2F]",
+                              : "bg-alert-pale text-alert-dk",
                           )}
                         >
                           {m.status === "sent" ? (
@@ -526,7 +526,7 @@ function ShellNotifications() {
                         e.stopPropagation();
                         deleteMsgMutation.mutate(m.id);
                       }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-[#E25C5C]/10 hover:text-[#E25C5C] transition-all"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-alert/10 hover:text-alert transition-all"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -658,8 +658,8 @@ function SendMessageModal({
                     className={cn(
                       "rounded-full px-4 py-2 text-xs font-semibold transition",
                       mode === opt.value
-                        ? "bg-[#28396C] text-white"
-                        : "border border-[#28396C]/15 text-foreground hover:bg-muted",
+                        ? "bg-brand text-white"
+                        : "border border-brand/15 text-foreground hover:bg-muted",
                     )}
                   >
                     {opt.label}
@@ -676,11 +676,11 @@ function SendMessageModal({
                 <Select value={selectedId} onValueChange={setSelectedId}>
                   <SelectTrigger
                     id="msg-client"
-                    className="rounded-xl border-[#28396C]/15"
+                    className="rounded-xl border-brand/15"
                   >
                     <SelectValue placeholder="Sélectionner un parent..." />
                   </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-[#28396C]/10">
+                  <SelectContent className="rounded-2xl border-brand/12">
                     {typedClients.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.parent_name} {c.phone}
@@ -709,8 +709,8 @@ function SendMessageModal({
                     className={cn(
                       "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition",
                       channel === opt.value
-                        ? "bg-[#28396C] text-white"
-                        : "border border-[#28396C]/15 text-foreground hover:bg-muted",
+                        ? "bg-brand text-white"
+                        : "border border-brand/15 text-foreground hover:bg-muted",
                     )}
                   >
                     <opt.icon className="h-3.5 w-3.5" /> {opt.label}
@@ -741,14 +741,14 @@ function SendMessageModal({
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="rounded-full border border-[#28396C]/15 bg-card px-5 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                className="rounded-full border border-brand/15 bg-card px-5 py-2 text-sm font-medium text-foreground hover:bg-muted"
               >
                 {t.common.cancel}
               </button>
               <button
                 type="submit"
                 disabled={!valid || sendMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-full bg-[#B5E18B] px-5 py-2 text-sm font-bold text-[#28396C] shadow-[0_14px_30px_-14px_rgba(107,165,58,0.7)] transition hover:brightness-105 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-bold text-foreground shadow-[0_14px_30px_-14px_rgba(107,165,58,0.7)] transition hover:brightness-105 disabled:opacity-50"
               >
                 <Send className="h-4 w-4" />
                 {sendMutation.isPending ? "Envoi..." : "Envoyer"}
@@ -761,34 +761,61 @@ function SendMessageModal({
   );
 }
 
+/**
+ * Interface picker. Roles are a UI state only (no real auth), so switching is
+ * instant and needs no re-login. Navigating home avoids being stranded on a
+ * page the newly-selected role cannot reach.
+ */
+function RoleSwitcher({ compact }: { compact?: boolean }) {
+  const { role, setRole } = useAuth();
+  const navigate = useNavigate();
+
+  if (!role) return null;
+
+  return (
+    <Select
+      value={role}
+      onValueChange={(next) => {
+        setRole(next as (typeof ROLES)[number]);
+        navigate({ to: "/dashboard" });
+      }}
+    >
+      <SelectTrigger
+        aria-label="Changer de profil"
+        className={cn(
+          "h-9 gap-1.5 rounded-full border-brand/20 bg-card text-xs font-medium shadow-none focus:ring-0 focus:ring-offset-0",
+          compact ? "w-[3.25rem] px-2" : "w-auto min-w-[9.5rem] px-3",
+        )}
+      >
+        {compact ? (
+          <UserCog className="h-4 w-4 shrink-0 text-brand" />
+        ) : (
+          <span className="flex min-w-0 items-center gap-1.5">
+            <UserCog className="h-4 w-4 shrink-0 text-brand" />
+            <span className="truncate">{ROLE_META[role].short}</span>
+          </span>
+        )}
+      </SelectTrigger>
+      <SelectContent className="rounded-2xl border-brand/15">
+        {ROLES.map((r) => (
+          <SelectItem key={r} value={r} className="text-xs">
+            {ROLE_META[r].label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/**
+ * Is this nav destination the active one?
+ *
+ * `/dashboard` is the index and must match exactly, otherwise it would light up
+ * on every child route. Everything else matches itself plus its subtree.
+ */
 function topNavItemActive(pathname: string, to: string) {
   if (to === "/dashboard")
     return pathname === "/dashboard" || pathname === "/dashboard/";
-  if (to === "/dashboard/rendez-vous")
-    return (
-      pathname === "/dashboard/rendez-vous" ||
-      pathname.startsWith("/dashboard/rendez-vous/")
-    );
-  if (to === "/dashboard/familles")
-    return (
-      pathname === "/dashboard/familles" ||
-      pathname.startsWith("/dashboard/familles/")
-    );
-  if (to === "/dashboard/paiements")
-    return (
-      pathname === "/dashboard/paiements" ||
-      pathname.startsWith("/dashboard/paiements/")
-    );
-  if (to === "/dashboard/affiches")
-    return (
-      pathname === "/dashboard/affiches" ||
-      pathname.startsWith("/dashboard/affiches/")
-    );
-  if (to === "/dashboard/rapports")
-    return (
-      pathname === "/dashboard/rapports" ||
-      pathname.startsWith("/dashboard/rapports/")
-    );
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
@@ -809,7 +836,7 @@ function MobileBottomNav({
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#28396C]/10 bg-white/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-10px_35px_-15px_rgba(40,57,108,0.3)] backdrop-blur-xl lg:hidden"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-brand/12 bg-white/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-10px_35px_-15px_rgb(var(--istpm-shadow)/0.3)] backdrop-blur-xl lg:hidden"
       aria-label={mainNavAria}
     >
       <div
@@ -912,30 +939,34 @@ export function DashShell({
         className="flex h-dvh min-h-0 flex-col overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#F4FAE6_45%,#EEF6E0_100%)]"
         dir={shellDir}
       >
-        <header className="z-30 shrink-0 border-b border-[#28396C]/10 bg-white/85 backdrop-blur-xl">
+        <header className="z-30 shrink-0 border-b border-brand/12 bg-white/85 backdrop-blur-xl">
           {/* Mobile: compact top bar (tabs live in bottom nav) */}
           <div className="flex items-center justify-between gap-3 px-4 lg:hidden">
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <Link
                 to={topNav[0]?.to ?? "/dashboard"}
-                className="flex min-w-0 items-center"
+                className="flex min-w-0 items-center gap-2"
               >
                 <img
-                  src="/edu-logo.png"
+                  src="/istpm-logo-mark.svg"
                   alt={`${brand} logo`}
-                  className="h-15 w-15"
+                  className="h-10 w-10 shrink-0"
                 />
+                <span className="min-w-0 truncate font-display text-sm font-bold tracking-tight text-foreground">
+                  {brand}
+                </span>
               </Link>
             </div>
             <div className="flex shrink-0 items-center gap-2 pt-0.5">
               {hideNotifications ? null : <ShellNotifications />}
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-[#28396C] text-sm font-medium text-[#B5E18B] shadow-[0_10px_20px_-10px_rgba(40,57,108,0.5)]">
+              <RoleSwitcher compact />
+              <div className="grid h-9 w-9 place-items-center rounded-full bg-brand text-sm font-medium text-white shadow-[0_10px_20px_-10px_rgb(var(--istpm-shadow)/0.5)]">
                 {(user?.name || user?.email || "A")!.slice(0, 1).toUpperCase()}
               </div>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#28396C]/15 text-muted-foreground transition-colors hover:bg-[#B5E18B]/15 hover:text-foreground"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-brand/15 text-muted-foreground transition-colors hover:bg-brand/10 hover:text-foreground"
                 aria-label={t.shell.logoutAria}
               >
                 <LogOut className="h-4 w-4" strokeWidth={1.75} />
@@ -948,17 +979,25 @@ export function DashShell({
             <div className="flex min-w-0 flex-col justify-center justify-self-start gap-1.5">
               <Link
                 to={topNav[0]?.to ?? "/dashboard"}
-                className="flex items-center"
+                className="flex items-center gap-2.5"
               >
                 <img
-                  src="/edu-logo.png"
+                  src="/istpm-logo-mark.svg"
                   alt={`${brand} logo`}
-                  className="h-15 w-15"
+                  className="h-11 w-11 shrink-0"
                 />
+                <span className="min-w-0">
+                  <span className="block truncate font-display text-base font-bold leading-tight tracking-tight text-foreground">
+                    {brand}
+                  </span>
+                  <span className="block truncate text-[10px] leading-tight text-muted-foreground">
+                    Techniques paramédicales
+                  </span>
+                </span>
               </Link>
             </div>
 
-            <nav className="scroll-touch flex justify-center gap-1 overflow-x-auto rounded-full border border-[#28396C]/10 bg-white/80 p-1 shadow-sm lg:py-1">
+            <nav className="scroll-touch flex justify-center gap-1 overflow-x-auto rounded-full border border-brand/12 bg-white/80 p-1 shadow-sm lg:py-1">
               {topNav.map((n) => {
                 const active = topNavItemActive(loc.pathname, n.to);
                 return (
@@ -968,8 +1007,8 @@ export function DashShell({
                     className={
                       "flex items-center gap-2 rounded-full px-4 py-2 text-sm whitespace-nowrap transition-colors " +
                       (active
-                        ? "bg-[#28396C] font-medium text-white shadow-[0_12px_25px_-12px_rgba(40,57,108,0.6)]"
-                        : "text-muted-foreground hover:bg-[#B5E18B]/20 hover:text-foreground")
+                        ? "bg-brand font-medium text-white shadow-[0_12px_25px_-12px_rgb(var(--istpm-shadow)/0.6)]"
+                        : "text-muted-foreground hover:bg-brand/10 hover:text-foreground")
                     }
                   >
                     <n.icon className="h-4 w-4 shrink-0 opacity-80" />
@@ -981,13 +1020,19 @@ export function DashShell({
 
             <div className="flex w-full flex-wrap items-center justify-end gap-2 justify-self-end lg:w-auto">
               {hideNotifications ? null : <ShellNotifications />}
+              <RoleSwitcher />
               <div className="flex items-center gap-2">
                 <div className="hidden text-right sm:block">
                   <p className="text-sm font-medium leading-none text-foreground">
                     {user?.name || user?.email || "admin"}
                   </p>
+                  {user ? (
+                    <p className="mt-0.5 text-[11px] leading-none text-muted-foreground">
+                      {ROLE_META[user.role].label}
+                    </p>
+                  ) : null}
                 </div>
-                <div className="grid h-9 w-9 place-items-center rounded-full bg-[#28396C] text-sm font-medium text-[#B5E18B] shadow-[0_10px_20px_-10px_rgba(40,57,108,0.5)]">
+                <div className="grid h-9 w-9 place-items-center rounded-full bg-brand text-sm font-medium text-white shadow-[0_10px_20px_-10px_rgb(var(--istpm-shadow)/0.5)]">
                   {(user?.name || user?.email || "A")!
                     .slice(0, 1)
                     .toUpperCase()}
@@ -996,7 +1041,7 @@ export function DashShell({
               <button
                 type="button"
                 onClick={handleLogout}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#28396C]/15 px-3 py-1.5 text-muted-foreground hover:bg-[#B5E18B]/15"
+                className="inline-flex items-center gap-1.5 rounded-full border border-brand/15 px-3 py-1.5 text-muted-foreground hover:bg-brand/10"
                 aria-label={t.shell.logoutAria}
               >
                 <LogOut className="h-3.5 w-3.5 shrink-0" />
@@ -1053,9 +1098,14 @@ export function DashShell({
     <div className="flex h-dvh min-h-0 overflow-hidden bg-muted">
       <aside className="hidden h-full min-h-0 w-64 shrink-0 flex-col border-r border-border bg-card lg:flex">
         <div className="px-6 py-5 border-b border-border space-y-3">
-          <div>
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#28396C] shadow-[0_8px_20px_-10px_rgba(40,57,108,0.5)]">
-              <GraduationCap className="h-[20px] w-[20px] text-[#B5E18B]" />
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/istpm-logo-mark.svg"
+              alt={`${brand} logo`}
+              className="h-10 w-10 shrink-0"
+            />
+            <span className="min-w-0 truncate font-display text-sm font-bold tracking-tight text-foreground">
+              {brand}
             </span>
           </div>
         </div>
@@ -1132,7 +1182,7 @@ export function StatCard({
   icon?: any;
 }) {
   return (
-    <div className="rounded-2xl bg-card border border-[#28396C]/10 p-5 shadow-[0_18px_45px_-28px_rgba(40,57,108,0.35)]">
+    <div className="rounded-2xl bg-card border border-brand/12 p-5 shadow-[0_18px_45px_-28px_rgb(var(--istpm-shadow)/0.35)]">
       <div className="flex items-center justify-between">
         <p className="text-xs uppercase tracking-widest text-muted-foreground">
           {label}

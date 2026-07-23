@@ -1,34 +1,39 @@
 /**
- * Shared dashboard UI tokens   soft, rounded, professional look (BANKOT-inspired)
- * expressed in the EIDEN palette (brass #B5E18B · beige #EAE6BC · navy #28396C).
+ * Shared dashboard UI tokens   soft, rounded, professional look
+ * expressed in the ISTPM palette (teal #029994 · red #e51e26 · white #ffffff).
  *
  * Import these instead of re-declaring per-page magic strings so every dashboard
  * page shares one consistent surface / input / badge language.
+ *
+ * Colours here are expressed as Tailwind theme utilities (`brand`, `alert`,
+ * `warn`, `info`, registered in `styles.css` under `@theme inline`) rather than
+ * hex literals, so a future palette change is a one-file edit.
  */
+import type { BadgeTone } from "./istpm-data";
 
-/** Primary surface   rounded card with hairline navy border + soft elevated shadow. */
+/** Primary surface   rounded card with hairline teal border + soft elevated shadow. */
 export const softCard =
-  "rounded-3xl border border-[#28396C]/10 bg-card shadow-[0_18px_45px_-28px_rgba(40,57,108,0.35)]";
+  "rounded-3xl border border-brand/12 bg-card shadow-[0_18px_45px_-28px_rgb(var(--istpm-shadow)/0.35)]";
 
 /** Interactive surface   same as softCard but lifts on hover (for clickable cards). */
 export const softCardHover =
-  "rounded-3xl border border-[#28396C]/10 bg-card shadow-[0_18px_45px_-28px_rgba(40,57,108,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_28px_60px_-28px_rgba(40,57,108,0.45)]";
+  "rounded-3xl border border-brand/12 bg-card shadow-[0_18px_45px_-28px_rgb(var(--istpm-shadow)/0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_28px_60px_-28px_rgb(var(--istpm-shadow)/0.45)]";
 
 /**
- * Text input   rounded, brass focus ring.
+ * Text input   rounded, teal focus ring.
  * Carries its own `border` width and `w-full`: Tailwind's preflight resets every
  * element to `border: 0 solid`, so a bare `<input>` styled only with a border
  * *colour* renders with no visible box.
  */
 export const softInput =
-  "w-full min-w-0 rounded-xl border border-[#28396C]/15 bg-card shadow-none focus-visible:border-[#6BA53A] focus-visible:ring-2 focus-visible:ring-[#B5E18B]/40";
+  "w-full min-w-0 rounded-xl border border-brand/20 bg-card shadow-none focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/30";
 
 /** Select trigger   matches softInput height/rounding. */
 export const softSelectTrigger =
-  "h-10 rounded-xl border-[#28396C]/15 bg-card shadow-none focus:ring-0 focus:ring-offset-0 data-[placeholder]:text-muted-foreground/70";
+  "h-10 rounded-xl border-brand/20 bg-card shadow-none focus:ring-0 focus:ring-offset-0 data-[placeholder]:text-muted-foreground/70";
 
 /** Select dropdown surface. */
-export const softSelectContent = "rounded-2xl border-[#28396C]/10";
+export const softSelectContent = "rounded-2xl border-brand/15";
 
 /** Small uppercase field label. */
 export const labelClass =
@@ -38,21 +43,29 @@ export const labelClass =
 export const eyebrowClass =
   "text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground";
 
-/** Primary pill button (brass fill, navy text). */
+/** Primary pill button (solid teal, white text). */
 export const primaryPill =
-  "inline-flex items-center gap-2 rounded-full bg-[#B5E18B] px-5 py-2.5 text-sm font-bold text-[#28396C] shadow-[0_14px_30px_-14px_rgba(107,165,58,0.7)] transition hover:brightness-105";
+  "inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_-14px_rgb(var(--istpm-shadow)/0.8)] transition hover:bg-brand-dk";
 
-/** Solid navy pill button. */
+/** Solid dark-teal pill button (secondary emphasis). */
 export const navyPill =
-  "inline-flex items-center gap-2 rounded-full bg-[#28396C] px-5 py-2.5 text-sm font-medium text-white shadow-[0_14px_30px_-14px_rgba(40,57,108,0.6)] transition hover:bg-[#1B2A55]";
+  "inline-flex items-center gap-2 rounded-full bg-brand-dk px-5 py-2.5 text-sm font-medium text-white shadow-[0_14px_30px_-14px_rgb(var(--istpm-shadow)/0.6)] transition hover:bg-brand-md";
+
+/** Destructive pill button   red, reserved for irreversible actions. */
+export const dangerPill =
+  "inline-flex items-center gap-2 rounded-full bg-alert px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_-14px_rgba(229,30,38,0.7)] transition hover:bg-alert-dk";
 
 /** Ghost / secondary pill button. */
 export const ghostPill =
-  "inline-flex items-center gap-2 rounded-full border border-[#28396C]/15 bg-card px-5 py-2.5 text-sm font-medium text-foreground transition hover:bg-[#B5E18B]/15";
+  "inline-flex items-center gap-2 rounded-full border border-brand/20 bg-card px-5 py-2.5 text-sm font-medium text-foreground transition hover:bg-brand/10";
 
 /** Small square icon-action button (view / edit inside tables). */
 export const iconButton =
-  "grid h-9 w-9 place-items-center rounded-xl border border-[#28396C]/15 bg-card text-muted-foreground transition hover:bg-[#B5E18B]/15 hover:text-foreground";
+  "grid h-9 w-9 place-items-center rounded-xl border border-brand/20 bg-card text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk";
+
+/** Destructive variant of iconButton. */
+export const iconButtonDanger =
+  "grid h-9 w-9 place-items-center rounded-xl border border-alert/25 bg-card text-alert transition hover:bg-alert/10 hover:text-alert-dk";
 
 /**
  * Dialog surface   soft, rounded, elevated.
@@ -61,38 +74,93 @@ export const iconButton =
  * max-height: a `vh` body ignores this cap and pushes the footer out of the clipped box.
  */
 export const dialogSurface =
-  "flex flex-col gap-0 overflow-hidden rounded-3xl border border-[#28396C]/10 bg-card p-0 shadow-[0_35px_80px_-40px_rgba(40,57,108,0.5)] sm:rounded-3xl " +
+  "flex flex-col gap-0 overflow-hidden rounded-3xl border border-brand/15 bg-card p-0 shadow-[0_35px_80px_-40px_rgb(var(--istpm-shadow)/0.5)] sm:rounded-3xl " +
   "max-h-[min(90vh,720px)] w-[min(100vw-1.5rem,560px)] max-w-[min(100vw-1.5rem,560px)] " +
-  "[&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-[#28396C]/15 [&>button]:bg-card [&>button]:opacity-100 [&>button]:hover:bg-muted [&>button]:focus:ring-0 [&>button]:focus:ring-offset-0";
+  "[&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-brand/20 [&>button]:bg-card [&>button]:opacity-100 [&>button]:hover:bg-muted [&>button]:focus:ring-0 [&>button]:focus:ring-offset-0";
+
+/**
+ * Wider dialog for detail sheets with tables inside.
+ * Spelled out rather than derived from `dialogSurface` by string replacement:
+ * Tailwind v4 scans source text statically, so a class only produced at runtime
+ * never makes it into the generated stylesheet.
+ */
+export const dialogSurfaceWide =
+  "flex flex-col gap-0 overflow-hidden rounded-3xl border border-brand/15 bg-card p-0 shadow-[0_35px_80px_-40px_rgb(var(--istpm-shadow)/0.5)] sm:rounded-3xl " +
+  "max-h-[min(90vh,720px)] w-[min(100vw-1.5rem,760px)] max-w-[min(100vw-1.5rem,760px)] " +
+  "[&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-brand/20 [&>button]:bg-card [&>button]:opacity-100 [&>button]:hover:bg-muted [&>button]:focus:ring-0 [&>button]:focus:ring-offset-0";
 
 /** Recharts tooltip content style   matches the soft card language. */
 export const dashTooltip = {
   background: "var(--card)",
-  border: "1px solid rgba(40,57,108,0.15)",
+  border: "1px solid rgb(var(--istpm-shadow) / 0.2)",
   borderRadius: 12,
   color: "var(--foreground)",
 } as const;
 
-/** Status colours   payé / en attente / retard / impaye (shared across pages). */
+/** Ordered chart palette   teal family first, red last so it stays meaningful. */
+export const CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+] as const;
+
+/**
+ * Solid colours per semantic tone   for row accent bars, chart cells and dots
+ * where a class name will not do.
+ */
+export const TONE_COLORS: Record<BadgeTone, string> = {
+  teal: "var(--istpm-teal)",
+  red: "var(--istpm-red)",
+  amber: "var(--istpm-amber)",
+  blue: "var(--istpm-blue)",
+  neutral: "var(--istpm-teal-lt)",
+};
+
+/** Status colours   payé / en attente / retard / impayé (shared across pages). */
 export const STATUS_COLORS = {
-  paye: "#6BA53A",
-  en_attente: "#E8A13C",
-  retard: "#E25C5C",
-  impaye: "#9A2F2F",
+  paye: "var(--istpm-teal)",
+  en_attente: "var(--istpm-amber)",
+  retard: "var(--istpm-red)",
+  impaye: "var(--istpm-red-dk)",
 } as const;
 
-/** Rounded status pill with a soft tinted background. */
+/**
+ * Rounded status badge keyed to the `BadgeTone` union exported by `istpm-data`.
+ *
+ * teal   = positive   payé · admis · validé · inscrit · publié
+ * red    = negative   impayé · retard · ajourné · abandon · à risque
+ * amber  = pending    en attente · rattrapage
+ * blue   = in-flight  en cours · convention signée
+ */
+export function toneBadge(tone: BadgeTone) {
+  const map: Record<BadgeTone, string> = {
+    teal: "bg-brand/15 text-brand-dk",
+    red: "bg-alert/12 text-alert-dk",
+    amber: "bg-warn-pale text-warn",
+    blue: "bg-info-pale text-info",
+    neutral: "bg-muted text-foreground/80",
+  };
+  return `inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${map[tone]}`;
+}
+
+/**
+ * Legacy payment-status pill. Kept so existing pages keep compiling; delegates
+ * to `toneBadge` so there is a single source of badge truth.
+ */
 export function statusPill(
   tone: "paye" | "en_attente" | "retard" | "impaye" | "neutral",
 ) {
-  const map = {
-    paye: "bg-[#B5E18B]/30 text-[#3E6420]",
-    en_attente: "bg-[#F4E3C0] text-[#8A5A16]",
-    retard: "bg-[#F6D8D8] text-[#9A2F2F]",
-    impaye: "bg-[#E25C5C]/20 text-[#9A2F2F]",
-    neutral: "bg-muted text-foreground/80",
-  } as const;
-  return `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${map[tone]}`;
+  const toTone: Record<typeof tone, BadgeTone> = {
+    paye: "teal",
+    en_attente: "amber",
+    retard: "red",
+    impaye: "red",
+    neutral: "neutral",
+  };
+  return toneBadge(toTone[tone]);
 }
 
 /**
@@ -141,3 +209,16 @@ export function initials(name: string) {
   const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
   return (first + last).toUpperCase();
 }
+
+/** Teal avatar chip used in name cells across the student/teacher tables. */
+export const avatarChip =
+  "grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand/15 text-[11px] font-bold text-brand-dk";
+
+/** Shared table shell classes   used by every list page. */
+export const tableWrap = "overflow-x-auto";
+export const tableEl =
+  "w-full min-w-[900px] text-left text-sm [&_th]:border-r [&_th]:border-brand/12 [&_td]:border-r [&_td]:border-brand/8";
+export const tableHead =
+  "border-b border-brand/15 bg-muted text-[11px] font-semibold uppercase tracking-wider text-muted-foreground";
+export const tableBody = "divide-y divide-brand/8";
+export const tableRow = "cursor-pointer transition-colors hover:bg-brand/8";

@@ -45,9 +45,12 @@ async function request<T>(
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
+  // This build is frontend-only and has no real authentication, so a 401 can
+  // only come from one of the orphaned legacy routes. Surface it as a normal
+  // error instead of hard-redirecting to /login, which would eject the user
+  // out of a perfectly valid session.
   if (res.status === 401) {
     clearToken();
-    window.location.href = "/login";
     throw new Error("Non authentifié");
   }
 

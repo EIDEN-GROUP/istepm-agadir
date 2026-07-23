@@ -70,7 +70,7 @@ function DashboardPlanifications() {
       </header>
 
       <section className={cn(softCard, "overflow-hidden")}>
-        <div className="divide-y divide-[#28396C]/8">
+        <div className="divide-y divide-brand/8">
           {plans.map((p) => (
             <div
               key={p.id}
@@ -102,7 +102,7 @@ function DashboardPlanifications() {
                 onClick={() => {
                   if (confirm("Supprimer ?")) deleteMutation.mutate(p.id);
                 }}
-                className={cn(iconButton, "text-[#E25C5C] shrink-0")}
+                className={cn(iconButton, "text-alert shrink-0")}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -152,7 +152,7 @@ function DashboardPlanifications() {
             </div>
             <button
               onClick={() => createMutation.mutate()}
-              className="w-full rounded-full bg-[#6BA53A] py-2.5 text-sm font-semibold text-white hover:bg-[#5a9232]"
+              className="w-full rounded-full bg-brand py-2.5 text-sm font-semibold text-white hover:bg-[#5a9232]"
             >
               Créer
             </button>

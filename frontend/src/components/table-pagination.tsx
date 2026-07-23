@@ -37,7 +37,7 @@ export function usePagination<T>(
 }
 
 const pagerButton =
-  "grid h-8 w-8 place-items-center rounded-full border border-[#28396C]/15 bg-card text-foreground transition hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
+  "grid h-8 w-8 place-items-center rounded-full border border-brand/15 bg-card text-foreground transition hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
 
 /** Pied de tableau : « 1–5 sur 23 familles » + précédent / suivant. */
 export function TablePagination({
@@ -64,7 +64,7 @@ export function TablePagination({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-between gap-3 border-t border-[#28396C]/10 px-5 py-3",
+        "flex flex-wrap items-center justify-between gap-3 border-t border-brand/12 px-5 py-3",
         className,
       )}
     >

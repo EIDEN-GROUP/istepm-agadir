@@ -1,11 +1,12 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
-import { DashShell } from "@/components/dash-shell";
+import { DashSidebarShell } from "@/components/dash-sidebar";
 import { useDashboardI18n, useDashboardNav } from "@/lib/dashboard-i18n";
+import { getStoredRole, useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/dashboard")({
+  // UI-only gate: no token, no network   just "has a role been picked yet?".
   beforeLoad: ({ location }) => {
-    const token = localStorage.getItem("school_crm_token");
-    if (!token) {
+    if (!getStoredRole()) {
       throw redirect({ to: "/login", search: { redirect: location.href } });
     }
   },
@@ -14,17 +15,12 @@ export const Route = createFileRoute("/dashboard")({
 
 function DashboardLayout() {
   const { dir } = useDashboardI18n();
-  const { topNav, brand } = useDashboardNav();
+  const { role } = useAuth();
+  const { nav, brand } = useDashboardNav(role);
 
   return (
-    <DashShell
-      brand={brand}
-      brandColor="primary"
-      variant="topnav"
-      topNav={topNav}
-      dir={dir}
-    >
+    <DashSidebarShell brand={brand} nav={nav} dir={dir}>
       <Outlet />
-    </DashShell>
+    </DashSidebarShell>
   );
 }
