@@ -473,6 +473,7 @@ function MonthlyTracker({
           />
         </div>
       </div>
+    </div>
 
       {etudiant ? (
         <>
