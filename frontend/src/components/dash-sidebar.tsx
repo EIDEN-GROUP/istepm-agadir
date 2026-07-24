@@ -489,7 +489,7 @@ export function DashSidebarShell({
   }, [drawerOpen]);
 
   return (
-    <div dir={dir} className="flex h-dvh min-h-0 overflow-hidden bg-brand-wash">
+    <div dir={dir} className="app-canvas flex h-dvh min-h-0 overflow-hidden">
       {/* Rail permanent (lg+) */}
       <aside
         className={cn(

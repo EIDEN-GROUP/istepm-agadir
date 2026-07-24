@@ -40,6 +40,7 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
   --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
   /* ISTPM brand utilities   bg-brand, border-brand/15, text-alert, ... */
   --color-brand: var(--istpm-teal);
   --color-brand-dk: var(--istpm-teal-dk);
@@ -54,6 +55,12 @@
   --color-warn-pale: var(--istpm-amber-pale);
   --color-info: var(--istpm-blue);
   --color-info-pale: var(--istpm-blue-pale);
+  /* Secondary accent   refined indigo/violet ("technology · innovation"),
+     used sparingly next to the teal brand for highlights and charts. */
+  --color-accent2: var(--istpm-violet);
+  --color-accent2-dk: var(--istpm-violet-dk);
+  --color-accent2-lt: var(--istpm-violet-lt);
+  --color-accent2-pale: var(--istpm-violet-pale);
   --color-ink: var(--istpm-ink);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -93,11 +100,24 @@
   --istpm-blue: #2f6fb0;
   --istpm-blue-pale: #dfeaf6;
 
+  /* Secondary accent   Stripe-style indigo/violet. Reserved for accents,
+     never a second brand: teal stays dominant. */
+  --istpm-violet: #635bff;
+  --istpm-violet-dk: #4b45d6;
+  --istpm-violet-lt: #8f8bff;
+  --istpm-violet-pale: #ececff;
+
   --istpm-ink: #123b3a;
   --istpm-white: #ffffff;
 
-  /* Teal-tinted rgba used by the soft-card shadow language. */
-  --istpm-shadow: 2, 153, 148;
+  /* Teal channels (space-separated for `rgb(... / a)` alpha syntax) used by the
+     soft-card shadow language. NB: must stay space-separated   the older
+     comma form `2, 153, 148` makes every `rgb(var(--istpm-shadow) / a)` shadow
+     invalid, so they silently render as `none`. */
+  --istpm-shadow: 2 153 148;
+  /* Neutral ink channels (space-separated for `rgb(... / a)` alpha syntax)
+     for crisp, colour-neutral elevation on white. */
+  --istpm-ink-rgb: 18 59 58;
 
   /* Legacy --eiden-* names kept as aliases: the landing-page utility
    * classes further down still reference them. Re-pointed at the ISTPM
@@ -166,8 +186,9 @@
   --chart-2: var(--istpm-teal-lt);
   --chart-3: var(--istpm-teal-dk);
   --chart-4: var(--istpm-blue);
-  --chart-5: var(--istpm-amber);
-  --chart-6: var(--istpm-red);
+  --chart-5: var(--istpm-violet);
+  --chart-6: var(--istpm-amber);
+  --chart-7: var(--istpm-red);
 
   --sidebar: var(--istpm-white);
   --sidebar-foreground: var(--istpm-ink);
@@ -184,6 +205,27 @@
   --gradient-hero: linear-gradient(135deg, var(--istpm-teal-dk) 0%, var(--istpm-teal) 55%, var(--istpm-teal-lt) 100%);
   --shadow-elegant: 0 20px 60px -20px rgb(var(--istpm-shadow) / 0.34);
   --shadow-soft: 0 8px 30px -10px rgb(var(--istpm-shadow) / 0.22);
+
+  /* ------------------------------------------------------------------
+   * Refined elevation ladder   layered, colour-neutral shadows in the
+   * spirit of Linear / Stripe. Each step stacks a tight contact shadow
+   * with a soft ambient one plus a hairline top highlight, so surfaces
+   * read as physically lifted rather than blurred.
+   * ------------------------------------------------------------------ */
+  --elevation-1:
+    0 1px 2px -1px rgb(var(--istpm-ink-rgb) / 0.16),
+    0 2px 6px -1px rgb(var(--istpm-ink-rgb) / 0.10);
+  --elevation-2:
+    0 2px 6px -2px rgb(var(--istpm-ink-rgb) / 0.14),
+    0 12px 28px -8px rgb(var(--istpm-ink-rgb) / 0.18);
+  --elevation-3:
+    0 8px 18px -6px rgb(var(--istpm-ink-rgb) / 0.18),
+    0 24px 48px -14px rgb(var(--istpm-ink-rgb) / 0.24);
+  --elevation-4:
+    0 14px 28px -10px rgb(var(--istpm-ink-rgb) / 0.20),
+    0 40px 72px -24px rgb(var(--istpm-ink-rgb) / 0.34);
+  /* Highlight applied inset at a card's top edge for a "lit from above" feel. */
+  --edge-highlight: inset 0 1px 0 rgb(255 255 255 / 0.7);
 }
 
 .dark {
@@ -224,7 +266,15 @@
   --chart-2: var(--eiden-brass);
   --chart-3: var(--eiden-canvas);
   --chart-4: var(--eiden-mint);
-  --chart-5: var(--eiden-blue);
+  --chart-5: var(--istpm-violet-lt);
+  --chart-6: var(--eiden-blue);
+  --chart-7: var(--eiden-red);
+
+  /* Secondary accent reads lighter on dark surfaces to keep contrast. */
+  --istpm-violet: #8f8bff;
+  --istpm-violet-dk: #635bff;
+  --istpm-violet-lt: #b3b0ff;
+  --istpm-violet-pale: color-mix(in srgb, #8f8bff 22%, transparent);
 
   --scrollbar-thumb: color-mix(in srgb, var(--eiden-gold) 42%, transparent);
   --scrollbar-thumb-hover: color-mix(in srgb, var(--eiden-brass) 52%, transparent);
@@ -232,6 +282,13 @@
   --gradient-hero: linear-gradient(135deg, var(--eiden-ink) 0%, var(--eiden-deep) 45%, color-mix(in srgb, var(--eiden-brass) 40%, var(--eiden-forest) 60%) 100%);
   --shadow-elegant: 0 20px 60px -20px color-mix(in srgb, black 55%, transparent);
   --shadow-soft: 0 8px 30px -10px color-mix(in srgb, var(--eiden-brass) 28%, transparent);
+
+  /* Dark elevation leans on black ambient + a faint light top edge. */
+  --elevation-1: 0 1px 2px -1px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.4);
+  --elevation-2: 0 2px 4px -2px rgb(0 0 0 / 0.5), 0 6px 16px -6px rgb(0 0 0 / 0.45);
+  --elevation-3: 0 4px 8px -4px rgb(0 0 0 / 0.5), 0 16px 32px -12px rgb(0 0 0 / 0.55);
+  --elevation-4: 0 8px 16px -8px rgb(0 0 0 / 0.55), 0 28px 56px -20px rgb(0 0 0 / 0.6);
+  --edge-highlight: inset 0 1px 0 rgb(255 255 255 / 0.06);
 }
 
 @layer base {
@@ -308,6 +365,79 @@
   .gradient-primary {
     background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 55%, var(--background)) 100%);
   }
+
+  /* ------------------------------------------------------------------
+   * Premium surface system   layered elevation + a lit top edge.
+   * `surface-2` is the default card; `surface-3/4` for popovers/dialogs.
+   * `surface-interactive` adds a smooth lift on hover for clickable cards.
+   * ------------------------------------------------------------------ */
+  .surface-1 { box-shadow: var(--edge-highlight), var(--elevation-1); }
+  .surface-2 { box-shadow: var(--edge-highlight), var(--elevation-2); }
+  .surface-3 { box-shadow: var(--edge-highlight), var(--elevation-3); }
+  .surface-4 { box-shadow: var(--edge-highlight), var(--elevation-4); }
+  .surface-interactive {
+    box-shadow: var(--edge-highlight), var(--elevation-2);
+    transition:
+      transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 0.28s ease;
+  }
+  .surface-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--edge-highlight), var(--elevation-4);
+  }
+
+  /* App canvas   a soft teal→violet tinted backdrop so white cards clearly
+     lift off the page (replaces the near-white flat wash). */
+  .app-canvas {
+    background:
+      radial-gradient(1100px 520px at 100% -8%, color-mix(in srgb, var(--istpm-violet) 12%, transparent) 0%, transparent 58%),
+      radial-gradient(1000px 500px at -8% 0%, color-mix(in srgb, var(--istpm-teal) 14%, transparent) 0%, transparent 55%),
+      linear-gradient(180deg, color-mix(in srgb, var(--istpm-teal) 7%, var(--istpm-white)) 0%, color-mix(in srgb, var(--istpm-teal) 4%, var(--istpm-white)) 100%);
+  }
+  :is(.dark) .app-canvas {
+    background:
+      radial-gradient(1100px 520px at 100% -8%, color-mix(in srgb, var(--istpm-violet) 16%, transparent) 0%, transparent 58%),
+      radial-gradient(1000px 500px at -8% 0%, color-mix(in srgb, var(--eiden-brass) 12%, transparent) 0%, transparent 55%),
+      var(--background);
+  }
+
+  /* Frosted top bar / sticky headers over scrolling content. */
+  .glass-bar {
+    background: color-mix(in srgb, var(--card) 72%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.5);
+    backdrop-filter: blur(14px) saturate(1.5);
+  }
+
+  /* Subtle brand aura   a soft radial wash used behind hero KPIs / headers. */
+  .brand-aura {
+    background:
+      radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--istpm-teal) 10%, transparent) 0%, transparent 45%),
+      radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--istpm-violet) 9%, transparent) 0%, transparent 45%),
+      var(--card);
+  }
+
+  /* Loading skeleton   soft shimmer sweep. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--foreground) 8%, transparent);
+    border-radius: 0.75rem;
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      transparent
+    );
+    animation: skeleton-sweep 1.6s ease-in-out infinite;
+  }
+
   .text-balance { text-wrap: balance; }
   .scrollbar-none {
     -ms-overflow-style: none;
@@ -550,6 +680,12 @@ html[dir="rtl"] [data-dashboard-main] {
 /* ------------------------------------------------------------------ */
 /*  Animation utilities   smooth CRM transitions                        */
 /* ------------------------------------------------------------------ */
+
+@keyframes skeleton-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
 
 @keyframes fade-in-up {
   from {

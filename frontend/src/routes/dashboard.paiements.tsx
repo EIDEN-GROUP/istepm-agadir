@@ -362,9 +362,6 @@ function PaiementsPage() {
                       </span>
                     </span>
                     <span className="shrink-0 text-right">
-                      <span className="block text-sm font-semibold tabular-nums text-alert">
-                        {fmtMAD(e.resteAPayer)}
-                      </span>
                       <span
                         className={toneBadge(STATUT_PAIEMENT_TONE[e.paiement])}
                       >
@@ -479,14 +476,7 @@ function MonthlyTracker({
         <>
           <p className="mt-3 text-xs text-muted-foreground">
             <strong className="font-semibold text-foreground">{nbRegles}</strong>{" "}
-            mois payé(s) sur {months.length} · Reste dû&nbsp;:{" "}
-            <strong
-              className={
-                etudiant.resteAPayer > 0 ? "text-alert" : "text-brand-dk"
-              }
-            >
-              {fmtMAD(etudiant.resteAPayer)}
-            </strong>
+            mois payé(s) sur {months.length} · <strong className="font-semibold text-foreground">{fmtMAD(etudiant.fraisMensuels)}</strong>/mois
           </p>
           <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {months.map((m) => {
@@ -601,12 +591,6 @@ function PaiementForm({
       next.montant = "Montant supérieur à 0 requis";
     if (!f.periode.trim()) next.periode = "Période obligatoire";
     if (!f.date) next.date = "Date obligatoire";
-    if (
-      etudiant &&
-      f.montant !== "" &&
-      Number(f.montant) > etudiant.resteAPayer
-    )
-      next.montant = `Dépasse le solde dû (${fmtMAD(etudiant.resteAPayer)})`;
 
     if (Object.keys(next).length || !etudiant) {
       setErrors(next);
@@ -655,15 +639,10 @@ function PaiementForm({
       {etudiant ? (
         <FullWidth>
           <div className="rounded-2xl bg-muted px-4 py-3 text-xs text-muted-foreground">
-            Solde restant dû&nbsp;:{" "}
-            <strong
-              className={
-                etudiant.resteAPayer > 0 ? "text-alert" : "text-brand-dk"
-              }
-            >
-              {fmtMAD(etudiant.resteAPayer)}
-            </strong>{" "}
-            sur {fmtMAD(etudiant.fraisAnnuels)}
+            Frais mensuels&nbsp;:{" "}
+            <strong className="text-brand-dk">
+              {fmtMAD(etudiant.fraisMensuels)}
+            </strong>
           </div>
         </FullWidth>
       ) : null}

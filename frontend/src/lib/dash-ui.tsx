@@ -11,13 +11,13 @@
  */
 import type { BadgeTone } from "./istpm-data";
 
-/** Primary surface   rounded card with hairline teal border + soft elevated shadow. */
+/** Primary surface   rounded card with a hairline border + layered, lit elevation. */
 export const softCard =
-  "rounded-3xl border border-brand/12 bg-card shadow-[0_18px_45px_-28px_rgb(var(--istpm-shadow)/0.35)]";
+  "rounded-3xl border border-brand/14 bg-card surface-2";
 
-/** Interactive surface   same as softCard but lifts on hover (for clickable cards). */
+/** Interactive surface   same as softCard but lifts smoothly on hover (clickable cards). */
 export const softCardHover =
-  "rounded-3xl border border-brand/12 bg-card shadow-[0_18px_45px_-28px_rgb(var(--istpm-shadow)/0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_28px_60px_-28px_rgb(var(--istpm-shadow)/0.45)]";
+  "rounded-3xl border border-brand/14 bg-card surface-interactive hover:border-brand/25";
 
 /**
  * Text input   rounded, teal focus ring.
@@ -26,11 +26,11 @@ export const softCardHover =
  * *colour* renders with no visible box.
  */
 export const softInput =
-  "w-full min-w-0 rounded-xl border border-brand/20 bg-card shadow-none focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/30";
+  "w-full min-w-0 rounded-xl border border-brand/20 bg-card shadow-none transition-[border-color,box-shadow,background-color] duration-200 hover:border-brand/35 focus-visible:border-brand focus-visible:ring-4 focus-visible:ring-brand/15";
 
 /** Select trigger   matches softInput height/rounding. */
 export const softSelectTrigger =
-  "h-10 rounded-xl border-brand/20 bg-card shadow-none focus:ring-0 focus:ring-offset-0 data-[placeholder]:text-muted-foreground/70";
+  "h-10 rounded-xl border-brand/20 bg-card shadow-none transition-[border-color,box-shadow] duration-200 hover:border-brand/35 focus:ring-0 focus:ring-offset-0 data-[state=open]:border-brand data-[state=open]:ring-4 data-[state=open]:ring-brand/15 data-[placeholder]:text-muted-foreground/70";
 
 /** Select dropdown surface. */
 export const softSelectContent = "rounded-2xl border-brand/15";
@@ -43,29 +43,37 @@ export const labelClass =
 export const eyebrowClass =
   "text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground";
 
-/** Primary pill button (solid teal, white text). */
+/** Shared focus-ring for pill/icon buttons   crisp, offset from the surface. */
+const focusRing =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+/** Primary pill button (teal gradient, white text)   the app's main CTA. */
 export const primaryPill =
-  "inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_-14px_rgb(var(--istpm-shadow)/0.8)] transition hover:bg-brand-dk";
+  "inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-brand to-brand-dk px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_-14px_rgb(var(--istpm-shadow)/0.85)] transition-all duration-200 hover:brightness-[1.06] hover:shadow-[0_18px_38px_-14px_rgb(var(--istpm-shadow)/0.95)] active:scale-[0.98] " +
+  focusRing;
 
 /** Solid dark-teal pill button (secondary emphasis). */
 export const navyPill =
-  "inline-flex items-center gap-2 rounded-full bg-brand-dk px-5 py-2.5 text-sm font-medium text-white shadow-[0_14px_30px_-14px_rgb(var(--istpm-shadow)/0.6)] transition hover:bg-brand-md";
+  "inline-flex items-center gap-2 rounded-full bg-brand-dk px-5 py-2.5 text-sm font-medium text-white shadow-[0_14px_30px_-14px_rgb(var(--istpm-shadow)/0.6)] transition-all duration-200 hover:bg-brand-md active:scale-[0.98] " +
+  focusRing;
 
 /** Destructive pill button   red, reserved for irreversible actions. */
 export const dangerPill =
-  "inline-flex items-center gap-2 rounded-full bg-alert px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_-14px_rgba(229,30,38,0.7)] transition hover:bg-alert-dk";
+  "inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-alert to-alert-dk px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_-14px_rgba(229,30,38,0.7)] transition-all duration-200 hover:brightness-[1.06] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alert/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /** Ghost / secondary pill button. */
 export const ghostPill =
-  "inline-flex items-center gap-2 rounded-full border border-brand/20 bg-card px-5 py-2.5 text-sm font-medium text-foreground transition hover:bg-brand/10";
+  "inline-flex items-center gap-2 rounded-full border border-brand/20 bg-card px-5 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:border-brand/35 hover:bg-brand/8 active:scale-[0.98] " +
+  focusRing;
 
 /** Small square icon-action button (view / edit inside tables). */
 export const iconButton =
-  "grid h-9 w-9 place-items-center rounded-xl border border-brand/20 bg-card text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk";
+  "grid h-9 w-9 place-items-center rounded-xl border border-brand/20 bg-card text-muted-foreground transition-all duration-200 hover:border-brand/35 hover:bg-brand/10 hover:text-brand-dk active:scale-95 " +
+  focusRing;
 
 /** Destructive variant of iconButton. */
 export const iconButtonDanger =
-  "grid h-9 w-9 place-items-center rounded-xl border border-alert/25 bg-card text-alert transition hover:bg-alert/10 hover:text-alert-dk";
+  "grid h-9 w-9 place-items-center rounded-xl border border-alert/25 bg-card text-alert transition-all duration-200 hover:bg-alert/10 hover:text-alert-dk active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alert/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /**
  * Dialog surface   soft, rounded, elevated.
@@ -74,7 +82,7 @@ export const iconButtonDanger =
  * max-height: a `vh` body ignores this cap and pushes the footer out of the clipped box.
  */
 export const dialogSurface =
-  "flex flex-col gap-0 overflow-hidden rounded-3xl border border-brand/15 bg-card p-0 shadow-[0_35px_80px_-40px_rgb(var(--istpm-shadow)/0.5)] sm:rounded-3xl " +
+  "flex flex-col gap-0 overflow-hidden rounded-3xl border border-brand/15 bg-card p-0 surface-4 sm:rounded-3xl " +
   // Les `_` deviennent des espaces : `min()` exige des espaces autour du `-`,
   // sans quoi la déclaration est invalide et ignorée   le dialogue gardait
   // alors 560 px et débordait sur mobile.
@@ -88,17 +96,24 @@ export const dialogSurface =
  * never makes it into the generated stylesheet.
  */
 export const dialogSurfaceWide =
-  "flex flex-col gap-0 overflow-hidden rounded-3xl border border-brand/15 bg-card p-0 shadow-[0_35px_80px_-40px_rgb(var(--istpm-shadow)/0.5)] sm:rounded-3xl " +
+  "flex flex-col gap-0 overflow-hidden rounded-3xl border border-brand/15 bg-card p-0 surface-4 sm:rounded-3xl " +
   "max-h-[min(90vh,720px)] w-[min(100vw_-_1.5rem,760px)] max-w-[min(100vw_-_1.5rem,760px)] " +
   "[&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-brand/20 [&>button]:bg-card [&>button]:opacity-100 [&>button]:hover:bg-muted [&>button]:focus:ring-0 [&>button]:focus:ring-offset-0";
 
 /** Recharts tooltip content style   matches the soft card language. */
 export const dashTooltip = {
-  background: "var(--card)",
-  border: "1px solid rgb(var(--istpm-shadow) / 0.2)",
-  borderRadius: 12,
+  background: "color-mix(in srgb, var(--card) 88%, transparent)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
+  border: "1px solid rgb(var(--istpm-shadow) / 0.16)",
+  borderRadius: 14,
+  boxShadow: "var(--elevation-3)",
   color: "var(--foreground)",
+  padding: "10px 12px",
 } as const;
+
+/** Shared Recharts cursor fill for hovered bars/areas   faint teal wash. */
+export const dashCursor = { fill: "rgb(var(--istpm-shadow) / 0.06)" } as const;
 
 /** Ordered chart palette   teal family first, red last so it stays meaningful. */
 export const CHART_COLORS = [
@@ -108,6 +123,7 @@ export const CHART_COLORS = [
   "var(--chart-4)",
   "var(--chart-5)",
   "var(--chart-6)",
+  "var(--chart-7)",
 ] as const;
 
 /**
@@ -140,11 +156,11 @@ export const STATUS_COLORS = {
  */
 export function toneBadge(tone: BadgeTone) {
   const map: Record<BadgeTone, string> = {
-    teal: "bg-brand/15 text-brand-dk",
-    red: "bg-alert/12 text-alert-dk",
-    amber: "bg-warn-pale text-warn",
-    blue: "bg-info-pale text-info",
-    neutral: "bg-muted text-foreground/80",
+    teal: "bg-brand/12 text-brand-dk ring-1 ring-inset ring-brand/20",
+    red: "bg-alert/10 text-alert-dk ring-1 ring-inset ring-alert/20",
+    amber: "bg-warn-pale text-warn ring-1 ring-inset ring-warn/25",
+    blue: "bg-info-pale text-info ring-1 ring-inset ring-info/25",
+    neutral: "bg-muted text-foreground/80 ring-1 ring-inset ring-brand/12",
   };
   return `inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${map[tone]}`;
 }
@@ -215,7 +231,7 @@ export function initials(name: string) {
 
 /** Teal avatar chip used in name cells across the student/teacher tables. */
 export const avatarChip =
-  "grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand/15 text-[11px] font-bold text-brand-dk";
+  "grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand/20 to-brand/10 text-[11px] font-bold text-brand-dk ring-1 ring-inset ring-brand/15";
 
 /**
  * Shared table shell classes   used by every list page.
@@ -229,10 +245,10 @@ export const tableEl =
   "w-full min-w-[900px] text-left text-sm [&_th]:border-r [&_th]:border-brand/12 [&_td]:border-r [&_td]:border-brand/8 " +
   "[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap [&_td]:px-4 [&_td]:py-3 [&_th]:px-4 [&_th]:py-3";
 export const tableHead =
-  "border-b border-brand/15 bg-muted text-[11px] font-semibold uppercase tracking-wider text-muted-foreground";
+  "sticky top-0 z-10 border-b border-brand/15 bg-muted/95 backdrop-blur-sm text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90";
 export const tableBody = "divide-y divide-brand/8";
 export const tableRow =
-  "h-14 cursor-pointer transition-colors hover:bg-brand/8";
+  "group/row h-14 cursor-pointer transition-colors duration-200 hover:bg-brand/[0.06]";
 
 /** Cellule dont le contenu peut être long : tronquée plutôt que repliée. */
 export const cellTruncate = "max-w-[15rem] truncate";

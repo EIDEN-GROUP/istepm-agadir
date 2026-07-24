@@ -80,11 +80,16 @@ function AnimatedNumber({ value, suffix = "" }: { value: number; suffix?: string
   const inView = useInView(ref, { once: true });
   const [display, setDisplay] = useState(0);
   const done = useRef(false);
+  const prevRef = useRef(0);
+
+  useEffect(() => { done.current = false; }, [value]);
 
   useEffect(() => {
     if (!inView || done.current) return;
     done.current = true;
-    const ctrl = animate(0, value, {
+    const start = prevRef.current;
+    prevRef.current = value;
+    const ctrl = animate(start, value, {
       duration: 0.9,
       ease: [0.22, 1, 0.36, 1],
       onUpdate: (v) => setDisplay(Math.round(v)),
@@ -92,7 +97,7 @@ function AnimatedNumber({ value, suffix = "" }: { value: number; suffix?: string
     return ctrl.stop;
   }, [inView, value]);
 
-  useEffect(() => { if (value === 0) setDisplay(0); }, [value]);
+  useEffect(() => { if (value === 0) { setDisplay(0); prevRef.current = 0; } }, [value]);
   useEffect(() => { if (inView) done.current = true; }, [inView]);
 
   return <span ref={ref}>{display.toLocaleString("fr-FR")}{suffix}</span>;
@@ -201,7 +206,7 @@ function KpiCard({
       className={cn(
         softCard,
         "group relative overflow-hidden p-4 sm:p-5",
-        "transition-shadow hover:shadow-[0_30px_60px_-32px_rgb(var(--istpm-shadow)/0.55)]",
+        "transition-shadow duration-300 hover:[box-shadow:var(--edge-highlight),var(--elevation-4)]",
       )}
     >
       <span

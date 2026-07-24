@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Eye, Download, Trash2 } from "lucide-react";
+import { Plus, Pencil, Eye, Download, Trash2, Upload } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { useIstpm } from "@/lib/istpm-store";
+import { useIstpm, type NouvelEtudiant } from "@/lib/istpm-store";
+import { ImportCsvDialog, type ImportColumn } from "@/components/import-csv";
 import { fetchStudentSemestres } from "@/lib/istpm-api";
 import {
   FILIERES,
@@ -93,6 +94,7 @@ function EtudiantsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Etudiant | null>(null);
   const [toDelete, setToDelete] = useState<Etudiant | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -128,7 +130,6 @@ function EtudiantsPage() {
       "groupe",
       "statut",
       "paiement",
-      "resteAPayer",
     ] as const;
     const rows = filtered.map((e) =>
       cols.map((c) => `"${String(e[c] ?? "")}"`).join(","),
@@ -145,6 +146,92 @@ function EtudiantsPage() {
     toast.success(`${filtered.length} étudiant(s) exporté(s)`);
   };
 
+  const colonnesImportEtudiants: ImportColumn[] = [
+    { key: "cne", label: "CNE", required: true },
+    { key: "matricule", label: "Matricule", required: true },
+    { key: "prenom", label: "Prénom", required: true },
+    { key: "nom", label: "Nom", required: true },
+    { key: "filiere", label: "Filière", required: true },
+    { key: "niveau", label: "Niveau", required: true },
+    { key: "annee", label: "Année", required: true },
+    { key: "groupe", label: "Groupe", required: true },
+    { key: "statut", label: "Statut", required: true, aliases: ["statut étudiant"] },
+    { key: "paiement", label: "Paiement", required: true, aliases: ["statut paiement", "statut_paiement"] },
+    { key: "telephone", label: "Téléphone" },
+    { key: "email", label: "E-mail" },
+    { key: "dateNaissance", label: "Date de naissance", aliases: ["date_naissance", "date naissance"] },
+    { key: "ville", label: "Ville" },
+    { key: "fraisMensuels", label: "Frais mensuels", aliases: ["frais_mensuels"] },
+  ];
+
+  const STATUT_ETUDIANT_VALUES: StatutEtudiant[] = ["inscrit", "en_attente", "diplome", "abandon"];
+  const STATUT_PAIEMENT_VALUES: StatutPaiement[] = ["paye", "en_attente", "retard", "impaye"];
+
+  const matchLabel = <T extends string>(
+    value: string,
+    values: readonly T[],
+    labels: Record<T, string>,
+  ): T | null => {
+    if (values.includes(value as T)) return value as T;
+    for (const k of values) {
+      if (labels[k].toLowerCase() === value.toLowerCase()) return k;
+    }
+    return null;
+  };
+
+  const validateEtudiant = (values: Record<string, string>): string[] => {
+    const errs: string[] = [];
+    if (!values.cne) errs.push("CNE requis");
+    if (!values.matricule) errs.push("Matricule requis");
+    if (!values.prenom) errs.push("Prénom requis");
+    if (!values.nom) errs.push("Nom requis");
+    if (!values.filiere) errs.push("Filière requise");
+    else if (!FILIERES.includes(values.filiere as Filiere))
+      errs.push(`Filière « ${values.filiere} » invalide`);
+    if (!values.niveau) errs.push("Niveau requis");
+    else if (!NIVEAUX.includes(values.niveau as Niveau))
+      errs.push(`Niveau « ${values.niveau} » invalide`);
+    if (!values.annee) errs.push("Année requise");
+    if (!values.groupe) errs.push("Groupe requis");
+    if (!values.statut) errs.push("Statut requis");
+    else if (!matchLabel(values.statut, STATUT_ETUDIANT_VALUES, STATUT_ETUDIANT_LABEL))
+      errs.push(`Statut « ${values.statut} » invalide`);
+    if (!values.paiement) errs.push("Paiement requis");
+    else if (!matchLabel(values.paiement, STATUT_PAIEMENT_VALUES, STATUT_PAIEMENT_LABEL))
+      errs.push(`Paiement « ${values.paiement} » invalide`);
+    if (values.fraisMensuels && isNaN(Number(values.fraisMensuels)))
+      errs.push("Frais mensuels doit être un nombre");
+    return errs;
+  };
+
+  const handleImportEtudiants = (rows: Record<string, string>[]) => {
+    let compteur = 0;
+    for (const r of rows) {
+      const statut = matchLabel(r.statut, STATUT_ETUDIANT_VALUES, STATUT_ETUDIANT_LABEL) ?? "inscrit";
+      const paiement = matchLabel(r.paiement, STATUT_PAIEMENT_VALUES, STATUT_PAIEMENT_LABEL) ?? "en_attente";
+      const nouvel: NouvelEtudiant = {
+        cne: r.cne,
+        matricule: r.matricule,
+        prenom: r.prenom,
+        nom: r.nom,
+        filiere: r.filiere as Filiere,
+        niveau: r.niveau as Niveau,
+        annee: r.annee,
+        groupe: r.groupe,
+        statut,
+        paiement,
+        telephone: r.telephone ?? "",
+        email: r.email ?? "",
+        dateNaissance: r.dateNaissance ?? "",
+        ville: r.ville ?? "",
+        fraisMensuels: r.fraisMensuels ? Number(r.fraisMensuels) : 0,
+      };
+      addEtudiant(nouvel);
+      compteur++;
+    }
+    toast.success(`${compteur} étudiant(s) importé(s)`);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -153,6 +240,9 @@ function EtudiantsPage() {
         actions={
           canEdit ? (
             <>
+              <button className={cn(ghostPill, "gap-1.5")} onClick={() => setImportOpen(true)}>
+                <Upload className="h-3.5 w-3.5" /> Importer
+              </button>
               <button className={cn(ghostPill, "gap-1.5")} onClick={exportCsv}>
                 <Download className="h-3.5 w-3.5" /> Exporter
               </button>
@@ -350,6 +440,16 @@ function EtudiantsPage() {
           setToDelete(null);
         }}
       />
+
+      <ImportCsvDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Importer des étudiants"
+        description="Ajouter des étudiants en lot depuis un fichier CSV"
+        columns={colonnesImportEtudiants}
+        validate={validateEtudiant}
+        onImport={handleImportEtudiants}
+      />
     </div>
   );
 }
@@ -373,8 +473,7 @@ type FormState = {
   email: string;
   dateNaissance: string;
   ville: string;
-  fraisAnnuels: number | "";
-  resteAPayer: number | "";
+  fraisMensuels: number | "";
 };
 
 function EtudiantForm({
@@ -383,11 +482,10 @@ function EtudiantForm({
   onCancel,
 }: {
   initial: Etudiant | null;
-  onSubmit: (data: Omit<FormState, "fraisAnnuels" | "resteAPayer"> & {
+  onSubmit: (data: Omit<FormState, "fraisMensuels"> & {
     filiere: Filiere;
     niveau: Niveau;
-    fraisAnnuels: number;
-    resteAPayer: number;
+    fraisMensuels: number;
   }) => void;
   onCancel: () => void;
 }) {
@@ -411,8 +509,7 @@ function EtudiantForm({
     email: initial?.email ?? "",
     dateNaissance: initial?.dateNaissance ?? "",
     ville: initial?.ville ?? "",
-    fraisAnnuels: initial?.fraisAnnuels ?? 34000,
-    resteAPayer: initial?.resteAPayer ?? 34000,
+    fraisMensuels: initial?.fraisMensuels ?? 3400,
   }));
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
@@ -432,16 +529,8 @@ function EtudiantForm({
     if (!f.niveau) next.niveau = "Niveau obligatoire";
     if (f.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email))
       next.email = "Adresse e-mail invalide";
-    if (f.fraisAnnuels === "" || Number(f.fraisAnnuels) < 0)
-      next.fraisAnnuels = "Montant invalide";
-    if (f.resteAPayer === "" || Number(f.resteAPayer) < 0)
-      next.resteAPayer = "Montant invalide";
-    if (
-      f.resteAPayer !== "" &&
-      f.fraisAnnuels !== "" &&
-      Number(f.resteAPayer) > Number(f.fraisAnnuels)
-    )
-      next.resteAPayer = "Le reste dû dépasse les frais annuels";
+    if (f.fraisMensuels === "" || Number(f.fraisMensuels) < 0)
+      next.fraisMensuels = "Montant invalide";
 
     if (Object.keys(next).length) {
       setErrors(next);
@@ -453,8 +542,7 @@ function EtudiantForm({
       ...f,
       filiere: f.filiere as Filiere,
       niveau: f.niveau as Niveau,
-      fraisAnnuels: Number(f.fraisAnnuels),
-      resteAPayer: Number(f.resteAPayer),
+      fraisMensuels: Number(f.fraisMensuels),
     });
   };
 
@@ -572,22 +660,13 @@ function EtudiantForm({
         onChange={(v) => set("annee", v)}
       />
       <NumberField
-        label="Frais annuels"
+        label="Frais mensuels"
         required
         suffix="MAD"
         min={0}
-        value={f.fraisAnnuels}
-        onChange={(v) => set("fraisAnnuels", v)}
-        error={errors.fraisAnnuels}
-      />
-      <NumberField
-        label="Reste à payer"
-        required
-        suffix="MAD"
-        min={0}
-        value={f.resteAPayer}
-        onChange={(v) => set("resteAPayer", v)}
-        error={errors.resteAPayer}
+        value={f.fraisMensuels}
+        onChange={(v) => set("fraisMensuels", v)}
+        error={errors.fraisMensuels}
       />
     </FormDialog>
   );
@@ -656,10 +735,9 @@ const RESULTAT_TONE = {
 };
 
 function EtudiantDetail({ e }: { e: Etudiant }) {
-  const paye = e.fraisAnnuels - e.resteAPayer;
-  const progression = e.fraisAnnuels
-    ? Math.round((paye / e.fraisAnnuels) * 100)
-    : 0;
+  const moisValues = Object.values(e.paiementsMensuels ?? {});
+  const moisPayes = moisValues.filter((v) => v === "paye").length;
+  const moisTotal = moisValues.length || 10;
   const [semestres, setSemestres] = useState<SemestreResume[]>(() => historiqueSemestres(e));
   useEffect(() => {
     fetchStudentSemestres(e.id)
@@ -806,33 +884,28 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
       </DetailSection>
 
       <DetailSection title="Situation financière">
-        <DetailGrid>
-          <DetailField label="Frais annuels" value={fmtMAD(e.fraisAnnuels)} />
+        <DetailGrid single>
+          <DetailField label="Frais mensuels" value={fmtMAD(e.fraisMensuels)} />
           <DetailField
-            label="Réglé"
-            value={fmtMAD(paye)}
-            tone="positive"
+            label="Mois réglés"
+            value={`${moisPayes} / ${moisTotal}`}
+            tone={moisPayes < moisTotal ? "negative" : "positive"}
           />
-          <DetailField
-            label="Reste à payer"
-            value={fmtMAD(e.resteAPayer)}
-            tone={e.resteAPayer > 0 ? "negative" : "positive"}
-          />
-          <DetailField label="Progression" value={`${progression} %`} />
         </DetailGrid>
 
-        {/* Jauge de recouvrement : lit plus vite qu'un pourcentage seul. */}
         <div
           className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-brand/12"
           role="img"
-          aria-label={`Réglé à ${progression} %`}
+          aria-label={`${moisPayes} mois payés sur ${moisTotal}`}
         >
           <div
             className={cn(
               "h-full rounded-full transition-all",
-              e.resteAPayer > 0 ? "bg-warn" : "bg-brand",
+              moisPayes < moisTotal ? "bg-warn" : "bg-brand",
             )}
-            style={{ width: `${Math.min(100, Math.max(0, progression))}%` }}
+            style={{
+              width: `${Math.min(100, Math.max(0, (moisPayes / moisTotal) * 100))}%`,
+            }}
           />
         </div>
 

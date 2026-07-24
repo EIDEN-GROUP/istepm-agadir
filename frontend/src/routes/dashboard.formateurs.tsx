@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Eye, Trash2 } from "lucide-react";
+import { Plus, Pencil, Eye, Trash2, Upload } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { useIstpm } from "@/lib/istpm-store";
+import { useIstpm, type NouveauFormateur } from "@/lib/istpm-store";
+import { ImportCsvDialog, type ImportColumn } from "@/components/import-csv";
 import {
   FILIERES,
   GRADE_LABEL,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/istpm-data";
 import {
   primaryPill,
+  ghostPill,
   iconButton,
   iconButtonDanger,
   toneBadge,
@@ -73,6 +75,7 @@ function FormateursPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Formateur | null>(null);
   const [toDelete, setToDelete] = useState<Formateur | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -86,6 +89,78 @@ function FormateursPage() {
     });
   }, [formateurs, search, departement, grade]);
 
+  const colonnesImportFormateurs: ImportColumn[] = [
+    { key: "matricule", label: "Matricule", required: true },
+    { key: "cin", label: "CIN", required: true },
+    { key: "prenom", label: "Prénom", required: true },
+    { key: "nom", label: "Nom", required: true },
+    { key: "grade", label: "Grade", required: true },
+    { key: "departement", label: "Département", required: true },
+    { key: "modules", label: "Modules", required: true },
+    { key: "groupes", label: "Groupes" },
+    { key: "statut", label: "Statut", required: true },
+    { key: "telephone", label: "Téléphone" },
+    { key: "email", label: "E-mail" },
+  ];
+
+  const GRADE_VALUES: GradeFormateur[] = ["PES", "vacataire", "formateur_clinique"];
+  const STATUT_FORMATEUR_VALUES: StatutFormateur[] = ["permanent", "vacataire", "en_conge"];
+
+  const matchLabelFormateur = <T extends string>(
+    value: string,
+    values: readonly T[],
+    labels: Record<T, string>,
+  ): T | null => {
+    if (values.includes(value as T)) return value as T;
+    for (const k of values) {
+      if (labels[k].toLowerCase() === value.toLowerCase()) return k;
+    }
+    return null;
+  };
+
+  const validateFormateur = (values: Record<string, string>): string[] => {
+    const errs: string[] = [];
+    if (!values.matricule) errs.push("Matricule requis");
+    if (!values.cin) errs.push("CIN requis");
+    if (!values.prenom) errs.push("Prénom requis");
+    if (!values.nom) errs.push("Nom requis");
+    if (!values.grade) errs.push("Grade requis");
+    else if (!matchLabelFormateur(values.grade, GRADE_VALUES, GRADE_LABEL))
+      errs.push(`Grade « ${values.grade} » invalide`);
+    if (!values.departement) errs.push("Département requis");
+    else if (!FILIERES.includes(values.departement as Filiere))
+      errs.push(`Département « ${values.departement} » invalide`);
+    if (!values.modules) errs.push("Modules requis");
+    if (!values.statut) errs.push("Statut requis");
+    else if (!matchLabelFormateur(values.statut, STATUT_FORMATEUR_VALUES, STATUT_FORMATEUR_LABEL))
+      errs.push(`Statut « ${values.statut} » invalide`);
+    return errs;
+  };
+
+  const handleImportFormateurs = (rows: Record<string, string>[]) => {
+    let compteur = 0;
+    for (const r of rows) {
+      const grade = matchLabelFormateur(r.grade, GRADE_VALUES, GRADE_LABEL) ?? "PES";
+      const statut = matchLabelFormateur(r.statut, STATUT_FORMATEUR_VALUES, STATUT_FORMATEUR_LABEL) ?? "permanent";
+      const nouveau: NouveauFormateur = {
+        matricule: r.matricule,
+        cin: r.cin,
+        prenom: r.prenom,
+        nom: r.nom,
+        grade,
+        departement: r.departement as Filiere,
+        modules: r.modules.split(",").map((m) => m.trim()).filter(Boolean),
+        groupes: r.groupes ? r.groupes.split(",").map((g) => g.trim()).filter(Boolean) : [],
+        statut,
+        telephone: r.telephone ?? "",
+        email: r.email ?? "",
+      };
+      addFormateur(nouveau);
+      compteur++;
+    }
+    toast.success(`${compteur} formateur(s) importé(s)`);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -93,15 +168,20 @@ function FormateursPage() {
         title="Formateurs"
         actions={
           canEdit ? (
-            <button
-              className={primaryPill}
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> Ajouter un formateur
-            </button>
+            <>
+              <button className={cn(ghostPill, "gap-1.5")} onClick={() => setImportOpen(true)}>
+                <Upload className="h-3.5 w-3.5" /> Importer
+              </button>
+              <button
+                className={primaryPill}
+                onClick={() => {
+                  setEditing(null);
+                  setFormOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4" /> Ajouter un formateur
+              </button>
+            </>
           ) : null
         }
       />
@@ -345,6 +425,16 @@ function FormateursPage() {
           );
           setToDelete(null);
         }}
+      />
+
+      <ImportCsvDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Importer des formateurs"
+        description="Ajouter des formateurs en lot depuis un fichier CSV"
+        columns={colonnesImportFormateurs}
+        validate={validateFormateur}
+        onImport={handleImportFormateurs}
       />
     </div>
   );

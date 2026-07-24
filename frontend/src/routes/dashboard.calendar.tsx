@@ -14,6 +14,11 @@ import {
   User,
   Clock,
   Download,
+  Upload,
+  FileUp,
+  X,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth, DEMO_FORMATEUR_ID, getStoredRole } from "@/lib/auth";
@@ -145,6 +150,7 @@ function PlanningPage() {
     null,
   );
   const [toDelete, setToDelete] = useState<Seance | null>(null);
+const [importOpen, setImportOpen] = useState(false);
 
   const nomProf = useMemo(() => {
     const map = new Map(
@@ -329,6 +335,12 @@ function PlanningPage() {
         title="Emploi du temps"
         actions={
           <>
+            <button
+              className={cn(ghostPill, "gap-1.5")}
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload className="h-3.5 w-3.5" /> Importer CSV
+            </button>
             <button className={cn(ghostPill, "gap-1.5")} onClick={exportCsv}>
               <Download className="h-3.5 w-3.5" /> Exporter CSV
             </button>
@@ -554,6 +566,17 @@ function PlanningPage() {
           }}
         />
       ) : null}
+
+      <ImportCsvDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        formateurs={formateurs}
+        onImport={(seances) => {
+          seances.forEach((s) => addSeance(s));
+          setImportOpen(false);
+          toast.success(`${seances.length} séance(s) importée(s)`);
+        }}
+      />
 
       <ConfirmDialog
         open={!!toDelete}
@@ -952,6 +975,586 @@ function SeanceForm({
         />
       </FullWidth>
     </FormDialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  CSV Import                                                          */
+/* ------------------------------------------------------------------ */
+
+const COLONNES_IMPORT = [
+  "Date",
+  "Début",
+  "Fin",
+  "Module",
+  "Filière",
+  "Type",
+  "Groupe",
+  "Salle",
+  "Formateur",
+  "Semestre",
+  "Année universitaire",
+  "Notes",
+] as const;
+
+const AUTO_MAP: Record<string, string> = {
+  date: "Date",
+  debut: "Début",
+  "heure début": "Début",
+  "heure de début": "Début",
+  fin: "Fin",
+  "heure fin": "Fin",
+  "heure de fin": "Fin",
+  module: "Module",
+  filière: "Filière",
+  filiere: "Filière",
+  département: "Filière",
+  departement: "Filière",
+  type: "Type",
+  groupe: "Groupe",
+  classe: "Groupe",
+  salle: "Salle",
+  formateur: "Formateur",
+  professeur: "Formateur",
+  enseignant: "Formateur",
+  prof: "Formateur",
+  semestre: "Semestre",
+  niveau: "Semestre",
+  "année universitaire": "Année universitaire",
+  "annee universitaire": "Année universitaire",
+  année: "Année universitaire",
+  annee: "Année universitaire",
+  notes: "Notes",
+};
+
+function parseCsv(text: string): string[][] {
+  const lignes: string[][] = [];
+  let current: string[] = [];
+  let champ = "";
+  let dansGuillemets = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    const next = text[i + 1];
+
+    if (dansGuillemets) {
+      if (c === '"' && next === '"') {
+        champ += '"';
+        i++;
+      } else if (c === '"') {
+        dansGuillemets = false;
+      } else {
+        champ += c;
+      }
+    } else {
+      if (c === '"') {
+        dansGuillemets = true;
+      } else if (c === ",") {
+        current.push(champ.trim());
+        champ = "";
+      } else if (c === "\n" || (c === "\r" && next === "\n")) {
+        if (c === "\r") i++;
+        current.push(champ.trim());
+        champ = "";
+        if (current.length > 0 && current.some((s) => s !== "")) {
+          lignes.push(current);
+        }
+        current = [];
+      } else if (c === "\r") {
+        current.push(champ.trim());
+        champ = "";
+        if (current.some((s) => s !== "")) {
+          lignes.push(current);
+        }
+        current = [];
+      } else {
+        champ += c;
+      }
+    }
+  }
+  if (champ.trim() || current.length > 0) {
+    current.push(champ.trim());
+    if (current.some((s) => s !== "")) {
+      lignes.push(current);
+    }
+  }
+  return lignes;
+}
+
+function detecterDelimiteur(entetes: string[]): string {
+  if (entetes.some((h) => h.includes(";"))) return ";";
+  return ",";
+}
+
+function parseCell(v: string): string {
+  return v.replace(/^"(.*)"$/, "$1").replace(/""/g, '"').trim();
+}
+
+type LigneImport = Record<string, string>;
+
+function autoMapper(entetes: string[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const h of entetes) {
+    const key = h.toLowerCase().trim().replace(/[_\s-]+/g, " ");
+    const target = AUTO_MAP[key];
+    if (target) {
+      map.set(target, h);
+    }
+  }
+  for (const col of COLONNES_IMPORT) {
+    if (!map.has(col)) {
+      const found = entetes.find((e) => e.toLowerCase().trim() === col.toLowerCase());
+      if (found) map.set(col, found);
+    }
+  }
+  return map;
+}
+
+function trouverFormateurId(
+  nom: string,
+  formateurs: Formateur[],
+): string | null {
+  const q = nom.toLowerCase().trim();
+  const parts = q.split(/\s+/);
+  const initial = parts[0]?.replace(/\.$/, "") ?? "";
+  const nomFamille = parts.slice(1).join(" ");
+
+  for (const f of formateurs) {
+    const full = `${f.prenom} ${f.nom}`.toLowerCase();
+    if (full === q) return f.id;
+  }
+  for (const f of formateurs) {
+    const short = `${f.prenom[0]}. ${f.nom}`.toLowerCase();
+    if (short === q) return f.id;
+  }
+  for (const f of formateurs) {
+    if (f.nom.toLowerCase() === nomFamille) return f.id;
+  }
+  return null;
+}
+
+function validerLigne(
+  ligne: Record<string, string>,
+  mapping: Map<string, string>,
+  formateurs: Formateur[],
+): { ok: true; seance: Omit<Seance, "id"> } | { ok: false; erreurs: string[] } {
+  const erreurs: string[] = [];
+  const get = (col: string) => (ligne[mapping.get(col) ?? ""] ?? "").trim();
+
+  const date = get("Date");
+  const debut = get("Début");
+  const fin = get("Fin");
+  const module = get("Module");
+  const groupe = get("Groupe");
+  const salle = get("Salle");
+  const formateurRaw = get("Formateur");
+  const filiereRaw = get("Filière");
+  const typeRaw = get("Type");
+  const semestreRaw = get("Semestre");
+  const anneeRaw = get("Année universitaire");
+  const notes = get("Notes");
+
+  if (!date) erreurs.push("Date manquante");
+  else if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+    erreurs.push(`Format date invalide: "${date}" (attendu YYYY-MM-DD)`);
+
+  if (!debut) erreurs.push("Début manquant");
+  else if (!/^\d{2}:\d{2}$/.test(debut))
+    erreurs.push(`Format heure début invalide: "${debut}" (attendu HH:MM)`);
+
+  if (!fin) erreurs.push("Fin manquante");
+  else if (!/^\d{2}:\d{2}$/.test(fin))
+    erreurs.push(`Format heure fin invalide: "${fin}" (attendu HH:MM)`);
+
+  if (debut && fin && /^\d{2}:\d{2}$/.test(debut) && /^\d{2}:\d{2}$/.test(fin)) {
+    const dMin = parseInt(debut.split(":")[0], 10) * 60 + parseInt(debut.split(":")[1], 10);
+    const fMin = parseInt(fin.split(":")[0], 10) * 60 + parseInt(fin.split(":")[1], 10);
+    if (fMin <= dMin) erreurs.push("La fin doit suivre le début");
+  }
+
+  if (!module) erreurs.push("Module manquant");
+  if (!groupe) erreurs.push("Groupe manquant");
+  if (!salle) erreurs.push("Salle manquante");
+
+  let professeurId = "";
+  if (!formateurRaw) erreurs.push("Formateur manquant");
+  else {
+    const id = trouverFormateurId(formateurRaw, formateurs);
+    if (id) professeurId = id;
+    else erreurs.push(`Formateur introuvable: "${formateurRaw}"`);
+  }
+
+  let filiere = filiereRaw;
+  if (filiere && !FILIERES.includes(filiere as any)) {
+    erreurs.push(`Filière inconnue: "${filiere}"`);
+  }
+  if (!filiere && professeurId) {
+    const f = formateurs.find((p) => p.id === professeurId);
+    if (f) filiere = f.departement;
+  }
+
+  let type: TypeSeance = "cours";
+  if (typeRaw) {
+    const found = (Object.entries(TYPE_SEANCE_LABEL) as [TypeSeance, string][]).find(
+      ([, label]) => label.toLowerCase() === typeRaw.toLowerCase(),
+    );
+    if (found) type = found[0];
+    else if (["cours", "td", "tp", "stage"].includes(typeRaw.toLowerCase())) {
+      type = typeRaw.toLowerCase() as TypeSeance;
+    } else {
+      erreurs.push(`Type inconnu: "${typeRaw}" (attendu: Cours, TD, TP, Encadrement stage)`);
+    }
+  }
+
+  let semestre = semestreRaw;
+  if (semestre && !NIVEAUX.includes(semestre as any)) {
+    const match = semestre.match(/[Ss][1-6]/);
+    if (match) semestre = match[0].toUpperCase();
+    else erreurs.push(`Semestre invalide: "${semestre}" (attendu S1–S6)`);
+  }
+  if (!semestre && groupe) {
+    const match = groupe.match(/[Ss][1-6]/);
+    if (match) semestre = match[0].toUpperCase();
+  }
+  if (!semestre) erreurs.push("Semestre manquant (non déduit du groupe)");
+
+  const anneeUniversitaire = anneeRaw || "2025/2026";
+
+  if (erreurs.length > 0) return { ok: false, erreurs };
+
+  return {
+    ok: true,
+    seance: {
+      module,
+      professeurId,
+      filiere: (filiere || FILIERES[0]) as Filiere,
+      groupe,
+      salle,
+      date,
+      debut,
+      fin,
+      anneeUniversitaire,
+      semestre: semestre as Niveau,
+      type,
+      notes: notes || undefined,
+    },
+  };
+}
+
+function ImportCsvDialog({
+  open,
+  onOpenChange,
+  formateurs,
+  onImport,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  formateurs: Formateur[];
+  onImport: (seances: Omit<Seance, "id">[]) => void;
+}) {
+  const [raw, setRaw] = useState<string[][]>([]);
+  const [entetes, setEntetes] = useState<string[]>([]);
+  const [lignes, setLignes] = useState<LigneImport[]>([]);
+  const [mapping, setMapping] = useState<Map<string, string>>(new Map());
+  const [colonneDispo, setColonneDispo] = useState<string[]>([]);
+  const [resultats, setResultats] = useState<
+    ({ ok: true; seance: Omit<Seance, "id"> } | { ok: false; erreurs: string[] })[]
+  >([]);
+  const [fichier, setFichier] = useState<string>("");
+  const [etape, setEtape] = useState<"upload" | "mapper" | "resultat">("upload");
+
+  const reset = () => {
+    setRaw([]);
+    setEntetes([]);
+    setLignes([]);
+    setMapping(new Map());
+    setColonneDispo([]);
+    setResultats([]);
+    setFichier("");
+    setEtape("upload");
+  };
+
+  const handleFile = (file: File) => {
+    if (!file.name.endsWith(".csv")) {
+      toast.error("Seuls les fichiers .csv sont acceptés");
+      return;
+    }
+    setFichier(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      // Remove BOM
+      const clean = text.replace(/^\uFEFF/, "");
+      const toutes = parseCsv(clean);
+      if (toutes.length < 2) {
+        toast.error("Le fichier doit contenir au moins une ligne d'en-tête et une ligne de données");
+        return;
+      }
+      const ent = toutes[0].map((h) => h.trim());
+      const cols = toutes.slice(1).map((row) => {
+        const obj: LigneImport = {};
+        ent.forEach((h, i) => {
+          obj[h] = parseCell(row[i] ?? "");
+        });
+        return obj;
+      });
+
+      setEntetes(ent);
+      setLignes(cols);
+      setColonneDispo(ent);
+
+      const auto = autoMapper(ent);
+      setMapping(auto);
+
+      // Validate with current mapping
+      const res = cols.map((l) => validerLigne(l, auto, formateurs));
+      setResultats(res);
+      setEtape("mapper");
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  const setColMap = (colCible: string, source: string) => {
+    const next = new Map(mapping);
+    // Unset previous mapping for this source
+    for (const [k, v] of next) {
+      if (v === source) next.delete(k);
+    }
+    if (source) next.set(colCible, source);
+    else next.delete(colCible);
+    setMapping(next);
+    const res = lignes.map((l) => validerLigne(l, next, formateurs));
+    setResultats(res);
+  };
+
+  const nbOk = resultats.filter((r) => r.ok).length;
+  const nbErreur = resultats.filter((r) => !r.ok).length;
+
+  const lignesApercu = lignes.slice(0, 5);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
+      <DialogContent className={cn(dialogSurface, "max-w-4xl")}>
+        <DialogTitle className="sr-only">Importer un CSV</DialogTitle>
+        <DialogDescription className="sr-only">
+          Importer des séances depuis un fichier CSV
+        </DialogDescription>
+
+        <div className="space-y-5">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-brand/12 text-brand-dk">
+              <FileUp className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
+                Importer un CSV
+              </h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Ajouter des séances en lot depuis un fichier CSV
+              </p>
+            </div>
+          </div>
+
+          {etape === "upload" && (
+            <div
+              onDrop={handleDrop}
+              onDragOver={(e) => e.preventDefault()}
+              onClick={() => document.getElementById("csv-input")?.click()}
+              className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-brand/20 bg-brand/3 px-6 py-10 transition hover:border-brand/40 hover:bg-brand/6"
+            >
+              <Upload className="h-8 w-8 text-muted-foreground" />
+              <div className="text-center">
+                <p className="font-semibold text-foreground">
+                  Cliquez ou glissez-déposez un fichier CSV
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Le fichier doit comporter une ligne d'en-tête
+                </p>
+              </div>
+              <input
+                id="csv-input"
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f);
+                }}
+              />
+            </div>
+          )}
+
+          {etape === "mapper" && (
+            <>
+              {/* Aperçu des données */}
+              <div>
+                <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Aperçu ({lignes.length} ligne{lignes.length > 1 ? "s" : ""})
+                </p>
+                <div className="overflow-x-auto rounded-xl border border-brand/12">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-brand/5">
+                        {entetes.map((h) => (
+                          <th key={h} className="px-3 py-2 text-left font-semibold text-foreground">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lignesApercu.map((l, i) => (
+                        <tr key={i} className="border-t border-brand/8">
+                          {entetes.map((h) => (
+                            <td key={h} className="max-w-40 truncate px-3 py-1.5 text-muted-foreground">
+                              {l[h] || ""}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Mappage des colonnes */}
+              <div>
+                <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Correspondance des colonnes
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {COLONNES_IMPORT.map((col) => (
+                    <div key={col} className="flex items-center gap-2">
+                      <span className="w-36 shrink-0 text-xs font-medium text-foreground">
+                        {col === "Début" || col === "Fin" ? (
+                          <span>
+                            {col} <span className="text-alert">*</span>
+                          </span>
+                        ) : ["Date", "Module", "Groupe", "Salle", "Formateur"].includes(col) ? (
+                          <span>
+                            {col} <span className="text-alert">*</span>
+                          </span>
+                        ) : (
+                          col
+                        )}
+                      </span>
+                      <select
+                        value={mapping.get(col) ?? ""}
+                        onChange={(e) => setColMap(col, e.target.value)}
+                        className={cn(
+                          "h-7 flex-1 rounded-lg border border-brand/12 bg-card px-2 text-xs font-medium text-foreground outline-none",
+                          "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
+                          mapping.get(col) ? "" : "border-alert/40 text-alert",
+                        )}
+                      >
+                        <option value="">— Non mappé —</option>
+                        {colonneDispo.map((h) => (
+                          <option key={h} value={h}>
+                            {h}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Résumé de validation */}
+              <div className="flex items-center justify-between rounded-xl bg-brand/5 px-4 py-3">
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="inline-flex items-center gap-1 font-semibold text-teal-600">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {nbOk} valide{nbOk > 1 ? "s" : ""}
+                  </span>
+                  {nbErreur > 0 && (
+                    <span className="inline-flex items-center gap-1 font-semibold text-alert">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      {nbErreur} erreur{nbErreur > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { reset(); onOpenChange(false); }}
+                    className={cn(ghostPill, "h-8 px-3 text-xs")}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={() => setEtape("resultat")}
+                    disabled={nbOk === 0}
+                    className={cn(primaryPill, "h-8 gap-1.5 px-4 text-xs")}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    Importer {nbOk} séance{nbOk > 1 ? "s" : ""}
+                  </button>
+                </div>
+              </div>
+
+              {/* Fichier actuel */}
+              <p className="text-[11px] text-muted-foreground">
+                Fichier : {fichier}
+              </p>
+            </>
+          )}
+
+          {etape === "resultat" && (
+            <>
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-foreground">
+                  Résultat de l'importation
+                </p>
+                <div className="flex items-center gap-4 text-xs">
+                  <span className="inline-flex items-center gap-1 font-semibold text-teal-600">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {nbOk} importée{nbOk > 1 ? "s" : ""}
+                  </span>
+                  {nbErreur > 0 && (
+                    <span className="inline-flex items-center gap-1 font-semibold text-alert">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      {nbErreur} ignorée{nbErreur > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Erreurs */}
+              {nbErreur > 0 && (
+                <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-alert/20 bg-alert/5 p-3">
+                  {resultats.map((r, i) =>
+                    r.ok ? null : (
+                      <div key={i} className="flex gap-2 text-xs">
+                        <span className="shrink-0 font-semibold text-alert">
+                          Ligne {i + 2}:
+                        </span>
+                        <span className="text-muted-foreground">
+                          {r.erreurs.join(" · ")}
+                        </span>
+                      </div>
+                    ),
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => { reset(); onOpenChange(false); }}
+                  className={cn(ghostPill, "h-8 px-3 text-xs")}
+                >
+                  Fermer
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

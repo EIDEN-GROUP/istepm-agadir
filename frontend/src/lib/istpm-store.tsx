@@ -97,7 +97,7 @@ import {
 
 /** Bump when the record shape changes: stored data on an old version is
  *  discarded rather than loaded into a UI that no longer understands it. */
-const STORAGE_KEY = "istpm-data-v4";
+const STORAGE_KEY = "istpm-data-v5";
 
 type Snapshot = {
   etudiants: Etudiant[];
@@ -198,7 +198,7 @@ export function decisionFor(moy: number, notes: NoteModule[]): Decision {
 
 export type NouvelEtudiant = Omit<
   Etudiant,
-  "id" | "moyenne" | "notes" | "historique"
+  "id" | "moyenne" | "notes" | "historique" | "paiementsMensuels"
 >;
 export type NouveauFormateur = Omit<Formateur, "id" | "notesSaisies">;
 /** `createdBy` et `document` sont posés par le store, pas par le formulaire. */
@@ -437,6 +437,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         moyenne: 0,
         notes: [],
         historique: [],
+        paiementsMensuels: {},
       };
       apiCreateEtudiant(data as unknown as Record<string, unknown>).catch(() => {});
       setSnap((s) => ({ ...s, etudiants: [etudiant, ...s.etudiants] }));
@@ -755,8 +756,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         mode: ligne.mode,
         periode: ligne.periode,
         date: ligne.date,
-        // Envoyé au backend pour le suivi mensuel ; ignoré tant que l'API ne le
-        // persiste pas (voir la note de passation).
         mois: ligne.mois,
       }).catch(() => {});
       setSnap((s) => {
@@ -767,8 +766,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           new Date().getMonth() + 1,
         ).padStart(2, "0")}-${String(etudiant.historique.length + 1).padStart(3, "0")}`;
 
-        const reste = Math.max(0, etudiant.resteAPayer - ligne.montant);
-
         return {
           ...s,
           etudiants: s.etudiants.map((e) =>
@@ -777,9 +774,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
               : {
                   ...e,
                   historique: [...e.historique, { ...ligne, recu }],
-                  resteAPayer: reste,
-                  paiement: reste === 0 ? ("paye" as const) : e.paiement,
-                  // Le règlement met à jour le suivi mensuel du mois concerné.
+                  paiement: ligne.statut,
                   paiementsMensuels: ligne.mois
                     ? { ...e.paiementsMensuels, [ligne.mois]: ligne.statut }
                     : e.paiementsMensuels,
@@ -1036,15 +1031,28 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [snap.etudiants],
   );
 
+  const unpaidForStatus = useCallback(
+    (status: StatutPaiement) =>
+      snap.etudiants.reduce((s, e) => {
+        const months = Object.values(e.paiementsMensuels ?? {});
+        return s + months.filter((v) => v === status).length * e.fraisMensuels;
+      }, 0),
+    [snap.etudiants],
+  );
+
+  const totalUnpaidMonths = useMemo(
+    () =>
+      snap.etudiants.reduce((s, e) => {
+        const months = Object.values(e.paiementsMensuels ?? {});
+        return s + months.filter((v) => v !== "paye").length * e.fraisMensuels;
+      }, 0),
+    [snap.etudiants],
+  );
+
   const financier = useMemo(() => {
     const encaisse = paiements
       .filter((p) => p.statut === "paye")
       .reduce((s, p) => s + p.montant, 0);
-    const sommeReste = (statut: Etudiant["paiement"]) =>
-      snap.etudiants
-        .filter((e) => e.paiement === statut)
-        .reduce((s, e) => s + e.resteAPayer, 0);
-    const totalReste = snap.etudiants.reduce((s, e) => s + e.resteAPayer, 0);
 
     const ceMois = paiements
       .filter(
@@ -1058,15 +1066,15 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     return {
       encaisse,
       encaisseCeMois: ceMois,
-      enAttente: sommeReste("en_attente"),
-      impaye: sommeReste("impaye"),
-      retard: sommeReste("retard"),
+      enAttente: unpaidForStatus("en_attente"),
+      impaye: unpaidForStatus("impaye"),
+      retard: unpaidForStatus("retard"),
       tauxRecouvrement:
-        encaisse + totalReste === 0
+        encaisse + totalUnpaidMonths === 0
           ? 100
-          : Math.round((encaisse / (encaisse + totalReste)) * 100),
+          : Math.round((encaisse / (encaisse + totalUnpaidMonths)) * 100),
     };
-  }, [paiements, snap.etudiants]);
+  }, [paiements, unpaidForStatus, totalUnpaidMonths]);
 
   const dashboard = useMemo(() => {
     const inscrits = snap.etudiants.filter(
@@ -1083,9 +1091,9 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
             (notes.filter((e) => e.moyenne >= 10).length / notes.length) * 100,
           )
         : 0,
-      totalARecouvrer: snap.etudiants.reduce((s, e) => s + e.resteAPayer, 0),
+      totalARecouvrer: totalUnpaidMonths,
     };
-  }, [snap.etudiants, snap.formateurs]);
+  }, [snap.etudiants, snap.formateurs, totalUnpaidMonths]);
 
   const repartitionFiliere = useMemo(
     () =>
@@ -1116,7 +1124,10 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const aRelancer = useMemo(
     () =>
-      snap.etudiants.filter((e) => e.resteAPayer > 0 && e.paiement !== "paye"),
+      snap.etudiants.filter((e) => {
+        const months = Object.values(e.paiementsMensuels ?? {});
+        return months.length > 0 && months.some((v) => v !== "paye");
+      }),
     [snap.etudiants],
   );
 

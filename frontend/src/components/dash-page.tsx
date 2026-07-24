@@ -293,7 +293,7 @@ export function DataTable({
       transition={{ duration: 0.35, delay: 0.1, ease: "easeOut" }}
       className={cn(softCard, "overflow-hidden")}
     >
-      <div className={tableWrap}>
+      <div className={cn(tableWrap, "scroll-touch max-h-[72vh] overflow-y-auto")}>
         <table className={cn(tableEl, minWidth)}>
           <thead>
             <tr className={tableHead}>{head}</tr>

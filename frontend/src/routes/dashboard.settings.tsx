@@ -1326,10 +1326,10 @@ function SettingsPage() {
               />
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              {etudiants.length} étudiant(s) · frais moyens{" "}
+              {etudiants.length} étudiant(s) · frais mensuels moyens{" "}
               {fmtMAD(
                 Math.round(
-                  etudiants.reduce((s, e) => s + e.fraisAnnuels, 0) /
+                  etudiants.reduce((s, e) => s + e.fraisMensuels, 0) /
                     Math.max(1, etudiants.length),
                 ),
               )}

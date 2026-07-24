@@ -176,8 +176,7 @@ export type Etudiant = {
   email: string;
   dateNaissance: string;
   ville: string;
-  fraisAnnuels: number;
-  resteAPayer: number;
+  fraisMensuels: number;
   notes: NoteModule[];
   historique: LignePaiement[];
   stageEnCours?: string;
@@ -206,8 +205,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "salma.elamrani@istpm.ma",
     dateNaissance: "2003-04-12",
     ville: "Agadir",
-    fraisAnnuels: 34000,
-    resteAPayer: 0,
+    fraisMensuels: 3400,
     notes: [
       { module: "Soins infirmiers en médecine", note: 15.5, coef: 3, credits: 6 },
       { module: "Pharmacologie", note: 13.0, coef: 2, credits: 4 },
@@ -219,6 +217,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2026-01-14", montant: 11000, mode: "Chèque", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-051", statut: "paye" },
       { date: "2026-04-10", montant: 11000, mode: "Virement", periode: "Tranche 3   2025/26", recu: "ISTPM-R-2604-077", statut: "paye" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "paye",
+      "mai 2026": "paye",
+      "juin 2026": "paye",
+    },
     stageEnCours: "CHR Hassan II   Service de Médecine interne",
   },
   {
@@ -238,8 +248,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "y.aittaleb@istpm.ma",
     dateNaissance: "2002-11-30",
     ville: "Inezgane",
-    fraisAnnuels: 38000,
-    resteAPayer: 13000,
+    fraisMensuels: 3800,
     notes: [
       { module: "Réanimation et soins intensifs", note: 13.5, coef: 3, credits: 6 },
       { module: "Anesthésie clinique", note: 11.0, coef: 3, credits: 6 },
@@ -250,6 +259,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2026-01-20", montant: 12000, mode: "Virement", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-064", statut: "paye" },
       { date: " ", montant: 13000, mode: "Virement", periode: "Tranche 3   2025/26", recu: " ", statut: "retard" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "retard",
+      "mai 2026": "retard",
+      "juin 2026": "retard",
+    },
     stageEnCours: "CHR Hassan II   Bloc opératoire",
   },
   {
@@ -269,8 +290,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "i.benkirane@istpm.ma",
     dateNaissance: "2004-02-18",
     ville: "Agadir",
-    fraisAnnuels: 32000,
-    resteAPayer: 0,
+    fraisMensuels: 3200,
     notes: [
       { module: "Obstétrique", note: 16.5, coef: 3, credits: 6 },
       { module: "Suivi de grossesse", note: 15.0, coef: 2, credits: 4 },
@@ -280,6 +300,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2025-09-28", montant: 16000, mode: "Virement", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2509-004", statut: "paye" },
       { date: "2026-02-02", montant: 16000, mode: "Carte", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2602-088", statut: "paye" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "paye",
+      "mai 2026": "paye",
+      "juin 2026": "paye",
+    },
     stageEnCours: "Hôpital Hassan II   Maternité",
   },
   {
@@ -299,8 +331,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "a.chafik@istpm.ma",
     dateNaissance: "2003-07-05",
     ville: "Taroudant",
-    fraisAnnuels: 33000,
-    resteAPayer: 16500,
+    fraisMensuels: 3300,
     notes: [
       { module: "Rééducation fonctionnelle", note: 12.0, coef: 3, credits: 6 },
       { module: "Anatomie du mouvement", note: 10.5, coef: 2, credits: 4 },
@@ -310,6 +341,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2025-10-15", montant: 16500, mode: "Chèque", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-045", statut: "paye" },
       { date: " ", montant: 16500, mode: "Virement", periode: "Tranche 2   2025/26", recu: " ", statut: "en_attente" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "en_attente",
+      "mars 2026": "en_attente",
+      "avril 2026": "en_attente",
+      "mai 2026": "en_attente",
+      "juin 2026": "en_attente",
+    },
     stageEnCours: "Clinique Al Massira   Rééducation",
   },
   {
@@ -329,8 +372,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "k.ouhssaine@istpm.ma",
     dateNaissance: "2002-05-22",
     ville: "Agadir",
-    fraisAnnuels: 35000,
-    resteAPayer: 0,
+    fraisMensuels: 3500,
     notes: [
       { module: "Techniques de radiologie", note: 14.0, coef: 3, credits: 6 },
       { module: "Scanner et IRM", note: 13.5, coef: 3, credits: 6 },
@@ -340,6 +382,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2025-09-30", montant: 17500, mode: "Virement", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2509-011", statut: "paye" },
       { date: "2026-01-30", montant: 17500, mode: "Virement", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-072", statut: "paye" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "paye",
+      "mai 2026": "paye",
+      "juin 2026": "paye",
+    },
     stageEnCours: "CHR Hassan II   Service d'imagerie",
   },
   {
@@ -359,8 +413,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "o.bennani@istpm.ma",
     dateNaissance: "2002-09-14",
     ville: "Agadir",
-    fraisAnnuels: 33000,
-    resteAPayer: 33000,
+    fraisMensuels: 3300,
     notes: [
       { module: "Hématologie", note: 8.5, coef: 3, credits: 6 },
       { module: "Biochimie clinique", note: 10.0, coef: 3, credits: 6 },
@@ -369,6 +422,18 @@ export const ETUDIANTS: Etudiant[] = [
     historique: [
       { date: " ", montant: 16500, mode: "Virement", periode: "Tranche 1   2025/26", recu: " ", statut: "impaye" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "impaye",
+      "octobre 2025": "impaye",
+      "novembre 2025": "impaye",
+      "décembre 2025": "impaye",
+      "janvier 2026": "impaye",
+      "février 2026": "impaye",
+      "mars 2026": "impaye",
+      "avril 2026": "impaye",
+      "mai 2026": "impaye",
+      "juin 2026": "impaye",
+    },
     stageEnCours: "Hôpital Hassan II   Laboratoire d'analyses",
   },
   {
@@ -388,8 +453,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "fz.lahlou@istpm.ma",
     dateNaissance: "2005-01-08",
     ville: "Aït Melloul",
-    fraisAnnuels: 30000,
-    resteAPayer: 0,
+    fraisMensuels: 3000,
     notes: [
       { module: "Anatomie dentaire", note: 14.0, coef: 2, credits: 4 },
       { module: "Matériaux de prothèse", note: 12.5, coef: 2, credits: 4 },
@@ -399,6 +463,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2025-10-02", montant: 15000, mode: "Espèces", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-002", statut: "paye" },
       { date: "2026-02-10", montant: 15000, mode: "Carte", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2602-095", statut: "paye" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "paye",
+      "mai 2026": "paye",
+      "juin 2026": "paye",
+    },
   },
   {
     id: "et-8",
@@ -417,8 +493,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "m.sabri@istpm.ma",
     dateNaissance: "2005-03-25",
     ville: "Agadir",
-    fraisAnnuels: 34000,
-    resteAPayer: 11000,
+    fraisMensuels: 3400,
     notes: [
       { module: "Bases des soins infirmiers", note: 11.0, coef: 3, credits: 6 },
       { module: "Anatomie-physiologie", note: 10.5, coef: 2, credits: 4 },
@@ -429,6 +504,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2026-01-25", montant: 11000, mode: "Virement", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-081", statut: "paye" },
       { date: " ", montant: 11000, mode: "Virement", periode: "Tranche 3   2025/26", recu: " ", statut: "retard" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "retard",
+      "mai 2026": "retard",
+      "juin 2026": "retard",
+    },
   },
   {
     id: "et-9",
@@ -447,8 +534,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "h.idrissi@istpm.ma",
     dateNaissance: "2003-12-01",
     ville: "Agadir",
-    fraisAnnuels: 32000,
-    resteAPayer: 8000,
+    fraisMensuels: 3200,
     notes: [
       { module: "Obstétrique avancée", note: 15.0, coef: 3, credits: 6 },
       { module: "Pathologies de la grossesse", note: 13.5, coef: 2, credits: 4 },
@@ -458,6 +544,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2026-01-18", montant: 12000, mode: "Chèque", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-060", statut: "paye" },
       { date: " ", montant: 8000, mode: "Virement", periode: "Tranche 3   2025/26", recu: " ", statut: "en_attente" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "paye",
+      "mai 2026": "en_attente",
+      "juin 2026": "en_attente",
+    },
     stageEnCours: "Hôpital préfectoral Inezgane   Maternité",
   },
   {
@@ -477,8 +575,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "z.moutaouakil@istpm.ma",
     dateNaissance: "2003-06-19",
     ville: "Ouarzazate",
-    fraisAnnuels: 33000,
-    resteAPayer: 0,
+    fraisMensuels: 3300,
     notes: [
       { module: "Kinésithérapie orthopédique", note: 14.5, coef: 3, credits: 6 },
       { module: "Électrothérapie", note: 13.0, coef: 2, credits: 4 },
@@ -487,6 +584,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2025-09-29", montant: 16500, mode: "Virement", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2509-007", statut: "paye" },
       { date: "2026-02-05", montant: 16500, mode: "Virement", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2602-090", statut: "paye" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "paye",
+      "mai 2026": "paye",
+      "juin 2026": "paye",
+    },
   },
   {
     id: "et-11",
@@ -505,8 +614,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "n.fadili@istpm.ma",
     dateNaissance: "2005-08-11",
     ville: "Agadir",
-    fraisAnnuels: 35000,
-    resteAPayer: 17500,
+    fraisMensuels: 3500,
     notes: [
       { module: "Physique des rayonnements", note: 12.0, coef: 2, credits: 4 },
       { module: "Introduction à l'imagerie", note: 13.25, coef: 2, credits: 4 },
@@ -515,6 +623,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2025-10-18", montant: 17500, mode: "Chèque", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-062", statut: "paye" },
       { date: " ", montant: 17500, mode: "Virement", periode: "Tranche 2   2025/26", recu: " ", statut: "en_attente" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "en_attente",
+      "mars 2026": "en_attente",
+      "avril 2026": "en_attente",
+      "mai 2026": "en_attente",
+      "juin 2026": "en_attente",
+    },
   },
   {
     id: "et-12",
@@ -533,8 +653,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "a.naciri@istpm.ma",
     dateNaissance: "2002-01-27",
     ville: "Agadir",
-    fraisAnnuels: 38000,
-    resteAPayer: 0,
+    fraisMensuels: 3800,
     notes: [
       { module: "Réanimation avancée", note: 16.0, coef: 3, credits: 6 },
       { module: "Prise en charge de la douleur", note: 15.0, coef: 2, credits: 4 },
@@ -543,6 +662,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2025-09-25", montant: 19000, mode: "Virement", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2509-001", statut: "paye" },
       { date: "2026-01-15", montant: 19000, mode: "Virement", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-052", statut: "paye" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "paye",
+      "mai 2026": "paye",
+      "juin 2026": "paye",
+    },
   },
   {
     id: "et-13",
@@ -561,8 +692,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "s.elghazi@istpm.ma",
     dateNaissance: "2005-10-03",
     ville: "Tiznit",
-    fraisAnnuels: 33000,
-    resteAPayer: 33000,
+    fraisMensuels: 3300,
     notes: [
       { module: "Bases de biochimie", note: 9.0, coef: 2, credits: 4 },
       { module: "Techniques de laboratoire", note: 8.5, coef: 2, credits: 4 },
@@ -570,6 +700,18 @@ export const ETUDIANTS: Etudiant[] = [
     historique: [
       { date: " ", montant: 16500, mode: "Virement", periode: "Tranche 1   2025/26", recu: " ", statut: "impaye" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "impaye",
+      "octobre 2025": "impaye",
+      "novembre 2025": "impaye",
+      "décembre 2025": "impaye",
+      "janvier 2026": "impaye",
+      "février 2026": "impaye",
+      "mars 2026": "impaye",
+      "avril 2026": "impaye",
+      "mai 2026": "impaye",
+      "juin 2026": "impaye",
+    },
   },
   {
     id: "et-14",
@@ -588,8 +730,7 @@ export const ETUDIANTS: Etudiant[] = [
     email: "b.ramdani@istpm.ma",
     dateNaissance: "2003-04-30",
     ville: "Agadir",
-    fraisAnnuels: 30000,
-    resteAPayer: 22000,
+    fraisMensuels: 3000,
     notes: [
       { module: "Prothèse amovible (TP)", note: 8.0, coef: 3, credits: 6 },
       { module: "Occlusodontie", note: 7.5, coef: 2, credits: 4 },
@@ -598,6 +739,18 @@ export const ETUDIANTS: Etudiant[] = [
       { date: "2025-10-08", montant: 8000, mode: "Espèces", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-040", statut: "paye" },
       { date: " ", montant: 22000, mode: "Virement", periode: "Solde 2025/26", recu: " ", statut: "impaye" },
     ],
+    paiementsMensuels: {
+      "septembre 2025": "paye",
+      "octobre 2025": "impaye",
+      "novembre 2025": "impaye",
+      "décembre 2025": "impaye",
+      "janvier 2026": "impaye",
+      "février 2026": "impaye",
+      "mars 2026": "impaye",
+      "avril 2026": "impaye",
+      "mai 2026": "impaye",
+      "juin 2026": "impaye",
+    },
   },
 ];
 
@@ -1631,7 +1784,15 @@ export const DASHBOARD = {
   deltaSemestre: 6,
   formateursActifs: FORMATEURS.filter((f) => f.statut !== "en_conge").length,
   tauxReussite: 78, // %
-  totalARecouvrer: ETUDIANTS.reduce((s, e) => s + e.resteAPayer, 0),
+  totalARecouvrer: ETUDIANTS.reduce(
+    (s, e) =>
+      s +
+      (Object.values(e.paiementsMensuels ?? {}).filter(
+        (v) => v !== "paye",
+      ).length *
+        e.fraisMensuels),
+    0,
+  ),
 };
 
 /** Répartition des étudiants par filière (pour donut). */
@@ -1671,25 +1832,30 @@ const encaisse = PAIEMENTS.filter((p) => p.statut === "paye").reduce(
   (s, p) => s + p.montant,
   0,
 );
+const unpaidForStatus = (
+  students: Etudiant[],
+  status: StatutPaiement,
+): number =>
+  students.reduce((s, e) => {
+    const months = Object.values(e.paiementsMensuels ?? {});
+    return s + months.filter((v) => v === status).length * e.fraisMensuels;
+  }, 0);
+
+const totalUnpaid = ETUDIANTS.reduce((s, e) => {
+  const months = Object.values(e.paiementsMensuels ?? {});
+  return s + months.filter((v) => v !== "paye").length * e.fraisMensuels;
+}, 0);
+
 export const FINANCIER = {
   encaisse,
   encaisseCeMois: 128500,
-  enAttente: ETUDIANTS.filter((e) => e.paiement === "en_attente").reduce(
-    (s, e) => s + e.resteAPayer,
-    0,
-  ),
-  impaye: ETUDIANTS.filter((e) => e.paiement === "impaye").reduce(
-    (s, e) => s + e.resteAPayer,
-    0,
-  ),
-  retard: ETUDIANTS.filter((e) => e.paiement === "retard").reduce(
-    (s, e) => s + e.resteAPayer,
-    0,
-  ),
-  tauxRecouvrement: Math.round(
-    (encaisse / (encaisse + ETUDIANTS.reduce((s, e) => s + e.resteAPayer, 0))) *
-      100,
-  ),
+  enAttente: unpaidForStatus(ETUDIANTS, "en_attente"),
+  impaye: unpaidForStatus(ETUDIANTS, "impaye"),
+  retard: unpaidForStatus(ETUDIANTS, "retard"),
+  tauxRecouvrement:
+    encaisse + totalUnpaid === 0
+      ? 100
+      : Math.round((encaisse / (encaisse + totalUnpaid)) * 100),
 };
 
 /** À traiter. */
@@ -1720,8 +1886,9 @@ export const ACTIVITE_RECENTE: ActiviteItem[] = [
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-export function fmtMAD(n: number): string {
-  return `${n.toLocaleString("fr-FR")} MAD`;
+export function fmtMAD(n: number | null | undefined): string {
+  const val = typeof n === "number" && Number.isFinite(n) ? n : 0;
+  return `${val.toLocaleString("fr-FR")} MAD`;
 }
 
 export function fmtDate(iso: string): string {
