@@ -15,8 +15,11 @@ const createSeanceSchema = z.object({
   filiere: z.string().min(1, "Filière requise"),
   salle: z.string().optional().default(""),
   groupe: z.string().optional().default(""),
-  type: z.enum(["cours", "td", "tp", "examen", "soutenance"]).optional().default("cours"),
+  type: z.enum(["cours", "td", "tp", "examen", "stage", "soutenance"]).optional().default("cours"),
   statut: z.enum(["planifie", "en_cours", "termine", "annule"]).optional().default("planifie"),
+  anneeUniversitaire: z.string().optional().default(""),
+  semestre: z.string().optional().default(""),
+  notes: z.string().optional().default(""),
 });
 
 const updateSeanceSchema = createSeanceSchema.partial();
@@ -25,7 +28,7 @@ export function enrichSeance(row: typeof seances.$inferSelect) {
   const year = row.date ? row.date.slice(0, 4) : "";
   return {
     ...row,
-    anneeUniversitaire: year ? `${year}/${Number(year) + 1}` : "",
+    anneeUniversitaire: row.anneeUniversitaire || (year ? `${year}/${Number(year) + 1}` : ""),
     semestre: row.semestre || "",
     notes: row.notes || undefined,
   };

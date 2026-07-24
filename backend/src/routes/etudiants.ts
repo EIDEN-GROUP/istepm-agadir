@@ -110,6 +110,7 @@ export async function etudiantRoutes(app: FastifyInstance) {
           dateNaissance: e.dateNaissance,
           ville: e.ville,
           fraisAnnuels: Number(e.fraisAnnuels),
+          fraisMensuels: Math.round(Number(e.fraisAnnuels) / 10),
           resteAPayer: Number(e.resteAPayer),
           notes: notes.map((n) => ({
             id: n.id,

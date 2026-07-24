@@ -269,6 +269,26 @@ export function resetSettings() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Seances                                                            */
+/* ------------------------------------------------------------------ */
+
+export function fetchSeances(params?: { start?: string; end?: string; professeurId?: string; date?: string }) {
+  return api.get<Record<string, unknown>[]>("/seances", params);
+}
+
+export function createSeance(data: Record<string, unknown>) {
+  return api.post<Record<string, unknown>>("/seances", data);
+}
+
+export function updateSeance(id: string, data: Record<string, unknown>) {
+  return api.put<Record<string, unknown>>(`/seances/${id}`, data);
+}
+
+export function deleteSeance(id: string) {
+  return api.delete<{ ok: boolean }>(`/seances/${id}`);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Dashboard aggregates                                               */
 /* ------------------------------------------------------------------ */
 

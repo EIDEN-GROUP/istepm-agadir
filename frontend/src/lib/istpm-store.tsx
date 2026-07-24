@@ -89,6 +89,10 @@ import {
   deleteNote as apiDeleteNote,
   createFiliereApi,
   deleteFiliereApi,
+  fetchSeances as apiFetchSeances,
+  createSeance as apiCreateSeance,
+  updateSeance as apiUpdateSeance,
+  deleteSeance as apiDeleteSeance,
 } from "@/lib/istpm-api";
 
 /* ------------------------------------------------------------------ */
@@ -369,30 +373,38 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        const [etudiants, formateurs, examens, bulletins, stages] =
+        const [etudiants, formateurs, examens, bulletins, stages, seances] =
           await Promise.all([
             apiFetchEtudiants(),
             apiFetchFormateurs(),
             apiFetchExamens(),
             apiFetchBulletins(),
             apiFetchStages(),
+            apiFetchSeances(),
           ]);
         if (!mounted) return;
-        const derivePaiementsMensuels = (e: Etudiant): Etudiant => {
-          if (!e.historique || e.paiementsMensuels) return e;
-          const pm: Record<string, StatutPaiement> = {};
-          for (const h of e.historique) {
-            if (h.mois) pm[h.mois] = h.statut as StatutPaiement;
+        const enrichEtudiant = (raw: Record<string, unknown>): Etudiant => {
+          const e = raw as unknown as Etudiant;
+          if (!e.fraisMensuels && (raw as any).fraisAnnuels) {
+            (e as any).fraisMensuels = Math.round(Number((raw as any).fraisAnnuels) / 10);
           }
-          return { ...e, paiementsMensuels: pm };
+          if (!e.paiementsMensuels && e.historique) {
+            const pm: Record<string, StatutPaiement> = {};
+            for (const h of e.historique) {
+              if (h.mois) pm[h.mois] = h.statut;
+            }
+            (e as any).paiementsMensuels = pm;
+          }
+          return e;
         };
         setSnap((s) => ({
           ...s,
-          etudiants: (etudiants as Etudiant[]).map(derivePaiementsMensuels),
+          etudiants: (etudiants as unknown as Record<string, unknown>[]).map(enrichEtudiant),
           formateurs: formateurs as Formateur[],
           examens: examens as Examen[],
           bulletins: bulletins as Bulletin[],
           stages: stages as Stage[],
+          seances: seances as Seance[],
         }));
       } catch {
         // Backend not available — keep localStorage data.
@@ -932,22 +944,27 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const addSeance = useCallback((data: NouvelleSeance) => {
     const seance: Seance = { ...data, id: uid("se") };
+    apiCreateSeance(data as unknown as Record<string, unknown>).catch(() => {});
     setSnap((s) => ({ ...s, seances: [...s.seances, seance] }));
     return seance;
   }, []);
 
   const updateSeance = useCallback(
-    (id: string, patch: Partial<Seance>) =>
+    (id: string, patch: Partial<Seance>) => {
+      apiUpdateSeance(id, patch as unknown as Record<string, unknown>).catch(() => {});
       setSnap((s) => ({
         ...s,
         seances: s.seances.map((x) => (x.id === id ? { ...x, ...patch } : x)),
-      })),
+      }));
+    },
     [],
   );
 
   const deleteSeance = useCallback(
-    (id: string) =>
-      setSnap((s) => ({ ...s, seances: s.seances.filter((x) => x.id !== id) })),
+    (id: string) => {
+      apiDeleteSeance(id).catch(() => {});
+      setSnap((s) => ({ ...s, seances: s.seances.filter((x) => x.id !== id) }));
+    },
     [],
   );
 
