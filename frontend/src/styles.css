@@ -110,14 +110,14 @@
   --istpm-ink: #123b3a;
   --istpm-white: #ffffff;
 
-  /* Teal channels (space-separated for `rgb(... / a)` alpha syntax) used by the
-     soft-card shadow language. NB: must stay space-separated   the older
-     comma form `2, 153, 148` makes every `rgb(var(--istpm-shadow) / a)` shadow
-     invalid, so they silently render as `none`. */
-  --istpm-shadow: 2 153 148;
-  /* Neutral ink channels (space-separated for `rgb(... / a)` alpha syntax)
-     for crisp, colour-neutral elevation on white. */
-  --istpm-ink-rgb: 18 59 58;
+  /* Shadow channels (space-separated for `rgb(... / a)` alpha syntax) used by the
+     soft-card shadow language. Kept NEUTRAL grey on purpose: coloured (teal)
+     shadows read as artificial, so elevation stays a plain, human drop shadow.
+     NB: must stay space-separated   the older comma form `2, 153, 148` makes
+     every `rgb(var(--istpm-shadow) / a)` shadow invalid (renders as `none`). */
+  --istpm-shadow: 23 23 26;
+  /* Neutral ink channels for crisp, colour-neutral elevation on white. */
+  --istpm-ink-rgb: 23 23 26;
 
   /* Legacy --eiden-* names kept as aliases: the landing-page utility
    * classes further down still reference them. Re-pointed at the ISTPM
@@ -213,17 +213,17 @@
    * read as physically lifted rather than blurred.
    * ------------------------------------------------------------------ */
   --elevation-1:
-    0 1px 2px -1px rgb(var(--istpm-ink-rgb) / 0.16),
-    0 2px 6px -1px rgb(var(--istpm-ink-rgb) / 0.10);
+    0 1px 2px -1px rgb(var(--istpm-ink-rgb) / 0.08),
+    0 1px 3px 0 rgb(var(--istpm-ink-rgb) / 0.06);
   --elevation-2:
-    0 2px 6px -2px rgb(var(--istpm-ink-rgb) / 0.14),
-    0 12px 28px -8px rgb(var(--istpm-ink-rgb) / 0.18);
+    0 1px 2px -1px rgb(var(--istpm-ink-rgb) / 0.06),
+    0 6px 16px -8px rgb(var(--istpm-ink-rgb) / 0.10);
   --elevation-3:
-    0 8px 18px -6px rgb(var(--istpm-ink-rgb) / 0.18),
-    0 24px 48px -14px rgb(var(--istpm-ink-rgb) / 0.24);
+    0 4px 10px -6px rgb(var(--istpm-ink-rgb) / 0.09),
+    0 14px 28px -14px rgb(var(--istpm-ink-rgb) / 0.13);
   --elevation-4:
-    0 14px 28px -10px rgb(var(--istpm-ink-rgb) / 0.20),
-    0 40px 72px -24px rgb(var(--istpm-ink-rgb) / 0.34);
+    0 8px 18px -10px rgb(var(--istpm-ink-rgb) / 0.10),
+    0 26px 50px -22px rgb(var(--istpm-ink-rgb) / 0.18);
   /* Highlight applied inset at a card's top edge for a "lit from above" feel. */
   --edge-highlight: inset 0 1px 0 rgb(255 255 255 / 0.7);
 }

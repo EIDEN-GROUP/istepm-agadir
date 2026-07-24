@@ -27,8 +27,7 @@ export function DashTabs({
   return (
     <div
       className={cn(
-        "relative flex w-full overflow-x-auto rounded-2xl border border-brand/10 bg-muted/60 p-1 shadow-[0_4px_20px_-8px_rgb(var(--istpm-shadow)/0.18)]",
-        "scrollbar-none",
+        "relative flex w-full gap-1 overflow-x-auto border-b border-border bg-background/80 backdrop-blur-sm scrollbar-none",
         className,
       )}
       role="tablist"
@@ -43,17 +42,22 @@ export function DashTabs({
             aria-selected={isActive}
             onClick={() => onChange(i)}
             className={cn(
-              "relative z-10 flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200",
-              "outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-1",
+              "relative flex items-center justify-center gap-2 whitespace-nowrap px-4 py-3 text-sm font-medium transition-colors duration-200",
+              "outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-inset",
               isActive
-                ? "text-brand-dk"
+                ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
             {Icon ? (
-              <Icon className="hidden h-4 w-4 shrink-0 sm:block" />
+              <Icon
+                className={cn(
+                  "hidden h-4 w-4 shrink-0 transition-colors sm:block",
+                  isActive ? "text-brand" : "text-muted-foreground",
+                )}
+              />
             ) : null}
-            <span className="truncate whitespace-nowrap">
+            <span className="truncate">
               <span className="sm:hidden">{t.short ?? t.label}</span>
               <span className="hidden sm:inline">{t.label}</span>
             </span>
@@ -62,30 +66,24 @@ export function DashTabs({
                 className={cn(
                   "inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none",
                   isActive
-                    ? "bg-brand/15 text-brand-dk"
-                    : "bg-muted-foreground/12 text-muted-foreground",
+                    ? "bg-brand text-white"
+                    : "bg-muted-foreground/15 text-muted-foreground",
                 )}
               >
                 {t.badge > 99 ? "99+" : t.badge}
               </span>
             ) : null}
+            {/* Animated underline indicator */}
+            {isActive ? (
+              <motion.span
+                layoutId="dash-tab-underline"
+                transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-brand"
+              />
+            ) : null}
           </button>
         );
       })}
-      {/* Animated floating indicator */}
-      <motion.div
-        layout
-        layoutId="dash-tab-indicator"
-        transition={{ type: "spring", stiffness: 500, damping: 35 }}
-        className={cn(
-          "pointer-events-none absolute bottom-1 left-0 top-1 z-0 rounded-xl bg-card shadow-[0_2px_8px_-2px_rgb(var(--istpm-shadow)/0.24)]",
-          "ring-1 ring-black/[0.03]",
-        )}
-        style={{
-          left: `${(100 / tabs.length) * active}%`,
-          width: `${100 / tabs.length}%`,
-        }}
-      />
     </div>
   );
 }

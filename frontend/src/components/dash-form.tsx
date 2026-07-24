@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { Check, ChevronsUpDown, FileText, Upload, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronsUpDown, FileText, Upload, X } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   Dialog,
@@ -524,13 +524,16 @@ export function ConfirmDialog({
             </div>
           }
         >
-          <motion.p
+          <motion.div
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-sm text-foreground"
+            className="flex gap-3.5"
           >
-            {message}
-          </motion.p>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-alert/12 text-alert ring-1 ring-inset ring-alert/20">
+              <AlertTriangle className="h-5 w-5" />
+            </span>
+            <p className="text-sm leading-relaxed text-foreground">{message}</p>
+          </motion.div>
         </DetailShell>
       </DialogContent>
     </Dialog>

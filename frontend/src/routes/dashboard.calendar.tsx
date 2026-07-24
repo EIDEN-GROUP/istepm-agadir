@@ -335,12 +335,14 @@ const [importOpen, setImportOpen] = useState(false);
         title="Emploi du temps"
         actions={
           <>
-            <button
-              className={cn(ghostPill, "gap-1.5")}
-              onClick={() => setImportOpen(true)}
-            >
-              <Upload className="h-3.5 w-3.5" /> Importer CSV
-            </button>
+            {canEdit ? (
+              <button
+                className={cn(ghostPill, "gap-1.5")}
+                onClick={() => setImportOpen(true)}
+              >
+                <Upload className="h-3.5 w-3.5" /> Importer CSV
+              </button>
+            ) : null}
             <button className={cn(ghostPill, "gap-1.5")} onClick={exportCsv}>
               <Download className="h-3.5 w-3.5" /> Exporter CSV
             </button>

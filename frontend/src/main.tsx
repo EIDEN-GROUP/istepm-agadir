@@ -6,6 +6,7 @@ import { routeTree } from "@/routeTree.gen";
 import { AuthProvider } from "@/lib/auth";
 import { DashboardI18nProvider } from "@/lib/dashboard-i18n";
 import { IstpmProvider } from "@/lib/istpm-store";
+import { AppLoadingGate } from "@/components/brand-loader";
 import "./styles.css";
 
 const queryClient = new QueryClient();
@@ -29,7 +30,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <AuthProvider>
         <DashboardI18nProvider>
           <IstpmProvider>
-            <RouterProvider router={router} />
+            <AppLoadingGate>
+              <RouterProvider router={router} />
+            </AppLoadingGate>
           </IstpmProvider>
         </DashboardI18nProvider>
       </AuthProvider>

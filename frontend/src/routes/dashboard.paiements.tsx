@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Plus, BellRing, Eye, Receipt } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, BellRing, Eye, Receipt, ListChecks, CalendarDays, Search } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -30,6 +30,8 @@ import {
   iconButton,
   TONE_COLORS,
   dialogSurface,
+  softInput,
+  labelClass,
 } from "@/lib/dash-ui";
 import {
   PageHeader,
@@ -63,6 +65,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { softSelectTrigger, softSelectContent } from "@/lib/dash-ui";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { DashTabs } from "@/components/dash-tabs";
 import { cn } from "@/lib/utils";
 
 const MODES: LignePaiement["mode"][] = [
@@ -85,6 +90,7 @@ function PaiementsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [relanceOpen, setRelanceOpen] = useState(false);
   const [detail, setDetail] = useState<PaiementLigne | null>(null);
+  const [tab, setTab] = useState(0); // 0 = transactions · 1 = suivi mensuel
   const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear);
   const months = useMemo(() => getAcademicYearMonths(academicYear), [academicYear]);
 
@@ -142,7 +148,7 @@ function PaiementsPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         {kpis.map((k, i) => (
           <motion.div
             key={k.label}
@@ -165,6 +171,17 @@ function PaiementsPage() {
         ))}
       </div>
 
+      <DashTabs
+        tabs={[
+          { label: "Transactions", icon: ListChecks },
+          { label: "Suivi mensuel", short: "Mensuel", icon: CalendarDays },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
+
+      {tab === 0 ? (
+        <>
       <FilterPanel
         search={search}
         onSearch={setSearch}
@@ -252,8 +269,10 @@ function PaiementsPage() {
           </motion.tr>
         ))}
       </DataTable>
-
-      <MonthlyTracker etudiants={etudiants} canEdit={canEdit} academicYear={academicYear} onAcademicYearChange={setAcademicYear} months={months} />
+        </>
+      ) : (
+        <MonthlyTracker etudiants={etudiants} canEdit={canEdit} academicYear={academicYear} onAcademicYearChange={setAcademicYear} months={months} />
+      )}
 
       {/* Détail d'un règlement */}
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
@@ -434,17 +453,12 @@ function MonthlyTracker({
 
   return (
     <section className={cn(softCard, "p-4 sm:p-5")}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Suivi mensuel
-          </p>
-          <h2 className="mt-1 font-display text-lg font-bold tracking-tight text-foreground">
-            Paiements par mois
-          </h2>
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="w-44">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <p className="max-w-xs text-sm text-muted-foreground">
+          Statut de règlement, mois par mois, pour un étudiant donné.
+        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="w-full sm:w-44">
             <SelectField
               label="Année universitaire"
               value={academicYear}
@@ -550,6 +564,117 @@ function MonthlyTracker({
 
 /* ------------------------------------------------------------------ */
 
+/**
+ * Champ étudiant en autocomplétion : l'utilisateur tape directement dans le
+ * champ et la liste se filtre en direct sous le champ (nom, prénom ou CNE).
+ */
+function StudentSearchField({
+  students,
+  value,
+  onChange,
+  error,
+}: {
+  students: { id: string; prenom: string; nom: string; cne: string }[];
+  value: string;
+  onChange: (id: string) => void;
+  error?: string;
+}) {
+  const label = (s: { prenom: string; nom: string; cne: string }) =>
+    `${s.prenom} ${s.nom} — ${s.cne}`;
+  const selected = students.find((s) => s.id === value);
+  const [query, setQuery] = useState(selected ? label(selected) : "");
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  const q = query.trim().toLowerCase();
+  const matches = useMemo(() => {
+    const base = q
+      ? students.filter((s) =>
+          `${s.prenom} ${s.nom} ${s.cne}`.toLowerCase().includes(q),
+        )
+      : students;
+    return base.slice(0, 8);
+  }, [students, q]);
+
+  // Un clic hors du champ referme la liste.
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const choose = (s: { id: string; prenom: string; nom: string; cne: string }) => {
+    onChange(s.id);
+    setQuery(label(s));
+    setOpen(false);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <Label className={labelClass}>
+        Étudiant<span className="ml-0.5 text-alert">*</span>
+      </Label>
+      <div ref={boxRef} className="relative">
+        <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
+        <Input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            if (value) onChange("");
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder="Rechercher un étudiant…"
+          autoComplete="off"
+          className={cn(softInput, "ps-9", error && "border-alert focus-visible:border-alert")}
+        />
+        {open ? (
+          <ul
+            className={cn(
+              softSelectContent,
+              "absolute z-50 mt-1 max-h-64 w-full overflow-auto border bg-popover p-1 shadow-lg surface-3",
+            )}
+          >
+            {matches.length ? (
+              matches.map((s) => (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      choose(s);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-start text-sm transition-colors hover:bg-brand/10",
+                      value === s.id && "bg-brand/10",
+                    )}
+                  >
+                    <span className="truncate">
+                      {s.prenom} {s.nom}
+                    </span>
+                    <span className="ms-auto shrink-0 font-mono text-xs text-muted-foreground">
+                      {s.cne}
+                    </span>
+                  </button>
+                </li>
+              ))
+            ) : (
+              <li className="px-3 py-2 text-sm text-muted-foreground">
+                Aucun étudiant trouvé.
+              </li>
+            )}
+          </ul>
+        ) : null}
+      </div>
+      {error ? <p className="text-[11px] text-alert">{error}</p> : null}
+    </div>
+  );
+}
+
 function PaiementForm({
   etudiants,
   academicYear,
@@ -570,7 +695,6 @@ function PaiementForm({
     etudiantId: "",
     montant: "" as number | "",
     mode: "Espèces" as LignePaiement["mode"],
-    periode: "",
     mois: getDefaultMois(academicYear),
     date: new Date().toISOString().slice(0, 10),
     statut: "paye" as StatutPaiement,
@@ -589,7 +713,6 @@ function PaiementForm({
     if (!etudiant) next.etudiantId = "Étudiant obligatoire";
     if (f.montant === "" || Number(f.montant) <= 0)
       next.montant = "Montant supérieur à 0 requis";
-    if (!f.periode.trim()) next.periode = "Période obligatoire";
     if (!f.date) next.date = "Date obligatoire";
 
     if (Object.keys(next).length || !etudiant) {
@@ -604,7 +727,7 @@ function PaiementForm({
         date: f.date,
         montant: Number(f.montant),
         mode: f.mode,
-        periode: f.periode.trim(),
+        periode: `${f.mois.charAt(0).toUpperCase()}${f.mois.slice(1)} ${academicYear}`,
         mois: f.mois,
         statut: f.statut,
       },
@@ -621,18 +744,10 @@ function PaiementForm({
       onSubmit={submit}
     >
       <FullWidth>
-        <ComboBoxField
-          label="Étudiant"
-          required
+        <StudentSearchField
+          students={etudiants}
           value={f.etudiantId}
           onChange={(v) => set("etudiantId", v)}
-          options={etudiants.map((e) => ({
-            value: e.id,
-            label: `${e.prenom} ${e.nom}   ${e.cne}`,
-          }))}
-          placeholder="Rechercher un étudiant…"
-          searchPlaceholder="Nom, prénom ou CNE…"
-          emptyText="Aucun étudiant trouvé."
           error={errors.etudiantId}
         />
       </FullWidth>
@@ -670,14 +785,6 @@ function PaiementForm({
           value: m,
           label: m.charAt(0).toUpperCase() + m.slice(1),
         }))}
-      />
-      <TextField
-        label="Période"
-        required
-        value={f.periode}
-        onChange={(v) => set("periode", v)}
-        placeholder="Tranche 2   2025/2026"
-        error={errors.periode}
       />
       <TextField
         label="Date"

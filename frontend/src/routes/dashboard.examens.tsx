@@ -10,6 +10,7 @@ import {
   FileText,
   FileWarning,
   ClipboardList,
+  PenLine,
   Lock,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -85,6 +86,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { DashTabs } from "@/components/dash-tabs";
 import { cn } from "@/lib/utils";
 
 const TYPES: TypeExamen[] = [
@@ -381,10 +383,17 @@ function EspaceFormateur() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Examen | null>(null);
   const [toDelete, setToDelete] = useState<Examen | null>(null);
+  // 0 = liste des examens · 1 = saisie des notes
+  const [tab, setTab] = useState(0);
 
   const mesExamens = useMemo(
     () => examens.filter((x) => x.createdBy === moiId),
     [examens, moiId],
+  );
+
+  const aNoter = useMemo(
+    () => mesExamens.filter((x) => x.statut !== "notes_saisies").length,
+    [mesExamens],
   );
 
   const filtered = useMemo(() => {
@@ -406,24 +415,26 @@ function EspaceFormateur() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Espace formateur"
-        title="Mes examens"
+        title="Examens"
         actions={
-          <>
-            {sansSujet ? (
-              <span className="rounded-full bg-warn-pale px-3 py-1.5 text-xs font-medium text-warn">
-                {sansSujet} sans sujet déposé
-              </span>
-            ) : null}
-            <button
-              className={primaryPill}
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> Nouvel examen
-            </button>
-          </>
+          tab === 0 ? (
+            <>
+              {sansSujet ? (
+                <span className="rounded-full bg-warn-pale px-3 py-1.5 text-xs font-medium text-warn">
+                  {sansSujet} sans sujet déposé
+                </span>
+              ) : null}
+              <button
+                className={primaryPill}
+                onClick={() => {
+                  setEditing(null);
+                  setFormOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4" /> Nouvel examen
+              </button>
+            </>
+          ) : null
         }
       />
 
@@ -431,6 +442,22 @@ function EspaceFormateur() {
         {moi ? `${moi.prenom} ${moi.nom} · ${moi.departement}` : null}
       </p>
 
+      <DashTabs
+        tabs={[
+          { label: "Mes examens", short: "Examens", icon: ClipboardList },
+          {
+            label: "Saisie des notes",
+            short: "Notes",
+            icon: PenLine,
+            badge: aNoter,
+          },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
+
+      {tab === 0 ? (
+      <>
       <FilterPanel
         search={search}
         onSearch={setSearch}
@@ -548,8 +575,12 @@ function EspaceFormateur() {
           </motion.tr>
         ))}
       </DataTable>
+      </>
+      ) : (
+        <SaisieNotesPanel examens={mesExamens} />
+      )}
 
-      {/* Détail + saisie des notes */}
+      {/* Boîtes de dialogue   montées en permanence, indépendantes de l'onglet */}
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className={dialogSurfaceWide}>
           <DialogTitle className="sr-only">Détail de l'examen</DialogTitle>
@@ -623,8 +654,6 @@ function EspaceFormateur() {
           setToDelete(null);
         }}
       />
-
-      <SaisieNotesPanel examens={mesExamens} />
     </div>
   );
 }
@@ -1261,19 +1290,16 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
   };
 
   return (
-    <section className="space-y-4">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Notes
-        </p>
-        <h2 className="mt-1 flex items-center gap-2 font-display text-lg font-bold tracking-tight text-foreground">
-          <ClipboardList className="h-5 w-5 text-brand" /> Saisie des notes
-        </h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Choisissez l'un de vos examens, puis saisissez une note pour chaque
-          étudiant de la classe concernée.
-        </p>
-      </div>
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="space-y-4"
+    >
+      <p className="text-sm text-muted-foreground">
+        Choisissez l'un de vos examens, puis saisissez une note pour chaque
+        étudiant de la classe concernée.
+      </p>
 
       {/* Saisie par examen / classe */}
       <div className={cn(softCard, "space-y-4 p-4 sm:p-5")}>
@@ -1402,7 +1428,7 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
           </motion.tr>
         ))}
       </DataTable>
-    </section>
+    </motion.section>
   );
 }
 

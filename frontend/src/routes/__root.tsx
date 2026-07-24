@@ -1,5 +1,4 @@
 import { createRootRoute, Outlet, Link } from "@tanstack/react-router";
-import { LanguageToggleFloating } from "@/components/language-toggle";
 
 function NotFoundComponent() {
   return (
@@ -30,7 +29,6 @@ export const Route = createRootRoute({
   component: () => (
     <div className="relative">
       <Outlet />
-      <LanguageToggleFloating />
     </div>
   ),
 });

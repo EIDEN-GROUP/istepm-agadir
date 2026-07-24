@@ -22,6 +22,7 @@ import {
   Settings,
   Hospital,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth, ROLE_META, type UserRole } from "@/lib/auth";
 import {
@@ -57,13 +58,21 @@ import {
   primaryPill,
   ghostPill,
   iconButtonDanger,
-  eyebrowClass,
   toneBadge,
   softInput,
 } from "@/lib/dash-ui";
 import { PageHeader } from "@/components/dash-page";
+import { DashTabs } from "@/components/dash-tabs";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+
+/** Libellé court + icône pour la navigation par catégorie de réglages. */
+const GROUPE_META: Record<string, { short: string; icone: typeof Users }> = {
+  "Organisation pédagogique": { short: "Pédagogie", icone: LayoutGrid },
+  "Structure de l'institut": { short: "Institut", icone: Building2 },
+  Administration: { short: "Administration", icone: ShieldCheck },
+  Évaluation: { short: "Évaluation", icone: ClipboardList },
+};
 
 /* ------------------------------------------------------------------ */
 /*  Périmètre par rôle                                                 */
@@ -672,6 +681,7 @@ function SettingsPage() {
     Object.values(TYPE_EXAMEN_LABEL),
   );
   const [resetOpen, setResetOpen] = useState(false);
+  const [activeGroup, setActiveGroup] = useState(0);
 
   const [institut, setInstitut] = useState({
     nom: "ISTEPM Agadir",
@@ -850,18 +860,35 @@ function SettingsPage() {
         </p>
       ) : null}
 
-      {groupesAffiches.map((nomGroupe) => (
-        <div key={nomGroupe} className="space-y-3">
-          <h2 className={eyebrowClass}>{nomGroupe}</h2>
-          <div className="grid gap-4 lg:grid-cols-2">
+      <DashTabs
+        tabs={groupesAffiches.map((g) => ({
+          label: g,
+          short: GROUPE_META[g]?.short ?? g,
+          icon: GROUPE_META[g]?.icone,
+        }))}
+        active={Math.min(activeGroup, groupesAffiches.length - 1)}
+        onChange={setActiveGroup}
+      />
+
+      {(() => {
+        const nomGroupe =
+          groupesAffiches[Math.min(activeGroup, groupesAffiches.length - 1)];
+        return (
+          <motion.div
+            key={nomGroupe}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="grid gap-4 lg:grid-cols-2"
+          >
             {autorisees
               .filter((id) => META[id].groupe === nomGroupe)
               .map((id) => (
                 <div key={id}>{renderSection(id)}</div>
               ))}
-          </div>
-        </div>
-      ))}
+          </motion.div>
+        );
+      })()}
 
       {/* Données de démonstration   accessible aux deux rôles */}
       <section className={cn(softCard, "p-5")}>

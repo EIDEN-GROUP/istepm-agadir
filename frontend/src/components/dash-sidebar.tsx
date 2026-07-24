@@ -12,7 +12,7 @@
  * right without a second set of styles.
  */
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ChevronDown,
@@ -99,15 +99,24 @@ function useCollapsed() {
 /* ------------------------------------------------------------------ */
 
 const ROW_BASE =
-  "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand/40";
+  "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-lt/60";
 
-/** Teal active pill with a rounded indicator on the inline-start edge. */
+/**
+ * Dark navigation rail surface. A deep teal-ink gradient with a lit top edge
+ * and a faint brand glow at the base   keeps the institute's teal identity
+ * while giving the shell the premium, focused feel of the reference dashboards.
+ */
+const RAIL_STYLE: CSSProperties = {
+  backgroundColor: "color-mix(in srgb, var(--istpm-ink) 90%, #000)",
+};
+
+/** Slim teal accent bar on the inline-start edge of the active row. */
 function ActiveIndicator({ show }: { show: boolean }) {
   return (
     <span
       aria-hidden
       className={cn(
-        "absolute inset-y-1.5 start-0 w-1 rounded-full bg-white/90 transition-all duration-200",
+        "absolute inset-y-2 start-0 w-[3px] rounded-full bg-brand-lt transition-all duration-200",
         show ? "opacity-100" : "scale-y-0 opacity-0",
       )}
     />
@@ -138,14 +147,16 @@ function NavRow({
         ROW_BASE,
         collapsed ? "justify-center px-0" : nested && "ps-9",
         active
-          ? "bg-brand text-white shadow-[0_10px_24px_-12px_rgb(var(--istpm-shadow)/0.9)]"
-          : "text-muted-foreground hover:bg-brand/8 hover:text-brand-dk",
+          ? "bg-white/[0.09] text-white ring-1 ring-inset ring-white/10"
+          : "text-white/55 hover:bg-white/[0.06] hover:text-white",
       )}
     >
       {active && !collapsed ? <ActiveIndicator show /> : null}
       <Icon
-        className={cn("h-[18px] w-[18px] shrink-0 transition-transform duration-200",
-          !active && "group-hover:scale-110")}
+        className={cn(
+          "h-[18px] w-[18px] shrink-0 transition-transform duration-200",
+          active ? "text-brand-lt" : "group-hover:scale-110",
+        )}
         strokeWidth={active ? 2.25 : 1.75}
       />
       {/* Label is unmounted (not just hidden) when collapsed so it cannot be
@@ -193,8 +204,8 @@ function NavGroupBlock({
           ROW_BASE,
           "w-full justify-center px-0",
           hasActiveChild
-            ? "bg-brand/12 text-brand-dk"
-            : "text-muted-foreground hover:bg-brand/8 hover:text-brand-dk",
+            ? "bg-white/10 text-white"
+            : "text-white/60 hover:bg-white/[0.07] hover:text-white",
         )}
       >
         <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
@@ -212,8 +223,8 @@ function NavGroupBlock({
           ROW_BASE,
           "w-full",
           hasActiveChild && !open
-            ? "bg-brand/12 text-brand-dk"
-            : "text-muted-foreground hover:bg-brand/8 hover:text-brand-dk",
+            ? "bg-white/10 text-white"
+            : "text-white/60 hover:bg-white/[0.07] hover:text-white",
         )}
       >
         <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
@@ -277,15 +288,15 @@ function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
       <SelectTrigger
         aria-label="Changer de profil"
         className={cn(
-          "h-9 rounded-xl border-brand/20 bg-card text-xs font-medium shadow-none focus:ring-0 focus:ring-offset-0",
+          "h-9 rounded-xl border-white/12 bg-white/[0.06] text-xs font-medium text-white/85 shadow-none transition-colors hover:bg-white/10 focus:ring-0 focus:ring-offset-0 [&>svg]:text-white/50 data-[state=open]:bg-white/10",
           collapsed ? "w-9 justify-center px-0 [&>svg:last-child]:hidden" : "w-full px-3",
         )}
       >
         {collapsed ? (
-          <UserCog className="h-4 w-4 shrink-0 text-brand" />
+          <UserCog className="h-4 w-4 shrink-0 text-brand-lt" />
         ) : (
           <span className="flex min-w-0 items-center gap-2">
-            <UserCog className="h-4 w-4 shrink-0 text-brand" />
+            <UserCog className="h-4 w-4 shrink-0 text-brand-lt" />
             <span className="truncate">{ROLE_META[role].short}</span>
           </span>
         )}
@@ -329,11 +340,11 @@ function SidebarBody({
   const navigate = useNavigate();
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-card">
+    <div className="flex h-full min-h-0 flex-col text-white" style={RAIL_STYLE}>
       {/* En-tête : marque */}
       <div
         className={cn(
-          "flex shrink-0 items-center gap-2.5 border-b border-brand/12 px-4",
+          "flex shrink-0 items-center gap-2.5 border-b border-white/10 px-4",
           collapsed ? "h-16 justify-center px-0" : "h-16",
         )}
       >
@@ -342,17 +353,19 @@ function SidebarBody({
           onClick={onNavigate}
           className="flex min-w-0 items-center gap-2.5"
         >
-          <img
-            src="/istpm-logo-mark.svg"
-            alt={`${brand} logo`}
-            className="h-9 w-9 shrink-0"
-          />
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white shadow-[0_8px_18px_-8px_rgba(0,0,0,0.5)] ring-1 ring-white/20">
+            <img
+              src="/istpm-logo-mark.svg"
+              alt={`${brand} logo`}
+              className="h-7 w-7"
+            />
+          </span>
           {collapsed ? null : (
             <span className="min-w-0">
-              <span className="block truncate font-display text-sm font-bold leading-tight tracking-tight text-foreground">
+              <span className="block truncate font-display text-sm font-bold leading-tight tracking-tight text-white">
                 {brand}
               </span>
-              <span className="block truncate text-[10px] leading-tight text-muted-foreground">
+              <span className="block truncate text-[10px] leading-tight text-white/55">
                 Techniques paramédicales
               </span>
             </span>
@@ -363,7 +376,7 @@ function SidebarBody({
             type="button"
             onClick={onToggleCollapse}
             aria-label="Réduire le menu"
-            className="ms-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk"
+            className="ms-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white"
           >
             <PanelLeftClose className="h-4 w-4 rtl:rotate-180" />
           </button>
@@ -400,20 +413,20 @@ function SidebarBody({
       {/* Pied : profil + déconnexion */}
       <div
         className={cn(
-          "shrink-0 space-y-2 border-t border-brand/12 p-3",
+          "shrink-0 space-y-2 border-t border-white/10 p-3",
           collapsed && "flex flex-col items-center",
         )}
       >
         {collapsed ? null : (
-          <div className="flex items-center gap-2.5 px-1 pb-1">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand text-sm font-semibold text-white">
+          <div className="flex items-center gap-2.5 rounded-xl bg-white/[0.04] px-2 py-2">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand text-sm font-semibold text-white ring-1 ring-white/15">
               {(user?.name || "A").slice(0, 1).toUpperCase()}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-semibold text-foreground">
+              <span className="block truncate text-xs font-semibold text-white">
                 {user?.name}
               </span>
-              <span className="block truncate text-[10px] text-muted-foreground">
+              <span className="block truncate text-[10px] text-white/55">
                 {user ? ROLE_META[user.role].label : null}
               </span>
             </span>
@@ -431,7 +444,7 @@ function SidebarBody({
           aria-label={t.shell.logoutAria}
           title={collapsed ? t.shell.logout : undefined}
           className={cn(
-            "flex items-center gap-2 rounded-xl border border-brand/20 text-xs font-medium text-muted-foreground transition hover:bg-alert/10 hover:text-alert",
+            "flex items-center gap-2 rounded-xl border border-white/12 text-xs font-medium text-white/70 transition hover:border-alert/40 hover:bg-alert/15 hover:text-white",
             collapsed ? "h-9 w-9 justify-center" : "w-full px-3 py-2",
           )}
         >
@@ -444,7 +457,7 @@ function SidebarBody({
             type="button"
             onClick={onToggleCollapse}
             aria-label="Déplier le menu"
-            className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk"
+            className="grid h-9 w-9 place-items-center rounded-xl text-white/50 transition hover:bg-white/10 hover:text-white"
           >
             <PanelLeftOpen className="h-4 w-4 rtl:rotate-180" />
           </button>
@@ -539,7 +552,7 @@ export function DashSidebarShell({
             type="button"
             onClick={() => setDrawerOpen(false)}
             aria-label="Fermer le menu"
-            className="absolute end-3 top-4 z-10 grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition hover:bg-brand/10"
+            className="absolute end-3 top-4 z-10 grid h-8 w-8 place-items-center rounded-lg text-white/60 transition hover:bg-white/10 hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -557,7 +570,7 @@ export function DashSidebarShell({
       {/* Colonne principale */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Barre supérieure mobile */}
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-brand/12 bg-card px-4 lg:hidden">
+        <header className="glass-bar flex h-14 shrink-0 items-center gap-3 border-b border-brand/12 px-4 lg:hidden">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}

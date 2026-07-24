@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Eye, Download, Trash2, Upload } from "lucide-react";
+import { Plus, Pencil, Eye, Download, Trash2, Upload, ListFilter } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -85,10 +85,36 @@ function EtudiantsPage() {
   // and the directeur's job.
   const canEdit = role === "directeur" || role === "responsable";
 
+  // Teachers start from an explicit selection (filière + semestre + groupe)
+  // rather than the full roster, so the view stays focused on one class.
+  const isTeacher = role === "enseignant";
+
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
   const [niveau, setNiveau] = useState<string>(ALL);
+  const [groupe, setGroupe] = useState<string>(ALL);
   const [statut, setStatut] = useState<string>(ALL);
+
+  // Groups relevant to the current filière / semestre choice, so the teacher's
+  // group picker only offers real classes.
+  const groupeOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of etudiants) {
+      if (filiere !== ALL && e.filiere !== filiere) continue;
+      if (niveau !== ALL && e.niveau !== niveau) continue;
+      if (e.groupe) set.add(e.groupe);
+    }
+    return [...set].sort();
+  }, [etudiants, filiere, niveau]);
+
+  // Drop a group choice that no longer matches the filière/semestre.
+  useEffect(() => {
+    if (groupe !== ALL && !groupeOptions.includes(groupe)) setGroupe(ALL);
+  }, [groupeOptions, groupe]);
+
+  // Teacher must pick all three before the roster appears.
+  const needsSelection =
+    isTeacher && (filiere === ALL || niveau === ALL || groupe === ALL);
 
   const [detail, setDetail] = useState<Etudiant | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -101,6 +127,7 @@ function EtudiantsPage() {
     return etudiants.filter((e) => {
       if (filiere !== ALL && e.filiere !== filiere) return false;
       if (niveau !== ALL && e.niveau !== niveau) return false;
+      if (groupe !== ALL && e.groupe !== groupe) return false;
       if (statut !== ALL && STATUT_ETUDIANT_LABEL[e.statut] !== statut)
         return false;
       if (!q) return true;
@@ -108,7 +135,7 @@ function EtudiantsPage() {
         .toLowerCase()
         .includes(q);
     });
-  }, [etudiants, search, filiere, niveau, statut]);
+  }, [etudiants, search, filiere, niveau, groupe, statut]);
 
   const openCreate = () => {
     setEditing(null);
@@ -277,27 +304,47 @@ function EtudiantsPage() {
             value: niveau,
             onChange: setNiveau,
             options: NIVEAUX,
-            allLabel: "Tous les semestres",
+            allLabel: isTeacher ? "Choisir un semestre" : "Tous les semestres",
           },
           {
-            id: "statut",
-            label: "Statut",
-            value: statut,
-            onChange: setStatut,
-            options: STATUTS.map((s) => STATUT_ETUDIANT_LABEL[s]),
-            allLabel: "Tous les statuts",
+            id: "groupe",
+            label: "Groupe",
+            value: groupe,
+            onChange: setGroupe,
+            options: groupeOptions,
+            allLabel: isTeacher ? "Choisir un groupe" : "Tous les groupes",
           },
+          ...(isTeacher
+            ? []
+            : [
+                {
+                  id: "statut",
+                  label: "Statut",
+                  value: statut,
+                  onChange: setStatut,
+                  options: STATUTS.map((s) => STATUT_ETUDIANT_LABEL[s]),
+                  allLabel: "Tous les statuts",
+                },
+              ]),
         ]}
         summary={
-          <>
-            <strong className="font-semibold text-foreground">
-              {filtered.length}
-            </strong>{" "}
-            étudiant{filtered.length > 1 ? "s" : ""} sur {etudiants.length}
-          </>
+          needsSelection ? (
+            <>Choisissez une filière, un semestre et un groupe.</>
+          ) : (
+            <>
+              <strong className="font-semibold text-foreground">
+                {filtered.length}
+              </strong>{" "}
+              étudiant{filtered.length > 1 ? "s" : ""}
+              {isTeacher ? "" : ` sur ${etudiants.length}`}
+            </>
+          )
         }
       />
 
+      {needsSelection ? (
+        <SelectionPrompt />
+      ) : (
       <DataTable
         isEmpty={filtered.length === 0}
         empty="Aucun étudiant ne correspond à ces critères."
@@ -389,6 +436,7 @@ function EtudiantsPage() {
           </motion.tr>
         ))}
       </DataTable>
+      )}
 
       {/* Fiche détaillée */}
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
@@ -451,6 +499,38 @@ function EtudiantsPage() {
         onImport={handleImportEtudiants}
       />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Invite de sélection (vue formateur)                                */
+/* ------------------------------------------------------------------ */
+
+function SelectionPrompt() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className={cn(
+        "flex flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-brand/25 bg-card px-6 py-14 text-center sm:py-20",
+      )}
+    >
+      <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand/10 text-brand-dk">
+        <ListFilter className="h-6 w-6" />
+      </span>
+      <div className="max-w-sm space-y-1.5">
+        <h3 className="font-display text-lg font-bold tracking-tight text-foreground">
+          Choisissez un groupe à afficher
+        </h3>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Sélectionnez une <strong className="font-semibold text-foreground">filière</strong>,
+          un <strong className="font-semibold text-foreground">semestre</strong> et un{" "}
+          <strong className="font-semibold text-foreground">groupe</strong> ci-dessus pour
+          afficher la liste des étudiants concernés.
+        </p>
+      </div>
+    </motion.div>
   );
 }
 

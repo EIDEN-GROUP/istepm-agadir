@@ -2,18 +2,6 @@
 import { type ReactNode, useMemo, useRef, useState, useEffect } from "react";
 import { motion, animate, useInView } from "framer-motion";
 import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import {
   UserPlus,
   PenLine,
   Wallet,
@@ -50,17 +38,14 @@ import {
 } from "@/lib/istpm-data";
 import {
   softCard,
-  eyebrowClass,
   toneBadge,
-  dashTooltip,
-  renderPieLabel,
-  CHART_COLORS,
   TONE_COLORS,
   avatarChip,
   initials,
   primaryPill,
 } from "@/lib/dash-ui";
 import { DashTabs, DashTabPanel, type DashTab } from "@/components/dash-tabs";
+import { AreaTrend, LineTrend, BarSeries, HBarSeries, DonutChart } from "@/components/dash-charts";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
@@ -131,38 +116,34 @@ function DashHero({ chips }: { chips: { label: string; value: string | number }[
 
   return (
     <motion.header
-      initial={{ opacity: 0, y: -16 }}
+      initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="relative overflow-hidden rounded-3xl border border-brand/15 bg-brand p-5 text-white shadow-[0_28px_70px_-38px_rgb(var(--istpm-shadow)/0.9)] sm:p-7"
+      className="flex flex-wrap items-end justify-between gap-5 border-b border-border pb-5"
     >
-
-      <div className="relative flex flex-wrap items-end justify-between gap-5">
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/75">
-            
-            {role ? ROLE_META[role].label : "Tableau de bord"}
-          </p>
-          <h1 className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
-            {greeting}{user?.name ? `, ${user.name}` : ""}
-          </h1>
-          <p className="mt-1.5 text-sm capitalize text-white/80">{dateStr}</p>
-        </div>
-
-        {chips.length ? (
-          <div className="flex flex-wrap gap-2">
-            {chips.map((c) => (
-              <div
-                key={c.label}
-                className="rounded-2xl border border-white/20 bg-white/12 px-3.5 py-2 backdrop-blur-sm"
-              >
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-white/70">{c.label}</p>
-                <p className="mt-0.5 font-display text-lg font-bold leading-none">{c.value}</p>
-              </div>
-            ))}
-          </div>
-        ) : null}
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-dk">
+          {role ? ROLE_META[role].label : "Tableau de bord"}
+        </p>
+        <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-[2.5rem]">
+          {greeting}{user?.name ? `, ${user.name}` : ""}
+        </h1>
+        <p className="mt-1.5 text-sm capitalize text-muted-foreground">{dateStr}</p>
       </div>
+
+      {chips.length ? (
+        <div className="flex flex-wrap gap-2.5">
+          {chips.map((c) => (
+            <div
+              key={c.label}
+              className="rounded-xl border border-border bg-card px-4 py-2.5"
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{c.label}</p>
+              <p className="mt-1 font-display text-lg font-bold leading-none text-foreground">{c.value}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </motion.header>
   );
 }
@@ -233,7 +214,10 @@ function KpiCard({
         {Icon ? (
           <span
             className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg sm:h-11 sm:w-11"
-            style={{ backgroundColor: `${TONE_COLORS[tone]}18` }}
+            style={{
+              background: `linear-gradient(135deg, ${TONE_COLORS[tone]}26, ${TONE_COLORS[tone]}0d)`,
+              boxShadow: `inset 0 0 0 1px ${TONE_COLORS[tone]}2b`,
+            }}
           >
             <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: TONE_COLORS[tone] }} />
           </span>
@@ -249,7 +233,7 @@ function KpiGrid({ children }: { children: ReactNode }) {
       initial="hidden"
       animate="show"
       variants={{ show: { transition: { staggerChildren: 0.04 } } }}
-      className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
+      className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5"
     >
       {children}
     </motion.div>
@@ -345,21 +329,6 @@ function MeterRow({ label, ratio, color, detail }: {
         />
       </div>
       <span className="whitespace-nowrap text-xs text-muted-foreground">{detail}</span>
-    </div>
-  );
-}
-
-function ChartCard({ title, children, height = 240 }: {
-  title: string; children: ReactNode; height?: number;
-}) {
-  return (
-    <div className={cn(softCard, "p-4 sm:p-5")}>
-      <p className={eyebrowClass}>{title}</p>
-      <div className="mt-3 w-full" style={{ height }}>
-        <ResponsiveContainer width="100%" height="100%">
-          {children as React.ReactElement}
-        </ResponsiveContainer>
-      </div>
     </div>
   );
 }
@@ -611,18 +580,10 @@ function DashboardDirecteur() {
           <div className="space-y-6">
             <Section title="Analyse">
               <div className="grid gap-4 xl:grid-cols-2">
-                <ChartCard title="Répartition par filière">
-                  <PieChart><Pie data={repartitionFiliere} dataKey="value" nameKey="name" innerRadius="45%" outerRadius="78%" paddingAngle={2} label={renderPieLabel} labelLine={false}>{repartitionFiliere.map((_, i) => (<Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />))}</Pie><Tooltip contentStyle={dashTooltip} /></PieChart>
-                </ChartCard>
-                <ChartCard title="Répartition par niveau">
-                  <BarChart data={repartitionNiveau}><CartesianGrid stroke="var(--border)" vertical={false} /><XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" /><YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" width={32} /><Tooltip contentStyle={dashTooltip} cursor={false} /><Bar dataKey="value" fill="var(--chart-2)" radius={[6, 6, 0, 0]} /></BarChart>
-                </ChartCard>
-                <ChartCard title="Examens par mois">
-                  <BarChart data={examensParMois}><CartesianGrid stroke="var(--border)" vertical={false} /><XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" interval="preserveStartEnd" /><YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" width={32} /><Tooltip contentStyle={dashTooltip} cursor={false} /><Bar dataKey="value" fill="var(--chart-3)" radius={[6, 6, 0, 0]} /></BarChart>
-                </ChartCard>
-                <ChartCard title="Séances par jour de la semaine">
-                  <BarChart data={sessionsParJour}><CartesianGrid stroke="var(--border)" vertical={false} /><XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" /><YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" width={32} /><Tooltip contentStyle={dashTooltip} cursor={false} /><Bar dataKey="value" fill="var(--chart-4)" radius={[6, 6, 0, 0]} /></BarChart>
-                </ChartCard>
+                <DonutChart title="Répartition par filière" data={repartitionFiliere} />
+                <BarSeries title="Répartition par niveau" data={repartitionNiveau} colorful />
+                <AreaTrend title="Examens par mois" data={examensParMois} color="var(--chart-1)" />
+                <LineTrend title="Séances par jour de la semaine" data={sessionsParJour} color="var(--chart-5)" />
               </div>
             </Section>
             <Section title="Charge des formateurs">
@@ -665,7 +626,7 @@ function DashboardEnseignant() {
       <DashHero chips={[{ label: "Groupes", value: moi.groupes.length }, { label: "Séances ajd", value: seancesAujourdhui.length }, { label: "Ã€ noter", value: aNoter.length }]} />
       <DashWorkspace tabs={PROFESSOR_TABS} tab={tab} onChange={setTab} direction={direction}>
         {tab === 0 ? (
-          <div className="space-y-6">
+          <div className="space-y-5">
             <KpiGrid>
               <KpiCard label="Mes groupes" value={moi.groupes.length} icon={Users} />
               <KpiCard label="Mes modules" value={moi.modules.length} tone="blue" icon={BookOpen} />
@@ -674,9 +635,7 @@ function DashboardEnseignant() {
               <KpiCard label="Examens Ã  noter" value={aNoter.length} tone={aNoter.length ? "red" : "teal"} icon={PenLine} />
             </KpiGrid>
             <div className="grid gap-6 xl:grid-cols-2">
-              <Section title="Mes séances aujourd&rsquo;hui" action={<SectionLink to="/dashboard/calendar">Mon planning</SectionLink>}>
-                <AujourdhuiTable seances={seancesAujourdhui} />
-              </Section>
+              <Section title="Notifications"><ActiviteFeed /></Section>
               <Section title="Mon calendrier (7 jours)" action={<SectionLink to="/dashboard/calendar">Voir tout</SectionLink>}>
                 <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
                   {calendrierProche.length ? calendrierProche.map((s) => (
@@ -695,14 +654,16 @@ function DashboardEnseignant() {
                 </div>
               </Section>
             </div>
-            <Section title="Notifications"><ActiviteFeed /></Section>
+            <Section title="Mes séances aujourd&rsquo;hui" action={<SectionLink to="/dashboard/calendar">Mon planning</SectionLink>}>
+                <AujourdhuiTable seances={seancesAujourdhui} />
+              </Section>
           </div>
         ) : tab === 1 ? (
           <Section title="Mes examens" action={<Link to="/dashboard/examens" className={primaryPill}><Plus className="h-4 w-4" />Créer un examen</Link>}>
             <ExamensRecentsTable examens={mesExamens} />
           </Section>
         ) : (
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="grid gap-6 xl:grid-cols-1">
             <Section title="Mes étudiants" action={<SectionLink to="/dashboard/etudiants">Tous les étudiants</SectionLink>}>
               <StudentAvatarList etudiants={mesEtudiants} />
             </Section>
@@ -811,17 +772,17 @@ function DashboardResponsable() {
           </div>
         ) : (
           <Section title="Analyse">
-            <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-              <ChartCard title="Occupation des salles" height={220}>
-                <PieChart><Pie data={occupationSalles.map((o) => ({ name: o.salle, value: o.seancesCount }))} dataKey="value" nameKey="name" innerRadius="45%" outerRadius="78%" paddingAngle={2} label={renderPieLabel} labelLine={false}>{occupationSalles.map((_, i) => (<Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />))}</Pie><Tooltip contentStyle={dashTooltip} /></PieChart>
-              </ChartCard>
-              <ChartCard title="Séances par jour" height={220}>
-                <BarChart data={sessionsParJour}><CartesianGrid stroke="var(--border)" vertical={false} /><XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" /><YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" width={32} /><Tooltip contentStyle={dashTooltip} cursor={false} /><Bar dataKey="value" fill="var(--chart-4)" radius={[6, 6, 0, 0]} /></BarChart>
-              </ChartCard>
-              <ChartCard title="Charge des formateurs" height={220}>
-                <BarChart data={workloadData} layout="vertical"><CartesianGrid stroke="var(--border)" horizontal={false} /><XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" /><YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" width={60} /><Tooltip contentStyle={dashTooltip} cursor={false} formatter={(value: number, _name: string, entry: { payload?: { seances?: number } }) => [`${entry.payload?.seances ?? value} séances`, "Charge"]} /><Bar dataKey="value" fill="var(--chart-1)" radius={[0, 6, 6, 0]} /></BarChart>
-              </ChartCard>
+            <div className="grid gap-4 lg:grid-cols-1 2xl:grid-cols-2">
+              <DonutChart title="Occupation des salles" height={220} data={occupationSalles.map((o) => ({ name: o.salle, value: o.seancesCount }))} />
+              <HBarSeries
+                title="Charge des formateurs"
+                height={220}
+                data={workloadData}
+                formatter={(value: number, _name: string, entry: { payload?: { seances?: number } }) => [`${entry.payload?.seances ?? value} séances`, "Charge"]}
+              />
             </div>
+            <AreaTrend title="Séances par jour" height={220} data={sessionsParJour} color="var(--chart-4)" />
+            
           </Section>
         )}
       </DashWorkspace>
