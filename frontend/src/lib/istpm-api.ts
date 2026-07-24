@@ -414,3 +414,50 @@ export function deleteUser(id: string) {
 export function assignUserRole(id: string, role: string) {
   return api.put<UserRecord>(`/auth/users/${id}/role`, { role });
 }
+
+/* ------------------------------------------------------------------ */
+/*  AI Agent                                                           */
+/* ------------------------------------------------------------------ */
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ProposedAction {
+  toolCallId: string;
+  actionName: string;
+  params: Record<string, unknown>;
+  reasoning: string;
+}
+
+export interface AnalyzeResult {
+  reasoning: string;
+  proposedActions: ProposedAction[];
+}
+
+export function analyzeIntent(messages: ChatMessage[]) {
+  return api.post<AnalyzeResult>("/agent/analyze", { messages });
+}
+
+export function confirmAction(actionName: string, params: Record<string, unknown>) {
+  return api.post<{ success: boolean; data: unknown; error?: string }>("/agent/confirm", {
+    actionName,
+    params,
+  });
+}
+
+export function executeBatchActions(
+  actions: { actionName: string; params: Record<string, unknown> }[],
+) {
+  return api.post<{ results: unknown[]; failedAt: number | null; error?: string }>(
+    "/agent/execute-batch",
+    { actions },
+  );
+}
+
+export function fetchAgentActions() {
+  return api.get<
+    { name: string; description: string; category: string; paramsCount: number }[]
+  >("/agent/actions");
+}

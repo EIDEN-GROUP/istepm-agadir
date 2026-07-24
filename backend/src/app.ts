@@ -37,6 +37,7 @@ import { attendanceRoutes } from "@/routes/attendance";
 import { reminderRoutes } from "@/routes/reminders";
 import { reportRoutes } from "@/routes/reports";
 import { noteRoutes } from "@/routes/notes";
+import { agentRoutes } from "@/routes/agent";
 
 export async function buildApp() {
   const env = getEnv();
@@ -108,6 +109,7 @@ export async function buildApp() {
   await app.register(reminderRoutes, { prefix: "/api/reminders" });
   await app.register(reportRoutes, { prefix: "/api/reports" });
   await app.register(noteRoutes, { prefix: "/api/notes" });
+  await app.register(agentRoutes, { prefix: "/api/agent" });
 
   return app;
 }

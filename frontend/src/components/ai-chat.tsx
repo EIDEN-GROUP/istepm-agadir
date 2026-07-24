@@ -1,0 +1,429 @@
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type KeyboardEvent,
+  type FormEvent,
+} from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { MessageCircle, X, Send, Loader2, Check, Ban, Pencil, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { softCard, primaryPill, ghostPill } from "@/lib/dash-ui";
+import {
+  analyzeIntent,
+  confirmAction,
+  type ChatMessage,
+  type ProposedAction,
+} from "@/lib/istpm-api";
+
+/* ------------------------------------------------------------------ */
+/*  Loading Dots                                                       */
+/* ------------------------------------------------------------------ */
+
+function LoadingDots() {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          className="h-2 w-2 rounded-full bg-brand/60"
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Action Card                                                        */
+/* ------------------------------------------------------------------ */
+
+function ActionCard({
+  action,
+  index,
+  onAccept,
+  onDecline,
+  onModify,
+  disabled,
+}: {
+  action: ProposedAction;
+  index: number;
+  onAccept: () => void;
+  onDecline: () => void;
+  onModify: () => void;
+  disabled: boolean;
+}) {
+  const actionLabel = action.actionName.replace(/_/g, " ");
+  const isReadAction = action.actionName.startsWith("get_") || action.actionName.startsWith("list_");
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ delay: index * 0.08, duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      className={cn(
+        softCard,
+        "overflow-hidden border-l-4",
+        isReadAction ? "border-l-blue-400" : "border-l-brand",
+      )}
+    >
+      <div className="space-y-2 px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {isReadAction ? "Lecture" : "Écriture"}
+          </span>
+        </div>
+        <p className="text-sm font-semibold text-foreground capitalize">{actionLabel}</p>
+        {Object.keys(action.params).length > 0 && (
+          <pre className="max-h-28 overflow-auto rounded-xl bg-muted/50 p-2 text-[10px] text-muted-foreground">
+            {JSON.stringify(action.params, null, 1)}
+          </pre>
+        )}
+        {isReadAction && (
+          <p className="text-[10px] text-blue-500 font-medium">
+            Action de lecture — exécutée automatiquement
+          </p>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onAccept}
+            disabled={disabled}
+            className="inline-flex items-center gap-1 rounded-full bg-brand px-3 py-1.5 text-[11px] font-bold text-white transition hover:brightness-105 disabled:opacity-40"
+          >
+            <Check className="h-3 w-3" /> Accepter
+          </button>
+          <button
+            type="button"
+            onClick={onDecline}
+            disabled={disabled}
+            className="inline-flex items-center gap-1 rounded-full border border-alert/30 px-3 py-1.5 text-[11px] font-semibold text-alert transition hover:bg-alert/10 disabled:opacity-40"
+          >
+            <Ban className="h-3 w-3" /> Refuser
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Message Bubble                                                     */
+/* ------------------------------------------------------------------ */
+
+function MessageBubble({ msg }: { msg: ChatMessage }) {
+  const isUser = msg.role === "user";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={cn("flex", isUser ? "justify-end" : "justify-start")}
+    >
+      <div
+        className={cn(
+          "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+          isUser
+            ? "bg-brand text-white"
+            : "bg-muted/70 text-foreground",
+        )}
+      >
+        {msg.content}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Floating Button                                                    */
+/* ------------------------------------------------------------------ */
+
+function FloatingButton({ onClick, open }: { onClick: () => void; open: boolean }) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      aria-label="Assistant IA"
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      className={cn(
+        "fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-[0_16px_40px_-12px_rgb(var(--istpm-shadow)/0.5)] transition-shadow hover:shadow-[0_20px_50px_-12px_rgb(var(--istpm-shadow)/0.6)]",
+        open
+          ? "bg-muted text-foreground ring-1 ring-brand/20"
+          : "bg-gradient-to-b from-brand to-brand-dk text-white",
+      )}
+    >
+      <AnimatePresence mode="wait">
+        {open ? (
+          <motion.span key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
+            <X className="h-5 w-5" />
+          </motion.span>
+        ) : (
+          <motion.span key="msg" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.15 }}>
+            <MessageCircle className="h-5 w-5" />
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </motion.button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main Chat Component                                                */
+/* ------------------------------------------------------------------ */
+
+export function AiChatFloating() {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: "assistant",
+      content: "Bonjour ! Je suis votre assistant IA. Je peux vous aider à gérer les étudiants, formateurs, examens, bulletins, stages, paiements et plus encore. Que souhaitez-vous faire ?",
+    },
+  ]);
+  const [proposedActions, setProposedActions] = useState<ProposedAction[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [input, setInput] = useState("");
+  const [executing, setExecuting] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const scrollToBottom = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  useEffect(() => scrollToBottom(), [messages, proposedActions, loading, scrollToBottom]);
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    function handleKeyDown(e: globalThis.KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setOpen((o) => !o);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  async function handleSend(e?: FormEvent) {
+    e?.preventDefault();
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput("");
+    setProposedActions([]);
+
+    const userMsg: ChatMessage = { role: "user", content: text };
+    const updated = [...messages, userMsg];
+    setMessages(updated);
+    setLoading(true);
+
+    try {
+      const result = await analyzeIntent(updated);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: result.reasoning },
+      ]);
+      setProposedActions(result.proposedActions);
+
+      const readActions = result.proposedActions.filter(
+        (a) => a.actionName.startsWith("get_") || a.actionName.startsWith("list_"),
+      );
+      if (readActions.length === result.proposedActions.length && readActions.length > 0) {
+        for (const action of readActions) {
+          try {
+            const res = await confirmAction(action.actionName, action.params);
+            const dataStr =
+              typeof res.data === "object"
+                ? JSON.stringify(res.data).slice(0, 500)
+                : String(res.data);
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: `Résultat de **${action.actionName.replace(/_/g, " ")}** :\n\`\`\`json\n${dataStr}\n\`\`\``,
+              },
+            ]);
+          } catch (err) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: `Erreur lors de l'exécution de ${action.actionName}: ${err instanceof Error ? err.message : "Erreur"}`,
+              },
+            ]);
+          }
+        }
+        setProposedActions([]);
+      }
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `Désolé, je n'ai pas pu analyser votre demande : ${err instanceof Error ? err.message : "Erreur inconnue"}`,
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAccept(action: ProposedAction) {
+    setExecuting(action.actionName);
+    try {
+      const res = await confirmAction(action.actionName, action.params);
+      const dataStr =
+        typeof res.data === "object"
+          ? JSON.stringify(res.data, null, 1).slice(0, 1000)
+          : String(res.data);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `✅ Action **${action.actionName.replace(/_/g, " ")}** exécutée avec succès.\n\`\`\`json\n${dataStr}\n\`\`\``,
+        },
+      ]);
+      setProposedActions([]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `❌ Erreur lors de l'exécution : ${err instanceof Error ? err.message : "Erreur inconnue"}`,
+        },
+      ]);
+    } finally {
+      setExecuting(null);
+    }
+  }
+
+  function handleDecline(action: ProposedAction) {
+    setProposedActions((prev) => prev.filter((a) => a.toolCallId !== action.toolCallId));
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: `✋ Action **${action.actionName.replace(/_/g, " ")}** refusée.`,
+      },
+    ]);
+  }
+
+  function handleModify(action: ProposedAction) {
+    const newParams = prompt(
+      `Modifier les paramètres pour ${action.actionName.replace(/_/g, " ")}:\n(Format: JSON)`,
+      JSON.stringify(action.params, null, 2),
+    );
+    if (!newParams) return;
+    try {
+      const parsed = JSON.parse(newParams);
+      setProposedActions((prev) =>
+        prev.map((a) =>
+          a.toolCallId === action.toolCallId ? { ...a, params: parsed } : a,
+        ),
+      );
+    } catch {
+      alert("JSON invalide");
+    }
+  }
+
+  return (
+    <>
+      <FloatingButton onClick={() => setOpen((o) => !o)} open={open} />
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className={cn(
+              softCard,
+              "fixed bottom-24 right-6 z-50 flex w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden shadow-[0_32px_80px_-20px_rgb(var(--istpm-shadow)/0.5)]",
+            )}
+            style={{ height: 560, maxHeight: "calc(100vh - 8rem)" }}
+          >
+            {/* Header */}
+            <div className="flex shrink-0 items-center gap-3 border-b border-brand/12 bg-gradient-to-r from-brand to-brand-dk px-5 py-4 text-white">
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-white/20">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold">Assistant IA</p>
+                <p className="text-[10px] opacity-80">Cmd+K pour ouvrir/fermer</p>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-4 py-4">
+              {messages.map((msg, i) => (
+                <MessageBubble key={i} msg={msg} />
+              ))}
+
+              {proposedActions.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Actions proposées
+                  </p>
+                  {proposedActions.map((a, i) => (
+                    <ActionCard
+                      key={a.toolCallId}
+                      action={a}
+                      index={i}
+                      onAccept={() => handleAccept(a)}
+                      onDecline={() => handleDecline(a)}
+                      onModify={() => handleModify(a)}
+                      disabled={executing === a.actionName}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="flex items-center gap-3 rounded-2xl bg-muted/70 px-4 py-3">
+                    <LoadingDots />
+                    <span className="text-xs text-muted-foreground">Analyse en cours...</span>
+                  </div>
+                </div>
+              )}
+
+              <div ref={bottomRef} />
+            </div>
+
+            {/* Input */}
+            <form
+              onSubmit={handleSend}
+              className="flex shrink-0 items-center gap-2 border-t border-brand/12 px-4 py-3"
+            >
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Décrivez ce que vous voulez faire..."
+                disabled={loading}
+                className="min-w-0 flex-1 rounded-full border border-brand/20 bg-card px-4 py-2 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/50 hover:border-brand/35 focus:border-brand focus:ring-4 focus:ring-brand/15 disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || loading}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand text-white transition hover:brightness-105 disabled:opacity-40"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}

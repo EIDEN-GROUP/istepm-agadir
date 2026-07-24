@@ -26,6 +26,7 @@ import {
 import { ROLES, ROLE_META, useAuth } from "@/lib/auth";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
 import { Toaster } from "@/components/ui/sonner";
+import { AiChatFloating } from "@/components/ai-chat";
 import {
   Select,
   SelectContent,
@@ -585,6 +586,7 @@ export function DashSidebarShell({
       </div>
 
       <Toaster />
+      <AiChatFloating />
     </div>
   );
 }

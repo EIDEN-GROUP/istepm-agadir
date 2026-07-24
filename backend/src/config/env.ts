@@ -41,6 +41,10 @@ const envSchema = z.object({
 
   ADMIN_API_KEY: z.string().default("superadmin-secret-key-change-me"),
 
+  AI_API_KEY: z.string().default(""),
+  AI_BASE_URL: z.string().default("https://integrate.api.nvidia.com/v1"),
+  AI_MODEL: z.string().default("nvidia/qwen-qwen3.5-397b-a17b"),
+
   LOG_LEVEL: z.string().default("info"),
 });
 
