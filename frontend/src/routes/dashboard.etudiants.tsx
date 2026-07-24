@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Eye, Download, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
+import { fetchStudentSemestres } from "@/lib/istpm-api";
 import {
   FILIERES,
   NIVEAUX,
@@ -659,7 +660,12 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
   const progression = e.fraisAnnuels
     ? Math.round((paye / e.fraisAnnuels) * 100)
     : 0;
-  const semestres = historiqueSemestres(e);
+  const [semestres, setSemestres] = useState<SemestreResume[]>(() => historiqueSemestres(e));
+  useEffect(() => {
+    fetchStudentSemestres(e.id)
+      .then((data) => setSemestres(data as SemestreResume[]))
+      .catch(() => {});
+  }, [e.id]);
 
   return (
     <DetailShell

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { bulletins } from "@/db/schema/bulletins";
+import { notesEtudiant } from "@/db/schema/notes-etudiant";
 import { eq, desc, sql } from "drizzle-orm";
 
 const bulletinSchema = z.object({
@@ -64,7 +65,28 @@ export async function bulletinRoutes(app: FastifyInstance) {
       );
     }
 
-    return result;
+    const rows = await result;
+    return Promise.all(
+      rows.map(async (b) => {
+        const notes = await db
+          .select()
+          .from(notesEtudiant)
+          .where(eq(notesEtudiant.etudiantId, b.etudiantId));
+        return {
+          ...b,
+          moyenne: Number(b.moyenne),
+          evaluationClinique: Number(b.evaluationClinique),
+          notes: notes.map((n) => ({
+            id: n.id,
+            module: n.module,
+            note: Number(n.note),
+            coef: Number(n.coef),
+            credits: Number(n.credits),
+            examen: n.examen || undefined,
+          })),
+        };
+      }),
+    );
   });
 
   app.get("/:id", { preHandler: [authenticate] }, async (request, reply) => {
@@ -76,7 +98,23 @@ export async function bulletinRoutes(app: FastifyInstance) {
       .where(eq(bulletins.id, id))
       .limit(1);
     if (!bulletin) return reply.status(404).send({ error: "Bulletin introuvable" });
-    return bulletin;
+    const notes = await db
+      .select()
+      .from(notesEtudiant)
+      .where(eq(notesEtudiant.etudiantId, bulletin.etudiantId));
+    return {
+      ...bulletin,
+      moyenne: Number(bulletin.moyenne),
+      evaluationClinique: Number(bulletin.evaluationClinique),
+      notes: notes.map((n) => ({
+        id: n.id,
+        module: n.module,
+        note: Number(n.note),
+        coef: Number(n.coef),
+        credits: Number(n.credits),
+        examen: n.examen || undefined,
+      })),
+    };
   });
 
   app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {

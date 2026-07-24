@@ -38,6 +38,7 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
         montant: historiquePaiements.montant,
         mode: historiquePaiements.mode,
         periode: historiquePaiements.periode,
+        mois: historiquePaiements.mois,
         recu: historiquePaiements.recu,
         statut: historiquePaiements.statut,
         etudiantPrenom: etudiants.prenom,

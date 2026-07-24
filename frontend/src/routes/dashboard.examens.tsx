@@ -15,6 +15,7 @@ import {
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
+import { deleteNote } from "@/lib/istpm-api";
 import { useIstpm, moyennePonderee } from "@/lib/istpm-store";
 import {
   FILIERES,
@@ -1250,6 +1251,10 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
   const removeNote = (etudiantId: string, module: string) => {
     const e = etudiants.find((x) => x.id === etudiantId);
     if (!e) return;
+    const note = e.notes.find((n) => n.module === module);
+    if (note?.id) {
+      deleteNote(note.id).catch(() => toast.error("Erreur lors de la suppression côté serveur"));
+    }
     const notes = e.notes.filter((n) => n.module !== module);
     updateEtudiant(etudiantId, { notes, moyenne: moyennePonderee(notes) });
     toast.success("Note supprimée");

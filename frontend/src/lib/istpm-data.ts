@@ -88,6 +88,7 @@ export const STATUT_PAIEMENT_TONE: Record<StatutPaiement, BadgeTone> = {
 };
 
 export type NoteModule = {
+  id?: string;
   module: string;
   note: number; // /20
   coef: number;

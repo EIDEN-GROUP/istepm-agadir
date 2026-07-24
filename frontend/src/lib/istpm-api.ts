@@ -107,6 +107,34 @@ export function saveNotesExamenApi(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Notes (grades)                                                      */
+/* ------------------------------------------------------------------ */
+
+export function createNote(data: {
+  etudiantId: string;
+  module: string;
+  note: number;
+  coef?: number;
+  credits?: number;
+  examen?: string;
+}) {
+  return api.post<{ id: string; etudiantId: string; module: string; note: string; coef: string; credits: string; examen: string }>("/notes", data);
+}
+
+export function deleteNote(id: string) {
+  return api.delete<{ ok: boolean }>(`/notes/${id}`);
+}
+
+export function fetchStudentSemestres(id: string) {
+  return api.get<{
+    semestre: string;
+    modules: { module: string; note: number }[];
+    moyenne: number;
+    resultat: string;
+  }[]>(`/etudiants/${id}/semestres`);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Bulletins                                                          */
 /* ------------------------------------------------------------------ */
 

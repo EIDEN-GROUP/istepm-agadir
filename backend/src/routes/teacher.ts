@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticate } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { seances } from "@/db/schema/seances";
+import { enrichSeance } from "./seances";
 import { formateurs } from "@/db/schema/formateurs";
 import { examens } from "@/db/schema/examens";
 import { etudiants } from "@/db/schema/etudiants";
@@ -26,7 +27,7 @@ export async function teacherRoutes(app: FastifyInstance) {
 
     const today = new Date().toISOString().slice(0, 10);
 
-    const [mesSeancesAujourdhui, mesExamens, tousBulletins, mesEtudiants] =
+    const [rawSeancesAujourdhui, mesExamens, tousBulletins, mesEtudiants] =
       await Promise.all([
         db
           .select()
@@ -62,7 +63,7 @@ export async function teacherRoutes(app: FastifyInstance) {
 
     return {
       formateur,
-      seancesAujourdhui: mesSeancesAujourdhui,
+      seancesAujourdhui: rawSeancesAujourdhui.map(enrichSeance),
       examens: mesExamens,
       aNoter: aNoter.length,
       bulletinsAPublier: bulletinsAPublier.length,
@@ -79,11 +80,12 @@ export async function teacherRoutes(app: FastifyInstance) {
     const conditions = [eq(seances.professeurId, userId)];
     if (query.start) conditions.push(gte(seances.date, query.start));
     if (query.end) conditions.push(lte(seances.date, query.end));
-    return db
+    const rows = await db
       .select()
       .from(seances)
       .where(and(...conditions))
       .orderBy(seances.date, seances.debut);
+    return rows.map(enrichSeance);
   });
 
   app.get("/examens", { preHandler: [authenticate] }, async (request) => {

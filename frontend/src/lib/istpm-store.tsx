@@ -20,6 +20,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { toast } from "sonner";
 import {
   ETUDIANTS,
   FORMATEURS,
@@ -83,6 +84,8 @@ import {
   deleteStage as apiDeleteStage,
   validerStageApi,
   createPaiement as apiCreatePaiement,
+  createNote as apiCreateNote,
+  deleteNote as apiDeleteNote,
   createFiliereApi,
   deleteFiliereApi,
 } from "@/lib/istpm-api";
@@ -358,23 +361,30 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        const [etudiants, formateurs, examens, bulletins, stages, paiementsRows] =
+        const [etudiants, formateurs, examens, bulletins, stages] =
           await Promise.all([
             apiFetchEtudiants(),
             apiFetchFormateurs(),
             apiFetchExamens(),
             apiFetchBulletins(),
             apiFetchStages(),
-            apiFetchEtudiants(), // paiements are derived from etudiants
           ]);
         if (!mounted) return;
+        const derivePaiementsMensuels = (e: Etudiant): Etudiant => {
+          if (!e.historique || e.paiementsMensuels) return e;
+          const pm: Record<string, StatutPaiement> = {};
+          for (const h of e.historique) {
+            if (h.mois) pm[h.mois] = h.statut as StatutPaiement;
+          }
+          return { ...e, paiementsMensuels: pm };
+        };
         setSnap((s) => ({
           ...s,
-          etudiants: etudiants as unknown as Etudiant[],
-          formateurs: formateurs as unknown as Formateur[],
-          examens: examens as unknown as Examen[],
-          bulletins: bulletins as unknown as Bulletin[],
-          stages: stages as unknown as Stage[],
+          etudiants: (etudiants as Etudiant[]).map(derivePaiementsMensuels),
+          formateurs: formateurs as Formateur[],
+          examens: examens as Examen[],
+          bulletins: bulletins as Bulletin[],
+          stages: stages as Stage[],
         }));
       } catch {
         // Backend not available — keep localStorage data.
@@ -799,39 +809,60 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   );
 
   /**
-   * Enregistre une note ponctuelle pour un étudiant.
+   * Enregistre une note ponctuelle pour un étudiant (persistée côté serveur).
    *
    * Si le module existe déjà, la note est mise à jour ; sinon elle est ajoutée.
-   * La moyenne pondérée de l'étudiant est recalculée à chaque saisie. Le backend
-   * ne persiste pas encore la note isolée (voir la note de passation) : la
-   * saisie reste locale, comme le reste de l'écran de démonstration.
+   * La moyenne pondérée de l'étudiant est recalculée à chaque saisie.
    */
   const addNote = useCallback(
     (etudiantId: string, note: NoteModule) => {
-      setSnap((s) => {
-        const etudiant = s.etudiants.find((e) => e.id === etudiantId);
-        if (!etudiant) return s;
-        const existante = etudiant.notes.find((n) => n.module === note.module);
-        const notes = existante
-          ? etudiant.notes.map((n) => (n.module === note.module ? note : n))
-          : [...etudiant.notes, note];
-        return {
-          ...s,
-          etudiants: s.etudiants.map((e) =>
-            e.id === etudiantId
-              ? { ...e, notes, moyenne: moyennePonderee(notes) }
-              : e,
-          ),
-          activite: [
-            {
-              type: "note" as const,
-              texte: `Note saisie   ${note.module} : ${note.note.toFixed(2)}/20 (${etudiant.prenom} ${etudiant.nom})`,
-              date: today(),
-            },
-            ...s.activite,
-          ].slice(0, 30),
-        };
-      });
+      apiCreateNote({
+        etudiantId,
+        module: note.module,
+        note: note.note,
+        coef: note.coef,
+        credits: note.credits,
+        examen: note.examen,
+      })
+        .then((created) => {
+          setSnap((s) => {
+            const etudiant = s.etudiants.find((e) => e.id === etudiantId);
+            if (!etudiant) return s;
+            const saved: NoteModule = {
+              id: created.id,
+              module: created.module,
+              note: Number(created.note),
+              coef: Number(created.coef),
+              credits: Number(created.credits),
+              examen: created.examen || undefined,
+            };
+            const existante = etudiant.notes.find((n) => n.module === saved.module);
+            const notes = existante
+              ? etudiant.notes.map((n) =>
+                  n.module === saved.module ? saved : n,
+                )
+              : [...etudiant.notes, saved];
+            return {
+              ...s,
+              etudiants: s.etudiants.map((e) =>
+                e.id === etudiantId
+                  ? { ...e, notes, moyenne: moyennePonderee(notes) }
+                  : e,
+              ),
+              activite: [
+                {
+                  type: "note" as const,
+                  texte: `Note saisie   ${note.module} : ${note.note.toFixed(2)}/20 (${etudiant.prenom} ${etudiant.nom})`,
+                  date: today(),
+                },
+                ...s.activite,
+              ].slice(0, 30),
+            };
+          });
+        })
+        .catch(() => {
+          toast.error("Erreur lors de l'enregistrement de la note");
+        });
     },
     [],
   );

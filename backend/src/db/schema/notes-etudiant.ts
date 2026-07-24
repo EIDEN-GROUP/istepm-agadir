@@ -10,5 +10,6 @@ export const notesEtudiant = pgTable("notes_etudiant", {
   note: numeric("note").notNull().default("0"),
   coef: numeric("coef").notNull().default("1"),
   credits: numeric("credits").notNull().default("0"),
+  examen: text("examen").notNull().default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

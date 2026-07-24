@@ -19,8 +19,12 @@ const examenSchema = z.object({
   salle: z.string().optional().default(""),
   surveillants: z.array(z.string()).optional().default([]),
   statut: z.string().optional().default("planifie"),
+  groupe: z.string().optional().default(""),
   etudiantsConvoques: z.number().optional().default(0),
   composante: z.string().optional().default("Theorique"),
+  duree: z.number().min(0).optional().default(120),
+  description: z.string().optional().default(""),
+  createdBy: z.string().optional().default(""),
 });
 
 const saisieNoteSchema = z.object({
@@ -44,6 +48,21 @@ function ponderee(notes: { note: string; coef: string }[]): number {
 }
 
 export async function examenRoutes(app: FastifyInstance) {
+  function enrichExamen(row: typeof examens.$inferSelect) {
+    const annee = row.date ? `${new Date(row.date).getFullYear()}/${new Date(row.date).getFullYear() + 1}` : "";
+    const typeLabel = row.type.charAt(0).toUpperCase() + row.type.slice(1);
+    return {
+      ...row,
+      titre: row.module ? `${typeLabel} — ${row.module}` : "",
+      classe: row.niveau && row.groupe ? `${row.niveau}-${row.groupe}` : "",
+      anneeUniversitaire: annee,
+      duree: row.duree ?? 120,
+      createdBy: row.createdBy ?? "",
+      description: row.description ?? "",
+      etudiantsConvoques: row.etudiantsConvoques ?? 0,
+    };
+  }
+
   app.get("/", { preHandler: [authenticate] }, async (request) => {
     const db = getDb();
     const query = request.query as {
@@ -71,7 +90,8 @@ export async function examenRoutes(app: FastifyInstance) {
       result = result.where(eq(examens.module, query.module));
     }
 
-    return result;
+    const rows = await result;
+    return rows.map(enrichExamen);
   });
 
   app.get("/:id", { preHandler: [authenticate] }, async (request, reply) => {
@@ -99,7 +119,7 @@ export async function examenRoutes(app: FastifyInstance) {
       .leftJoin(etudiants, eq(notesExamen.etudiantId, etudiants.id))
       .where(eq(notesExamen.examenId, id));
 
-    return { ...examen, notes };
+    return { ...enrichExamen(examen), notes };
   });
 
   app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
@@ -109,7 +129,7 @@ export async function examenRoutes(app: FastifyInstance) {
       .insert(examens)
       .values(input)
       .returning();
-    return examen;
+    return enrichExamen(examen);
   });
 
   app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
@@ -126,7 +146,7 @@ export async function examenRoutes(app: FastifyInstance) {
       .where(eq(examens.id, id))
       .returning();
     if (!examen) return reply.status(404).send({ error: "Examen introuvable" });
-    return examen;
+    return enrichExamen(examen);
   });
 
   app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {

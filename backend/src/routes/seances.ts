@@ -12,6 +12,7 @@ const createSeanceSchema = z.object({
   fin: z.string().optional().default("09:00"),
   professeurId: z.string().optional().default(""),
   module: z.string().min(1),
+  filiere: z.string().min(1, "Filière requise"),
   salle: z.string().optional().default(""),
   groupe: z.string().optional().default(""),
   type: z.enum(["cours", "td", "tp", "examen", "soutenance"]).optional().default("cours"),
@@ -20,8 +21,18 @@ const createSeanceSchema = z.object({
 
 const updateSeanceSchema = createSeanceSchema.partial();
 
+export function enrichSeance(row: typeof seances.$inferSelect) {
+  const year = row.date ? row.date.slice(0, 4) : "";
+  return {
+    ...row,
+    anneeUniversitaire: year ? `${year}/${Number(year) + 1}` : "",
+    semestre: row.semestre || "",
+    notes: row.notes || undefined,
+  };
+}
+
 export async function seanceRoutes(app: FastifyInstance) {
-  app.get("/", { preHandler: [authenticate] }, async (request) => {
+  app.get("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const query = request.query as { start?: string; end?: string; professeurId?: string; date?: string };
     const db = getDb();
     const conditions = [];
@@ -30,32 +41,34 @@ export async function seanceRoutes(app: FastifyInstance) {
     if (query.professeurId) conditions.push(eq(seances.professeurId, query.professeurId));
     if (query.date) conditions.push(eq(seances.date, query.date));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
-    return db.select().from(seances).where(where).orderBy(seances.date, seances.debut);
+    const rows = await db.select().from(seances).where(where).orderBy(seances.date, seances.debut);
+    return rows.map(enrichSeance);
   });
 
-  app.get("/today", { preHandler: [authenticate] }, async () => {
+  app.get("/today", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async () => {
     const db = getDb();
     const today = new Date().toISOString().slice(0, 10);
-    return db
+    const rows = await db
       .select()
       .from(seances)
       .where(eq(seances.date, today))
       .orderBy(seances.debut);
+    return rows.map(enrichSeance);
   });
 
-  app.get("/:id", { preHandler: [authenticate] }, async (request, reply) => {
+  app.get("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [seance] = await db.select().from(seances).where(eq(seances.id, id)).limit(1);
     if (!seance) return reply.status(404).send({ error: "Séance introuvable" });
-    return seance;
+    return enrichSeance(seance);
   });
 
   app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const input = createSeanceSchema.parse(request.body);
     const db = getDb();
     const [seance] = await db.insert(seances).values(input).returning();
-    return seance;
+    return enrichSeance(seance);
   });
 
   app.post("/bulk", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
@@ -65,7 +78,7 @@ export async function seanceRoutes(app: FastifyInstance) {
     const input = schema.parse(request.body);
     const db = getDb();
     const created = await db.insert(seances).values(input.seances).returning();
-    return created;
+    return created.map(enrichSeance);
   });
 
   app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
@@ -79,7 +92,7 @@ export async function seanceRoutes(app: FastifyInstance) {
       .set({ ...input, updatedAt: new Date() })
       .where(eq(seances.id, id))
       .returning();
-    return updated;
+    return enrichSeance(updated);
   });
 
   app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {

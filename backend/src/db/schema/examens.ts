@@ -11,8 +11,12 @@ export const examens = pgTable("examens", {
   salle: text("salle").notNull().default(""),
   surveillants: text("surveillants").array().notNull().default([]),
   statut: text("statut").notNull().default("planifie"),
+  groupe: text("groupe").notNull().default(""),
   etudiantsConvoques: integer("etudiants_convoques").notNull().default(0),
   composante: text("composante").notNull().default("Theorique"),
+  duree: integer("duree").notNull().default(120),
+  description: text("description").notNull().default(""),
+  createdBy: text("created_by").notNull().default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
