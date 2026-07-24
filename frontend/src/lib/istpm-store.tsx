@@ -44,6 +44,7 @@ import {
   genererSeances,
   minutesDepuisMinuit,
   ajouterMinutes,
+  STRUCTURES_ACCUEIL,
   type LignePaiement,
   type NoteModule,
   type PaiementLigne,
@@ -96,7 +97,7 @@ import {
 
 /** Bump when the record shape changes: stored data on an old version is
  *  discarded rather than loaded into a UI that no longer understands it. */
-const STORAGE_KEY = "istpm-data-v3";
+const STORAGE_KEY = "istpm-data-v4";
 
 type Snapshot = {
   etudiants: Etudiant[];
@@ -107,6 +108,7 @@ type Snapshot = {
   activite: ActiviteItem[];
   seances: Seance[];
   filieres: string[];
+  structuresAccueil: string[];
 };
 
 function seed(): Snapshot {
@@ -120,6 +122,7 @@ function seed(): Snapshot {
     activite: ACTIVITE_RECENTE,
     seances: SEANCES,
     filieres: [...FILIERES],
+    structuresAccueil: [...STRUCTURES_ACCUEIL],
   }) as Snapshot;
 }
 
@@ -233,6 +236,7 @@ type IstpmCtx = {
   activite: ActiviteItem[];
   seances: Seance[];
   filieres: string[];
+  structuresAccueil: string[];
 
   /* Dérivés */
   paiements: PaiementLigne[];
@@ -302,6 +306,10 @@ type IstpmCtx = {
 
   addFiliere: (nom: string) => void;
   deleteFiliere: (nom: string) => void;
+
+  addStructureAccueil: (nom: string) => void;
+  updateStructureAccueil: (oldName: string, newName: string) => void;
+  deleteStructureAccueil: (nom: string) => void;
 
   addSeance: (data: NouvelleSeance) => Seance;
   updateSeance: (id: string, patch: Partial<Seance>) => void;
@@ -889,6 +897,42 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /* ---------------- Structures d'accueil ---------------- */
+
+  const addStructureAccueil = useCallback(
+    (nom: string) => {
+      setSnap((s) => ({
+        ...s,
+        structuresAccueil: s.structuresAccueil.includes(nom)
+          ? s.structuresAccueil
+          : [...s.structuresAccueil, nom],
+      }));
+    },
+    [],
+  );
+
+  const updateStructureAccueil = useCallback(
+    (oldName: string, newName: string) => {
+      setSnap((s) => ({
+        ...s,
+        structuresAccueil: s.structuresAccueil.map((st) =>
+          st === oldName ? newName : st,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const deleteStructureAccueil = useCallback(
+    (nom: string) => {
+      setSnap((s) => ({
+        ...s,
+        structuresAccueil: s.structuresAccueil.filter((st) => st !== nom),
+      }));
+    },
+    [],
+  );
+
   /* ---------------- Planning ---------------- */
 
   const addSeance = useCallback((data: NouvelleSeance) => {
@@ -1145,6 +1189,9 @@ addSeance,
     addNote,
     addFiliere,
     deleteFiliere,
+    addStructureAccueil,
+    updateStructureAccueil,
+    deleteStructureAccueil,
     reset,
   };
 

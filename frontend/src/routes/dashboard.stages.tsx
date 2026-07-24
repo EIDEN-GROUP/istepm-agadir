@@ -21,7 +21,6 @@ import { makePlaceholderPdf } from "@/lib/doc-store";
 import {
   FILIERES,
   NIVEAUX,
-  STRUCTURES_ACCUEIL,
   STATUT_STAGE_LABEL,
   STATUT_STAGE_TONE,
   fmtDate,
@@ -274,7 +273,7 @@ function StagesAnalytics({ stages }: { stages: Stage[] }) {
 
 function StagesPage() {
   const { role } = useAuth();
-  const { stages, etudiants, addStage, updateStage, deleteStage } = useIstpm();
+  const { stages, etudiants, structuresAccueil, addStage, updateStage, deleteStage } = useIstpm();
   // Conventions are handled by student administration.
   const canManage = role === "directeur" || role === "responsable";
 
@@ -342,7 +341,7 @@ function StagesPage() {
             label: "Structure",
             value: structure,
             onChange: setStructure,
-            options: STRUCTURES_ACCUEIL,
+            options: structuresAccueil,
             allLabel: "Toutes les structures",
           },
           {
@@ -567,6 +566,7 @@ function StagesPage() {
           key={editing?.id ?? "new"}
           initial={editing}
           etudiants={etudiants}
+          structuresAccueil={structuresAccueil}
           onCancel={() => setFormOpen(false)}
           onSubmit={(data) => {
             if (editing) {
@@ -606,11 +606,13 @@ function StagesPage() {
 function StageForm({
   initial,
   etudiants,
+  structuresAccueil: structures,
   onSubmit,
   onCancel,
 }: {
   initial: Stage | null;
   etudiants: ReturnType<typeof useIstpm>["etudiants"];
+  structuresAccueil: string[];
   onSubmit: (data: Omit<Stage, "id">) => void;
   onCancel: () => void;
 }) {
@@ -711,7 +713,7 @@ function StageForm({
           required
           value={f.structure}
           onChange={(v) => set("structure", v)}
-          options={STRUCTURES_ACCUEIL}
+          options={structures}
           error={errors.structure}
         />
       </FullWidth>

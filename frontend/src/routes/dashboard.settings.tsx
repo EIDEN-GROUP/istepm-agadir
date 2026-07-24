@@ -20,6 +20,7 @@ import {
   Eye,
   PenLine,
   Settings,
+  Hospital,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth, ROLE_META, type UserRole } from "@/lib/auth";
@@ -84,7 +85,8 @@ type SectionId =
   | "bulletins"
   | "institut"
   | "systeme"
-  | "securite";
+  | "securite"
+  | "structures";
 
 /**
  * Ce que chaque rôle peut administrer.
@@ -101,6 +103,7 @@ const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
     "salles",
     "creneaux",
     "planning",
+    "structures",
   ],
   directeur: [
     "utilisateurs",
@@ -118,13 +121,14 @@ const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
     "institut",
     "systeme",
     "securite",
+    "structures",
   ],
   enseignant: [],
 };
 
 const META: Record<
   SectionId,
-  { titre: string; desc: string; icone: typeof Users; groupe: string }
+  { titre: string; desc: string; icone: typeof Users | typeof Hospital; groupe: string }
 > = {
   annees: { titre: "Années universitaires", desc: "Années ouvertes à l'inscription", icone: CalendarRange, groupe: "Organisation pédagogique" },
   semestres: { titre: "Semestres", desc: "Découpage du cycle de formation", icone: LayoutGrid, groupe: "Organisation pédagogique" },
@@ -142,6 +146,7 @@ const META: Record<
   institut: { titre: "Informations de l'institut", desc: "Identité et coordonnées", icone: Building2, groupe: "Administration" },
   systeme: { titre: "Configuration système", desc: "Langue, devise et fuseau", icone: SlidersHorizontal, groupe: "Administration" },
   securite: { titre: "Sécurité", desc: "Mots de passe et sessions", icone: Lock, groupe: "Administration" },
+  structures: { titre: "Structures d'accueil", desc: "CHU, hôpitaux et cliniques partenaires", icone: Hospital, groupe: "Organisation pédagogique" },
 };
 
 /* ------------------------------------------------------------------ */
@@ -193,6 +198,8 @@ function ListeEditable({
   readOnly?: boolean;
 }) {
   const [nouveau, setNouveau] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const ajouter = () => {
     const v = nouveau.trim();
@@ -209,27 +216,76 @@ function ListeEditable({
   return (
     <div className="space-y-2.5">
       <div className="flex flex-wrap gap-1.5">
-        {valeurs.map((v) => (
-          <span
-            key={v}
-            className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 py-1 ps-3 pe-1.5 text-xs font-medium text-brand-dk"
-          >
-            {v}
-            {readOnly ? null : (
+        {valeurs.map((v) =>
+          editing === v ? (
+            <span
+              key={v}
+              className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 py-1 ps-1 pe-1 text-xs font-medium text-brand-dk"
+            >
+              <Input
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setEditing(null);
+                    setEditValue("");
+                  }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const trimmed = editValue.trim();
+                    if (trimmed && trimmed !== v && !valeurs.includes(trimmed)) {
+                      onChange(valeurs.map((x) => (x === v ? trimmed : x)));
+                      toast.success(`Renommé   ${trimmed}`);
+                    }
+                    setEditing(null);
+                    setEditValue("");
+                  }
+                }}
+                onBlur={() => {
+                  const trimmed = editValue.trim();
+                  if (trimmed && trimmed !== v && !valeurs.includes(trimmed)) {
+                    onChange(valeurs.map((x) => (x === v ? trimmed : x)));
+                    toast.success(`Renommé   ${trimmed}`);
+                  }
+                  setEditing(null);
+                  setEditValue("");
+                }}
+                autoFocus
+                className={cn(softInput, "h-6 w-40 text-xs")}
+              />
+            </span>
+          ) : (
+            <span
+              key={v}
+              className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 py-1 ps-3 pe-1.5 text-xs font-medium text-brand-dk"
+            >
               <button
                 type="button"
-                aria-label={`Retirer ${v}`}
+                className="cursor-pointer hover:underline"
                 onClick={() => {
-                  onChange(valeurs.filter((x) => x !== v));
-                  toast.success(`Retiré   ${v}`);
+                  if (readOnly) return;
+                  setEditing(v);
+                  setEditValue(v);
                 }}
-                className="grid h-4 w-4 place-items-center rounded-full transition hover:bg-alert/20 hover:text-alert"
               >
-                <Trash2 className="h-2.5 w-2.5" />
+                {v}
               </button>
-            )}
-          </span>
-        ))}
+              {readOnly ? null : (
+                <button
+                  type="button"
+                  aria-label={`Retirer ${v}`}
+                  onClick={() => {
+                    onChange(valeurs.filter((x) => x !== v));
+                    toast.success(`Retiré   ${v}`);
+                  }}
+                  className="grid h-4 w-4 place-items-center rounded-full transition hover:bg-alert/20 hover:text-alert"
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                </button>
+              )}
+            </span>
+          ),
+        )}
         {valeurs.length === 0 ? (
           <p className="text-xs text-muted-foreground">Aucune entrée.</p>
         ) : null}
@@ -587,7 +643,17 @@ function NewUserForm({
 
 function SettingsPage() {
   const { role } = useAuth();
-  const { etudiants, formateurs, examens, filieres, reset } = useIstpm();
+  const {
+    etudiants,
+    formateurs,
+    examens,
+    filieres,
+    structuresAccueil,
+    addStructureAccueil,
+    updateStructureAccueil,
+    deleteStructureAccueil,
+    reset,
+  } = useIstpm();
 
   const autorisees = role ? SECTIONS_PAR_ROLE[role] : [];
   const peut = (id: SectionId) => autorisees.includes(id);
@@ -601,6 +667,7 @@ function SettingsPage() {
     CRENEAUX.map((c) => `${c.debut} – ${c.fin}`),
   );
   const [listeFilieres, setListeFilieres] = useState<string[]>([...filieres]);
+  const [listeStructures, setListeStructures] = useState<string[]>([...structuresAccueil]);
   const [typesExamen, setTypesExamen] = useState<string[]>(
     Object.values(TYPE_EXAMEN_LABEL),
   );
@@ -635,6 +702,8 @@ function SettingsPage() {
   /* --------- API sync --------- */
   const filieresRef = useRef(listeFilieres);
   filieresRef.current = listeFilieres;
+  const structuresRef = useRef(listeStructures);
+  structuresRef.current = listeStructures;
 
   useEffect(() => {
     fetchSettings()
@@ -1288,6 +1357,24 @@ function SettingsPage() {
             <p className="mt-2 text-[11px] text-muted-foreground">
               L'authentification est assurée par le serveur.
             </p>
+          </Carte>
+        );
+
+      case "structures":
+        return (
+          <Carte id="structures">
+            <ListeEditable
+              valeurs={listeStructures}
+              onChange={(v) => {
+                const oldList = structuresRef.current;
+                const added = v.filter((x) => !oldList.includes(x));
+                const removed = oldList.filter((x) => !v.includes(x));
+                added.forEach((nom) => addStructureAccueil(nom));
+                removed.forEach((nom) => deleteStructureAccueil(nom));
+                setListeStructures(v);
+              }}
+              placeholder="CHU Mohammed VI   Marrakech"
+            />
           </Carte>
         );
 
