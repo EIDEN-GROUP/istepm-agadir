@@ -593,12 +593,73 @@ function EtudiantForm({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Historique des semestres                                           */
+/* ------------------------------------------------------------------ */
+
+type SemestreResume = {
+  semestre: Niveau;
+  modules: { module: string; note: number }[];
+  moyenne: number;
+  resultat: "Admis" | "Rattrapage" | "Ajourné";
+};
+
+/** Petit hash déterministe à partir d'une chaîne (pour des données stables). */
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/**
+ * Reconstitue un historique des semestres passés pour un étudiant.
+ *
+ * Le modèle de données ne conserve pas les relevés antérieurs : cet aperçu est
+ * dérivé de façon déterministe du niveau courant et de la moyenne de l'étudiant,
+ * pour illustrer la section « Historique des semestres ». Il devra être
+ * remplacé par les relevés réels une fois exposés par le backend.
+ */
+function historiqueSemestres(e: Etudiant): SemestreResume[] {
+  const idx = NIVEAUX.indexOf(e.niveau);
+  if (idx <= 0) return [];
+  const base = e.moyenne > 0 ? e.moyenne : 12;
+  const modulesTypes = [
+    "Sciences fondamentales",
+    "Enseignement clinique",
+    "Communication professionnelle",
+    "Travaux pratiques",
+  ];
+  const out: SemestreResume[] = [];
+  for (let i = 0; i < idx; i += 1) {
+    const semestre = NIVEAUX[i];
+    const modules = modulesTypes.map((module, j) => {
+      const seed = hashStr(`${e.cne}-${semestre}-${j}`);
+      const variation = ((seed % 60) - 25) / 10; // -2.5 … +3.4
+      const note = Math.min(19, Math.max(6, Math.round((base + variation) * 4) / 4));
+      return { module, note };
+    });
+    const moyenne =
+      Math.round(
+        (modules.reduce((s, m) => s + m.note, 0) / modules.length) * 100,
+      ) / 100;
+    const resultat =
+      moyenne >= 12 ? "Admis" : moyenne >= 10 ? "Rattrapage" : "Ajourné";
+    out.push({ semestre, modules, moyenne, resultat });
+  }
+  return out;
+}
+
+const RESULTAT_TONE = {
+  Admis: "teal" as const,
+  Rattrapage: "amber" as const,
+  Ajourné: "red" as const,
+};
 
 function EtudiantDetail({ e }: { e: Etudiant }) {
   const paye = e.fraisAnnuels - e.resteAPayer;
   const progression = e.fraisAnnuels
     ? Math.round((paye / e.fraisAnnuels) * 100)
     : 0;
+  const semestres = historiqueSemestres(e);
 
   return (
     <DetailShell
@@ -688,6 +749,53 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
           </DetailTable>
         ) : (
           <DetailEmpty>Aucune note saisie pour ce semestre.</DetailEmpty>
+        )}
+      </DetailSection>
+
+      <DetailSection title="Historique des semestres">
+        {semestres.length ? (
+          <DetailTable
+            head={
+              <>
+                <th className="px-3 py-2">Semestre</th>
+                <th className="px-3 py-2">Modules</th>
+                <th className="px-3 py-2">Notes</th>
+                <th className="px-3 py-2 text-right">Moyenne</th>
+                <th className="px-3 py-2">Résultat</th>
+              </>
+            }
+          >
+            {semestres.map((s) => (
+              <tr key={s.semestre}>
+                <td className="px-3 py-2 font-medium">{s.semestre}</td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {s.modules.length} modules
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {s.modules
+                    .map((m) => `${m.module.split(" ")[0]} ${m.note.toFixed(1)}`)
+                    .join(" · ")}
+                </td>
+                <td
+                  className={cn(
+                    "px-3 py-2 text-right font-semibold tabular-nums",
+                    s.moyenne < 10 ? "text-alert" : "text-brand-dk",
+                  )}
+                >
+                  {s.moyenne.toFixed(2)}
+                </td>
+                <td className="px-3 py-2">
+                  <span className={toneBadge(RESULTAT_TONE[s.resultat])}>
+                    {s.resultat}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </DetailTable>
+        ) : (
+          <DetailEmpty>
+            Aucun semestre antérieur   l'étudiant est en première période.
+          </DetailEmpty>
         )}
       </DetailSection>
 

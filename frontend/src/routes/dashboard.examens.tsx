@@ -15,7 +15,7 @@ import {
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
-import { useIstpm } from "@/lib/istpm-store";
+import { useIstpm, moyennePonderee } from "@/lib/istpm-store";
 import {
   FILIERES,
   NIVEAUX,
@@ -40,6 +40,7 @@ import {
   previewUrl,
 } from "@/lib/doc-store";
 import {
+  softCard,
   primaryPill,
   ghostPill,
   iconButton,
@@ -70,6 +71,7 @@ import {
   ConfirmDialog,
   TextField,
   SelectField,
+  ComboBoxField,
   ListField,
   FileField,
   FullWidth,
@@ -620,6 +622,8 @@ function EspaceFormateur() {
           setToDelete(null);
         }}
       />
+
+      <SaisieNotesPanel examens={mesExamens} />
     </div>
   );
 }
@@ -823,100 +827,23 @@ function EspaceDirecteur() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Détail formateur : infos + saisie des notes                        */
+/*  Détail formateur : informations de l'examen (lecture seule)        */
 /* ------------------------------------------------------------------ */
 
-type NoteSaisie = { theorique: string; pratique: string };
-
-/** Vide = non noté ; sinon la note doit être comprise entre 0 et 20. */
-function parseNote(v: string): number | undefined | "invalid" {
-  if (v.trim() === "") return undefined;
-  const n = Number(v);
-  if (Number.isNaN(n) || n < 0 || n > 20) return "invalid";
-  return n;
-}
-
+/**
+ * Fiche de l'examen. La saisie des notes ne se fait plus ici mais dans le
+ * panneau dédié « Saisie des notes », qui gère l'ensemble des classes et
+ * modules d'un formateur.
+ */
 function ExamenDetailFormateur({
   examen,
   onPreview,
-  onClose,
 }: {
   examen: Examen;
   onPreview: (e: Examen) => void;
-  onClose: () => void;
+  onClose?: () => void;
 }) {
-  const { etudiants, formateurs, saveNotesExamen } = useIstpm();
-
-  const convoques = useMemo(
-    () =>
-      etudiants.filter(
-        (e) =>
-          e.filiere === examen.filiere &&
-          e.niveau === examen.niveau &&
-          e.statut !== "abandon",
-      ),
-    [etudiants, examen],
-  );
-
-  const [notes, setNotes] = useState<Record<string, NoteSaisie>>(() => {
-    const seeded: Record<string, NoteSaisie> = {};
-    for (const e of convoques) {
-      const existante = e.notes.find((n) => n.module === examen.module);
-      if (existante) {
-        const v = String(existante.note);
-        seeded[e.id] = { theorique: v, pratique: v };
-      }
-    }
-    return seeded;
-  });
-
-  const hasTheorique = examen.composante !== "Pratique";
-  const hasPratique = examen.composante !== "Théorique";
-
-  const set = (id: string, key: keyof NoteSaisie, value: string) =>
-    setNotes((prev) => {
-      const current = prev[id] ?? { theorique: "", pratique: "" };
-      return { ...prev, [id]: { ...current, [key]: value } };
-    });
-
-  const saisies = Object.values(notes).filter(
-    (n) =>
-      (hasTheorique && n.theorique !== "") || (hasPratique && n.pratique !== ""),
-  ).length;
-
-  const save = () => {
-    const payload: {
-      etudiantId: string;
-      theorique?: number;
-      pratique?: number;
-    }[] = [];
-
-    for (const e of convoques) {
-      const n = notes[e.id];
-      if (!n) continue;
-      const th = hasTheorique ? parseNote(n.theorique) : undefined;
-      const pr = hasPratique ? parseNote(n.pratique) : undefined;
-      if (th === "invalid" || pr === "invalid") {
-        toast.error(
-          `Note invalide pour ${e.prenom} ${e.nom}   saisir une valeur entre 0 et 20`,
-        );
-        return;
-      }
-      if (th === undefined && pr === undefined) continue;
-      payload.push({ etudiantId: e.id, theorique: th, pratique: pr });
-    }
-
-    if (!payload.length) {
-      toast.error("Aucune note à enregistrer");
-      return;
-    }
-
-    const count = saveNotesExamen(examen.id, payload);
-    toast.success(
-      `Notes enregistrées pour ${count} étudiant(s)   ${examen.module}`,
-    );
-    onClose();
-  };
+  const { formateurs } = useIstpm();
 
   return (
     <DetailShell
@@ -935,87 +862,20 @@ function ExamenDetailFormateur({
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground">
-            {saisies} / {convoques.length} étudiant(s) saisi(s)
+            La saisie des notes se fait dans « Saisie des notes ».
           </span>
-          <div className="flex items-center gap-2">
-            {examen.document ? (
-              <button
-                className={cn(ghostPill, "gap-1.5")}
-                onClick={() => onPreview(examen)}
-              >
-                <Eye className="h-3.5 w-3.5" /> Sujet
-              </button>
-            ) : null}
-            <button className={primaryPill} onClick={save}>
-              <Save className="h-4 w-4" /> Enregistrer les notes
+          {examen.document ? (
+            <button
+              className={cn(ghostPill, "gap-1.5")}
+              onClick={() => onPreview(examen)}
+            >
+              <Eye className="h-3.5 w-3.5" /> Sujet
             </button>
-          </div>
+          ) : null}
         </div>
       }
     >
       <InfosExamen examen={examen} formateurs={formateurs} />
-
-      {/* Le jeu de démonstration ne contient qu'une poignée d'étudiants par
-          filière : la liste nominative est un sous-ensemble de l'effectif. */}
-      <DetailSection title={`Liste nominative (${convoques.length})`}>
-        {convoques.length ? (
-          <DetailTable
-            head={
-              <>
-                <th className="px-3 py-2">CNE</th>
-                <th className="px-3 py-2">Étudiant</th>
-                {hasTheorique ? (
-                  <th className="px-3 py-2 text-right">Théorique /20</th>
-                ) : null}
-                {hasPratique ? (
-                  <th className="px-3 py-2 text-right">Pratique /20</th>
-                ) : null}
-              </>
-            }
-          >
-            {convoques.map((e) => (
-              <tr key={e.id}>
-                <td className="px-3 py-2 tabular-nums text-muted-foreground">
-                  {e.cne}
-                </td>
-                <td className="px-3 py-2 font-medium">
-                  {e.prenom} {e.nom}
-                </td>
-                {hasTheorique ? (
-                  <td className="px-3 py-2 text-right">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={20}
-                      step={0.25}
-                      value={notes[e.id]?.theorique ?? ""}
-                      onChange={(ev) => set(e.id, "theorique", ev.target.value)}
-                      className={cn(softInput, "h-8 w-20 text-right")}
-                    />
-                  </td>
-                ) : null}
-                {hasPratique ? (
-                  <td className="px-3 py-2 text-right">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={20}
-                      step={0.25}
-                      value={notes[e.id]?.pratique ?? ""}
-                      onChange={(ev) => set(e.id, "pratique", ev.target.value)}
-                      className={cn(softInput, "h-8 w-20 text-right")}
-                    />
-                  </td>
-                ) : null}
-              </tr>
-            ))}
-          </DetailTable>
-        ) : (
-          <DetailEmpty>
-            Aucun étudiant inscrit dans cette filière pour ce semestre.
-          </DetailEmpty>
-        )}
-      </DetailSection>
     </DetailShell>
   );
 }
@@ -1263,6 +1123,281 @@ function ExamenForm({
         />
       </FullWidth>
     </FormDialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Saisie des notes   par examen / classe, un formateur → plusieurs classes */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Saisie des notes d'un formateur.
+ *
+ * Un formateur enseigne potentiellement plusieurs classes et plusieurs modules :
+ * il choisit d'abord l'un de **ses** examens (chaque examen porte son module et
+ * sa classe), puis saisit une note pour **chaque étudiant** de la classe
+ * concernée. L'enregistrement met à jour le dossier de chaque étudiant, recalcule
+ * sa moyenne et marque l'examen comme noté. Les notes déjà saisies sont listées
+ * en dessous et peuvent être retirées.
+ */
+function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
+  const { etudiants, addNote, updateExamen, updateEtudiant } = useIstpm();
+  const [examenId, setExamenId] = useState("");
+  const [notes, setNotes] = useState<Record<string, string>>({});
+
+  // La classe convoquée = les étudiants dont le groupe correspond à celui de
+  // l'examen sélectionné (ex. « S5-G1 »).
+  const examen = examens.find((x) => x.id === examenId);
+  const convoques = useMemo(
+    () =>
+      examen
+        ? etudiants.filter(
+            (e) =>
+              `${e.niveau}-${e.groupe}` === examen.classe &&
+              e.statut !== "abandon",
+          )
+        : [],
+    [etudiants, examen],
+  );
+
+  const choisirExamen = (id: string) => {
+    setExamenId(id);
+    const ex = examens.find((x) => x.id === id);
+    const roster = ex
+      ? etudiants.filter(
+          (e) =>
+            `${e.niveau}-${e.groupe}` === ex.classe && e.statut !== "abandon",
+        )
+      : [];
+    // Pré-remplit avec les notes déjà attribuées pour ce module.
+    const seed: Record<string, string> = {};
+    for (const e of roster) {
+      const n = e.notes.find((nn) => nn.module === ex?.module);
+      if (n) seed[e.id] = String(n.note);
+    }
+    setNotes(seed);
+  };
+
+  const setNote = (id: string, v: string) =>
+    setNotes((p) => ({ ...p, [id]: v }));
+
+  const saisis = Object.values(notes).filter((v) => v.trim() !== "").length;
+
+  const enregistrer = () => {
+    if (!examen) {
+      toast.error("Choisir d'abord un examen");
+      return;
+    }
+    const valides: { etudiantId: string; note: number }[] = [];
+    for (const e of convoques) {
+      const v = notes[e.id];
+      if (v === undefined || v.trim() === "") continue;
+      const n = Number(v);
+      if (Number.isNaN(n) || n < 0 || n > 20) {
+        toast.error(`Note invalide pour ${e.prenom} ${e.nom}   entre 0 et 20`);
+        return;
+      }
+      valides.push({ etudiantId: e.id, note: n });
+    }
+    if (!valides.length) {
+      toast.error("Aucune note à enregistrer");
+      return;
+    }
+    for (const v of valides) {
+      addNote(v.etudiantId, {
+        module: examen.module,
+        note: v.note,
+        coef: 3,
+        credits: 6,
+        examen: examen.titre,
+      });
+    }
+    updateExamen(examen.id, { statut: "notes_saisies" });
+    toast.success(
+      `Notes enregistrées pour ${valides.length} étudiant(s)   ${examen.module}`,
+    );
+  };
+
+  const notesSaisies = useMemo(() => {
+    const rows: {
+      key: string;
+      etudiantId: string;
+      etudiant: string;
+      cne: string;
+      groupe: string;
+      module: string;
+      examen: string;
+      note: number;
+    }[] = [];
+    for (const e of etudiants) {
+      for (const n of e.notes) {
+        if (!n.examen) continue;
+        rows.push({
+          key: `${e.id}-${n.module}`,
+          etudiantId: e.id,
+          etudiant: `${e.prenom} ${e.nom}`,
+          cne: e.cne,
+          groupe: `${e.niveau}-${e.groupe}`,
+          module: n.module,
+          examen: n.examen,
+          note: n.note,
+        });
+      }
+    }
+    return rows.reverse();
+  }, [etudiants]);
+
+  const removeNote = (etudiantId: string, module: string) => {
+    const e = etudiants.find((x) => x.id === etudiantId);
+    if (!e) return;
+    const notes = e.notes.filter((n) => n.module !== module);
+    updateEtudiant(etudiantId, { notes, moyenne: moyennePonderee(notes) });
+    toast.success("Note supprimée");
+  };
+
+  return (
+    <section className="space-y-4">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Notes
+        </p>
+        <h2 className="mt-1 flex items-center gap-2 font-display text-lg font-bold tracking-tight text-foreground">
+          <ClipboardList className="h-5 w-5 text-brand" /> Saisie des notes
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Choisissez l'un de vos examens, puis saisissez une note pour chaque
+          étudiant de la classe concernée.
+        </p>
+      </div>
+
+      {/* Saisie par examen / classe */}
+      <div className={cn(softCard, "space-y-4 p-4 sm:p-5")}>
+        <div className="max-w-md">
+          <ComboBoxField
+            label="Examen à noter"
+            value={examenId}
+            onChange={choisirExamen}
+            options={examens.map((x) => ({
+              value: x.id,
+              label: `${x.titre}   ${x.classe}`,
+            }))}
+            placeholder="Choisir un de vos examens…"
+            searchPlaceholder="Titre, module, classe…"
+            emptyText="Vous n'avez pas encore créé d'examen."
+          />
+        </div>
+
+        {examen ? (
+          <>
+            <p className="text-xs text-muted-foreground">
+              <strong className="font-semibold text-foreground">
+                {examen.module}
+              </strong>{" "}
+              · classe {examen.classe} · {convoques.length} étudiant(s) ·{" "}
+              {saisis} saisi(s)
+            </p>
+            {convoques.length ? (
+              <>
+                <DetailTable
+                  head={
+                    <>
+                      <th className="px-3 py-2">CNE</th>
+                      <th className="px-3 py-2">Étudiant</th>
+                      <th className="px-3 py-2 text-right">Note /20</th>
+                    </>
+                  }
+                >
+                  {convoques.map((e) => (
+                    <tr key={e.id}>
+                      <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                        {e.cne}
+                      </td>
+                      <td className="px-3 py-2 font-medium">
+                        {e.prenom} {e.nom}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={20}
+                          step={0.25}
+                          value={notes[e.id] ?? ""}
+                          onChange={(ev) => setNote(e.id, ev.target.value)}
+                          className={cn(softInput, "h-8 w-20 text-right")}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </DetailTable>
+                <div className="flex justify-end">
+                  <button className={primaryPill} onClick={enregistrer}>
+                    <Save className="h-4 w-4" /> Enregistrer les notes
+                  </button>
+                </div>
+              </>
+            ) : (
+              <DetailEmpty>
+                Aucun étudiant dans la classe {examen.classe}.
+              </DetailEmpty>
+            )}
+          </>
+        ) : (
+          <DetailEmpty>
+            Sélectionnez un examen pour saisir les notes de sa classe.
+          </DetailEmpty>
+        )}
+      </div>
+
+      <DataTable
+        minWidth="min-w-[820px]"
+        isEmpty={notesSaisies.length === 0}
+        empty="Aucune note enregistrée pour le moment."
+        head={
+          <>
+            <th>Étudiant</th>
+            <th>Groupe</th>
+            <th>Module</th>
+            <th>Examen</th>
+            <th className="text-right">Note /20</th>
+            <th className="w-20 text-center">Actions</th>
+          </>
+        }
+      >
+        {notesSaisies.map((r, i) => (
+          <motion.tr
+            key={r.key}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
+            className={tableRow}
+          >
+            <td className={cn("font-medium", cellTruncate)}>{r.etudiant}</td>
+            <td className="text-muted-foreground">{r.groupe}</td>
+            <td className={cn("text-muted-foreground", cellTruncate)}>{r.module}</td>
+            <td className={cn("text-muted-foreground", cellTruncate)}>{r.examen}</td>
+            <td
+              className={cn(
+                "text-right font-semibold tabular-nums",
+                r.note < 10 ? "text-alert" : "text-brand-dk",
+              )}
+            >
+              {r.note.toFixed(2)}
+            </td>
+            <td className="text-center">
+              <div className={rowActions}>
+                <button
+                  className={iconButtonDanger}
+                  aria-label="Supprimer la note"
+                  onClick={() => removeNote(r.etudiantId, r.module)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </td>
+          </motion.tr>
+        ))}
+      </DataTable>
+    </section>
   );
 }
 

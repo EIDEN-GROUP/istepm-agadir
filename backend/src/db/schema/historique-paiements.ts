@@ -10,6 +10,7 @@ export const historiquePaiements = pgTable("historique_paiements", {
   montant: numeric("montant").notNull(),
   mode: text("mode").notNull().default("Especes"),
   periode: text("periode").notNull().default(""),
+  mois: text("mois").notNull().default(""),
   recu: text("recu").notNull().default(""),
   statut: text("statut").notNull().default("paye"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -110,9 +110,13 @@ export function useDashboardI18n() {
  * hides navigation, it is not a security boundary.
  *
  * directeur    full access
- * enseignant   pedagogy only: no payments, no staff management, no settings
+ * enseignant   pedagogy only: no payments, no staff management, no settings.
+ *              Voit l'emploi du temps en consultation seule (son planning).
  * responsable  student administration: no staff management, no note entry,
  *              no settings
+ *
+ * Le contrôle de l'emploi du temps (création / édition des séances) est réservé
+ * à la direction et au responsable ; l'enseignant le consulte uniquement.
  */
 const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
   directeur: [

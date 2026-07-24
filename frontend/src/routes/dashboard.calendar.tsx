@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   Plus,
@@ -13,9 +13,11 @@ import {
   Users,
   User,
   Clock,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
+import { useAuth, DEMO_FORMATEUR_ID, getStoredRole } from "@/lib/auth";
+import { canAccess } from "@/lib/dashboard-i18n";
 import {
   useIstpm,
   type Conflit,
@@ -25,6 +27,7 @@ import {
   SALLES,
   GROUPES,
   NIVEAUX,
+  FILIERES,
   CRENEAUX,
   ANNEES_UNIVERSITAIRES,
   TYPE_SEANCE_LABEL,
@@ -37,6 +40,7 @@ import {
   type Seance,
   type TypeSeance,
   type Niveau,
+  type Filiere,
   type Formateur,
 } from "@/lib/istpm-data";
 import {
@@ -120,9 +124,9 @@ function PlanningPage() {
     conflitsSeance,
   } = useIstpm();
 
-  // Seul le responsable des affaires estudiantines organise les séances ;
-  // le directeur supervise et l'enseignant consulte son propre planning.
-  const canEdit = role === "responsable";
+  // La direction et le responsable des affaires estudiantines organisent les
+  // séances ; l'enseignant consulte uniquement son propre planning.
+  const canEdit = role === "responsable" || role === "directeur";
   const estEnseignant = role === "enseignant";
 
   const [vue, setVue] = useState<VueCalendrier>("semaine");
@@ -267,22 +271,78 @@ function PlanningPage() {
     [filtrees, conflitsSeance],
   );
 
+  /** Exporte l'emploi du temps affiché (séances filtrées) au format CSV. */
+  const exportCsv = () => {
+    if (!filtrees.length) {
+      toast.error("Aucune séance à exporter");
+      return;
+    }
+    const entetes = [
+      "Date",
+      "Début",
+      "Fin",
+      "Module",
+      "Filière",
+      "Type",
+      "Groupe",
+      "Salle",
+      "Formateur",
+      "Semestre",
+      "Année universitaire",
+    ];
+    const lignes = filtrees
+      .slice()
+      .sort((a, b) => (a.date === b.date ? (a.debut < b.debut ? -1 : 1) : a.date < b.date ? -1 : 1))
+      .map((s) =>
+        [
+          s.date,
+          s.debut,
+          s.fin,
+          s.module,
+          s.filiere,
+          TYPE_SEANCE_LABEL[s.type],
+          s.groupe,
+          s.salle,
+          nomProf(s.professeurId),
+          s.semestre,
+          s.anneeUniversitaire,
+        ]
+          .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
+          .join(","),
+      );
+    // BOM pour qu'Excel lise correctement les entêtes accentuées.
+    const blob = new Blob(["﻿" + entetes.join(",") + "\n" + lignes.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "emploi-du-temps-istpm.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast.success(`${filtrees.length} séance(s) exportée(s)`);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Planning"
         title="Emploi du temps"
         actions={
-          canEdit ? (
-            <button className={primaryPill} onClick={() => ouvrirCreation()}>
-              <Plus className="h-4 w-4" /> Nouvelle séance
+          <>
+            <button className={cn(ghostPill, "gap-1.5")} onClick={exportCsv}>
+              <Download className="h-3.5 w-3.5" /> Exporter CSV
             </button>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
-              <Lock className="h-3.5 w-3.5" />
-              {estEnseignant ? "Mon planning" : "Consultation seule"}
-            </span>
-          )
+            {canEdit ? (
+              <button className={primaryPill} onClick={() => ouvrirCreation()}>
+                <Plus className="h-4 w-4" /> Nouvelle séance
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                <Lock className="h-3.5 w-3.5" />
+                {estEnseignant ? "Mon planning" : "Consultation seule"}
+              </span>
+            )}
+          </>
         }
       />
 
@@ -631,6 +691,7 @@ function SeanceDetail({
               </span>
             }
           />
+          <DetailField label="Filière" value={seance.filiere} full />
           <DetailField label="Semestre" value={seance.semestre} />
           <DetailField
             label="Année universitaire"
@@ -670,6 +731,7 @@ function SeanceForm({
   const [f, setF] = useState(() => ({
     module: initial?.module ?? "",
     professeurId: initial?.professeurId ?? "",
+    filiere: (initial?.filiere ?? "") as Filiere | "",
     groupe: initial?.groupe ?? "",
     salle: initial?.salle ?? "",
     date: initial?.date ?? prefill?.date ?? isoDate(new Date()),
@@ -709,6 +771,7 @@ function SeanceForm({
     const next: Record<string, string> = {};
     if (!f.module.trim()) next.module = "Module obligatoire";
     if (!f.professeurId) next.professeurId = "Formateur obligatoire";
+    if (!f.filiere) next.filiere = "Filière (département) obligatoire";
     if (!f.groupe) next.groupe = "Groupe obligatoire";
     if (!f.salle) next.salle = "Salle obligatoire";
     if (!f.semestre) next.semestre = "Semestre obligatoire";
@@ -725,6 +788,7 @@ function SeanceForm({
     onSubmit({
       module: f.module.trim(),
       professeurId: f.professeurId,
+      filiere: f.filiere as Filiere,
       groupe: f.groupe,
       salle: f.salle,
       date: f.date,
@@ -792,12 +856,32 @@ function SeanceForm({
           label="Formateur"
           required
           value={f.professeurId}
-          onChange={(v) => set("professeurId", v)}
+          onChange={(v) => {
+            // Choisir un formateur pré-remplit la filière avec son département,
+            // tant que l'utilisateur ne l'a pas fixée lui-même.
+            const dep = formateurs.find((p) => p.id === v)?.departement;
+            setF((p) => ({
+              ...p,
+              professeurId: v,
+              filiere: p.filiere || (dep ?? ""),
+            }));
+            setErrors((p) => ({ ...p, professeurId: undefined }));
+          }}
           options={formateurs.map((p) => ({
             value: p.id,
             label: `${p.prenom} ${p.nom}   ${p.departement}`,
           }))}
           error={errors.professeurId}
+        />
+      </FullWidth>
+      <FullWidth>
+        <SelectField
+          label="Filière (département)"
+          required
+          value={f.filiere}
+          onChange={(v) => set("filiere", v)}
+          options={FILIERES}
+          error={errors.filiere}
         />
       </FullWidth>
       <SelectField
@@ -872,5 +956,13 @@ function SeanceForm({
 }
 
 export const Route = createFileRoute("/dashboard/calendar")({
+  // L'emploi du temps est réservé à la direction et au responsable (chef de
+  // département). Toute autre fonction est renvoyée vers le tableau de bord.
+  beforeLoad: () => {
+    const role = getStoredRole();
+    if (role && !canAccess(role, "/dashboard/calendar")) {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
   component: PlanningPage,
 });

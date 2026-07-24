@@ -46,6 +46,7 @@ import {
   type LignePaiement,
   type NoteModule,
   type PaiementLigne,
+  type StatutPaiement,
   type Mention,
   type Decision,
   type ExamDocument,
@@ -92,7 +93,7 @@ import {
 
 /** Bump when the record shape changes: stored data on an old version is
  *  discarded rather than loaded into a UI that no longer understands it. */
-const STORAGE_KEY = "istpm-data-v2";
+const STORAGE_KEY = "istpm-data-v3";
 
 type Snapshot = {
   etudiants: Etudiant[];
@@ -285,6 +286,16 @@ type IstpmCtx = {
   deleteStage: (id: string) => void;
 
   addPaiement: (etudiantId: string, ligne: Omit<LignePaiement, "recu">) => void;
+
+  /** Fixe le statut de règlement d'un mois donné pour un étudiant (suivi mensuel). */
+  setMoisPaiementStatut: (
+    etudiantId: string,
+    mois: string,
+    statut: StatutPaiement,
+  ) => void;
+
+  /** Enregistre une note (module + examen) pour un étudiant et recalcule sa moyenne. */
+  addNote: (etudiantId: string, note: NoteModule) => void;
 
   addFiliere: (nom: string) => void;
   deleteFiliere: (nom: string) => void;
@@ -726,6 +737,9 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         mode: ligne.mode,
         periode: ligne.periode,
         date: ligne.date,
+        // Envoyé au backend pour le suivi mensuel ; ignoré tant que l'API ne le
+        // persiste pas (voir la note de passation).
+        mois: ligne.mois,
       }).catch(() => {});
       setSnap((s) => {
         const etudiant = s.etudiants.find((e) => e.id === etudiantId);
@@ -747,12 +761,71 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
                   historique: [...e.historique, { ...ligne, recu }],
                   resteAPayer: reste,
                   paiement: reste === 0 ? ("paye" as const) : e.paiement,
+                  // Le règlement met à jour le suivi mensuel du mois concerné.
+                  paiementsMensuels: ligne.mois
+                    ? { ...e.paiementsMensuels, [ligne.mois]: ligne.statut }
+                    : e.paiementsMensuels,
                 },
           ),
           activite: [
             {
               type: "paiement" as const,
               texte: `Paiement reçu   ${etudiant.prenom} ${etudiant.nom}, ${ligne.montant.toLocaleString("fr-FR")} MAD (${ligne.periode})`,
+              date: today(),
+            },
+            ...s.activite,
+          ].slice(0, 30),
+        };
+      });
+    },
+    [],
+  );
+
+  const setMoisPaiementStatut = useCallback(
+    (etudiantId: string, mois: string, statut: StatutPaiement) => {
+      setSnap((s) => ({
+        ...s,
+        etudiants: s.etudiants.map((e) =>
+          e.id === etudiantId
+            ? {
+                ...e,
+                paiementsMensuels: { ...e.paiementsMensuels, [mois]: statut },
+              }
+            : e,
+        ),
+      }));
+    },
+    [],
+  );
+
+  /**
+   * Enregistre une note ponctuelle pour un étudiant.
+   *
+   * Si le module existe déjà, la note est mise à jour ; sinon elle est ajoutée.
+   * La moyenne pondérée de l'étudiant est recalculée à chaque saisie. Le backend
+   * ne persiste pas encore la note isolée (voir la note de passation) : la
+   * saisie reste locale, comme le reste de l'écran de démonstration.
+   */
+  const addNote = useCallback(
+    (etudiantId: string, note: NoteModule) => {
+      setSnap((s) => {
+        const etudiant = s.etudiants.find((e) => e.id === etudiantId);
+        if (!etudiant) return s;
+        const existante = etudiant.notes.find((n) => n.module === note.module);
+        const notes = existante
+          ? etudiant.notes.map((n) => (n.module === note.module ? note : n))
+          : [...etudiant.notes, note];
+        return {
+          ...s,
+          etudiants: s.etudiants.map((e) =>
+            e.id === etudiantId
+              ? { ...e, notes, moyenne: moyennePonderee(notes) }
+              : e,
+          ),
+          activite: [
+            {
+              type: "note" as const,
+              texte: `Note saisie   ${note.module} : ${note.note.toFixed(2)}/20 (${etudiant.prenom} ${etudiant.nom})`,
               date: today(),
             },
             ...s.activite,
@@ -882,6 +955,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           periode: h.periode,
           recu: h.recu,
           statut: h.statut,
+          mois: h.mois,
         })),
       ),
     [snap.etudiants],
@@ -1036,6 +1110,8 @@ addSeance,
     updateStage,
     deleteStage,
     addPaiement,
+    setMoisPaiementStatut,
+    addNote,
     addFiliere,
     deleteFiliere,
     reset,

@@ -1,7 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Eye, FileDown, FileText, Plus, Pencil, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
@@ -19,6 +31,8 @@ import {
   type StatutStage,
 } from "@/lib/istpm-data";
 import {
+  softCard,
+  eyebrowClass,
   primaryPill,
   iconButton,
   iconButtonDanger,
@@ -29,6 +43,9 @@ import {
   rowActions,
   initials,
   TONE_COLORS,
+  CHART_COLORS,
+  dashTooltip,
+  renderPieLabel,
 } from "@/lib/dash-ui";
 import {
   PageHeader,
@@ -124,6 +141,137 @@ function downloadStageDoc(s: Stage, kind: "convention" | "rapport") {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
+/* ------------------------------------------------------------------ */
+/*  Analyse des stages                                                 */
+/* ------------------------------------------------------------------ */
+
+function ChartCard({
+  title,
+  children,
+  height = 240,
+}: {
+  title: string;
+  children: ReactNode;
+  height?: number;
+}) {
+  return (
+    <div className={cn(softCard, "p-4 sm:p-5")}>
+      <p className={eyebrowClass}>{title}</p>
+      <div className="mt-3 w-full" style={{ height }}>
+        <ResponsiveContainer width="100%" height="100%">
+          {children as React.ReactElement}
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Tableau de bord analytique des stages cliniques.
+ *
+ * Trois angles de lecture, tous dérivés en direct de l'état des stages :
+ *  · statistiques par statut d'avancement ;
+ *  · répartition par service / département d'accueil ;
+ *  · volume par structure hospitalière.
+ */
+function StagesAnalytics({ stages }: { stages: Stage[] }) {
+  const parStatut = useMemo(
+    () =>
+      STATUTS.map((s) => ({
+        name: STATUT_STAGE_LABEL[s],
+        value: stages.filter((x) => x.statut === s).length,
+      })),
+    [stages],
+  );
+
+  const parService = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of stages) map.set(s.service, (map.get(s.service) ?? 0) + 1);
+    return [...map.entries()]
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [stages]);
+
+  const parStructure = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of stages)
+      map.set(s.structure, (map.get(s.structure) ?? 0) + 1);
+    return [...map.entries()]
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [stages]);
+
+  if (!stages.length) return null;
+
+  return (
+    <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+      <ChartCard title="Statistiques des stages (par statut)">
+        <BarChart data={parStatut}>
+          <CartesianGrid stroke="var(--border)" vertical={false} />
+          <XAxis
+            dataKey="name"
+            tick={{ fontSize: 10 }}
+            stroke="var(--muted-foreground)"
+            interval={0}
+            angle={-15}
+            textAnchor="end"
+            height={54}
+          />
+          <YAxis
+            allowDecimals={false}
+            tick={{ fontSize: 11 }}
+            stroke="var(--muted-foreground)"
+            width={28}
+          />
+          <Tooltip contentStyle={dashTooltip} cursor={false} />
+          <Bar dataKey="value" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+        </BarChart>
+      </ChartCard>
+
+      <ChartCard title="Répartition par service / département">
+        <PieChart>
+          <Pie
+            data={parService}
+            dataKey="value"
+            nameKey="name"
+            innerRadius="45%"
+            outerRadius="78%"
+            paddingAngle={2}
+            label={renderPieLabel}
+            labelLine={false}
+          >
+            {parService.map((_, i) => (
+              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip contentStyle={dashTooltip} />
+        </PieChart>
+      </ChartCard>
+
+      <ChartCard title="Stages par structure hospitalière" height={260}>
+        <BarChart data={parStructure} layout="vertical">
+          <CartesianGrid stroke="var(--border)" horizontal={false} />
+          <XAxis
+            type="number"
+            allowDecimals={false}
+            tick={{ fontSize: 11 }}
+            stroke="var(--muted-foreground)"
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            tick={{ fontSize: 10 }}
+            stroke="var(--muted-foreground)"
+            width={130}
+          />
+          <Tooltip contentStyle={dashTooltip} cursor={false} />
+          <Bar dataKey="value" fill="var(--chart-2)" radius={[0, 6, 6, 0]} />
+        </BarChart>
+      </ChartCard>
+    </section>
+  );
+}
+
 function StagesPage() {
   const { role } = useAuth();
   const { stages, etudiants, addStage, updateStage, deleteStage } = useIstpm();
@@ -173,6 +321,8 @@ function StagesPage() {
           ) : undefined
         }
       />
+
+      <StagesAnalytics stages={stages} />
 
       <FilterPanel
         search={search}

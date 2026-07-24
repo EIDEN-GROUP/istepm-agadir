@@ -92,6 +92,8 @@ export type NoteModule = {
   note: number; // /20
   coef: number;
   credits: number;
+  /** Examen d'origine de la note (facultatif, pour la saisie des notes). */
+  examen?: string;
 };
 
 export type LignePaiement = {
@@ -101,7 +103,59 @@ export type LignePaiement = {
   periode: string;
   recu: string;
   statut: StatutPaiement;
+  /** Mois de scolarité réglé (« septembre 2025 » … « juin 2026 ») */
+  mois?: string;
 };
+
+/** Mois de l'année scolaire, dans l'ordre académique (septembre → juin), sans année. */
+export const MOIS_ACADEMIQUE = [
+  "septembre",
+  "octobre",
+  "novembre",
+  "décembre",
+  "janvier",
+  "février",
+  "mars",
+  "avril",
+  "mai",
+  "juin",
+] as const;
+
+export type MoisAcademique = (typeof MOIS_ACADEMIQUE)[number];
+
+/**
+ * Génère la liste des mois avec année pour une année universitaire donnée.
+ * Exemple : "2025/2026" → ["septembre 2025", …, "juin 2026"]
+ */
+export function getAcademicYearMonths(academicYear: string): string[] {
+  const parts = academicYear.split("/");
+  const start = Number.parseInt(parts[0], 10);
+  const end = Number.parseInt(parts[1], 10);
+  return MOIS_ACADEMIQUE.map((mois, i) => {
+    const year = i < 4 ? start : end;
+    return `${mois} ${year}`;
+  });
+}
+
+/** Détermine l'année universitaire courante à partir de la date du jour. */
+export function getCurrentAcademicYear(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  return month >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+}
+
+/** Renvoie le mois académique correspondant à la date du jour. */
+export function getDefaultMois(academicYear: string): string {
+  const months = getAcademicYearMonths(academicYear);
+  const now = new Date();
+  const m = now.getMonth();
+  let idx: number;
+  if (m >= 8 && m <= 11) idx = m - 8;
+  else if (m >= 0 && m <= 5) idx = m + 4;
+  else idx = 9; // juillet/août → juin
+  return months[idx];
+}
 
 export type Etudiant = {
   id: string;
@@ -126,6 +180,11 @@ export type Etudiant = {
   notes: NoteModule[];
   historique: LignePaiement[];
   stageEnCours?: string;
+  /**
+   * Statut de paiement mois par mois (scolarité mensuelle).
+   * Clé = mois (« septembre 2025 » … « juin 2026 »), valeur = statut du règlement.
+   */
+  paiementsMensuels?: Partial<Record<string, StatutPaiement>>;
 };
 
 export const ETUDIANTS: Etudiant[] = [
@@ -1537,6 +1596,7 @@ export type PaiementLigne = {
   periode: string;
   recu: string;
   statut: StatutPaiement;
+  mois?: string;
 };
 
 export const PAIEMENTS: PaiementLigne[] = ETUDIANTS.flatMap((e) =>
@@ -1553,6 +1613,7 @@ export const PAIEMENTS: PaiementLigne[] = ETUDIANTS.flatMap((e) =>
     periode: h.periode,
     recu: h.recu,
     statut: h.statut,
+    mois: h.mois,
   })),
 );
 
@@ -1735,6 +1796,8 @@ export type Seance = {
   module: string;
   /** Identifiant du formateur (voir FORMATEURS). */
   professeurId: string;
+  /** Filière / département concerné. */
+  filiere: Filiere;
   groupe: string;
   salle: string;
   /** ISO `YYYY-MM-DD`. */
@@ -1806,7 +1869,9 @@ export function isoDate(d: Date): string {
  * Les dates réelles sont calculées à partir de la semaine courante, pour que
  * le planning soit toujours peuplé quelle que soit la date de consultation.
  */
-const SEMAINE_TYPE: Array<Omit<Seance, "id" | "date"> & { jour: number }> = [
+const SEMAINE_TYPE: Array<
+  Omit<Seance, "id" | "date" | "filiere"> & { jour: number }
+> = [
   { jour: 0, module: "Soins infirmiers en médecine", professeurId: "fo-1", groupe: "S5-G1", salle: "Amphi A", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
   { jour: 0, module: "Réanimation et soins intensifs", professeurId: "fo-2", groupe: "S5-G2", salle: "Labo simulation 2", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S5", type: "tp" },
   { jour: 0, module: "Obstétrique", professeurId: "fo-3", groupe: "S3-G2", salle: "Salle 12", debut: "14:00", fin: "15:30", anneeUniversitaire: "2025/2026", semestre: "S3", type: "cours" },
@@ -1843,13 +1908,24 @@ const SEMAINE_TYPE: Array<Omit<Seance, "id" | "date"> & { jour: number }> = [
  */
 export function genererSeances(): Seance[] {
   const lundi = lundiDeLaSemaine(new Date());
+  // La filière de chaque séance est déduite du département du formateur qui
+  // l'assure : deux séances du même enseignant partagent toujours la filière,
+  // sans champ redondant à maintenir dans le gabarit hebdomadaire.
+  const filiereParProf = new Map<string, Filiere>(
+    FORMATEURS.map((f) => [f.id, f.departement] as const),
+  );
   const out: Seance[] = [];
   for (const semaine of [0, 1]) {
     SEMAINE_TYPE.forEach((s, i) => {
       const d = new Date(lundi);
       d.setDate(lundi.getDate() + s.jour + semaine * 7);
       const { jour: _jour, ...reste } = s;
-      out.push({ ...reste, id: `se-${semaine}-${i}`, date: isoDate(d) });
+      out.push({
+        ...reste,
+        filiere: filiereParProf.get(s.professeurId) ?? FILIERES[0],
+        id: `se-${semaine}-${i}`,
+        date: isoDate(d),
+      });
     });
   }
   return out;

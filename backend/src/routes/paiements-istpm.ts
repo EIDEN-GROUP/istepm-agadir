@@ -14,6 +14,7 @@ const paiementSchema = z.object({
     .optional()
     .default("Especes"),
   periode: z.string().optional().default(""),
+  mois: z.string().optional().default(""),
   date: z.string().optional(),
 });
 
@@ -88,6 +89,7 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
       montant: String(input.montant),
       mode: input.mode,
       periode: input.periode,
+      mois: input.mois,
       recu,
       statut: "paye",
     });

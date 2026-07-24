@@ -556,6 +556,9 @@ function DashboardDirecteur() {
   const { dashboard, formateurs, seances, examens, bulletins, etudiants, aTraiter, repartitionFiliere, repartitionNiveau } = useIstpm();
 
   const seancesAujourdhui = useMemo(() => seances.filter((s) => s.date === today), [seances]);
+  // « Étudiants actifs » = ceux dont la scolarité est en cours (statut inscrit),
+  // hors diplômés, abandons et dossiers en attente.
+  const etudiantsActifs = useMemo(() => etudiants.filter((e) => e.statut === "inscrit").length, [etudiants]);
   const examensParMois = useMemo(() => { const c = new Array(12).fill(0); examens.forEach((ex) => c[new Date(ex.date).getMonth()]++); return MOIS.map((n, i) => ({ name: n, value: c[i] })); }, [examens]);
   const sessionsParJour = useMemo(() => { const c = new Array(7).fill(0); seances.forEach((s) => c[new Date(s.date).getDay()]++); return JOURS.map((n, i) => ({ name: n, value: c[i] })); }, [seances]);
   const chargeFormateurs = useMemo(() => formateurs.filter((f) => f.statut !== "en_conge").map((f) => ({ id: f.id, nom: `${f.prenom} ${f.nom}`, seances: seances.filter((s) => s.professeurId === f.id).length, groupes: f.groupes.length, modules: f.modules.length })).sort((a, b) => b.seances - a.seances), [formateurs, seances]);
@@ -570,7 +573,7 @@ function DashboardDirecteur() {
         {tab === 0 ? (
           <div className="space-y-6">
             <KpiGrid>
-              <KpiCard label="étudiants inscrits" value={dashboard.totalInscrits} hint={`+${dashboard.deltaSemestre} ce semestre`} icon={Users} />
+              <KpiCard label="Étudiants actifs" value={etudiantsActifs} icon={Users} />
               <KpiCard label="Formateurs actifs" value={dashboard.formateursActifs} hint={`sur ${formateurs.length} au total`} icon={GraduationCap} />
               <KpiCard label="Taux de réussite" value={`${dashboard.tauxReussite} %`} tone="blue" icon={CheckCircle2} />
               <KpiCard label="Total Ã  recouvrer" value={fmtMAD(dashboard.totalARecouvrer)} tone="red" icon={Wallet} />

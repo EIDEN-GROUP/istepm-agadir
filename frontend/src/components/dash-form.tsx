@@ -1,5 +1,5 @@
-import { useRef, type ReactNode } from "react";
-import { FileText, Upload, X } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
+import { Check, ChevronsUpDown, FileText, Upload, X } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   Dialog,
@@ -16,6 +16,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   softInput,
   softSelectTrigger,
@@ -179,6 +192,92 @@ export function SelectField<T extends string>({
           ))}
         </SelectContent>
       </Select>
+    </FieldShell>
+  );
+}
+
+/**
+ * Sélecteur recherchable (autocomplétion).
+ *
+ * Même langage visuel que `SelectField`, mais la liste est filtrée en direct à
+ * la frappe via `cmdk`. Idéal pour les longues listes (étudiants) où un simple
+ * menu déroulant devient difficile à parcourir.
+ */
+export function ComboBoxField<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder = "Sélectionner…",
+  searchPlaceholder = "Rechercher…",
+  emptyText = "Aucun résultat.",
+  error,
+  required,
+}: {
+  label: string;
+  value: T | "";
+  onChange: (v: T) => void;
+  options: readonly { value: T; label: string }[];
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyText?: string;
+  error?: string;
+  required?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <FieldShell label={label} error={error} required={required}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            role="combobox"
+            aria-expanded={open}
+            className={cn(
+              softSelectTrigger,
+              "flex w-full items-center justify-between px-3 text-sm",
+              !selected && "text-muted-foreground/70",
+              error && "border-alert",
+            )}
+          >
+            <span className="truncate">{selected ? selected.label : placeholder}</span>
+            <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          className={cn(softSelectContent, "w-[--radix-popover-trigger-width] p-0")}
+          align="start"
+        >
+          <Command>
+            <CommandInput placeholder={searchPlaceholder} className="h-10" />
+            <CommandList>
+              <CommandEmpty>{emptyText}</CommandEmpty>
+              <CommandGroup>
+                {options.map((o) => (
+                  <CommandItem
+                    key={o.value}
+                    value={o.label}
+                    onSelect={() => {
+                      onChange(o.value);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "me-2 h-4 w-4",
+                        o.value === value ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    <span className="truncate">{o.label}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </FieldShell>
   );
 }

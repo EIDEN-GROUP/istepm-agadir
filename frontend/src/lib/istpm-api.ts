@@ -191,6 +191,8 @@ export function createPaiement(data: {
   mode: string;
   periode: string;
   date?: string;
+  /** Mois de scolarité réglé (suivi mensuel). Ignoré tant que l'API ne le gère pas. */
+  mois?: string;
 }) {
   return api.post<{ ok: boolean; recu: string; nouveauReste: number; statut: string }>(
     "/paiements-istpm",

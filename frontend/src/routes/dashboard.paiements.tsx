@@ -6,11 +6,15 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
 import {
+  ANNEES_UNIVERSITAIRES,
   FILIERES,
   STATUT_PAIEMENT_LABEL,
   STATUT_PAIEMENT_TONE,
   fmtDate,
   fmtMAD,
+  getAcademicYearMonths,
+  getCurrentAcademicYear,
+  getDefaultMois,
   type LignePaiement,
   type PaiementLigne,
   type StatutPaiement,
@@ -42,6 +46,7 @@ import {
   TextField,
   NumberField,
   SelectField,
+  ComboBoxField,
   FullWidth,
 } from "@/components/dash-form";
 import {
@@ -50,6 +55,14 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { softSelectTrigger, softSelectContent } from "@/lib/dash-ui";
 import { cn } from "@/lib/utils";
 
 const MODES: LignePaiement["mode"][] = [
@@ -72,6 +85,8 @@ function PaiementsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [relanceOpen, setRelanceOpen] = useState(false);
   const [detail, setDetail] = useState<PaiementLigne | null>(null);
+  const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear);
+  const months = useMemo(() => getAcademicYearMonths(academicYear), [academicYear]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -238,6 +253,8 @@ function PaiementsPage() {
         ))}
       </DataTable>
 
+      <MonthlyTracker etudiants={etudiants} canEdit={canEdit} academicYear={academicYear} onAcademicYearChange={setAcademicYear} months={months} />
+
       {/* Détail d'un règlement */}
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className={dialogSurface}>
@@ -261,6 +278,14 @@ function PaiementsPage() {
                   <DetailField label="Montant" value={fmtMAD(detail.montant)} />
                   <DetailField label="Date" value={fmtDate(detail.date)} />
                   <DetailField label="Mode" value={detail.mode} />
+                  <DetailField
+                    label="Mois réglé"
+                    value={
+                      detail.mois
+                        ? detail.mois.charAt(0).toUpperCase() + detail.mois.slice(1)
+                        : " "
+                    }
+                  />
                   <DetailField label="Période" value={detail.periode} />
                   <DetailField label="N° de reçu" value={detail.recu} full />
                 </DetailGrid>
@@ -282,6 +307,8 @@ function PaiementsPage() {
       {addOpen ? (
         <PaiementForm
           etudiants={etudiants}
+          academicYear={academicYear}
+          months={months}
           onCancel={() => setAddOpen(false)}
           onSubmit={({ etudiantId, ligne }) => {
             const et = etudiants.find((e) => e.id === etudiantId)!;
@@ -360,13 +387,188 @@ function PaiementsPage() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Suivi mensuel des paiements                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Suivi mensuel des paiements.
+ *
+ * L'institut fonctionne au mois : pour un étudiant donné, chaque mois de l'année
+ * scolaire porte son propre statut de règlement (payé / en attente / retard /
+ * impayé), modifiable directement ici. Le statut provient de `paiementsMensuels`
+ * (ou, à défaut, du dernier règlement rattaché à ce mois) et « Non renseigné »
+ * vaut impayé.
+ */
+function MonthlyTracker({
+  etudiants,
+  canEdit,
+  academicYear,
+  onAcademicYearChange,
+  months,
+}: {
+  etudiants: ReturnType<typeof useIstpm>["etudiants"];
+  canEdit: boolean;
+  academicYear: string;
+  onAcademicYearChange: (y: string) => void;
+  months: string[];
+}) {
+  const { setMoisPaiementStatut } = useIstpm();
+  const [etudiantId, setEtudiantId] = useState<string>(etudiants[0]?.id ?? "");
+  const etudiant = etudiants.find((e) => e.id === etudiantId);
+
+  const statutMois = (mois: string): StatutPaiement => {
+    if (!etudiant) return "impaye";
+    const explicite = etudiant.paiementsMensuels?.[mois];
+    if (explicite) return explicite;
+    const ligne = etudiant.historique.find(
+      (h) => h.mois?.toLowerCase() === mois,
+    );
+    return ligne?.statut ?? "impaye";
+  };
+
+  const montantMois = (mois: string): number =>
+    etudiant?.historique
+      .filter((h) => h.mois?.toLowerCase() === mois)
+      .reduce((s, h) => s + h.montant, 0) ?? 0;
+
+  const nbRegles = etudiant
+    ? months.filter((m) => statutMois(m) === "paye").length
+    : 0;
+
+  return (
+    <section className={cn(softCard, "p-4 sm:p-5")}>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Suivi mensuel
+          </p>
+          <h2 className="mt-1 font-display text-lg font-bold tracking-tight text-foreground">
+            Paiements par mois
+          </h2>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-44">
+            <SelectField
+              label="Année universitaire"
+              value={academicYear}
+              onChange={onAcademicYearChange}
+              options={ANNEES_UNIVERSITAIRES.map((y) => ({
+                value: y,
+                label: `${y.replace("/", "–")}`,
+              }))}
+            />
+          </div>
+          <div className="w-full max-w-xs">
+            <ComboBoxField
+            label="Étudiant"
+            value={etudiantId}
+            onChange={setEtudiantId}
+            options={etudiants.map((e) => ({
+              value: e.id,
+              label: `${e.prenom} ${e.nom}   ${e.cne}`,
+            }))}
+            placeholder="Choisir un étudiant…"
+            searchPlaceholder="Nom, prénom ou CNE…"
+            emptyText="Aucun étudiant trouvé."
+          />
+        </div>
+      </div>
+
+      {etudiant ? (
+        <>
+          <p className="mt-3 text-xs text-muted-foreground">
+            <strong className="font-semibold text-foreground">{nbRegles}</strong>{" "}
+            mois payé(s) sur {months.length} · Reste dû&nbsp;:{" "}
+            <strong
+              className={
+                etudiant.resteAPayer > 0 ? "text-alert" : "text-brand-dk"
+              }
+            >
+              {fmtMAD(etudiant.resteAPayer)}
+            </strong>
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            {months.map((m) => {
+              const st = statutMois(m);
+              const montant = montantMois(m);
+              return (
+                <div
+                  key={m}
+                  className={cn(
+                    "rounded-2xl border px-3 py-2.5",
+                    st === "paye"
+                      ? "border-brand/25 bg-brand/5"
+                      : "border-brand/12 bg-muted/40",
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold capitalize text-foreground">
+                      {m}
+                    </p>
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: TONE_COLORS[STATUT_PAIEMENT_TONE[st]] }}
+                    />
+                  </div>
+                  {canEdit ? (
+                    <Select
+                      value={st}
+                      onValueChange={(v) =>
+                        setMoisPaiementStatut(etudiant.id, m, v as StatutPaiement)
+                      }
+                    >
+                      <SelectTrigger
+                        className={cn(softSelectTrigger, "mt-2 h-8 w-full text-xs")}
+                        aria-label={`Statut de ${m}`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className={softSelectContent}>
+                        {STATUTS.map((s) => (
+                          <SelectItem key={s} value={s} className="text-xs">
+                            {STATUT_PAIEMENT_LABEL[s]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="mt-2">
+                      <span className={toneBadge(STATUT_PAIEMENT_TONE[st])}>
+                        {STATUT_PAIEMENT_LABEL[st]}
+                      </span>
+                    </p>
+                  )}
+                  {montant > 0 ? (
+                    <p className="mt-1.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+                      {fmtMAD(montant)}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Sélectionner un étudiant pour afficher son suivi mensuel.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 
 function PaiementForm({
   etudiants,
+  academicYear,
+  months,
   onSubmit,
   onCancel,
 }: {
   etudiants: ReturnType<typeof useIstpm>["etudiants"];
+  academicYear: string;
+  months: string[];
   onSubmit: (v: {
     etudiantId: string;
     ligne: Omit<LignePaiement, "recu">;
@@ -378,6 +580,7 @@ function PaiementForm({
     montant: "" as number | "",
     mode: "Espèces" as LignePaiement["mode"],
     periode: "",
+    mois: getDefaultMois(academicYear),
     date: new Date().toISOString().slice(0, 10),
     statut: "paye" as StatutPaiement,
   });
@@ -417,6 +620,7 @@ function PaiementForm({
         montant: Number(f.montant),
         mode: f.mode,
         periode: f.periode.trim(),
+        mois: f.mois,
         statut: f.statut,
       },
     });
@@ -432,7 +636,7 @@ function PaiementForm({
       onSubmit={submit}
     >
       <FullWidth>
-        <SelectField
+        <ComboBoxField
           label="Étudiant"
           required
           value={f.etudiantId}
@@ -441,6 +645,9 @@ function PaiementForm({
             value: e.id,
             label: `${e.prenom} ${e.nom}   ${e.cne}`,
           }))}
+          placeholder="Rechercher un étudiant…"
+          searchPlaceholder="Nom, prénom ou CNE…"
+          emptyText="Aucun étudiant trouvé."
           error={errors.etudiantId}
         />
       </FullWidth>
@@ -473,6 +680,16 @@ function PaiementForm({
         value={f.mode}
         onChange={(v) => set("mode", v)}
         options={MODES}
+      />
+      <SelectField
+        label="Mois réglé"
+        required
+        value={f.mois}
+        onChange={(v) => set("mois", v)}
+        options={months.map((m) => ({
+          value: m,
+          label: m.charAt(0).toUpperCase() + m.slice(1),
+        }))}
       />
       <TextField
         label="Période"
