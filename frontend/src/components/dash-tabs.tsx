@@ -27,7 +27,7 @@ export function DashTabs({
   return (
     <div
       className={cn(
-        "relative flex w-full gap-1 overflow-x-auto border-b border-border bg-background/80 backdrop-blur-sm scrollbar-none",
+        "relative flex w-full gap-1 overflow-x-auto rounded-3xl border-b border-border bg-background/80 backdrop-blur-sm scrollbar-none",
         className,
       )}
       role="tablist"

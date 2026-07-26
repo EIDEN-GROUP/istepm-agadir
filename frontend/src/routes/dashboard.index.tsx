@@ -19,7 +19,9 @@ import {
   LayoutGrid,
   BarChart3,
   CalendarRange,
-
+  Search,
+  Bell,
+  MessageSquare,
   Activity,
   type LucideProps,
 } from "lucide-react";
@@ -52,7 +54,7 @@ import { cn } from "@/lib/utils";
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const MOIS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","AoÃ»","Sep","Oct","Nov","Déc"];
+const MOIS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","AoÀ»","Sep","Oct","Nov","Déc"];
 const JOURS = ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const today = new Date().toISOString().slice(0, 10);
 
@@ -119,24 +121,25 @@ function DashHero({ chips }: { chips: { label: string; value: string | number }[
       initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="flex flex-wrap items-end justify-between gap-5 border-b border-border pb-5"
+      className="space-y-4"
     >
-      <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-dk">
-          {role ? ROLE_META[role].label : "Tableau de bord"}
-        </p>
-        <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-[2.5rem]">
-          {greeting}{user?.name ? `, ${user.name}` : ""}
-        </h1>
-        <p className="mt-1.5 text-sm capitalize text-muted-foreground">{dateStr}</p>
-      </div>
+      {/* Ligne principale   salutation + recherche + actions (style reference) */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-[2rem] sm:leading-tight">
+            {greeting}{user?.name ? `, ${user.name}` : ""}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {role ? ROLE_META[role].label : "Tableau de bord"} <span aria-hidden>·</span> <span className="capitalize">{dateStr}</span>
+          </p>
+        </div>
 
-      {chips.length ? (
+        {chips.length ? (
         <div className="flex flex-wrap gap-2.5">
           {chips.map((c) => (
             <div
               key={c.label}
-              className="rounded-xl border border-border bg-card px-4 py-2.5"
+              className="rounded-2xl border border-brand/10 bg-card px-4 py-2.5 shadow-[var(--elevation-1)]"
             >
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{c.label}</p>
               <p className="mt-1 font-display text-lg font-bold leading-none text-foreground">{c.value}</p>
@@ -144,6 +147,39 @@ function DashHero({ chips }: { chips: { label: string; value: string | number }[
           ))}
         </div>
       ) : null}
+
+        {/* <div className="flex w-full items-center gap-2.5 sm:w-auto">
+          <div className="flex h-12 min-w-0 flex-1 items-center gap-2 rounded-full border border-brand/10 bg-card ps-4 pe-1.5 shadow-[var(--elevation-1)] transition-shadow focus-within:shadow-[var(--elevation-2)] sm:flex-none">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              type="search"
+              aria-label="Rechercher"
+              placeholder="Rechercher..."
+              className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70 sm:w-44"
+            />
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink text-white transition-transform active:scale-95">
+              <Search className="h-4 w-4" />
+            </span>
+          </div>
+          <button
+            type="button"
+            aria-label="Messages"
+            className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full border border-brand/10 bg-card text-muted-foreground shadow-[var(--elevation-1)] transition-colors hover:text-brand-dk"
+          >
+            <MessageSquare className="h-[18px] w-[18px]" />
+            <span aria-hidden className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-alert ring-2 ring-card" />
+          </button>
+          <button
+            type="button"
+            aria-label="Notifications"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-brand/10 bg-card text-muted-foreground shadow-[var(--elevation-1)] transition-colors hover:text-brand-dk"
+          >
+            <Bell className="h-[18px] w-[18px]" />
+          </button>
+        </div> */}
+      </div>
+
+      
     </motion.header>
   );
 }
@@ -173,55 +209,118 @@ function DashWorkspace({
 /*  Reusable UI blocks                                                 */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Tiny decorative sparkline (SVG polyline) shown inside each stat card, echoing
+ * the reference dashboard's mini-charts. Shape is deterministic per `seed` so a
+ * card always draws the same curve   it is visual texture, not a data series.
+ */
+function sparkPath(seed: number, n = 11) {
+  const pts: number[] = [];
+  for (let i = 0; i < n; i++) {
+    pts.push(50 + 30 * Math.sin(i / 1.6 + seed) + 14 * Math.sin(i / 0.7 + seed * 1.7) + i * 1.5);
+  }
+  return pts;
+}
+
+function Sparkline({ seed, stroke, w = 72, h = 34 }: { seed: number; stroke: string; w?: number; h?: number }) {
+  const data = sparkPath(seed);
+  const max = Math.max(...data), min = Math.min(...data), rng = max - min || 1;
+  const coords = data.map((v, i) => [
+    (i / (data.length - 1)) * w,
+    h - 3 - ((v - min) / rng) * (h - 6),
+  ]);
+  const line = coords.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+  const area = `${line} L${w} ${h} L0 ${h} Z`;
+  const gid = `spark-${seed}-${Math.round(max)}`;
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden className="shrink-0">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={stroke} stopOpacity={0.22} />
+          <stop offset="100%" stopColor={stroke} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gid})`} />
+      <path d={line} fill="none" stroke={stroke} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function seedOf(label: string) {
+  let s = 0;
+  for (let i = 0; i < label.length; i++) s += label.charCodeAt(i);
+  return (s % 9) + 1;
+}
+
 function KpiCard({
-  label, value, hint, tone = "teal", icon: Icon,
+  label, value, hint, tone = "teal", icon: Icon, accent = false, spark = true,
 }: {
   label: string; value: string | number; hint?: string;
   tone?: keyof typeof TONE_COLORS;
   icon?: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  /** Filled brand-teal treatment for the lead metric (reference dashboard). */
+  accent?: boolean;
+  /** Show the decorative mini-chart (default true). */
+  spark?: boolean;
 }) {
+  const sparkColor = accent ? "#ffffff" : TONE_COLORS[tone];
   return (
     <motion.div
       whileHover={{ y: -4, scale: 1.01 }}
       transition={{ type: "spring", stiffness: 350, damping: 25 }}
       className={cn(
-        softCard,
         "group relative overflow-hidden p-4 sm:p-5",
-        "transition-shadow duration-300 hover:[box-shadow:var(--edge-highlight),var(--elevation-4)]",
+        accent
+          ? "rounded-3xl bg-gradient-to-br from-alert to-alert-dk text-white shadow-[0_18px_40px_-18px_rgb(var(--istpm-shadow)/0.6)]"
+          : cn(softCard, "transition-shadow duration-300 hover:[box-shadow:var(--edge-highlight),var(--elevation-4)]"),
       )}
     >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-        style={{ backgroundColor: `${TONE_COLORS[tone]}08` }}
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute left-0 top-0 h-full w-0.5 origin-bottom scale-y-0 transition-[transform,opacity] duration-300 group-hover:scale-y-100"
-        style={{ backgroundColor: TONE_COLORS[tone], opacity: 0.6 }}
-      />
+      {accent ? (
+        <span aria-hidden className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/10 blur-xl" />
+      ) : (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+          style={{ backgroundColor: `${TONE_COLORS[tone]}08` }}
+        />
+      )}
 
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground sm:text-[11px]">
-            {label}
-          </p>
-          <p className="mt-2 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            {typeof value === "number" && !hint ? <AnimatedNumber value={value} /> : value}
-          </p>
-          {hint ? <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p> : null}
-        </div>
+      {/* En-tête : petite icône + libellé (style reference) */}
+      <div className="relative flex items-center gap-2">
         {Icon ? (
           <span
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg sm:h-11 sm:w-11"
-            style={{
+            className={cn(
+              "grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-transform duration-300 group-hover:scale-110",
+              accent && "bg-white/15 ring-1 ring-inset ring-white/25",
+            )}
+            style={accent ? undefined : {
               background: `linear-gradient(135deg, ${TONE_COLORS[tone]}26, ${TONE_COLORS[tone]}0d)`,
               boxShadow: `inset 0 0 0 1px ${TONE_COLORS[tone]}2b`,
             }}
           >
-            <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: TONE_COLORS[tone] }} />
+            <Icon className="h-[15px] w-[15px]" style={accent ? { color: "#fff" } : { color: TONE_COLORS[tone] }} />
           </span>
         ) : null}
+        <p className={cn(
+          "min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.14em] sm:text-[11px]",
+          accent ? "text-white/75" : "text-muted-foreground",
+        )}>
+          {label}
+        </p>
+      </div>
+
+      {/* Valeur + sparkline */}
+      <div className="relative mt-3 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className={cn(
+            "font-display text-2xl font-bold tracking-tight sm:text-3xl",
+            accent ? "text-white" : "text-foreground",
+          )}>
+            {typeof value === "number" && !hint ? <AnimatedNumber value={value} /> : value}
+          </p>
+          {hint ? <p className={cn("mt-1 truncate text-xs", accent ? "text-white/70" : "text-muted-foreground")}>{hint}</p> : null}
+        </div>
+        {spark ? <Sparkline seed={seedOf(label)} stroke={sparkColor} /> : null}
       </div>
     </motion.div>
   );
@@ -239,6 +338,7 @@ function KpiGrid({ children }: { children: ReactNode }) {
     </motion.div>
   );
 }
+
 
 function Section({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
   return (
@@ -545,15 +645,15 @@ function DashboardDirecteur() {
       <DashHero chips={[{ label: "étudiants", value: dashboard.totalInscrits }, { label: "Séances ajd", value: seancesAujourdhui.length }, { label: "Réussite", value: `${dashboard.tauxReussite} %` }]} />
       <DashWorkspace tabs={DIRECTOR_TABS} tab={tab} onChange={setTab} direction={direction}>
         {tab === 0 ? (
-          <div className="space-y-6">
+          <div className="space-y-6 mt-5">
             <KpiGrid>
               <KpiCard label="Étudiants actifs" value={etudiantsActifs} icon={Users} />
-              <KpiCard label="Formateurs actifs" value={dashboard.formateursActifs} hint={`sur ${formateurs.length} au total`} icon={GraduationCap} />
+              <KpiCard label="Formateurs actifs" value={dashboard.formateursActifs} />
               <KpiCard label="Taux de réussite" value={`${dashboard.tauxReussite} %`} tone="blue" icon={CheckCircle2} />
-              <KpiCard label="Total Ã  recouvrer" value={fmtMAD(dashboard.totalARecouvrer)} tone="red" icon={Wallet} />
+              <KpiCard label="Total À recouvrer" value={fmtMAD(dashboard.totalARecouvrer)} tone="red" icon={Wallet} />
               <KpiCard label="Séances aujourd&rsquo;hui" value={seancesAujourdhui.length} icon={Calendar} />
-              <KpiCard label="Examens Ã  venir" value={aTraiter.examensAVenir} tone="amber" icon={BookOpen} />
-              <KpiCard label="Bulletins Ã  publier" value={aTraiter.bulletinsAPublier} tone="amber" icon={PenLine} />
+              <KpiCard label="Examens À venir" value={aTraiter.examensAVenir} tone="amber" icon={BookOpen} />
+              <KpiCard label="Bulletins À publier" value={aTraiter.bulletinsAPublier} tone="amber" icon={PenLine} />
             </KpiGrid>
             <Section title="Aujourd&rsquo;hui" action={<SectionLink to="/dashboard/calendar">Voir le planning</SectionLink>}>
               <AujourdhuiTable seances={seancesAujourdhui} />
@@ -564,16 +664,20 @@ function DashboardDirecteur() {
           </div>
         ) : tab === 1 ? (
           <div className="space-y-6">
-            <div className="grid gap-6 xl:grid-cols-2">
-              <Section title="Examens récents" action={<SectionLink to="/dashboard/examens">Tous les examens</SectionLink>}>
-                <ExamensRecentsTable examens={examensRecents} />
-              </Section>
-              <Section title="Bulletins récents" action={<SectionLink to="/dashboard/bulletins">Tous les bulletins</SectionLink>}>
-                <BulletinsRecentsTable bulletins={bulletinsRecents} />
-              </Section>
+            <div className="grid gap-6 xl:grid-cols-3">
+              <div className="xl:col-span-2">
+                <Section title="Examens récents" action={<SectionLink to="/dashboard/examens">Tous les examens</SectionLink>}>
+                  <ExamensRecentsTable examens={examensRecents} />
+                </Section>
+              </div>
+              <div className="xl:col-span-1">
+                <Section title="Nouveaux étudiants" action={<SectionLink to="/dashboard/etudiants">Tous les étudiants</SectionLink>}>
+                  <StudentAvatarList etudiants={derniersEtudiants} />
+                </Section>
+              </div>
             </div>
-            <Section title="Nouveaux étudiants" action={<SectionLink to="/dashboard/etudiants">Tous les étudiants</SectionLink>}>
-              <div className="max-w-lg"><StudentAvatarList etudiants={derniersEtudiants} /></div>
+            <Section title="Bulletins récents" action={<SectionLink to="/dashboard/bulletins">Tous les bulletins</SectionLink>}>
+              <BulletinsRecentsTable bulletins={bulletinsRecents} />
             </Section>
           </div>
         ) : (
@@ -587,7 +691,7 @@ function DashboardDirecteur() {
               </div>
             </Section>
             <Section title="Charge des formateurs">
-              <div className={cn(softCard, "max-w-xl divide-y divide-brand/8 overflow-hidden")}>
+              <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
                 {chargeFormateurs.map((f) => { const r = Math.min(f.seances / 8, 1); return <MeterRow key={f.id} label={f.nom} ratio={r} color={r > 0.75 ? TONE_COLORS.red : r > 0.5 ? TONE_COLORS.amber : TONE_COLORS.teal} detail={`${f.seances} séances Â· ${f.groupes} grp Â· ${f.modules} mod`} />; })}
               </div>
             </Section>
@@ -623,16 +727,16 @@ function DashboardEnseignant() {
 
   return (
     <>
-      <DashHero chips={[{ label: "Groupes", value: moi.groupes.length }, { label: "Séances ajd", value: seancesAujourdhui.length }, { label: "Ã€ noter", value: aNoter.length }]} />
+      <DashHero chips={[{ label: "Groupes", value: moi.groupes.length }, { label: "Séances ajd", value: seancesAujourdhui.length }, { label: "À€ noter", value: aNoter.length }]} />
       <DashWorkspace tabs={PROFESSOR_TABS} tab={tab} onChange={setTab} direction={direction}>
         {tab === 0 ? (
           <div className="space-y-5">
             <KpiGrid>
-              <KpiCard label="Mes groupes" value={moi.groupes.length} icon={Users} />
+              <KpiCard label="Mes groupes" value={moi.groupes.length} icon={Users} accent />
               <KpiCard label="Mes modules" value={moi.modules.length} tone="blue" icon={BookOpen} />
               <KpiCard label="Séances aujourd&rsquo;hui" value={seancesAujourdhui.length} icon={Calendar} />
               <KpiCard label="Mes examens" value={mesExamens.length} tone="amber" icon={GraduationCap} />
-              <KpiCard label="Examens Ã  noter" value={aNoter.length} tone={aNoter.length ? "red" : "teal"} icon={PenLine} />
+              <KpiCard label="Examens À  noter" value={aNoter.length} tone={aNoter.length ? "red" : "teal"} icon={PenLine} />
             </KpiGrid>
             <div className="grid gap-6 xl:grid-cols-2">
               <Section title="Notifications"><ActiviteFeed /></Section>
@@ -650,7 +754,7 @@ function DashboardEnseignant() {
                       </span>
                       <span className={toneBadge("blue")}>{TYPE_SEANCE_LABEL[s.type]}</span>
                     </div>
-                  )) : <p className="px-5 py-8 text-center text-sm text-muted-foreground">Aucune séance Ã  venir.</p>}
+                  )) : <p className="px-5 py-8 text-center text-sm text-muted-foreground">Aucune séance À  venir.</p>}
                 </div>
               </Section>
             </div>
@@ -725,12 +829,12 @@ function DashboardResponsable() {
         {tab === 0 ? (
           <div className="space-y-6">
             <KpiGrid>
-              <KpiCard label="Séances aujourd&rsquo;hui" value={seancesAujourdhui.length} icon={Calendar} />
+              <KpiCard label="Séances aujourd&rsquo;hui" value={seancesAujourdhui.length} icon={Calendar} accent />
               <KpiCard label="Formateurs actifs" value={dashboard.formateursActifs} hint={`sur ${formateurs.length} total`} tone="blue" icon={GraduationCap} />
               <KpiCard label="Salles occupées" value={sallesOccupees.length} icon={MapPin} />
               <KpiCard label="Salles disponibles" value={SALLES.length - sallesOccupees.length} tone={SALLES.length - sallesOccupees.length > 3 ? "teal" : "amber"} icon={Building2} />
               <KpiCard label="Conflits" value={conflits.length} tone={conflits.length ? "red" : "teal"} icon={AlertCircle} />
-              <KpiCard label="Stages Ã  valider" value={aTraiter.stagesAValider} tone="amber" icon={BookOpen} />
+              <KpiCard label="Stages À  valider" value={aTraiter.stagesAValider} tone="amber" icon={BookOpen} />
             </KpiGrid>
             <Section title="Aujourd&rsquo;hui" action={<SectionLink to="/dashboard/calendar">Voir le planning</SectionLink>}>
               <AujourdhuiTable seances={seancesAujourdhui} />

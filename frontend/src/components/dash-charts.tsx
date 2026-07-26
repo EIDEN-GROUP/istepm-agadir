@@ -54,6 +54,31 @@ const Grid = () => (
   />
 );
 
+/**
+ * Build one vertical (or horizontal) linear gradient per colour   solid at the
+ * base, fading toward the tip   so bars and donut slices read as the teal brand
+ * with gradient depth rather than flat fills. Returns the `<defs>` block and the
+ * gradient ids to reference as `fill={url(#id)}`.
+ */
+function useGradients(colors: readonly string[], horizontal = false) {
+  const base = useId().replace(/:/g, "");
+  const dir = horizontal
+    ? { x1: "0", y1: "0", x2: "1", y2: "0" }
+    : { x1: "0", y1: "0", x2: "0", y2: "1" };
+  const ids = colors.map((_, i) => `grad${base}-${i}`);
+  const defs = (
+    <defs>
+      {colors.map((c, i) => (
+        <linearGradient key={i} id={ids[i]} {...dir}>
+          <stop offset="0%" stopColor={c} stopOpacity={0.95} />
+          <stop offset="100%" stopColor={c} stopOpacity={0.48} />
+        </linearGradient>
+      ))}
+    </defs>
+  );
+  return { ids, defs };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Frame                                                              */
 /* ------------------------------------------------------------------ */
@@ -177,7 +202,7 @@ export function BarSeries({
   title,
   subtitle,
   data,
-  color = "var(--chart-2)",
+  color = "var(--chart-3)",
   colorful = false,
   height = 240,
 }: {
@@ -188,19 +213,24 @@ export function BarSeries({
   colorful?: boolean;
   height?: number;
 }) {
+  // Monochrome brand look: a single teal gradient, or per-bar teal-ramp
+  // gradients when `colorful` so shades still vary within the brand family.
+  const palette = colorful
+    ? data.map((_, i) => CHART_COLORS[i % CHART_COLORS.length])
+    : [color];
+  const { ids, defs } = useGradients(palette);
   return (
     <ChartFrame title={title} subtitle={subtitle} height={height}>
       <BarChart data={data} margin={{ top: 6, right: 6, left: -14, bottom: 0 }}>
+        {defs}
         <Grid />
         <XAxis dataKey="name" {...AXIS} />
         <YAxis width={34} allowDecimals={false} {...AXIS} />
         <Tooltip contentStyle={dashTooltip} cursor={dashCursor} />
-        <Bar dataKey="value" fill={color} maxBarSize={44} radius={[6, 6, 0, 0]}>
-          {colorful
-            ? data.map((_, i) => (
-                <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-              ))
-            : null}
+        <Bar dataKey="value" maxBarSize={30} radius={[0, 0, 0, 0]}>
+          {data.map((_, i) => (
+            <Cell key={i} fill={`url(#${ids[i % ids.length]})`} />
+          ))}
         </Bar>
       </BarChart>
     </ChartFrame>
@@ -228,6 +258,10 @@ export function HBarSeries({
     entry: { payload?: { seances?: number } },
   ) => [string, string];
 }) {
+  const { ids, defs } = useGradients(
+    data.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+    true,
+  );
   return (
     <ChartFrame title={title} subtitle={subtitle} height={height}>
       <BarChart
@@ -235,6 +269,7 @@ export function HBarSeries({
         layout="vertical"
         margin={{ top: 4, right: 10, left: 2, bottom: 0 }}
       >
+        {defs}
         <CartesianGrid
           strokeDasharray="3 3"
           strokeOpacity={0.5}
@@ -246,7 +281,7 @@ export function HBarSeries({
         <Tooltip contentStyle={dashTooltip} cursor={dashCursor} formatter={formatter} />
         <Bar dataKey="value" maxBarSize={22} radius={[0, 6, 6, 0]}>
           {data.map((_, i) => (
-            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            <Cell key={i} fill={`url(#${ids[i % ids.length]})`} />
           ))}
         </Bar>
       </BarChart>
@@ -270,6 +305,9 @@ export function DonutChart({
   height?: number;
 }) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const { ids, defs } = useGradients(
+    data.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+  );
   return (
     <div className={cn(softCard, "p-4 sm:p-5")}>
       <div className="flex items-center justify-between gap-2">
@@ -284,11 +322,12 @@ export function DonutChart({
         <div className="w-full sm:w-1/2" style={{ height }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
+              {defs}
               <Pie
                 data={data}
                 dataKey="value"
                 nameKey="name"
-                innerRadius={0}
+                innerRadius="52%"
                 outerRadius="94%"
                 paddingAngle={1}
                 stroke="var(--card)"
@@ -297,7 +336,7 @@ export function DonutChart({
                 labelLine={false}
               >
                 {data.map((_, i) => (
-                  <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  <Cell key={i} fill={`url(#${ids[i % ids.length]})`} />
                 ))}
               </Pie>
               <Tooltip contentStyle={dashTooltip} />

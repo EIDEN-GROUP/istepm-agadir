@@ -10,7 +10,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "relative isolate overflow-hidden border border-[color-mix(in_srgb,var(--primary)_78%,var(--foreground)_22%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--primary)_88%,#ffffff_12%)_0%,var(--primary)_55%,color-mix(in_srgb,var(--primary)_92%,var(--foreground)_8%)_100%)] text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_4px_16px_-4px_color-mix(in_srgb,var(--foreground)_38%,transparent)] hover:brightness-[1.06] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.34),0_8px_24px_-6px_color-mix(in_srgb,var(--foreground)_42%,transparent)] active:translate-y-px active:brightness-[0.96]",
+          "relative isolate overflow-hidden border border-[color-mix(in_srgb,var(--destructive)_78%,var(--foreground)_22%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--destructive)_88%,#ffffff_12%)_0%,var(--destructive)_55%,color-mix(in_srgb,var(--destructive)_92%,var(--foreground)_8%)_100%)] text-destructive-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_4px_16px_-4px_color-mix(in_srgb,var(--foreground)_38%,transparent)] hover:brightness-[1.06] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.34),0_8px_24px_-6px_color-mix(in_srgb,var(--foreground)_42%,transparent)] active:translate-y-px active:brightness-[0.96]",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:

@@ -11,13 +11,14 @@
  */
 import type { BadgeTone } from "./istpm-data";
 
-/** Primary surface   rounded card with a hairline border + layered, lit elevation. */
+/** Primary surface   airy rounded card with a near-invisible hairline + soft,
+ *  lit elevation (reference dashboard look). */
 export const softCard =
-  "rounded-3xl border border-brand/14 bg-card surface-2";
+  "rounded-3xl border border-brand/8 bg-card surface-2";
 
 /** Interactive surface   same as softCard but lifts smoothly on hover (clickable cards). */
 export const softCardHover =
-  "rounded-3xl border border-brand/14 bg-card surface-interactive hover:border-brand/25";
+  "rounded-3xl border border-brand/8 bg-card surface-interactive hover:border-brand/20";
 
 /**
  * Text input   rounded, teal focus ring.
@@ -47,9 +48,9 @@ export const eyebrowClass =
 const focusRing =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-/** Primary pill button (teal gradient, white text)   the app's main CTA. */
+/** Primary pill button (red gradient, white text)   the app's main CTA (brand red accent). */
 export const primaryPill =
-  "inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-brand to-brand-dk px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_-14px_rgb(var(--istpm-shadow)/0.85)] transition-all duration-200 hover:brightness-[1.06] hover:shadow-[0_18px_38px_-14px_rgb(var(--istpm-shadow)/0.95)] active:scale-[0.98] " +
+  "inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-alert to-alert-dk px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_-14px_rgb(var(--istpm-shadow)/0.85)] transition-all duration-200 hover:brightness-[1.06] hover:shadow-[0_18px_38px_-14px_rgb(var(--istpm-shadow)/0.95)] active:scale-[0.98] " +
   focusRing;
 
 /** Solid dark-teal pill button (secondary emphasis). */

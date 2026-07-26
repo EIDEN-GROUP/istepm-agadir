@@ -93,12 +93,19 @@
 
   --istpm-red: #e51e26;
   --istpm-red-dk: #b3141b;
+  --istpm-red-lt: #f4626a;
   --istpm-red-pale: #fbdcdd;
 
   --istpm-amber: #d98324;
   --istpm-amber-pale: #fbebd6;
   --istpm-blue: #2f6fb0;
   --istpm-blue-pale: #dfeaf6;
+
+  /* Extra categorical chart hues   muted, earthy companions to the teal brand
+     so multi-series charts read as a cohesive premium set on the cream canvas. */
+  --istpm-sage: #7ea262;
+  --istpm-coral: #e07a5f;
+  --istpm-gold: #e6b23a;
 
   /* Secondary accent   Stripe-style indigo/violet. Reserved for accents,
      never a second brand: teal stays dominant. */
@@ -109,6 +116,11 @@
 
   --istpm-ink: #123b3a;
   --istpm-white: #ffffff;
+
+  /* Warm cream canvas (reference dashboard backdrop). Neutral, faintly warm   the
+     white cards lift off it without competing colour. */
+  --app-cream-top: #f6f4ee;
+  --app-cream-bottom: #f0eee6;
 
   /* Shadow channels (space-separated for `rgb(... / a)` alpha syntax) used by the
      soft-card shadow language. Kept NEUTRAL grey on purpose: coloured (teal)
@@ -181,14 +193,16 @@
   --leaf: var(--istpm-teal-lt);
   --coral: var(--istpm-red);
 
-  /* Teal-family ramp, red last   keeps red meaningful in charts. */
-  --chart-1: var(--istpm-teal);
-  --chart-2: var(--istpm-teal-lt);
-  --chart-3: var(--istpm-teal-dk);
-  --chart-4: var(--istpm-blue);
-  --chart-5: var(--istpm-violet);
-  --chart-6: var(--istpm-amber);
-  --chart-7: var(--istpm-red);
+  /* Monochrome brand ramp   shades of the teal brand (#029994), deep → light.
+     All charts/graphs stay teal per the brand; the red (#e51e26) accent is
+     reserved for UI (active nav tile, lead KPI card, primary CTAs), not graphs. */
+  --chart-1: #015d5a;
+  --chart-2: #017a76;
+  --chart-3: #029994;
+  --chart-4: #22a9a3;
+  --chart-5: #46b7b2;
+  --chart-6: #6bc6c1;
+  --chart-7: #8fd4d0;
 
   --sidebar: var(--istpm-white);
   --sidebar-foreground: var(--istpm-ink);
@@ -387,13 +401,14 @@
     box-shadow: var(--edge-highlight), var(--elevation-4);
   }
 
-  /* App canvas   a soft teal→violet tinted backdrop so white cards clearly
-     lift off the page (replaces the near-white flat wash). */
+  /* App canvas   a warm, neutral cream backdrop (reference dashboard) so the
+     white cards read as softly lifted rather than floating on tinted colour.
+     A whisper of teal sits in the top corners to keep the brand present. */
   .app-canvas {
     background:
-      radial-gradient(1100px 520px at 100% -8%, color-mix(in srgb, var(--istpm-violet) 12%, transparent) 0%, transparent 58%),
-      radial-gradient(1000px 500px at -8% 0%, color-mix(in srgb, var(--istpm-teal) 14%, transparent) 0%, transparent 55%),
-      linear-gradient(180deg, color-mix(in srgb, var(--istpm-teal) 7%, var(--istpm-white)) 0%, color-mix(in srgb, var(--istpm-teal) 4%, var(--istpm-white)) 100%);
+      radial-gradient(1000px 480px at 100% -10%, color-mix(in srgb, var(--istpm-teal) 6%, transparent) 0%, transparent 60%),
+      radial-gradient(900px 460px at -6% 0%, color-mix(in srgb, var(--istpm-teal) 5%, transparent) 0%, transparent 55%),
+      linear-gradient(180deg, var(--app-cream-top) 0%, var(--app-cream-bottom) 100%);
   }
   :is(.dark) .app-canvas {
     background:
