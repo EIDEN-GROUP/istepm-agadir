@@ -24,7 +24,7 @@ const etudiantSchema = z.object({
   email: z.string().optional().default(""),
   dateNaissance: z.string().optional().default(""),
   ville: z.string().optional().default(""),
-  fraisAnnuels: z.number().optional().default(0),
+  fraisMensuels: z.number().optional().default(0),
   resteAPayer: z.number().optional().default(0),
   paiementsMensuels: z.record(z.string(), z.enum(["paye", "en_attente", "retard", "impaye"])).optional(),
 });
@@ -274,18 +274,25 @@ export async function etudiantRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const input = etudiantSchema.parse(request.body);
     const db = getDb();
-    const [etudiant] = await db
-      .insert(etudiants)
-      .values({
-        ...input,
-        fraisAnnuels: String(input.fraisAnnuels),
-        resteAPayer: String(input.resteAPayer),
-      })
-      .returning();
-    return etudiant;
+    try {
+      const fraisAnnuels = input.fraisMensuels * 10;
+      const [etudiant] = await db
+        .insert(etudiants)
+        .values({
+          ...input,
+          fraisAnnuels: String(fraisAnnuels),
+          resteAPayer: String(fraisAnnuels),
+        })
+        .returning();
+      return etudiant;
+    } catch (err) {
+      request.log.error(err, "Échec création étudiant");
+      const msg = err instanceof Error ? err.message : "Erreur inconnue";
+      return reply.status(500).send({ error: `Échec création étudiant : ${msg}` });
+    }
   });
 
   app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
@@ -295,10 +302,15 @@ export async function etudiantRoutes(app: FastifyInstance) {
     const values: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(input)) {
       if (val !== undefined) {
-        values[key] =
-          key === "fraisAnnuels" || key === "resteAPayer" || key === "moyenne"
-            ? String(val)
-            : val;
+        if (key === "fraisMensuels") {
+          values.fraisAnnuels = String(Number(val) * 10);
+        } else if (key === "fraisAnnuels") {
+          values.fraisAnnuels = String(val);
+        } else if (key === "resteAPayer" || key === "moyenne") {
+          values[key] = String(val);
+        } else {
+          values[key] = val;
+        }
       }
     }
     const [etudiant] = await db

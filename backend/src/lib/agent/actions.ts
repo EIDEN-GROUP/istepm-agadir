@@ -120,7 +120,7 @@ const ACTIONS: ActionDefinition[] = [
       { name: "email", type: "string", description: "Email" },
       { name: "dateNaissance", type: "string", description: "Date de naissance (YYYY-MM-DD)" },
       { name: "ville", type: "string", description: "Ville" },
-      { name: "fraisAnnuels", type: "number", description: "Frais annuels" },
+      { name: "fraisMensuels", type: "number", description: "Frais mensuels" },
     ],
   },
   {
@@ -139,7 +139,7 @@ const ACTIONS: ActionDefinition[] = [
       { name: "statut", type: "string", description: "Statut", enum: ["inscrit", "diplome", "abandon", "suspendu"] },
       { name: "telephone", type: "string", description: "Téléphone" },
       { name: "email", type: "string", description: "Email" },
-      { name: "fraisAnnuels", type: "number", description: "Frais annuels" },
+      { name: "fraisMensuels", type: "number", description: "Frais mensuels" },
     ],
   },
   {

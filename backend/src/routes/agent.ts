@@ -62,14 +62,23 @@ export async function agentRoutes(app: FastifyInstance) {
     } catch (err) {
       let msg = "Erreur de communication avec l'IA";
       if (err instanceof Error) {
-        if ("status" in err && (err as any).status === 404) {
-          msg = "Le modèle d'IA n'est pas disponible. Vérifiez la configuration AI_MODEL dans le fichier .env.";
-        } else if ("status" in err && (err as any).status === 401) {
-          msg = "Clé API IA invalide. Vérifiez AI_API_KEY dans le fichier .env.";
+        if ("status" in err) {
+          const status = (err as any).status;
+          if (status === 401) {
+            msg = "Clé API IA invalide. Vérifiez AI_API_KEY dans le fichier .env.";
+          } else if (status === 403) {
+            msg = "Accès refusé par l'API IA. Vérifiez que votre clé AI_API_KEY est valide et a accès au modèle AI_MODEL configuré.";
+          } else if (status === 404) {
+            msg = "Le modèle d'IA est introuvable. Vérifiez AI_MODEL dans le fichier .env.";
+          } else if (status === 429) {
+            msg = "L'API IA a limité le débit. Veuillez réessayer dans quelques instants.";
+          } else {
+            msg = `L'API IA a répondu avec une erreur (statut ${status}). Vérifiez votre configuration .env.`;
+          }
         } else if ((err as any).code === "ECONNREFUSED" || (err as any).code === "ENOTFOUND") {
           msg = "Impossible de contacter l'API IA. Vérifiez AI_BASE_URL dans le fichier .env.";
-        } else if (err.message.includes("404")) {
-          msg = "Le modèle d'IA est introuvable. Vérifiez AI_MODEL dans le fichier .env.";
+        } else if (err.message.includes("timed out") || err.message.includes("timeout")) {
+          msg = "L'API IA a mis trop de temps à répondre. Veuillez réessayer.";
         } else {
           msg = err.message;
         }
