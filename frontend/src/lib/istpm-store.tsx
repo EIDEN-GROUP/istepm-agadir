@@ -45,6 +45,8 @@ import {
   minutesDepuisMinuit,
   ajouterMinutes,
   STRUCTURES_ACCUEIL,
+  DEFAULT_MODULES,
+  type ModuleRecord,
   type LignePaiement,
   type NoteModule,
   type PaiementLigne,
@@ -95,11 +97,16 @@ import {
   updateStructureApi,
   deleteStructureApi,
   fetchStructuresApi as apiFetchStructures,
+  fetchModulesApi,
+  createModuleApi,
+  updateModuleApi,
+  deleteModuleApi,
   fetchSeances as apiFetchSeances,
   createSeance as apiCreateSeance,
   updateSeance as apiUpdateSeance,
   deleteSeance as apiDeleteSeance,
 } from "@/lib/istpm-api";
+import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
 
 /* ------------------------------------------------------------------ */
 /*  Persistance                                                        */
@@ -107,7 +114,7 @@ import {
 
 /** Bump when the record shape changes: stored data on an old version is
  *  discarded rather than loaded into a UI that no longer understands it. */
-const STORAGE_KEY = "istpm-data-v5";
+const STORAGE_KEY = "istpm-data-v6";
 
 type Snapshot = {
   etudiants: Etudiant[];
@@ -119,7 +126,12 @@ type Snapshot = {
   seances: Seance[];
   filieres: string[];
   structuresAccueil: string[];
+  modules: ModuleRecord[];
 };
+
+function seedModules(): ModuleRecord[] {
+  return DEFAULT_MODULES.map((m, i) => ({ id: `mod-seed-${i}`, ...m }));
+}
 
 function seed(): Snapshot {
   // Deep clone so edits never mutate the imported seed arrays.
@@ -133,6 +145,7 @@ function seed(): Snapshot {
     seances: SEANCES,
     filieres: [...FILIERES],
     structuresAccueil: [...STRUCTURES_ACCUEIL],
+    modules: seedModules(),
   }) as Snapshot;
 }
 
@@ -144,6 +157,9 @@ function load(): Snapshot {
     const parsed = JSON.parse(raw) as Snapshot;
     // Guard against a truncated or hand-edited payload.
     if (!Array.isArray(parsed?.etudiants)) return seed();
+
+    // Backfill fields added after this snapshot was persisted.
+    if (!Array.isArray(parsed.modules)) parsed.modules = seedModules();
 
     // Rebase seance dates to the current week.
     // Seed‑pattern seances ("se-0-…", "se-1-…") have dates frozen at save
@@ -247,6 +263,7 @@ type IstpmCtx = {
   seances: Seance[];
   filieres: string[];
   structuresAccueil: string[];
+  modules: ModuleRecord[];
 
   /* Dérivés */
   paiements: PaiementLigne[];
@@ -321,6 +338,10 @@ type IstpmCtx = {
   addStructureAccueil: (nom: string) => void;
   updateStructureAccueil: (oldName: string, newName: string) => void;
   deleteStructureAccueil: (nom: string) => void;
+
+  addModule: (data: Omit<ModuleRecord, "id">) => void;
+  updateModule: (id: string, data: Omit<ModuleRecord, "id">) => void;
+  deleteModule: (id: string) => void;
 
   addSeance: (data: NouvelleSeance) => Seance;
   updateSeance: (id: string, patch: Partial<Seance>) => void;
@@ -977,6 +998,50 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /* ---------------- Modules ---------------- */
+
+  // Hydrate depuis le backend quand une session existe ; en mode démo la
+  // requête échoue (401) et l'on conserve le jeu local (localStorage).
+  useEffect(() => {
+    fetchModulesApi()
+      .then((rows) => {
+        if (Array.isArray(rows) && rows.length) {
+          setSnap((s) => ({ ...s, modules: rows as ModuleRecord[] }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const addModule = useCallback((data: Omit<ModuleRecord, "id">) => {
+    const tempId = uid("mod");
+    setSnap((s) => ({ ...s, modules: [...s.modules, { ...data, id: tempId }] }));
+    // Best-effort : réconcilie l'id serveur si la requête aboutit.
+    createModuleApi(data)
+      .then((saved) => {
+        setSnap((s) => ({
+          ...s,
+          modules: s.modules.map((m) => (m.id === tempId ? (saved as ModuleRecord) : m)),
+        }));
+      })
+      .catch(() => {});
+  }, []);
+
+  const updateModule = useCallback(
+    (id: string, data: Omit<ModuleRecord, "id">) => {
+      setSnap((s) => ({
+        ...s,
+        modules: s.modules.map((m) => (m.id === id ? { ...m, ...data, id } : m)),
+      }));
+      updateModuleApi(id, data).catch(() => {});
+    },
+    [],
+  );
+
+  const deleteModule = useCallback((id: string) => {
+    setSnap((s) => ({ ...s, modules: s.modules.filter((m) => m.id !== id) }));
+    deleteModuleApi(id).catch(() => {});
+  }, []);
+
   /* ---------------- Planning ---------------- */
 
   const addSeance = useCallback((data: NouvelleSeance) => {
@@ -1258,6 +1323,9 @@ addSeance,
     addStructureAccueil,
     updateStructureAccueil,
     deleteStructureAccueil,
+    addModule,
+    updateModule,
+    deleteModule,
     reset,
   };
 
@@ -1268,4 +1336,25 @@ export function useIstpm() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useIstpm must be used within an IstpmProvider");
   return ctx;
+}
+
+/**
+ * Formateur « courant » pour le rôle enseignant.
+ *
+ * Résolu depuis le référentiel **hydraté** (store), et non depuis le seed
+ * statique : ainsi un formateur venu du backend (id UUID) est bien retrouvé.
+ * Repli sur le formateur de démonstration puis sur le premier de la liste.
+ */
+export function useCurrentFormateur(): Formateur | null {
+  const { formateurs } = useIstpm();
+  const { selectedFormateurId } = useAuth();
+  return useMemo(() => {
+    if (formateurs.length === 0) return null;
+    const id = selectedFormateurId ?? DEMO_FORMATEUR_ID;
+    return (
+      formateurs.find((f) => f.id === id) ??
+      formateurs.find((f) => f.id === DEMO_FORMATEUR_ID) ??
+      formateurs[0]
+    );
+  }, [formateurs, selectedFormateurId]);
 }

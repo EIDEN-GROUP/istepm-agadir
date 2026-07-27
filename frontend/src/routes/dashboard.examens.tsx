@@ -17,7 +17,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
 import { deleteNote } from "@/lib/istpm-api";
-import { useIstpm, moyennePonderee } from "@/lib/istpm-store";
+import { useIstpm, useCurrentFormateur, moyennePonderee } from "@/lib/istpm-store";
 import {
   FILIERES,
   NIVEAUX,
@@ -369,9 +369,10 @@ function EspaceFormateur() {
     removeDocument,
   } = useIstpm();
 
-  // Le formateur connecté (démo) : ses examens seulement.
-  const moiId = DEMO_FORMATEUR_ID;
-  const moi = formateurs.find((f) => f.id === moiId);
+  // Le formateur connecté : ses examens seulement. Résolu depuis le profil
+  // sélectionné (référentiel hydraté), avec repli sur le formateur de démo.
+  const moi = useCurrentFormateur();
+  const moiId = moi?.id ?? DEMO_FORMATEUR_ID;
 
   const [search, setSearch] = useState("");
   const [type, setType] = useState<string>(ALL);
@@ -952,9 +953,33 @@ function ExamenForm({
   const [removeExisting, setRemoveExisting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
+  /* Référentiel des modules (Paramètres › Modules) : chaque module connaît sa
+     filière, ce qui permet de la pré-remplir à la sélection. */
+  const { modules: modulesReg } = useIstpm();
+
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => {
     setF((prev) => ({ ...prev, [k]: v }));
     setErrors((prev) => ({ ...prev, [k]: undefined }));
+  };
+
+  /** Options du sélecteur de module : le référentiel, complété par la valeur
+   *  déjà saisie sur un examen existant pour ne rien perdre à l'édition. */
+  const moduleOptions = useMemo(() => {
+    const noms = new Set(modulesReg.map((m) => m.nom));
+    if (f.module.trim() && !noms.has(f.module)) noms.add(f.module);
+    return [...noms].sort().map((nom) => ({ value: nom, label: nom }));
+  }, [modulesReg, f.module]);
+
+  /** Sélection d'un module : renseigne le module et, si le référentiel connaît
+   *  sa filière, l'associe automatiquement à l'examen. */
+  const onModuleChange = (nom: string) => {
+    const found = modulesReg.find((m) => m.nom === nom);
+    setF((prev) => ({
+      ...prev,
+      module: nom,
+      filiere: (found ? (found.filiere as Filiere) : prev.filiere),
+    }));
+    setErrors((prev) => ({ ...prev, module: undefined, filiere: undefined }));
   };
 
   const submit = () => {
@@ -1024,12 +1049,15 @@ function ExamenForm({
         />
       </FullWidth>
       <FullWidth>
-        <TextField
+        <ComboBoxField
           label="Module"
           required
           value={f.module}
-          onChange={(v) => set("module", v)}
-          placeholder="Soins infirmiers en médecine"
+          onChange={onModuleChange}
+          options={moduleOptions}
+          placeholder="Sélectionner le module…"
+          searchPlaceholder="Rechercher un module…"
+          emptyText="Aucun module. Ajoutez-en dans Paramètres › Modules."
           error={errors.module}
         />
       </FullWidth>

@@ -4,7 +4,7 @@ import { Plus, Pencil, Eye, Download, Archive, RotateCcw, Upload, ListFilter, Ch
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { useIstpm, type NouvelEtudiant } from "@/lib/istpm-store";
+import { useIstpm, useCurrentFormateur, type NouvelEtudiant } from "@/lib/istpm-store";
 import { ImportEtudiantsDialog } from "@/components/import-etudiants-dialog";
 import { fetchStudentSemestres, exportEtudiantsCsv } from "@/lib/istpm-api";
 import {
@@ -21,7 +21,6 @@ import {
   type Niveau,
   type StatutEtudiant,
   type StatutPaiement,
-  FORMATEURS,
 } from "@/lib/istpm-data";
 import {
   primaryPill,
@@ -90,14 +89,14 @@ function EtudiantsPage() {
   // rather than the full roster, so the view stays focused on one class.
   const isTeacher = role === "enseignant";
 
-  // Scope assigned to the current enseignant (formateur).
+  // Scope assigned to the current enseignant (formateur), resolved from the
+  // hydrated referential so a backend-sourced formateur is found too.
+  const currentFormateur = useCurrentFormateur();
   const enseignantScope = useMemo(() => {
     if (!isTeacher) return null;
-    if (!selectedFormateurId) return null;
-    const f = FORMATEURS.find((x) => x.id === selectedFormateurId);
-    if (!f) return null;
-    return { filiere: f.departement, groupes: f.groupes };
-  }, [isTeacher, selectedFormateurId]);
+    if (!currentFormateur) return null;
+    return { filiere: currentFormateur.departement, groupes: currentFormateur.groupes };
+  }, [isTeacher, currentFormateur]);
 
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
@@ -143,7 +142,6 @@ function EtudiantsPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [toDelete, setToDelete] = useState<Etudiant | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
@@ -156,23 +154,6 @@ function EtudiantsPage() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filtered.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filtered.map((e) => e.id)));
-    }
-  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -204,25 +185,19 @@ function EtudiantsPage() {
     setFormOpen(true);
   };
 
-  const handleExport = async (mode: "all" | "filtered" | "selected") => {
+  const handleExport = async (mode: "all" | "filtered") => {
     setExportOpen(false);
-    if (mode === "selected" && selectedIds.size === 0) {
-      toast.error("Aucun étudiant sélectionné");
-      return;
-    }
-    const count = mode === "all" ? etudiants.length : mode === "filtered" ? filtered.length : selectedIds.size;
+    const count = mode === "all" ? etudiants.length : filtered.length;
     try {
       if (mode === "all") {
         await exportEtudiantsCsv();
-      } else if (mode === "filtered") {
+      } else {
         await exportEtudiantsCsv({
           ...(filiere !== ALL ? { filiere } : {}),
           ...(niveau !== ALL ? { niveau } : {}),
           ...(statut !== ALL ? { statut } : {}),
           ...(search ? { search } : {}),
         });
-      } else {
-        await exportEtudiantsCsv({ ids: [...selectedIds].join(",") });
       }
       toast.success(`${count} étudiant(s) exporté(s)`);
     } catch (err) {
@@ -267,17 +242,6 @@ function EtudiantsPage() {
                     >
                       <Download className="h-3.5 w-3.5 text-muted-foreground" />
                       Filtrés ({filtered.length})
-                    </button>
-                    <button
-                      onClick={() => handleExport("selected")}
-                      disabled={selectedIds.size === 0}
-                      className={cn(
-                        "flex w-full items-center gap-2 px-4 py-2 text-xs transition",
-                        selectedIds.size > 0 ? "text-foreground hover:bg-brand/5" : "text-muted-foreground cursor-not-allowed",
-                      )}
-                    >
-                      <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                      Sélectionnés ({selectedIds.size})
                     </button>
                   </motion.div>
                 )}
@@ -420,14 +384,6 @@ function EtudiantsPage() {
         empty="Aucun étudiant ne correspond à ces critères."
         head={
           <>
-            <th className="w-10">
-              <input
-                type="checkbox"
-                checked={selectedIds.size === filtered.length && filtered.length > 0}
-                onChange={toggleSelectAll}
-                className="h-4 w-4 cursor-pointer rounded border-muted-300 text-brand focus:ring-brand/30"
-              />
-            </th>
             <th>CNE</th>
             <th>Nom &amp; prénom</th>
             <th>Filière</th>
@@ -444,16 +400,8 @@ function EtudiantsPage() {
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
-            className={cn(tableRow, selectedIds.has(e.id) && "bg-brand/5", e.archived && "opacity-50")}
+            className={cn(tableRow, e.archived && "opacity-50")}
           >
-            <td className="w-10" onClick={(ev) => ev.stopPropagation()}>
-              <input
-                type="checkbox"
-                checked={selectedIds.has(e.id)}
-                onChange={() => toggleSelect(e.id)}
-                className="h-4 w-4 cursor-pointer rounded border-muted-300 text-brand focus:ring-brand/30"
-              />
-            </td>
             <td
               className="border-l-[3px] font-medium tabular-nums"
               style={{

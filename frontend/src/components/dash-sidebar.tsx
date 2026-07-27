@@ -26,6 +26,7 @@ import {
 import { ROLES, ROLE_META, useAuth } from "@/lib/auth";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
 import { useIstpm } from "@/lib/istpm-store";
+import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { AiChatFloating } from "@/components/ai-chat";
 import {
@@ -266,20 +267,17 @@ function NavGroupBlock({
 /* ------------------------------------------------------------------ */
 
 function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
-  const { role, setRole } = useAuth();
+  const { role, setRole, selectedFormateurId, setSelectedFormateurId } = useAuth();
   const { formateurs } = useIstpm();
   const navigate = useNavigate();
-  if (!role) return null;
-
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [selectedFormateurId, setSelectedFormateurId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem("istpm-selected-formateur");
-  });
+
+  if (!role) return null;
 
   const handleSelectRole = (next: (typeof ROLES)[number]) => {
     // If it's not enseignant, directly switch role
     if (next !== "enseignant") {
+      setSelectedFormateurId(null);
       setRole(next);
       navigate({ to: "/dashboard" });
       return;
@@ -290,16 +288,14 @@ function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
 
   return (
     <>
-      <Select
-        value={role}
-        onValueChange={handleSelectRole}
-        aria-label="Changer de profil"
-        className={cn(
-          "h-9 rounded-xl border-brand/15 bg-brand/5 text-xs font-medium text-foreground shadow-none transition-colors hover:bg-brand/10 focus:ring-0 focus:ring-offset-0 [&>svg]:text-muted-foreground data-[state=open]:bg-brand/10",
-          collapsed ? "w-9 justify-center px-0 [&>svg:last-child]:hidden" : "w-full px-3",
-        )}
-      >
-        <SelectTrigger>
+      <Select value={role} onValueChange={handleSelectRole}>
+        <SelectTrigger
+          aria-label="Changer de profil"
+          className={cn(
+            "h-9 rounded-xl border-brand/15 bg-brand/5 text-xs font-medium text-foreground shadow-none transition-colors hover:bg-brand/10 focus:ring-0 focus:ring-offset-0 [&>svg]:text-muted-foreground data-[state=open]:bg-brand/10",
+            collapsed ? "w-9 justify-center px-0 [&>svg:last-child]:hidden" : "w-full px-3",
+          )}
+        >
           {collapsed ? (
             <UserCog className="h-4 w-4 shrink-0 text-brand" />
           ) : (
@@ -329,11 +325,10 @@ function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
               <button
                 key={f.id}
                 onClick={() => {
-                  // Store the selected formateur ID
-                  window.localStorage.setItem("istpm-selected-formateur", f.id);
-                  // Switch to enseignant role
+                  // Persist the selected formateur through the auth context so
+                  // every page re-scopes reactively (no reload needed).
+                  setSelectedFormateurId(f.id);
                   setRole("enseignant");
-                  // Close picker and navigate
                   setPickerOpen(false);
                   navigate({ to: "/dashboard" });
                   toast.success(`Formateur sélectionné : ${f.prenom} ${f.nom}`);

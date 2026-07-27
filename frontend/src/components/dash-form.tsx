@@ -282,6 +282,125 @@ export function ComboBoxField<T extends string>({
   );
 }
 
+export function MultiSelectField({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder = "Sélectionner…",
+  searchPlaceholder = "Rechercher…",
+  emptyText = "Aucun résultat.",
+  error,
+  required,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: readonly { value: string; label: string }[];
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyText?: string;
+  error?: string;
+  required?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const selectedLabels = selected
+    .map((s) => options.find((o) => o.value === s)?.label ?? s)
+    .filter(Boolean);
+
+  const toggle = (v: string) => {
+    const next = selected.includes(v)
+      ? selected.filter((s) => s !== v)
+      : [...selected, v];
+    onChange(next.join(", "));
+  };
+
+  return (
+    <FieldShell label={label} error={error} required={required}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            role="combobox"
+            aria-expanded={open}
+            className={cn(
+              softSelectTrigger,
+              "flex w-full flex-wrap items-center gap-1.5 px-3 py-2 text-sm min-h-[42px]",
+              !selected.length && "text-muted-foreground/70",
+              error && "border-alert",
+            )}
+          >
+            {selectedLabels.length ? (
+              selectedLabels.map((l) => (
+                <span
+                  key={l}
+                  className="inline-flex items-center gap-1 rounded-md bg-brand/12 px-2 py-0.5 text-xs font-medium text-brand-dk"
+                >
+                  {l}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggle(
+                        options.find((o) => o.label === l)?.value ?? l,
+                      );
+                    }}
+                    className="hover:text-alert transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))
+            ) : (
+              <span className="text-muted-foreground/70">{placeholder}</span>
+            )}
+            <ChevronsUpDown className="ms-auto h-4 w-4 shrink-0 opacity-50" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          className={cn(softSelectContent, "w-[--radix-popover-trigger-width] p-0")}
+          align="start"
+        >
+          <Command>
+            <CommandInput placeholder={searchPlaceholder} className="h-10" />
+            <CommandList>
+              <CommandEmpty>{emptyText}</CommandEmpty>
+              <CommandGroup>
+                {options.map((o) => {
+                  const isSelected = selected.includes(o.value);
+                  return (
+                    <CommandItem
+                      key={o.value}
+                      value={o.label}
+                      onSelect={() => toggle(o.value)}
+                    >
+                      <div
+                        className={cn(
+                          "me-2 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                          isSelected
+                            ? "border-brand bg-brand text-white"
+                            : "border-border",
+                        )}
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </div>
+                      <span className="truncate">{o.label}</span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </FieldShell>
+  );
+}
+
 export function ListField({
   label,
   value,

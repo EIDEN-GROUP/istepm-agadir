@@ -47,6 +47,46 @@ export const STRUCTURES_ACCUEIL = [
 ] as const;
 
 /* ------------------------------------------------------------------ */
+/*  Modules — chaque module est rattaché à une filière                 */
+/* ------------------------------------------------------------------ */
+
+export type ModuleRecord = {
+  id: string;
+  nom: string;
+  /** Filière de rattachement (obligatoire) — clé par nom, comme partout. */
+  filiere: string;
+  code?: string | null;
+  description?: string | null;
+  volumeHoraire?: number | null;
+  coefficient?: string | number | null;
+};
+
+/** Jeu par défaut, aligné sur le seed du backend (Paramètres › Modules). */
+export const DEFAULT_MODULES: { nom: string; filiere: string }[] = [
+  { nom: "Soins infirmiers en médecine", filiere: "Infirmier polyvalent" },
+  { nom: "Hygiène hospitalière", filiere: "Infirmier polyvalent" },
+  { nom: "Éthique et déontologie", filiere: "Infirmier polyvalent" },
+  { nom: "Pharmacologie", filiere: "Infirmier polyvalent" },
+  { nom: "Santé publique", filiere: "Infirmier polyvalent" },
+  { nom: "Réanimation et soins intensifs", filiere: "Infirmier en anesthésie-réanimation" },
+  { nom: "Anesthésie clinique", filiere: "Infirmier en anesthésie-réanimation" },
+  { nom: "Obstétrique", filiere: "Sage-femme" },
+  { nom: "Suivi de grossesse", filiere: "Sage-femme" },
+  { nom: "Néonatologie", filiere: "Sage-femme" },
+  { nom: "Rééducation fonctionnelle", filiere: "Kinésithérapie" },
+  { nom: "Électrothérapie", filiere: "Kinésithérapie" },
+  { nom: "Techniques de radiologie", filiere: "Radiologie / Imagerie médicale" },
+  { nom: "Scanner et IRM", filiere: "Radiologie / Imagerie médicale" },
+  { nom: "Radioprotection", filiere: "Radiologie / Imagerie médicale" },
+  { nom: "Hématologie", filiere: "Laboratoire / Biologie médicale" },
+  { nom: "Biochimie clinique", filiere: "Laboratoire / Biologie médicale" },
+  { nom: "Microbiologie", filiere: "Laboratoire / Biologie médicale" },
+  { nom: "Anatomie dentaire", filiere: "Prothèse dentaire" },
+  { nom: "Prothèse fixe (TP)", filiere: "Prothèse dentaire" },
+  { nom: "Occlusodontie", filiere: "Prothèse dentaire" },
+];
+
+/* ------------------------------------------------------------------ */
 /*  Tonalités de badge (mappées vers dash-ui)                          */
 /* ------------------------------------------------------------------ */
 
@@ -269,7 +309,7 @@ export const ETUDIANTS: Etudiant[] = [
       "janvier 2026": "paye",
       "février 2026": "paye",
       "mars 2026": "paye",
-      "avril 2026": "retard",
+      "avril 2026": "paye",
       "mai 2026": "retard",
       "juin 2026": "retard",
     },
@@ -351,9 +391,9 @@ export const ETUDIANTS: Etudiant[] = [
       "novembre 2025": "paye",
       "décembre 2025": "paye",
       "janvier 2026": "paye",
-      "février 2026": "en_attente",
-      "mars 2026": "en_attente",
-      "avril 2026": "en_attente",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "paye",
       "mai 2026": "en_attente",
       "juin 2026": "en_attente",
     },
@@ -426,14 +466,15 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Microbiologie", note: 9.75, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: " ", montant: 16500, mode: "Virement", periode: "Tranche 1   2025/26", recu: " ", statut: "impaye" },
+      { date: "2025-10-10", montant: 16500, mode: "Espèces", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-071", statut: "paye" },
+      { date: " ", montant: 16500, mode: "Virement", periode: "Tranche 2   2025/26", recu: " ", statut: "impaye" },
     ],
     paiementsMensuels: {
-      "septembre 2025": "impaye",
-      "octobre 2025": "impaye",
-      "novembre 2025": "impaye",
-      "décembre 2025": "impaye",
-      "janvier 2026": "impaye",
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
       "février 2026": "impaye",
       "mars 2026": "impaye",
       "avril 2026": "impaye",
@@ -520,7 +561,7 @@ export const ETUDIANTS: Etudiant[] = [
       "janvier 2026": "paye",
       "février 2026": "paye",
       "mars 2026": "paye",
-      "avril 2026": "retard",
+      "avril 2026": "paye",
       "mai 2026": "retard",
       "juin 2026": "retard",
     },
@@ -551,7 +592,7 @@ export const ETUDIANTS: Etudiant[] = [
     historique: [
       { date: "2025-10-01", montant: 12000, mode: "Virement", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-009", statut: "paye" },
       { date: "2026-01-18", montant: 12000, mode: "Chèque", periode: "Tranche 2   2025/26", recu: "ISTPM-R-2601-060", statut: "paye" },
-      { date: " ", montant: 8000, mode: "Virement", periode: "Tranche 3   2025/26", recu: " ", statut: "en_attente" },
+      { date: "2026-04-12", montant: 8000, mode: "Virement", periode: "Tranche 3   2025/26", recu: "ISTPM-R-2604-069", statut: "paye" },
     ],
     paiementsMensuels: {
       "septembre 2025": "paye",
@@ -562,8 +603,8 @@ export const ETUDIANTS: Etudiant[] = [
       "février 2026": "paye",
       "mars 2026": "paye",
       "avril 2026": "paye",
-      "mai 2026": "en_attente",
-      "juin 2026": "en_attente",
+      "mai 2026": "paye",
+      "juin 2026": "paye",
     },
     stageEnCours: "Hôpital préfectoral Inezgane   Maternité",
     archived: false,
@@ -640,9 +681,9 @@ export const ETUDIANTS: Etudiant[] = [
       "novembre 2025": "paye",
       "décembre 2025": "paye",
       "janvier 2026": "paye",
-      "février 2026": "en_attente",
-      "mars 2026": "en_attente",
-      "avril 2026": "en_attente",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "paye",
       "mai 2026": "en_attente",
       "juin 2026": "en_attente",
     },
@@ -699,7 +740,7 @@ export const ETUDIANTS: Etudiant[] = [
     annee: "1re année",
     groupe: "B",
     statut: "en_attente",
-    paiement: "impaye",
+    paiement: "en_attente",
     moyenne: 8.7,
     telephone: "+212 6 41 55 78 20",
     email: "s.elghazi@istpm.ma",
@@ -711,19 +752,20 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Techniques de laboratoire", note: 8.5, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: " ", montant: 16500, mode: "Virement", periode: "Tranche 1   2025/26", recu: " ", statut: "impaye" },
+      { date: "2025-10-16", montant: 16500, mode: "Espèces", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-066", statut: "paye" },
+      { date: " ", montant: 16500, mode: "Virement", periode: "Tranche 2   2025/26", recu: " ", statut: "en_attente" },
     ],
     paiementsMensuels: {
-      "septembre 2025": "impaye",
-      "octobre 2025": "impaye",
-      "novembre 2025": "impaye",
-      "décembre 2025": "impaye",
-      "janvier 2026": "impaye",
-      "février 2026": "impaye",
-      "mars 2026": "impaye",
-      "avril 2026": "impaye",
-      "mai 2026": "impaye",
-      "juin 2026": "impaye",
+      "septembre 2025": "paye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
+      "janvier 2026": "paye",
+      "février 2026": "paye",
+      "mars 2026": "paye",
+      "avril 2026": "paye",
+      "mai 2026": "en_attente",
+      "juin 2026": "en_attente",
     },
     archived: false,
   },
@@ -750,14 +792,14 @@ export const ETUDIANTS: Etudiant[] = [
       { module: "Occlusodontie", note: 7.5, coef: 2, credits: 4 },
     ],
     historique: [
-      { date: "2025-10-08", montant: 8000, mode: "Espèces", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-040", statut: "paye" },
-      { date: " ", montant: 22000, mode: "Virement", periode: "Solde 2025/26", recu: " ", statut: "impaye" },
+      { date: "2025-10-08", montant: 12000, mode: "Espèces", periode: "Tranche 1   2025/26", recu: "ISTPM-R-2510-040", statut: "paye" },
+      { date: " ", montant: 18000, mode: "Virement", periode: "Solde 2025/26", recu: " ", statut: "impaye" },
     ],
     paiementsMensuels: {
       "septembre 2025": "paye",
-      "octobre 2025": "impaye",
-      "novembre 2025": "impaye",
-      "décembre 2025": "impaye",
+      "octobre 2025": "paye",
+      "novembre 2025": "paye",
+      "décembre 2025": "paye",
       "janvier 2026": "impaye",
       "février 2026": "impaye",
       "mars 2026": "impaye",
@@ -1893,7 +1935,7 @@ export const ACTIVITE_RECENTE: ActiviteItem[] = [
   { type: "paiement", texte: "Paiement reçu   Salma El Amrani, 11 000 MAD (Tranche 3)", date: "2026-07-20" },
   { type: "note", texte: "Notes saisies   Anatomie dentaire (S1, Prothèse dentaire)", date: "2026-07-19" },
   { type: "note", texte: "Notes saisies   Rééducation fonctionnelle (S3, Kinésithérapie)", date: "2026-07-18" },
-  { type: "paiement", texte: "Relance envoyée   Omar Bennani, solde 33 000 MAD", date: "2026-07-17" },
+  { type: "paiement", texte: "Relance envoyée   Omar Bennani, solde 16 500 MAD", date: "2026-07-17" },
   { type: "inscription", texte: "Réinscription confirmée   Zakaria Moutaouakil (Kinésithérapie, S4)", date: "2026-07-16" },
 ];
 

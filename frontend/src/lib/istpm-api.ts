@@ -363,6 +363,48 @@ export function deleteStructureApi(nom: string) {
   return api.delete<{ structures: string[] }>(`/settings/structures/${encodeURIComponent(nom)}`);
 }
 
+/* ------------------------------------------------------------------ */
+/*  Modules                                                           */
+/* ------------------------------------------------------------------ */
+
+export interface ModuleItem {
+  id: string;
+  nom: string;
+  filiere: string;
+  code?: string | null;
+  description?: string | null;
+  volumeHoraire?: number | null;
+  coefficient?: string | number | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export function fetchModulesApi(filiere?: string) {
+  const query = filiere ? `?filiere=${encodeURIComponent(filiere)}` : "";
+  return api.get<ModuleItem[]>(`/settings/modules${query}`);
+}
+
+export interface ModuleInput {
+  nom: string;
+  filiere: string;
+  code?: string | null;
+  description?: string | null;
+  volumeHoraire?: number | null;
+  coefficient?: number | string | null;
+}
+
+export function createModuleApi(data: ModuleInput) {
+  return api.post<ModuleItem>("/settings/modules", data);
+}
+
+export function updateModuleApi(id: string, data: ModuleInput) {
+  return api.put<ModuleItem>(`/settings/modules/${id}`, data);
+}
+
+export function deleteModuleApi(id: string) {
+  return api.delete<{ ok: boolean }>(`/settings/modules/${id}`);
+}
+
 export function resetSettings() {
   return api.post<{ ok: boolean }>("/settings/reset");
 }
