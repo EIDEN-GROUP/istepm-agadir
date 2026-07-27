@@ -83,7 +83,7 @@ jobs:
           file: ./backend/Dockerfile
           target: production
           push: true
-            tags: |
+          tags: |
             ${{ env.REGISTRY }}/eiden-group/istepm-agadir/school-crm-api:latest
             ${{ env.REGISTRY }}/eiden-group/istepm-agadir/school-crm-api:${{ github.sha }}
 
