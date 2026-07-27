@@ -26,6 +26,9 @@ const createUserSchema = z.object({
     .enum(["admin", "superadmin", "directeur", "enseignant", "responsable"])
     .optional()
     .default("admin"),
+  filiere: z.string().optional(),
+  niveau: z.string().optional(),
+  groupe: z.string().optional(),
 });
 
 const updateUserSchema = z.object({

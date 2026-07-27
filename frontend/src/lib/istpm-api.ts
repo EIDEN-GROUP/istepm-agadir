@@ -498,7 +498,15 @@ export function fetchUsers() {
   return api.get<UserRecord[]>("/auth/users");
 }
 
-export function createUser(data: { email: string; password: string; name: string; role?: string }) {
+export function createUser(data: {
+  email: string;
+  password: string;
+  name: string;
+  role?: string;
+  filiere?: string;
+  niveau?: string;
+  groupe?: string;
+}) {
   return api.post<UserRecord>("/auth/register", data);
 }
 

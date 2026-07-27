@@ -29,6 +29,7 @@ import {
   NIVEAUX,
   SALLES,
   GROUPES,
+  FILIERES,
   CRENEAUX,
   ANNEES_UNIVERSITAIRES,
   TYPE_EXAMEN_LABEL,
@@ -583,13 +584,24 @@ function NewUserForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("enseignant");
+  const [filiere, setFiliere] = useState("");
+  const [niveau, setNiveau] = useState("");
+  const [groupe, setGroupe] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const isEnseignant = role === "enseignant";
 
   const handleCreate = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) return;
     setLoading(true);
     try {
-      const user = await createUser({ name: name.trim(), email: email.trim(), password, role });
+      const user = await createUser({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        role,
+        ...(isEnseignant ? { filiere, niveau, groupe } : {}),
+      });
       onCreated(user);
       toast.success(`Utilisateur "${name}" créé`);
     } catch {
@@ -598,6 +610,11 @@ function NewUserForm({
       setLoading(false);
     }
   };
+
+  const selectClass = cn(
+    "h-8 w-full rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none",
+    "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
+  );
 
   return (
     <div className="mt-3 rounded-xl border border-brand/12 p-4">
@@ -619,17 +636,46 @@ function NewUserForm({
           <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Rôle</label>
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className={cn(
-              "h-8 w-full rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none",
-              "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
-            )}
+            onChange={(e) => {
+              setRole(e.target.value);
+              if (e.target.value !== "enseignant") {
+                setFiliere("");
+                setNiveau("");
+                setGroupe("");
+              }
+            }}
+            className={selectClass}
           >
             {["directeur", "responsable", "enseignant", "admin"].map((r) => (
               <option key={r} value={r}>{ROLE_META[r as UserRole]?.label ?? r}</option>
             ))}
           </select>
         </div>
+        {isEnseignant ? (
+          <>
+            <div>
+              <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Filière *</label>
+              <select value={filiere} onChange={(e) => setFiliere(e.target.value)} className={selectClass}>
+                <option value="">Sélectionner…</option>
+                {FILIERES.map((f) => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Semestre</label>
+              <select value={niveau} onChange={(e) => setNiveau(e.target.value)} className={selectClass}>
+                <option value="">Tous</option>
+                {NIVEAUX.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Groupe</label>
+              <select value={groupe} onChange={(e) => setGroupe(e.target.value)} className={selectClass}>
+                <option value="">Tous</option>
+                {GROUPES.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+          </>
+        ) : null}
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className={cn(ghostPill, "h-7 px-3 text-[11px]")}>
@@ -638,7 +684,7 @@ function NewUserForm({
         <button
           type="button"
           onClick={handleCreate}
-          disabled={!name.trim() || !email.trim() || !password.trim() || loading}
+          disabled={!name.trim() || !email.trim() || !password.trim() || (isEnseignant && !filiere) || loading}
           className={cn(primaryPill, "h-7 px-3 text-[11px]")}
         >
           {loading ? "Création..." : "Créer l'utilisateur"}
