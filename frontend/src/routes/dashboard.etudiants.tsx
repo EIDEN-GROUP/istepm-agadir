@@ -179,7 +179,7 @@ function EtudiantsPage() {
       // Enseignant scope: only show students in assigned filiere & groupes
       if (enseignantScope) {
         if (e.filiere !== enseignantScope.filiere) return false;
-        if (enseignantScope.groupes.length > 0 && !enseignantScope.groupes.includes(e.groupe)) return false;
+        if (enseignantScope.groupes.length > 0 && !enseignantScope.groupes.includes(`${e.niveau}-${e.groupe}`)) return false;
       }
       if (filiere !== ALL && e.filiere !== filiere) return false;
       if (niveau !== ALL && e.niveau !== niveau) return false;

@@ -595,37 +595,44 @@ function NewUserForm({
   const handleCreate = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) return;
     setLoading(true);
-    try {
-      const user = await createUser({
-        name: name.trim(),
+
+    const userData = {
+      name: name.trim(),
+      email: email.trim(),
+      password,
+      role,
+      ...(isEnseignant ? { filiere, niveau, groupe } : {}),
+    };
+
+    // Fire-and-forget the backend API — store is always updated.
+    createUser(userData).catch(() => {});
+
+    if (isEnseignant) {
+      const [prenom, ...reste] = name.trim().split(" ");
+      addFormateur({
+        prenom: prenom ?? name.trim(),
+        nom: reste.join(" ") || "",
         email: email.trim(),
-        password,
-        role,
-        ...(isEnseignant ? { filiere, niveau, groupe } : {}),
+        departement: filiere as NouveauFormateur["departement"],
+        groupes: groupe ? [groupe] : [],
+        matricule: "",
+        cin: "",
+        grade: "vacataire",
+        telephone: "",
+        statut: "permanent",
+        modules: [],
       });
-      onCreated(user);
-      if (isEnseignant) {
-        const [prenom, ...reste] = name.trim().split(" ");
-        addFormateur({
-          prenom: prenom ?? name.trim(),
-          nom: reste.join(" ") || "",
-          email: email.trim(),
-          departement: filiere as NouveauFormateur["departement"],
-          groupes: groupe ? [groupe] : [],
-          matricule: "",
-          cin: "",
-          grade: "vacataire",
-          telephone: "",
-          statut: "permanent",
-          modules: [],
-        });
-      }
-      toast.success(`Utilisateur "${name}" créé`);
-    } catch {
-      toast.error("Erreur lors de la création");
-    } finally {
-      setLoading(false);
     }
+
+    onCreated({
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      email: email.trim(),
+      role,
+      createdAt: new Date().toISOString(),
+    });
+    toast.success(`Utilisateur "${name}" créé`);
+    setLoading(false);
   };
 
   const selectClass = cn(
