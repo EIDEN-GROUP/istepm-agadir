@@ -1,4 +1,4 @@
-import { getEnv } from "@/config/env";
+import type { FastifyInstance } from "fastify";
 import ACTIONS from "./actions";
 
 export interface ExecuteParams {
@@ -7,11 +7,10 @@ export interface ExecuteParams {
   userToken: string;
 }
 
-export async function executeAction({
-  actionName,
-  params,
-  userToken,
-}: ExecuteParams): Promise<unknown> {
+export async function executeAction(
+  app: FastifyInstance,
+  { actionName, params, userToken }: ExecuteParams,
+): Promise<unknown> {
   const action = ACTIONS.find((a) => a.name === actionName);
   if (!action) {
     throw new Error(`Action inconnue: ${actionName}`);
@@ -24,10 +23,6 @@ export async function executeAction({
     }
   }
 
-  const env = getEnv();
-  const baseUrl = `http://localhost:${env.PORT || 3000}`;
-  const url = `${baseUrl}${path}`;
-
   const bodyParams: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(params)) {
     if (!path.includes(`:${key}`)) {
@@ -35,8 +30,9 @@ export async function executeAction({
     }
   }
 
-  const fetchOptions: RequestInit = {
-    method: action.method,
+  const injectPayload: Record<string, unknown> = {
+    method: action.method as "GET" | "POST" | "PUT" | "DELETE",
+    url: path,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${userToken}`,
@@ -44,34 +40,34 @@ export async function executeAction({
   };
 
   if (action.method !== "GET" && Object.keys(bodyParams).length > 0) {
-    fetchOptions.body = JSON.stringify(bodyParams);
+    injectPayload.body = JSON.stringify(bodyParams);
   }
 
-  const res = await fetch(url, fetchOptions);
+  const res = await app.inject(injectPayload);
 
-  if (!res.ok) {
-    const errorBody = await res.text();
+  if (res.statusCode >= 400) {
     let errorMsg: string;
     try {
-      const parsed = JSON.parse(errorBody);
-      errorMsg = parsed.error || errorBody;
+      const parsed = JSON.parse(res.body);
+      errorMsg = parsed.error || res.body;
     } catch {
-      errorMsg = errorBody;
+      errorMsg = res.body;
     }
-    throw new Error(`Erreur ${res.status}: ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 
-  if (res.status === 204) return null;
-  return res.json();
+  if (res.statusCode === 204 || !res.body) return null;
+  return JSON.parse(res.body);
 }
 
 export async function executeBatch(
+  app: FastifyInstance,
   paramsList: ExecuteParams[],
 ): Promise<{ results: unknown[]; failedAt: number | null; error?: string }> {
   const results: unknown[] = [];
   for (let i = 0; i < paramsList.length; i++) {
     try {
-      const result = await executeAction(paramsList[i]);
+      const result = await executeAction(app, paramsList[i]);
       results.push(result);
     } catch (err) {
       return {

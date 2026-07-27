@@ -38,16 +38,18 @@ export async function agentRoutes(app: FastifyInstance) {
       return result;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur analyse";
+      request.log.error(err, "Agent analyze failed");
       return reply.status(502).send({ error: msg });
     }
   });
 
   app.post("/confirm", { preHandler: [authenticate] }, async (request, reply) => {
     const input = confirmSchema.parse(request.body);
-    const token = (request as any).token as string;
+    const authHeader = request.headers.authorization;
+    const token = authHeader?.replace("Bearer ", "") ?? "";
 
     try {
-      const result = await executeAction({
+      const result = await executeAction(app, {
         actionName: input.actionName,
         params: input.params,
         userToken: token,
@@ -55,16 +57,19 @@ export async function agentRoutes(app: FastifyInstance) {
       return { success: true, data: result };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur exécution";
+      request.log.error(err, "Agent confirm failed");
       return reply.status(400).send({ error: msg });
     }
   });
 
   app.post("/execute-batch", { preHandler: [authenticate] }, async (request, reply) => {
     const input = batchSchema.parse(request.body);
-    const token = (request as any).token as string;
+    const authHeader = request.headers.authorization;
+    const token = authHeader?.replace("Bearer ", "") ?? "";
 
     try {
       const result = await executeBatch(
+        app,
         input.actions.map((a) => ({
           actionName: a.actionName,
           params: a.params,

@@ -264,6 +264,22 @@ export function deleteFiliereApi(nom: string) {
   return api.delete<{ filieres: string[] }>(`/settings/filieres/${nom}`);
 }
 
+export function fetchStructuresApi() {
+  return api.get<string[]>("/settings/structures");
+}
+
+export function createStructureApi(nom: string) {
+  return api.post<{ structures: string[] }>("/settings/structures", { nom });
+}
+
+export function updateStructureApi(nom: string, nouveauNom: string) {
+  return api.put<{ structures: string[] }>(`/settings/structures/${encodeURIComponent(nom)}`, { nouveauNom });
+}
+
+export function deleteStructureApi(nom: string) {
+  return api.delete<{ structures: string[] }>(`/settings/structures/${encodeURIComponent(nom)}`);
+}
+
 export function resetSettings() {
   return api.post<{ ok: boolean }>("/settings/reset");
 }

@@ -1,25 +1,14 @@
-import {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  type KeyboardEvent,
-  type FormEvent,
-} from "react";
+import { useState, useRef, useEffect, useCallback, type FormEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Loader2, Check, Ban, Pencil, Sparkles } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Check, Ban, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { softCard, primaryPill, ghostPill } from "@/lib/dash-ui";
+import { softCard } from "@/lib/dash-ui";
 import {
   analyzeIntent,
   confirmAction,
   type ChatMessage,
   type ProposedAction,
 } from "@/lib/istpm-api";
-
-/* ------------------------------------------------------------------ */
-/*  Loading Dots                                                       */
-/* ------------------------------------------------------------------ */
 
 function LoadingDots() {
   return (
@@ -36,27 +25,21 @@ function LoadingDots() {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Action Card                                                        */
-/* ------------------------------------------------------------------ */
-
 function ActionCard({
   action,
   index,
   onAccept,
   onDecline,
-  onModify,
   disabled,
 }: {
   action: ProposedAction;
   index: number;
   onAccept: () => void;
   onDecline: () => void;
-  onModify: () => void;
   disabled: boolean;
 }) {
-  const actionLabel = action.actionName.replace(/_/g, " ");
-  const isReadAction = action.actionName.startsWith("get_") || action.actionName.startsWith("list_");
+  const label = action.actionName.replace(/_/g, " ");
+  const isRead = action.actionName.startsWith("get_") || action.actionName.startsWith("list_");
 
   return (
     <motion.div
@@ -66,25 +49,20 @@ function ActionCard({
       className={cn(
         softCard,
         "overflow-hidden border-l-4",
-        isReadAction ? "border-l-blue-400" : "border-l-brand",
+        isRead ? "border-l-blue-400" : "border-l-brand",
       )}
     >
       <div className="space-y-2 px-4 py-3">
         <div className="flex items-start justify-between gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {isReadAction ? "Lecture" : "Écriture"}
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {isRead ? "Lecture" : "Écriture"}
           </span>
         </div>
-        <p className="text-sm font-semibold text-foreground capitalize">{actionLabel}</p>
+        <p className="text-sm font-semibold text-foreground capitalize">{label}</p>
         {Object.keys(action.params).length > 0 && (
           <pre className="max-h-28 overflow-auto rounded-xl bg-muted/50 p-2 text-[10px] text-muted-foreground">
             {JSON.stringify(action.params, null, 1)}
           </pre>
-        )}
-        {isReadAction && (
-          <p className="text-[10px] text-blue-500 font-medium">
-            Action de lecture — exécutée automatiquement
-          </p>
         )}
         <div className="flex gap-2">
           <button
@@ -109,10 +87,6 @@ function ActionCard({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Message Bubble                                                     */
-/* ------------------------------------------------------------------ */
-
 function MessageBubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === "user";
   return (
@@ -123,7 +97,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
     >
       <div
         className={cn(
-          "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+          "max-w-[88%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
           isUser
             ? "bg-brand text-white"
             : "bg-muted/70 text-foreground",
@@ -134,10 +108,6 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
     </motion.div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Floating Button                                                    */
-/* ------------------------------------------------------------------ */
 
 function FloatingButton({ onClick, open }: { onClick: () => void; open: boolean }) {
   return (
@@ -169,19 +139,16 @@ function FloatingButton({ onClick, open }: { onClick: () => void; open: boolean 
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Main Chat Component                                                */
-/* ------------------------------------------------------------------ */
-
 export function AiChatFloating() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
-      content: "Bonjour ! Je suis votre assistant IA. Je peux vous aider à gérer les étudiants, formateurs, examens, bulletins, stages, paiements et plus encore. Que souhaitez-vous faire ?",
+      content:
+        "Bonjour ! Je suis votre assistant IA. Je peux vous aider à gérer les étudiants, formateurs, examens, bulletins, stages, paiements et plus encore. Que souhaitez-vous faire ?",
     },
   ]);
-  const [proposedActions, setProposedActions] = useState<ProposedAction[]>([]);
+  const [pendingActions, setPendingActions] = useState<ProposedAction[]>([]);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
   const [executing, setExecuting] = useState<string | null>(null);
@@ -192,10 +159,10 @@ export function AiChatFloating() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  useEffect(() => scrollToBottom(), [messages, proposedActions, loading, scrollToBottom]);
+  useEffect(() => scrollToBottom(), [messages, pendingActions, loading, scrollToBottom]);
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    if (open) setTimeout(() => inputRef.current?.focus(), 100);
   }, [open]);
 
   useEffect(() => {
@@ -214,7 +181,7 @@ export function AiChatFloating() {
     const text = input.trim();
     if (!text || loading) return;
     setInput("");
-    setProposedActions([]);
+    setPendingActions([]);
 
     const userMsg: ChatMessage = { role: "user", content: text };
     const updated = [...messages, userMsg];
@@ -223,48 +190,54 @@ export function AiChatFloating() {
 
     try {
       const result = await analyzeIntent(updated);
+
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: result.reasoning },
       ]);
-      setProposedActions(result.proposedActions);
 
-      const readActions = result.proposedActions.filter(
-        (a) => a.actionName.startsWith("get_") || a.actionName.startsWith("list_"),
-      );
-      if (readActions.length === result.proposedActions.length && readActions.length > 0) {
-        for (const action of readActions) {
-          try {
-            const res = await confirmAction(action.actionName, action.params);
-            const dataStr =
-              typeof res.data === "object"
-                ? JSON.stringify(res.data).slice(0, 500)
-                : String(res.data);
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "assistant",
-                content: `Résultat de **${action.actionName.replace(/_/g, " ")}** :\n\`\`\`json\n${dataStr}\n\`\`\``,
-              },
-            ]);
-          } catch (err) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "assistant",
-                content: `Erreur lors de l'exécution de ${action.actionName}: ${err instanceof Error ? err.message : "Erreur"}`,
-              },
-            ]);
+      if (result.proposedActions.length > 0) {
+        const allRead = result.proposedActions.every(
+          (a) => a.actionName.startsWith("get_") || a.actionName.startsWith("list_"),
+        );
+
+        if (allRead) {
+          for (const action of result.proposedActions) {
+            setExecuting(action.actionName);
+            try {
+              const res = await confirmAction(action.actionName, action.params);
+              const dataStr =
+                typeof res.data === "object"
+                  ? JSON.stringify(res.data, null, 1).slice(0, 800)
+                  : String(res.data);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "assistant",
+                  content: `📋 Résultat de **${action.actionName.replace(/_/g, " ")}** :\n\`\`\`json\n${dataStr}\n\`\`\``,
+                },
+              ]);
+            } catch (err) {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "assistant",
+                  content: `❌ Erreur pour **${action.actionName.replace(/_/g, " ")}** : ${err instanceof Error ? err.message : "Erreur inconnue"}`,
+                },
+              ]);
+            }
           }
+          setExecuting(null);
+        } else {
+          setPendingActions(result.proposedActions);
         }
-        setProposedActions([]);
       }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `Désolé, je n'ai pas pu analyser votre demande : ${err instanceof Error ? err.message : "Erreur inconnue"}`,
+          content: `❌ Désolé, je n'ai pas pu analyser votre demande : ${err instanceof Error ? err.message : "Erreur inconnue"}`,
         },
       ]);
     } finally {
@@ -278,7 +251,7 @@ export function AiChatFloating() {
       const res = await confirmAction(action.actionName, action.params);
       const dataStr =
         typeof res.data === "object"
-          ? JSON.stringify(res.data, null, 1).slice(0, 1000)
+          ? JSON.stringify(res.data, null, 1).slice(0, 800)
           : String(res.data);
       setMessages((prev) => [
         ...prev,
@@ -287,13 +260,13 @@ export function AiChatFloating() {
           content: `✅ Action **${action.actionName.replace(/_/g, " ")}** exécutée avec succès.\n\`\`\`json\n${dataStr}\n\`\`\``,
         },
       ]);
-      setProposedActions([]);
+      setPendingActions([]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `❌ Erreur lors de l'exécution : ${err instanceof Error ? err.message : "Erreur inconnue"}`,
+          content: `❌ Erreur lors de l'exécution de **${action.actionName.replace(/_/g, " ")}** :\n${err instanceof Error ? err.message : "Erreur inconnue"}`,
         },
       ]);
     } finally {
@@ -302,38 +275,19 @@ export function AiChatFloating() {
   }
 
   function handleDecline(action: ProposedAction) {
-    setProposedActions((prev) => prev.filter((a) => a.toolCallId !== action.toolCallId));
+    setPendingActions((prev) => prev.filter((a) => a.toolCallId !== action.toolCallId));
     setMessages((prev) => [
       ...prev,
       {
         role: "assistant",
-        content: `✋ Action **${action.actionName.replace(/_/g, " ")}** refusée.`,
+        content: `✋ Action **${action.actionName.replace(/_/g, " ")}** annulée.`,
       },
     ]);
-  }
-
-  function handleModify(action: ProposedAction) {
-    const newParams = prompt(
-      `Modifier les paramètres pour ${action.actionName.replace(/_/g, " ")}:\n(Format: JSON)`,
-      JSON.stringify(action.params, null, 2),
-    );
-    if (!newParams) return;
-    try {
-      const parsed = JSON.parse(newParams);
-      setProposedActions((prev) =>
-        prev.map((a) =>
-          a.toolCallId === action.toolCallId ? { ...a, params: parsed } : a,
-        ),
-      );
-    } catch {
-      alert("JSON invalide");
-    }
   }
 
   return (
     <>
       <FloatingButton onClick={() => setOpen((o) => !o)} open={open} />
-
       <AnimatePresence>
         {open && (
           <motion.div
@@ -347,7 +301,6 @@ export function AiChatFloating() {
             )}
             style={{ height: 560, maxHeight: "calc(100vh - 8rem)" }}
           >
-            {/* Header */}
             <div className="flex shrink-0 items-center gap-3 border-b border-brand/12 bg-gradient-to-r from-brand to-brand-dk px-5 py-4 text-white">
               <span className="grid h-9 w-9 place-items-center rounded-full bg-white/20">
                 <Sparkles className="h-4 w-4" />
@@ -358,25 +311,23 @@ export function AiChatFloating() {
               </div>
             </div>
 
-            {/* Messages */}
             <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-4 py-4">
               {messages.map((msg, i) => (
                 <MessageBubble key={i} msg={msg} />
               ))}
 
-              {proposedActions.length > 0 && (
+              {pendingActions.length > 0 && (
                 <div className="space-y-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Actions proposées
+                    Actions proposées — veuillez confirmer
                   </p>
-                  {proposedActions.map((a, i) => (
+                  {pendingActions.map((a, i) => (
                     <ActionCard
                       key={a.toolCallId}
                       action={a}
                       index={i}
                       onAccept={() => handleAccept(a)}
                       onDecline={() => handleDecline(a)}
-                      onModify={() => handleModify(a)}
                       disabled={executing === a.actionName}
                     />
                   ))}
@@ -395,7 +346,6 @@ export function AiChatFloating() {
               <div ref={bottomRef} />
             </div>
 
-            {/* Input */}
             <form
               onSubmit={handleSend}
               className="flex shrink-0 items-center gap-2 border-t border-brand/12 px-4 py-3"

@@ -168,6 +168,91 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { filieres: list };
   });
 
+  app.get("/structures", { preHandler: [authenticate] }, async () => {
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "structures_accueil"))
+      .limit(1);
+    return row?.value ?? [];
+  });
+
+  app.post("/structures", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const { nom } = z.object({ nom: z.string().min(1) }).parse(request.body);
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "structures_accueil"))
+      .limit(1);
+
+    const list: string[] = (row?.value as string[]) ?? [];
+    if (list.includes(nom)) {
+      return reply.status(409).send({ error: "Cette structure existe déjà" });
+    }
+    list.push(nom);
+    list.sort();
+
+    if (row) {
+      await db
+        .update(settings)
+        .set({ value: list })
+        .where(eq(settings.key, "structures_accueil"));
+    } else {
+      await db.insert(settings).values({ key: "structures_accueil", value: list });
+    }
+    return { structures: list };
+  });
+
+  app.put("/structures/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const { nom } = request.params as { nom: string };
+    const { nouveauNom } = z.object({ nouveauNom: z.string().min(1) }).parse(request.body);
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "structures_accueil"))
+      .limit(1);
+    if (!row) return reply.status(404).send({ error: "Aucune structure enregistrée" });
+
+    const list: string[] = (row.value as string[]) ?? [];
+    const idx = list.indexOf(nom);
+    if (idx === -1) return reply.status(404).send({ error: "Structure introuvable" });
+    if (list.includes(nouveauNom))
+      return reply.status(409).send({ error: "Ce nom existe déjà" });
+    list[idx] = nouveauNom;
+    list.sort();
+
+    await db
+      .update(settings)
+      .set({ value: list })
+      .where(eq(settings.key, "structures_accueil"));
+    return { structures: list };
+  });
+
+  app.delete("/structures/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const { nom } = request.params as { nom: string };
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "structures_accueil"))
+      .limit(1);
+    if (!row) return reply.status(404).send({ error: "Aucune structure enregistrée" });
+
+    const list: string[] = (row.value as string[]) ?? [];
+    const idx = list.indexOf(nom);
+    if (idx === -1) return reply.status(404).send({ error: "Structure introuvable" });
+    list.splice(idx, 1);
+
+    await db
+      .update(settings)
+      .set({ value: list })
+      .where(eq(settings.key, "structures_accueil"));
+    return { structures: list };
+  });
+
   app.post("/reset", { preHandler: [authenticate, requireRole("directeur")] }, async () => {
     const db = getDb();
     await db.delete(historiquePaiements);

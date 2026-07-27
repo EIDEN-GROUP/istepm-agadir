@@ -89,6 +89,10 @@ import {
   deleteNote as apiDeleteNote,
   createFiliereApi,
   deleteFiliereApi,
+  createStructureApi,
+  updateStructureApi,
+  deleteStructureApi,
+  fetchStructuresApi as apiFetchStructures,
   fetchSeances as apiFetchSeances,
   createSeance as apiCreateSeance,
   updateSeance as apiUpdateSeance,
@@ -373,7 +377,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        const [etudiants, formateurs, examens, bulletins, stages, seances] =
+        const [etudiants, formateurs, examens, bulletins, stages, seances, structures] =
           await Promise.all([
             apiFetchEtudiants(),
             apiFetchFormateurs(),
@@ -381,6 +385,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
             apiFetchBulletins(),
             apiFetchStages(),
             apiFetchSeances(),
+            apiFetchStructures().catch(() => [] as string[]),
           ]);
         if (!mounted) return;
         const enrichEtudiant = (raw: Record<string, unknown>): Etudiant => {
@@ -405,6 +410,9 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           bulletins: bulletins as Bulletin[],
           stages: stages as Stage[],
           seances: seances as Seance[],
+          structuresAccueil: (structures as string[])?.length
+            ? (structures as string[])
+            : s.structuresAccueil,
         }));
       } catch {
         // Backend not available — keep localStorage data.
@@ -908,6 +916,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const addStructureAccueil = useCallback(
     (nom: string) => {
+      createStructureApi(nom).catch(() => {});
       setSnap((s) => ({
         ...s,
         structuresAccueil: s.structuresAccueil.includes(nom)
@@ -920,6 +929,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const updateStructureAccueil = useCallback(
     (oldName: string, newName: string) => {
+      updateStructureApi(oldName, newName).catch(() => {});
       setSnap((s) => ({
         ...s,
         structuresAccueil: s.structuresAccueil.map((st) =>
@@ -932,6 +942,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const deleteStructureAccueil = useCallback(
     (nom: string) => {
+      deleteStructureApi(nom).catch(() => {});
       setSnap((s) => ({
         ...s,
         structuresAccueil: s.structuresAccueil.filter((st) => st !== nom),
