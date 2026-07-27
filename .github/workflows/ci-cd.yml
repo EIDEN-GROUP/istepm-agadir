@@ -163,21 +163,43 @@ jobs:
             # Deploy the stack
             docker stack deploy -c docker-compose.production.yml school-crm --with-registry-auth --prune
 
-            # Wait for postgres to be ready (up to 3 minutes)
+            # Wait for postgres service to be ready (up to 3 minutes)
             echo "Waiting for postgres to be ready..."
             for i in $(seq 1 60); do
-              docker run --rm --network school-crm_school-crm \
-                postgres:16-alpine pg_isready -h postgres -U postgres 2>/dev/null && break
+              PG_CONTAINER=$(docker ps --filter name=school-crm_postgres --format '{{.Names}}' | head -1)
+              [ -n "$PG_CONTAINER" ] && docker exec "$PG_CONTAINER" pg_isready -U postgres 2>/dev/null && break
               echo "  Waiting... ($i)"
               sleep 3
-            done
+            done || echo "Postgres wait timed out, proceeding anyway..."
 
-            # Run database migrations
+            # Run database migrations as a one-off Swarm service
             echo "Running database migrations..."
-            docker run --rm \
+            docker service rm school-crm-migrate 2>/dev/null || true
+            docker service create \
+              --name school-crm-migrate \
               --network school-crm_school-crm \
+              --restart-condition none \
               -e DATABASE_URL="postgres://postgres:${DB_PASSWORD}@postgres:5432/school_crm" \
               ghcr.io/eiden-group/istepm-agadir/school-crm-api:${{ github.sha }} \
               node dist/db/migrate.js
+
+            # Wait for migration task to complete
+            sleep 5
+            echo "Waiting for migration to finish..."
+            for i in $(seq 1 60); do
+              STATE=$(docker service ps school-crm-migrate --format '{{.CurrentState}}' 2>/dev/null)
+              case "$STATE" in
+                *"Complete"*) echo "Migration completed successfully"; break;;
+                *"Failed"*) echo "Migration failed"; docker service logs school-crm-migrate --tail 50; exit 1;;
+                *"Shutdown"*) echo "Migration shut down"; break;;
+                "") echo "  No task yet... ($i)"; sleep 3; continue;;
+                *) echo "  State: $STATE ($i)";;
+              esac
+              sleep 3
+            done
+
+            # Show migration logs
+            docker service logs school-crm-migrate --tail 20 || true
+            docker service rm school-crm-migrate 2>/dev/null || true
 
             echo "Deployment complete!"
