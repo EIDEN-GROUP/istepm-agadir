@@ -1,0 +1,25 @@
+# PostgreSQL automated backup service
+# Runs an initial backup on start, then pg_dump on a daily schedule (2 AM)
+# with 30-day retention
+
+FROM postgres:16-alpine
+
+# Install cron and bash
+RUN apk add --no-cache bash dcron
+
+# Copy backup script
+COPY scripts/backup-db.sh /usr/local/bin/backup-db.sh
+RUN chmod +x /usr/local/bin/backup-db.sh
+
+# Create backup directory
+RUN mkdir -p /backups
+
+# Schedule daily backup at 2:00 AM
+RUN echo "0 2 * * * /usr/local/bin/backup-db.sh >> /var/log/backup.log 2>&1" > /var/spool/cron/crontabs/root
+
+# Run an initial backup 10 seconds after container starts,
+# then hand over to cron for the daily schedule
+COPY docker/entrypoint-backup.sh /entrypoint-backup.sh
+RUN chmod +x /entrypoint-backup.sh
+
+CMD ["/entrypoint-backup.sh"]

@@ -1,0 +1,13 @@
+# Prometheus configuration
+# Scrapes container metrics from cAdvisor (works out of the box).
+# Traefik and backend metrics are not yet exposed — add them when available.
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+
+  - job_name: "cadvisor"
+    static_configs:
+      - targets: ["cadvisor:8080"]

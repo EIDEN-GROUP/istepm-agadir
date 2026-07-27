@@ -1,5 +1,10 @@
 # Docker Compose file for production (Docker Swarm)
 # Deploy with: docker stack deploy -c docker-compose.production.yml school-crm
+#
+# Architecture: Both frontend (SPA) and backend API are served on the SAME domain.
+#   https://DOMAIN/      → nginx → React SPA (index.html)
+#   https://DOMAIN/api/* → Traefik → Backend API (Fastify)
+#   https://DOMAIN/health → Traefik → Backend API (health check)
 
 services:
 
@@ -14,6 +19,9 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # Redirect HTTP → HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
     ports:
       - target: 80
         published: 80
@@ -104,6 +112,41 @@ services:
       restart_policy:
         condition: none
 
+  frontend:
+    image: school-crm-frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      # Main domain → frontend SPA (lower priority than the API router)
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      # Lower priority so /api/* matches the backend router first
+      - "traefik.http.routers.frontend.priority=1"
+    networks:
+      - school-crm
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
   backend:
     image: school-crm-api:latest
     build:
@@ -122,8 +165,10 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: school-crm
       JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRES_IN: 7d
-      CORS_ORIGIN: https://${FRONTEND_DOMAIN}
+      JWT_EXPIRES_IN: 24h
+      # Same domain — no CORS needed for same-origin requests,
+      # but the backend still validates the Origin header when present.
+      CORS_ORIGIN: https://${DOMAIN}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
@@ -149,9 +194,12 @@ services:
       start_period: 30s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`${API_DOMAIN}`)"
+      # /api/* and /health routes → backend (higher priority than frontend)
+      # NOTE: /api prefix is NOT stripped — the backend registers routes with /api/ prefix
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && (PathPrefix(`/api`) || Path(`/health`))"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend.priority=10"
       - "traefik.http.services.backend.loadbalancer.server.port=3000"
     networks:
       - school-crm
@@ -195,11 +243,158 @@ services:
           cpus: "0.5"
           memory: 256M
 
+  # ═══════════════════════════════════════════════════════════
+  # Database Backups — daily pg_dump with 30-day retention
+  # ═══════════════════════════════════════════════════════════
+
+  db-backup:
+    image: school-crm-backup:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backup
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: school_crm
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      BACKUP_DIR: /backups
+      RETENTION_DAYS: 30
+    volumes:
+      - dbbackups:/backups
+    depends_on:
+      - postgres
+    networks:
+      - school-crm
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  # ═══════════════════════════════════════════════════════════
+  # Monitoring Stack — Prometheus + Grafana + Loki
+  # ═══════════════════════════════════════════════════════════
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.51
+    restart: unless-stopped
+    command:
+      - "-docker_only=true"
+      - "-housekeeping_interval=30s"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - school-crm
+    deploy:
+      mode: global
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 128M
+
+  prometheus:
+    image: prom/prometheus:v3.2
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheusdata:/prometheus
+    networks:
+      - school-crm
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  loki:
+    image: grafana/loki:3.4
+    restart: unless-stopped
+    command:
+      - "-config.file=/etc/loki/loki-config.yml"
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - lokidata:/loki
+    networks:
+      - school-crm
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  promtail:
+    image: grafana/promtail:3.4
+    restart: unless-stopped
+    command:
+      - "-config.file=/etc/promtail/promtail-config.yml"
+    volumes:
+      - ./monitoring/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - school-crm
+    deploy:
+      mode: global
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 128M
+
+  grafana:
+    image: grafana/grafana:11.5
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ROOT_URL: https://monitor.${DOMAIN}
+    volumes:
+      - grafanadata:/var/lib/grafana
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`monitor.${DOMAIN}`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    networks:
+      - school-crm
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
 volumes:
   pgdata:
   redisdata:
   miniodata:
   letsencrypt:
+  dbbackups:
+  prometheusdata:
+  lokidata:
+  grafanadata:
 
 networks:
   school-crm:

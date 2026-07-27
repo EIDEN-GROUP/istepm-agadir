@@ -6,6 +6,7 @@ set -euo pipefail
 # Prerequisites:
 #   - Docker Engine 24+ with Swarm initialized (`docker swarm init`)
 #   - .env.production file populated
+#   - Ports 80 and 443 open on the VPS firewall
 #
 # Usage:
 #   ./deploy.sh [stack-name]
@@ -19,15 +20,50 @@ if [ ! -f .env.production ]; then
   exit 1
 fi
 
-echo "=== Deploying $STACK_NAME to Docker Swarm ==="
+echo ""
+echo "╔═══════════════════════════════════════════════════╗"
+echo "║  Deploying $STACK_NAME to Docker Swarm"
+echo "╚═══════════════════════════════════════════════════╝"
+echo ""
 
-# Build backend image
-echo "Building backend image..."
-docker build -t school-crm-api:latest -f backend/Dockerfile --target production backend/
+# ── 1. Build the frontend (SPA) ─────────────────────────
+echo "→ Building frontend..."
 
-# Deploy the stack
-echo "Deploying stack..."
-docker stack deploy -c docker-compose.production.yml --with-registry-auth "$STACK_NAME"
+# Read DOMAIN from .env.production (without sourcing the whole file to avoid
+# parsing issues with special characters in passwords)
+DOMAIN="$(grep -m1 '^DOMAIN=' .env.production 2>/dev/null | cut -d= -f2-)"
+DOMAIN="${DOMAIN:-localhost}"
+VITE_API_URL="https://${DOMAIN}/api"
 
-echo "=== Done ==="
-echo "Run 'docker stack ps $STACK_NAME' to check service status."
+cd frontend
+npm ci
+VITE_API_URL="$VITE_API_URL" npm run build
+cd ..
+
+docker build -t school-crm-frontend:latest -f frontend/Dockerfile frontend/ \
+  && echo "  ✓ Frontend image built"
+
+# ── 2. Build the backend (API) ──────────────────────────
+echo "→ Building backend image..."
+docker build -t school-crm-api:latest -f backend/Dockerfile --target production backend/ \
+  && echo "  ✓ Backend image built"
+
+# ── 3. Build the backup image ───────────────────────────
+echo "→ Building backup image..."
+docker build -t school-crm-backup:latest -f docker/Dockerfile.backup . \
+  && echo "  ✓ Backup image built"
+
+# ── 4. Deploy the stack ─────────────────────────────────
+echo "→ Deploying stack..."
+docker stack deploy -c docker-compose.production.yml --with-registry-auth "$STACK_NAME" \
+  && echo "  ✓ Stack deployed"
+
+echo ""
+echo "╔═══════════════════════════════════════════════════╗"
+echo "║  Deployment complete!"
+echo "║"
+echo "║  Check status: docker stack ps $STACK_NAME"
+echo "║  View logs:    docker service logs ${STACK_NAME}_backend -f"
+echo "║  Visit:        https://\${DOMAIN}"
+echo "╚═══════════════════════════════════════════════════╝"
+echo ""
