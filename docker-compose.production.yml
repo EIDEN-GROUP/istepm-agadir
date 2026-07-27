@@ -339,3 +339,4 @@ volumes:
 networks:
   school-crm:
     driver: overlay
+    attachable: true

@@ -163,9 +163,9 @@ jobs:
             # Deploy the stack
             docker stack deploy -c docker-compose.production.yml school-crm --with-registry-auth --prune
 
-            # Wait for postgres to be ready
+            # Wait for postgres to be ready (up to 3 minutes)
             echo "Waiting for postgres to be ready..."
-            for i in $(seq 1 30); do
+            for i in $(seq 1 60); do
               docker run --rm --network school-crm_school-crm \
                 postgres:16-alpine pg_isready -h postgres -U postgres 2>/dev/null && break
               echo "  Waiting... ($i)"
