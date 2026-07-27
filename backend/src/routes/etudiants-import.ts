@@ -368,7 +368,7 @@ export async function etudiantImportRoutes(app: FastifyInstance) {
           }
         }
       } catch {
-        // Silently ignore filiere sync errors — not critical
+        // Silently ignore filiere sync errors   not critical
       }
     }
 

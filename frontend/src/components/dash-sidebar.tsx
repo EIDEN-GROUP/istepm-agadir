@@ -22,6 +22,7 @@ import {
   Menu,
   X,
   UserCog,
+  RotateCcw,
 } from "lucide-react";
 import { ROLES, ROLE_META, useAuth } from "@/lib/auth";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
@@ -306,6 +307,18 @@ function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
           )}
         </SelectTrigger>
         <SelectContent className="rounded-2xl border-brand/15">
+          {role === "enseignant" && selectedFormateurId ? (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setPickerOpen(true)}
+              onKeyDown={(e) => e.key === "Enter" && setPickerOpen(true)}
+              className="flex w-full cursor-pointer items-center gap-2 px-2 py-2 text-xs font-medium text-brand-dk hover:bg-brand/10 rounded-lg transition-colors"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Changer de formateur…
+            </div>
+          ) : null}
           {ROLES.map((r) => (
             <SelectItem key={r} value={r} className="text-xs">
               {ROLE_META[r].label}
@@ -316,7 +329,7 @@ function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
 
       {/* Formateur picker dialog */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <DialogContent className="w-[300px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-full max-h-[80vh] overflow-y-auto">
           <DialogTitle className="text-lg font-medium">
             Sélectionner un formateur
           </DialogTitle>
@@ -326,9 +339,10 @@ function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
                 key={f.id}
                 onClick={() => {
                   // Persist the selected formateur through the auth context so
-                  // every page re-scopes reactively (no reload needed).
+                  // every page re-scopes reactively (no reload needed). This
+                  // also switches the session identity to the chosen teacher
+                  // (name/email), so no separate setRole call is needed.
                   setSelectedFormateurId(f.id);
-                  setRole("enseignant");
                   setPickerOpen(false);
                   navigate({ to: "/dashboard" });
                   toast.success(`Formateur sélectionné : ${f.prenom} ${f.nom}`);

@@ -49,6 +49,7 @@ import {
   DetailShell,
   ALL,
 } from "@/components/dash-page";
+import { usePagination, TablePagination } from "@/components/table-pagination";
 import {
   FormDialog,
   ConfirmDialog,
@@ -95,7 +96,17 @@ function EtudiantsPage() {
   const enseignantScope = useMemo(() => {
     if (!isTeacher) return null;
     if (!currentFormateur) return null;
-    return { filiere: currentFormateur.departement, groupes: currentFormateur.groupes };
+    // Semestres enseignés par le formateur, déduits du préfixe de ses groupes
+    // (« S5-G1 » → « S5 »). Le formateur voit TOUS les étudiants de sa filière
+    // dans ces semestres, quel que soit le sous-groupe (G1/G2).
+    const niveaux = [
+      ...new Set(currentFormateur.groupes.map((g) => g.split("-")[0])),
+    ];
+    return {
+      filiere: currentFormateur.departement,
+      niveaux,
+      groupes: currentFormateur.groupes,
+    };
   }, [isTeacher, currentFormateur]);
 
   const [search, setSearch] = useState("");
@@ -121,13 +132,15 @@ function EtudiantsPage() {
     if (groupe !== ALL && !groupeOptions.includes(groupe)) setGroupe(ALL);
   }, [groupeOptions, groupe]);
 
-  // Pre-set scope filters for enseignant with assigned formateur.
+  // Pre-set scope filters for enseignant with assigned formateur. On garde le
+  // semestre et le groupe sur « Tous » : la portée (filière + semestres
+  // enseignés) est appliquée directement dans le filtre, donc tous les
+  // étudiants concernés apparaissent sans exiger de choix supplémentaire.
   useEffect(() => {
     if (enseignantScope) {
       setFiliere(enseignantScope.filiere);
-      if (enseignantScope.groupes.length > 0) {
-        setGroupe(enseignantScope.groupes[0]);
-      }
+      setNiveau(ALL);
+      setGroupe(ALL);
     }
   }, [enseignantScope]);
 
@@ -162,7 +175,11 @@ function EtudiantsPage() {
       // Enseignant scope: only show students in assigned filiere & groupes
       if (enseignantScope) {
         if (e.filiere !== enseignantScope.filiere) return false;
-        if (enseignantScope.groupes.length > 0 && !enseignantScope.groupes.includes(`${e.niveau}-${e.groupe}`)) return false;
+        if (
+          enseignantScope.niveaux.length > 0 &&
+          !enseignantScope.niveaux.includes(e.niveau)
+        )
+          return false;
       }
       if (filiere !== ALL && e.filiere !== filiere) return false;
       if (niveau !== ALL && e.niveau !== niveau) return false;
@@ -175,6 +192,11 @@ function EtudiantsPage() {
         .includes(q);
     });
   }, [etudiants, search, showArchived, enseignantScope, filiere, niveau, groupe, statut]);
+
+  const pager = usePagination(
+    filtered,
+    `${search}|${showArchived}|${filiere}|${niveau}|${groupe}|${statut}`,
+  );
 
   const openCreate = () => {
     setEditing(null);
@@ -266,12 +288,20 @@ function EtudiantsPage() {
           enseignantScope
             ? [
                 {
-                  id: "statut",
-                  label: "Statut",
-                  value: statut,
-                  onChange: setStatut,
-                  options: STATUTS.map((s) => STATUT_ETUDIANT_LABEL[s]),
-                  allLabel: "Tous les statuts",
+                  id: "niveau",
+                  label: "Semestre",
+                  value: niveau,
+                  onChange: setNiveau,
+                  options: enseignantScope.niveaux,
+                  allLabel: "Tous les semestres",
+                },
+                {
+                  id: "groupe",
+                  label: "Groupe",
+                  value: groupe,
+                  onChange: setGroupe,
+                  options: groupeOptions,
+                  allLabel: "Tous les groupes",
                 },
               ]
             : [
@@ -329,9 +359,9 @@ function EtudiantsPage() {
               <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-[10px] font-medium text-brand-dk">
                 {enseignantScope.filiere}
               </span>
-              {enseignantScope.groupes.map((g) => (
-                <span key={g} className="rounded-full bg-brand/10 px-2.5 py-0.5 text-[10px] font-medium text-brand-dk">
-                  {g}
+              {enseignantScope.niveaux.map((n) => (
+                <span key={n} className="rounded-full bg-brand/10 px-2.5 py-0.5 text-[10px] font-medium text-brand-dk">
+                  {n}
                 </span>
               ))}
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
@@ -353,15 +383,6 @@ function EtudiantsPage() {
                 étudiant{filtered.length > 1 ? "s" : ""}
                 {isTeacher ? "" : ` sur ${etudiants.length}`}
               </span>
-              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={showArchived}
-                  onChange={() => setShowArchived((v) => !v)}
-                  className="h-3.5 w-3.5 rounded border-muted-300"
-                />
-                Archivés
-              </label>
             </div>
           )
         }
@@ -379,9 +400,35 @@ function EtudiantsPage() {
       ) : needsSelection ? (
         <SelectionPrompt />
       ) : (
+      <>
+      <div className="flex items-center gap-3 rounded-2xl border border-brand/12 bg-card px-4 py-3">
+        <span className="text-xs text-muted-foreground">
+          <strong className="font-semibold text-foreground">{etudiants.filter(e => e.archived).length}</strong> étudiant(s) archivé(s)
+        </span>
+        <span className="h-4 w-px bg-brand/12" />
+        <label className="flex items-center gap-2 text-xs font-medium text-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={() => setShowArchived((v) => !v)}
+            className="h-4 w-4 rounded border-muted-300 accent-brand"
+          />
+          Afficher les archivés
+        </label>
+      </div>
       <DataTable
         isEmpty={filtered.length === 0}
         empty="Aucun étudiant ne correspond à ces critères."
+        footer={
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            pageSize={pager.pageSize}
+            onPage={pager.setPage}
+            label="étudiants"
+          />
+        }
         head={
           <>
             <th>CNE</th>
@@ -394,7 +441,7 @@ function EtudiantsPage() {
           </>
         }
       >
-        {filtered.map((e, i) => (
+        {pager.pageItems.map((e, i) => (
           <motion.tr
             key={e.id}
             initial={{ opacity: 0, x: -8 }}
@@ -473,6 +520,7 @@ function EtudiantsPage() {
           </motion.tr>
         ))}
       </DataTable>
+      </>
       )}
 
       {/* Fiche détaillée */}
@@ -513,6 +561,7 @@ function EtudiantsPage() {
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}
         title="Archiver cet étudiant ?"
+        confirmLabel="Archiver"
         message={
           toDelete
             ? `${toDelete.prenom} ${toDelete.nom} (${toDelete.cne}) sera masqué des listes. Vous pourrez le restaurer à tout moment.`

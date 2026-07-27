@@ -724,7 +724,7 @@ async function seed() {
       [c.id, c.name, c.city, c.contactEmail, c.contactPhone, c.plan, c.status, c.monthlyPrice, c.studentsCount, c.isPrimary, c.notes],
     );
   }
-  // center admins — link the directeur user to the primary center
+  // center admins   link the directeur user to the primary center
   await pool.query(
     `INSERT INTO center_admins (center_id, profile_id)
      SELECT $1, id FROM users WHERE email = 'direction@istpm-agadir.ma'

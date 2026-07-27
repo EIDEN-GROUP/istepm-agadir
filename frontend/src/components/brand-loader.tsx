@@ -98,7 +98,7 @@ export function BrandLoader({
 
 /**
  * Boot gate. Shows the branded splash on first mount for at least `minMs`, then
- * fades it out and reveals the app. Purely presentational — it renders children
+ * fades it out and reveals the app. Purely presentational   it renders children
  * immediately underneath, so no data loading or routing is affected.
  */
 export function AppLoadingGate({

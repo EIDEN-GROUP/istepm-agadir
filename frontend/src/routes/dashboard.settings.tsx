@@ -368,7 +368,7 @@ function ChampReglage({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Modules — registre des modules rattachés à une filière             */
+/*  Modules   registre des modules rattachés à une filière             */
 /* ------------------------------------------------------------------ */
 
 type ModuleForm = {

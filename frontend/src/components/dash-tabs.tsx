@@ -10,7 +10,7 @@ export type DashTab = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  DashTabs — modern pill/indicator tab bar                          */
+/*  DashTabs   modern pill/indicator tab bar                          */
 /* ------------------------------------------------------------------ */
 
 export function DashTabs({
@@ -89,7 +89,7 @@ export function DashTabs({
 }
 
 /* ------------------------------------------------------------------ */
-/*  DashTabPanel — animated enter/exit with direction                  */
+/*  DashTabPanel   animated enter/exit with direction                  */
 /* ------------------------------------------------------------------ */
 
 const variants = {

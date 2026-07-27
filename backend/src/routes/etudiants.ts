@@ -252,7 +252,7 @@ export async function etudiantRoutes(app: FastifyInstance) {
             mois: p.mois || undefined,
           })),
           stageEnCours: stageEnCours
-            ? `${stageEnCours.structure} — ${stageEnCours.service}`
+            ? `${stageEnCours.structure}   ${stageEnCours.service}`
             : undefined,
         };
       }),

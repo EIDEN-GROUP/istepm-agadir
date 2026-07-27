@@ -76,6 +76,8 @@ import {
   updateExamen as apiUpdateExamen,
   deleteExamen as apiDeleteExamen,
   saveNotesExamenApi,
+  uploadExamenDocumentApi,
+  deleteExamenDocumentApi,
   fetchBulletins as apiFetchBulletins,
   createBulletin as apiCreateBulletin,
   updateBulletin as apiUpdateBulletin,
@@ -114,7 +116,7 @@ import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
 
 /** Bump when the record shape changes: stored data on an old version is
  *  discarded rather than loaded into a UI that no longer understands it. */
-const STORAGE_KEY = "istpm-data-v6";
+const STORAGE_KEY = "istpm-data-v9";
 
 type Snapshot = {
   etudiants: Etudiant[];
@@ -395,8 +397,15 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync from the backend API on mount, replacing localStorage data.
-  // If the API is unreachable the existing localStorage data stays in place.
+  // Sync from the backend API on mount   **localStorage/seed-first**.
+  //
+  // The store is the source of truth (see istpm-store-is-localstorage-first):
+  // a collection is only taken from the backend when the local one is *empty*,
+  // never replacing seed data or the user's optimistic edits. A blind replace
+  // was the root cause of two bugs: exams created here (which the backend
+  // rejects for the enseignant role, or never persists) vanished on refresh,
+  // and the rich per-formateur fields (createdBy / modules / groupes) were
+  // flattened, so switching teacher stopped changing what was shown.
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -412,6 +421,9 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
             apiFetchStructures().catch(() => [] as string[]),
           ]);
         if (!mounted) return;
+        // Keep local data when we already have some; only backfill empties.
+        const prefer = <T,>(local: T[], remote: T[]): T[] =>
+          local.length > 0 ? local : remote;
         const enrichEtudiant = (raw: Record<string, unknown>): Etudiant => {
           const e = raw as unknown as Etudiant;
           if (!e.fraisMensuels && (raw as any).fraisAnnuels) {
@@ -431,18 +443,21 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         };
         setSnap((s) => ({
           ...s,
-          etudiants: (etudiants as unknown as Record<string, unknown>[]).map(enrichEtudiant),
-          formateurs: formateurs as Formateur[],
-          examens: examens as Examen[],
-          bulletins: bulletins as Bulletin[],
-          stages: stages as Stage[],
-          seances: seances as Seance[],
+          etudiants: prefer(
+            s.etudiants,
+            (etudiants as unknown as Record<string, unknown>[]).map(enrichEtudiant),
+          ),
+          formateurs: prefer(s.formateurs, formateurs as Formateur[]),
+          examens: prefer(s.examens, examens as Examen[]),
+          bulletins: prefer(s.bulletins, bulletins as Bulletin[]),
+          stages: prefer(s.stages, stages as Stage[]),
+          seances: prefer(s.seances, seances as Seance[]),
           structuresAccueil: (structures as string[])?.length
             ? (structures as string[])
             : s.structuresAccueil,
         }));
       } catch {
-        // Backend not available — keep localStorage data.
+        // Backend not available   keep localStorage data.
       }
     })();
     return () => {
@@ -893,46 +908,42 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         coef: note.coef,
         credits: note.credits,
         examen: note.examen,
-      })
-        .then((created) => {
-          setSnap((s) => {
-            const etudiant = s.etudiants.find((e) => e.id === etudiantId);
-            if (!etudiant) return s;
-            const saved: NoteModule = {
-              id: created.id,
-              module: created.module,
-              note: Number(created.note),
-              coef: Number(created.coef),
-              credits: Number(created.credits),
-              examen: created.examen || undefined,
-            };
-            const existante = etudiant.notes.find((n) => n.module === saved.module);
-            const notes = existante
-              ? etudiant.notes.map((n) =>
-                  n.module === saved.module ? saved : n,
-                )
-              : [...etudiant.notes, saved];
-            return {
-              ...s,
-              etudiants: s.etudiants.map((e) =>
-                e.id === etudiantId
-                  ? { ...e, notes, moyenne: moyennePonderee(notes) }
-                  : e,
-              ),
-              activite: [
-                {
-                  type: "note" as const,
-                  texte: `Note saisie   ${note.module} : ${note.note.toFixed(2)}/20 (${etudiant.prenom} ${etudiant.nom})`,
-                  date: today(),
-                },
-                ...s.activite,
-              ].slice(0, 30),
-            };
-          });
-        })
-        .catch(() => {
-          toast.error("Erreur lors de l'enregistrement de la note");
-        });
+      }).catch(() => {});
+
+      setSnap((s) => {
+        const etudiant = s.etudiants.find((e) => e.id === etudiantId);
+        if (!etudiant) return s;
+        const saved: NoteModule = {
+          id: note.id ?? crypto.randomUUID(),
+          module: note.module,
+          note: note.note,
+          coef: note.coef,
+          credits: note.credits,
+          examen: note.examen,
+        };
+        const existante = etudiant.notes.find((n) => n.module === saved.module);
+        const notes = existante
+          ? etudiant.notes.map((n) =>
+              n.module === saved.module ? saved : n,
+            )
+          : [...etudiant.notes, saved];
+        return {
+          ...s,
+          etudiants: s.etudiants.map((e) =>
+            e.id === etudiantId
+              ? { ...e, notes, moyenne: moyennePonderee(notes) }
+              : e,
+          ),
+          activite: [
+            {
+              type: "note" as const,
+              texte: `Note saisie   ${note.module} : ${note.note.toFixed(2)}/20 (${etudiant.prenom} ${etudiant.nom})`,
+              date: today(),
+            },
+            ...s.activite,
+          ].slice(0, 30),
+        };
+      });
     },
     [],
   );

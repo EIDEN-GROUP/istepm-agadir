@@ -17,6 +17,12 @@ export const examens = pgTable("examens", {
   duree: integer("duree").notNull().default(120),
   description: text("description").notNull().default(""),
   createdBy: text("created_by").notNull().default(""),
+  /** Document metadata (the file itself lives in MinIO). */
+  documentId: text("document_id"),
+  documentNom: text("document_nom"),
+  documentTaille: integer("document_taille"),
+  documentMime: text("document_mime"),
+  documentUploadedAt: text("document_uploaded_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

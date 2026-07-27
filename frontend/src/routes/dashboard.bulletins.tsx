@@ -41,6 +41,7 @@ import {
   DetailShell,
   ALL,
 } from "@/components/dash-page";
+import { usePagination, TablePagination } from "@/components/table-pagination";
 import {
   FormDialog,
   ConfirmDialog,
@@ -152,6 +153,8 @@ function BulletinsPage() {
     });
   }, [bulletins, search, filiere, niveau, session]);
 
+  const pager = usePagination(filtered, `${search}|${filiere}|${niveau}|${session}`);
+
   const aPublier = bulletins.filter((b) => b.statut !== "publie").length;
 
   return (
@@ -217,6 +220,16 @@ function BulletinsPage() {
         minWidth="min-w-[1100px]"
         isEmpty={filtered.length === 0}
         empty="Aucun bulletin ne correspond à ces critères."
+        footer={
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            pageSize={pager.pageSize}
+            onPage={pager.setPage}
+            label="bulletins"
+          />
+        }
         head={
           <>
             <th>Étudiant</th>
@@ -229,7 +242,7 @@ function BulletinsPage() {
           </>
         }
       >
-        {filtered.map((b, i) => (
+        {pager.pageItems.map((b, i) => (
           <motion.tr
             key={b.id}
             initial={{ opacity: 0, x: -8 }}

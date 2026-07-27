@@ -42,6 +42,7 @@ import {
   DetailShell,
   ALL,
 } from "@/components/dash-page";
+import { usePagination, TablePagination } from "@/components/table-pagination";
 import {
   FormDialog,
   ConfirmDialog,
@@ -104,6 +105,8 @@ function FormateursPage() {
         .includes(q);
     });
   }, [formateurs, search, departement, grade]);
+
+  const pager = usePagination(filtered, `${search}|${departement}|${grade}`);
 
   const colonnesImportFormateurs: ImportColumn[] = [
     { key: "matricule", label: "Matricule", required: true },
@@ -229,6 +232,16 @@ function FormateursPage() {
       <DataTable
         isEmpty={filtered.length === 0}
         empty="Aucun formateur ne correspond à ces critères."
+        footer={
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            pageSize={pager.pageSize}
+            onPage={pager.setPage}
+            label="formateurs"
+          />
+        }
         head={
           <>
             <th>Matricule</th>
@@ -241,7 +254,7 @@ function FormateursPage() {
           </>
         }
       >
-        {filtered.map((f, i) => (
+        {pager.pageItems.map((f, i) => (
           <motion.tr
             key={f.id}
             initial={{ opacity: 0, x: -8 }}

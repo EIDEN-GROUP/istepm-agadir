@@ -1,4 +1,4 @@
-# ISTEPM Agadir — Frontend changes (handoff to backend)
+# ISTEPM Agadir   Frontend changes (handoff to backend)
 
 **Date:** 2026-07-24
 **Scope:** Frontend-only feature work. No backend code, database schema, routing,
@@ -16,7 +16,7 @@ frontend features fully persistent (today they work against the in-memory /
 
 ---
 
-## 1. Dashboard — "Active Students" KPI
+## 1. Dashboard   "Active Students" KPI
 
 - **What changed:** The director dashboard KPI card **"Étudiants inscrits"** was
   replaced by **"Étudiants actifs"**, showing only the count of students whose
@@ -44,7 +44,7 @@ frontend features fully persistent (today they work against the in-memory /
   "department manager" (frontend roles are `directeur`, `enseignant`,
   `responsable`).
 
-## 3. Session (Séance) creation — required "Filière (département)" field
+## 3. Session (Séance) creation   required "Filière (département)" field
 
 - **What changed:** The new-session form now has a **required** `Filière`
   (department) select. Selecting a formateur pre-fills the filière from that
@@ -59,7 +59,7 @@ frontend features fully persistent (today they work against the in-memory /
   session creation without a filière. `filiere` values come from the `FILIERES`
   reference list.
 
-## 4. Schedule — Export CSV
+## 4. Schedule   Export CSV
 
 - **What changed:** An **"Exporter CSV"** action on the Schedule page downloads the
   **currently displayed** (filtered) sessions. Columns: Date, Début, Fin, Module,
@@ -70,7 +70,7 @@ frontend features fully persistent (today they work against the in-memory /
   server-side export endpoint if exports should include data beyond what the
   client currently holds.
 
-## 5. New Payment form — searchable student autocomplete
+## 5. New Payment form   searchable student autocomplete
 
 - **What changed:** In the "Nouveau paiement" form, the student `<select>` was
   replaced with a **searchable autocomplete** (search by name / CNE, instant
@@ -80,7 +80,7 @@ frontend features fully persistent (today they work against the in-memory /
   `src/routes/dashboard.paiements.tsx`
 - **Backend support:** None required.
 
-## 6. Payment form — "Mois réglé" (month) selector
+## 6. Payment form   "Mois réglé" (month) selector
 
 - **What changed:** The payment form gained a **required "Mois réglé"** select
   (janvier … décembre), defaulting to the current month. The chosen month is
@@ -97,18 +97,18 @@ frontend features fully persistent (today they work against the in-memory /
 
 ## 7. Monthly payment tracking view
 
-- **What changed:** The Payments page has a new **"Suivi mensuel — Paiements par
+- **What changed:** The Payments page has a new **"Suivi mensuel   Paiements par
   mois"** panel: pick a student and see a 12-month grid, each month marked
   **Réglé / Non réglé** with the paid amount. Status is derived from payment lines
   carrying a `mois` value.
 - **Files:** `src/routes/dashboard.paiements.tsx` (`MonthlyTracker` component)
-- **Backend support required:** Same as #6 — depends on `mois` being persisted and
+- **Backend support required:** Same as #6   depends on `mois` being persisted and
   returned by the payments API. *Optional (recommended):* a per-student
   **monthly payment status** endpoint (e.g. `{ mois, statut, montant }[]`) so the
   view does not have to infer status client-side. Historical payments created
   before this change have no `mois` and show as "Non réglé".
 
-## 8. Student grades — CRUD ("Saisie des notes")
+## 8. Student grades   CRUD ("Saisie des notes")
 
 - **What changed:** A new **"Saisie des notes"** panel on the Examens page
   (teacher space) lets a user **record a grade** with **Group, Module, Exam,
@@ -128,16 +128,16 @@ frontend features fully persistent (today they work against the in-memory /
   - `DELETE /notes/:id`
   - grade rows returned per student so the "Saisie des notes" table can hydrate
     from the server.
-  The frontend defaults `coef: 3`, `credits: 6` when not specified — adjust to your
+  The frontend defaults `coef: 3`, `credits: 6` when not specified   adjust to your
   academic model. Average recomputation currently happens client-side
   (`moyennePonderee`); ideally the backend returns the recomputed average.
 
-## 9. Student profile — "Historique des semestres" section
+## 9. Student profile   "Historique des semestres" section
 
 - **What changed:** The student detail sheet has a new **"Historique des
   semestres"** section: a table of previous semesters with **Semestre, Modules,
   Notes, Moyenne, Résultat**.
-- **Important — placeholder data:** The data model does not store past-semester
+- **Important   placeholder data:** The data model does not store past-semester
   transcripts, so this section is currently **derived deterministically** from the
   student's current level (`niveau`) and average, purely to populate the UI.
 - **Files:** `src/routes/dashboard.etudiants.tsx` (`historiqueSemestres` helper +
@@ -148,13 +148,13 @@ frontend features fully persistent (today they work against the in-memory /
   moyenne, resultat }]`. Once available, replace the `historiqueSemestres()`
   placeholder with the API data (the rendering table is already in place).
 
-## 10. Internship (Stages) dashboard — analytics
+## 10. Internship (Stages) dashboard   analytics
 
 - **What changed:** The Stages page gained an analytics row with **three charts**
   (recharts, the library already used elsewhere):
-  1. **Statistiques des stages** — count by status,
-  2. **Répartition par service / département** — distribution by host service,
-  3. **Stages par structure hospitalière** — volume per hospital.
+  1. **Statistiques des stages**   count by status,
+  2. **Répartition par service / département**   distribution by host service,
+  3. **Stages par structure hospitalière**   volume per hospital.
   All are computed live from the current `stages` data.
 - **Files:** `src/routes/dashboard.stages.tsx` (`StagesAnalytics`, `ChartCard`)
 - **Backend support:** None required (aggregated client-side from existing stage
@@ -167,10 +167,10 @@ frontend features fully persistent (today they work against the in-memory /
 
 | Entity | Field | Type | Status |
 |---|---|---|---|
-| `Seance` (session/timetable) | `filiere` | string (from `FILIERES`) | **New — must persist & return, required on create** |
-| `Paiement` (payment line) | `mois` | string (`MOIS_PAIEMENT`, e.g. "janvier") | **New — sent by client, must persist & return** |
-| `Note` / grade | `examen` (link to exam) | string / id | **New — no endpoint yet; needs grade CRUD** |
-| Student | past-semester transcripts | array | **Not modeled — needs a read endpoint (feature #9 is placeholder)** |
+| `Seance` (session/timetable) | `filiere` | string (from `FILIERES`) | **New   must persist & return, required on create** |
+| `Paiement` (payment line) | `mois` | string (`MOIS_PAIEMENT`, e.g. "janvier") | **New   sent by client, must persist & return** |
+| `Note` / grade | `examen` (link to exam) | string / id | **New   no endpoint yet; needs grade CRUD** |
+| Student | past-semester transcripts | array | **Not modeled   needs a read endpoint (feature #9 is placeholder)** |
 
 ## New API expectations (recommended)
 
@@ -180,27 +180,27 @@ frontend features fully persistent (today they work against the in-memory /
 - Grades: `POST /notes`, `DELETE /notes/:id`, and grades returned per student
   (fields: `module`, `examen`/`examenId`, `groupe`, `note`, `coef`, `credits`).
 - Student history: `GET /etudiants/:id/semestres`.
-- **Role enforcement:** replicate the Schedule (calendar) restriction server-side —
+- **Role enforcement:** replicate the Schedule (calendar) restriction server-side  
   only the director and department-manager roles may access timetable endpoints.
 
 ## Files touched (frontend)
 
-- `src/lib/istpm-data.ts` — `genererSeances` sets `filiere`; `LignePaiement`/
+- `src/lib/istpm-data.ts`   `genererSeances` sets `filiere`; `LignePaiement`/
   `PaiementLigne` gain `mois`; `MOIS_PAIEMENT`/`MoisPaiement` added.
-- `src/lib/istpm-store.tsx` — `paiements` maps `mois`; `addPaiement` sends `mois`;
+- `src/lib/istpm-store.tsx`   `paiements` maps `mois`; `addPaiement` sends `mois`;
   new `addNote` action.
-- `src/lib/istpm-api.ts` — `createPaiement` payload accepts `mois`.
-- `src/lib/dashboard-i18n.tsx` — Schedule removed from `enseignant` nav.
-- `src/components/dash-form.tsx` — new reusable `ComboBoxField` (searchable select).
-- `src/routes/dashboard.index.tsx` — "Étudiants actifs" KPI; removed teacher
+- `src/lib/istpm-api.ts`   `createPaiement` payload accepts `mois`.
+- `src/lib/dashboard-i18n.tsx`   Schedule removed from `enseignant` nav.
+- `src/components/dash-form.tsx`   new reusable `ComboBoxField` (searchable select).
+- `src/routes/dashboard.index.tsx`   "Étudiants actifs" KPI; removed teacher
   calendar links.
-- `src/routes/dashboard.calendar.tsx` — route guard, required `Filière` field,
+- `src/routes/dashboard.calendar.tsx`   route guard, required `Filière` field,
   Export CSV, filière in detail.
-- `src/routes/dashboard.paiements.tsx` — student autocomplete, month select,
+- `src/routes/dashboard.paiements.tsx`   student autocomplete, month select,
   monthly tracker, month in detail.
-- `src/routes/dashboard.examens.tsx` — grades CRUD panel + form.
-- `src/routes/dashboard.etudiants.tsx` — semester history section.
-- `src/routes/dashboard.stages.tsx` — internship analytics charts.
+- `src/routes/dashboard.examens.tsx`   grades CRUD panel + form.
+- `src/routes/dashboard.etudiants.tsx`   semester history section.
+- `src/routes/dashboard.stages.tsx`   internship analytics charts.
 
 _No backend files, DB migrations, routing config, or auth were modified.
 `npx tsc --noEmit` passes clean._

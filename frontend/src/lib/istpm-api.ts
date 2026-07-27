@@ -103,13 +103,78 @@ export function updateExamen(id: string, data: Record<string, unknown>) {
 export function deleteExamen(id: string) {
   return api.delete<{ ok: boolean }>(`/examens/${id}`);
 }
-
 export function saveNotesExamenApi(
   examenId: string,
   saisies: { etudiantId: string; theorique?: number; pratique?: number }[],
 ) {
-  return api.post<{ ok: boolean }>(`/examens/${examenId}/notes`, { saisies });
+  return api.post<{ ok: boolean; examen?: Examen }>(`/examens/${examenId}/notes`, { saisies });
 }
+
+/* -------- Documents d'examen (upload via base64 JSON) -------- */
+
+/** Upload a document for an examen. Reads the File, converts to base64, sends to API. */
+export async function uploadExamenDocumentApi(
+  examenId: string,
+  file: File,
+): Promise<Examen> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const content = btoa(binary);
+  return api.post<Examen>(`/examens/${examenId}/document`, {
+    nom: file.name,
+    mime: file.type,
+    content,
+  });
+}
+
+/** Download an examen document (blob from API). */
+export async function downloadExamenDocumentApi(
+  examenId: string,
+  filename: string,
+): Promise<void> {
+  const token = getStoredToken();
+  const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
+  const res = await fetch(`${API_BASE}/examens/${examenId}/document`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error("Impossible de télécharger le document");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+/** Get a preview URL for an examen document. */
+export async function previewExamenDocumentApi(
+  examenId: string,
+): Promise<string | null> {
+  const token = getStoredToken();
+  const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
+  const res = await fetch(`${API_BASE}/examens/${examenId}/document`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+/** Delete the document for an examen. */
+export function deleteExamenDocumentApi(examenId: string) {
+  return api.delete<{ ok: boolean }>(`/examens/${examenId}/document`);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Notes (grades)                                                      */
+
 
 /* ------------------------------------------------------------------ */
 /*  Notes (grades)                                                      */
