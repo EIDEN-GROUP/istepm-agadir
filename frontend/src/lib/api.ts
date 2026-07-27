@@ -9,6 +9,8 @@ type RequestOptions = {
   params?: Record<string, string | undefined>;
 };
 
+const FETCH_TIMEOUT = 30000;
+
 async function request<T>(
   path: string,
   options: RequestOptions = {},
@@ -25,15 +27,30 @@ async function request<T>(
       ).toString()
     : "";
 
-  const res = await fetch(`${url}${queryParams}`, {
-    method: options.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+  let res: Response;
+  try {
+    res = await fetch(`${url}${queryParams}`, {
+      method: options.method ?? "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("La requête a pris trop de temps. Vérifiez que le serveur est accessible.");
+    }
+    throw new Error("Impossible de contacter le serveur. Vérifiez votre connexion.");
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (res.status === 401) {
     throw new Error("Non authentifié");

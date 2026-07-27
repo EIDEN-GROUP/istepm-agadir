@@ -233,11 +233,17 @@ export function AiChatFloating() {
         }
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur inconnue";
+      const hint = msg.includes("contacter le serveur")
+        ? "\n\n💡 Vérifiez que le serveur backend est en cours d'exécution et que l'URL de l'API est correcte (VITE_API_URL)."
+        : msg.includes("trop de temps")
+        ? "\n\n💡 Le serveur a mis trop de temps à répondre. Veuillez réessayer."
+        : "";
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `❌ Désolé, je n'ai pas pu analyser votre demande : ${err instanceof Error ? err.message : "Erreur inconnue"}`,
+          content: `❌ Désolé, je n'ai pas pu analyser votre demande : ${msg}${hint}`,
         },
       ]);
     } finally {

@@ -120,10 +120,16 @@ Tu disposes d'un registre d'actions (tools) qui correspondent aux fonctionnalit√
   const proposedActions: ProposedAction[] = [];
   for (const tc of toolCalls) {
     if (tc.type === "function") {
+      let params: Record<string, unknown> = {};
+      try {
+        params = JSON.parse(tc.function.arguments);
+      } catch {
+        params = {};
+      }
       proposedActions.push({
         toolCallId: tc.id,
         actionName: tc.function.name,
-        params: JSON.parse(tc.function.arguments),
+        params,
         reasoning: `Action propos√©e: ${tc.function.name}`,
       });
     }

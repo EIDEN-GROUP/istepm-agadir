@@ -198,22 +198,27 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     const etuRows = await db
       .select({
-        paiement: etudiants.paiement,
-        resteAPayer: etudiants.resteAPayer,
+        fraisAnnuels: etudiants.fraisAnnuels,
+        paiementsMensuels: etudiants.paiementsMensuels,
       })
       .from(etudiants);
 
-    const enAttente = etuRows
-      .filter((e) => e.paiement === "en_attente")
-      .reduce((s, e) => s + Number(e.resteAPayer), 0);
-    const impaye = etuRows
-      .filter((e) => e.paiement === "impaye")
-      .reduce((s, e) => s + Number(e.resteAPayer), 0);
-    const retard = etuRows
-      .filter((e) => e.paiement === "retard")
-      .reduce((s, e) => s + Number(e.resteAPayer), 0);
+    const fm = (e: { fraisAnnuels: string }) =>
+      Math.round(Number(e.fraisAnnuels) / 10);
 
-    const totalARecouvrer = etuRows.reduce((s, e) => s + Number(e.resteAPayer), 0);
+    let enAttente = 0;
+    let impaye = 0;
+    let retard = 0;
+    for (const e of etuRows) {
+      const pm = (e.paiementsMensuels ?? {}) as Record<string, string>;
+      for (const st of Object.values(pm)) {
+        if (st === "en_attente") enAttente += fm(e);
+        else if (st === "impaye") impaye += fm(e);
+        else if (st === "retard") retard += fm(e);
+      }
+    }
+
+    const totalARecouvrer = enAttente + impaye + retard;
     const tauxRecouvrement =
       encaisse + totalARecouvrer > 0
         ? Math.round((encaisse / (encaisse + totalARecouvrer)) * 100)

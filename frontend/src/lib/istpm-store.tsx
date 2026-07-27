@@ -85,6 +85,7 @@ import {
   deleteStage as apiDeleteStage,
   validerStageApi,
   createPaiement as apiCreatePaiement,
+  updateMoisPaiementStatut as apiUpdateMoisPaiementStatut,
   createNote as apiCreateNote,
   deleteNote as apiDeleteNote,
   createFiliereApi,
@@ -393,12 +394,15 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           if (!e.fraisMensuels && (raw as any).fraisAnnuels) {
             (e as any).fraisMensuels = Math.round(Number((raw as any).fraisAnnuels) / 10);
           }
-          if (!e.paiementsMensuels && e.historique) {
-            const pm: Record<string, StatutPaiement> = {};
-            for (const h of e.historique) {
-              if (h.mois) pm[h.mois] = h.statut;
-            }
+          const pm = (raw as any).paiementsMensuels;
+          if (pm && typeof pm === "object" && Object.keys(pm).length > 0) {
             (e as any).paiementsMensuels = pm;
+          } else if (e.historique) {
+            const derived: Record<string, StatutPaiement> = {};
+            for (const h of e.historique) {
+              if (h.mois) derived[h.mois] = h.statut;
+            }
+            (e as any).paiementsMensuels = derived;
           }
           return e;
         };
@@ -777,45 +781,55 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         periode: ligne.periode,
         date: ligne.date,
         mois: ligne.mois,
-      }).catch(() => {});
-      setSnap((s) => {
-        const etudiant = s.etudiants.find((e) => e.id === etudiantId);
-        if (!etudiant) return s;
-
-        const recu = `ISTPM-R-${new Date().getFullYear().toString().slice(2)}${String(
-          new Date().getMonth() + 1,
-        ).padStart(2, "0")}-${String(etudiant.historique.length + 1).padStart(3, "0")}`;
-
-        return {
-          ...s,
-          etudiants: s.etudiants.map((e) =>
-            e.id !== etudiantId
-              ? e
-              : {
-                  ...e,
-                  historique: [...e.historique, { ...ligne, recu }],
-                  paiement: ligne.statut,
-                  paiementsMensuels: ligne.mois
-                    ? { ...e.paiementsMensuels, [ligne.mois]: ligne.statut }
-                    : e.paiementsMensuels,
+      })
+        .then((res) => {
+          setSnap((s) => {
+            const etudiant = s.etudiants.find((e) => e.id === etudiantId);
+            if (!etudiant) return s;
+            return {
+              ...s,
+              etudiants: s.etudiants.map((e) =>
+                e.id !== etudiantId
+                  ? e
+                  : {
+                      ...e,
+                      resteAPayer: res.nouveauReste,
+                      paiement: res.statut as StatutPaiement,
+                      historique: [
+                        ...e.historique,
+                        {
+                          ...ligne,
+                          recu: res.recu,
+                          id: `tmp-${Date.now()}`,
+                          statut: "paye",
+                        },
+                      ],
+                      paiementsMensuels: ligne.mois
+                        ? { ...e.paiementsMensuels, [ligne.mois]: "paye" }
+                        : e.paiementsMensuels,
+                    },
+              ),
+              activite: [
+                {
+                  type: "paiement" as const,
+                  texte: `Paiement reçu   ${etudiant.prenom} ${etudiant.nom}, ${ligne.montant.toLocaleString("fr-FR")} MAD (${ligne.periode})`,
+                  date: today(),
                 },
-          ),
-          activite: [
-            {
-              type: "paiement" as const,
-              texte: `Paiement reçu   ${etudiant.prenom} ${etudiant.nom}, ${ligne.montant.toLocaleString("fr-FR")} MAD (${ligne.periode})`,
-              date: today(),
-            },
-            ...s.activite,
-          ].slice(0, 30),
-        };
-      });
+                ...s.activite,
+              ].slice(0, 30),
+            };
+          });
+        })
+        .catch(() => {
+          toast.error("Erreur lors de l'enregistrement du paiement");
+        });
     },
     [],
   );
 
   const setMoisPaiementStatut = useCallback(
     (etudiantId: string, mois: string, statut: StatutPaiement) => {
+      apiUpdateMoisPaiementStatut(etudiantId, mois, statut).catch(() => {});
       setSnap((s) => ({
         ...s,
         etudiants: s.etudiants.map((e) =>

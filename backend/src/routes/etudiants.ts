@@ -26,6 +26,7 @@ const etudiantSchema = z.object({
   ville: z.string().optional().default(""),
   fraisAnnuels: z.number().optional().default(0),
   resteAPayer: z.number().optional().default(0),
+  paiementsMensuels: z.record(z.string(), z.enum(["paye", "en_attente", "retard", "impaye"])).optional(),
 });
 
 export async function etudiantRoutes(app: FastifyInstance) {
@@ -112,6 +113,7 @@ export async function etudiantRoutes(app: FastifyInstance) {
           fraisAnnuels: Number(e.fraisAnnuels),
           fraisMensuels: Math.round(Number(e.fraisAnnuels) / 10),
           resteAPayer: Number(e.resteAPayer),
+          paiementsMensuels: e.paiementsMensuels ?? {},
           notes: notes.map((n) => ({
             id: n.id,
             module: n.module,
@@ -201,7 +203,9 @@ export async function etudiantRoutes(app: FastifyInstance) {
     for (const [key, val] of Object.entries(input)) {
       if (val !== undefined) {
         values[key] =
-          key === "fraisAnnuels" || key === "resteAPayer" ? String(val) : val;
+          key === "fraisAnnuels" || key === "resteAPayer" || key === "moyenne"
+            ? String(val)
+            : val;
       }
     }
     const [etudiant] = await db

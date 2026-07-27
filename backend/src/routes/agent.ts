@@ -5,6 +5,25 @@ import { getToolDefinitions } from "@/lib/agent/actions";
 import { analyzeIntent } from "@/lib/agent/llm";
 import { executeAction, executeBatch } from "@/lib/agent/executor";
 
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 2,
+  baseDelay = 500,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i < maxRetries) {
+        await new Promise((r) => setTimeout(r, baseDelay * Math.pow(2, i)));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 const analyzeSchema = z.object({
   messages: z.array(
     z.object({
@@ -34,7 +53,11 @@ export async function agentRoutes(app: FastifyInstance) {
   app.post("/analyze", { preHandler: [authenticate] }, async (request, reply) => {
     const input = analyzeSchema.parse(request.body);
     try {
-      const result = await analyzeIntent(input.messages, toolDefinitions);
+      const result = await withRetry(
+        () => analyzeIntent(input.messages, toolDefinitions),
+        1,
+        1000,
+      );
       return result;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur analyse";
@@ -47,13 +70,15 @@ export async function agentRoutes(app: FastifyInstance) {
     const input = confirmSchema.parse(request.body);
     const authHeader = request.headers.authorization;
     const token = authHeader?.replace("Bearer ", "") ?? "";
+    const userRole = request.user?.role ?? "";
 
     try {
-      const result = await executeAction(app, {
+      const result = await withRetry(() => executeAction(app, {
         actionName: input.actionName,
         params: input.params,
         userToken: token,
-      });
+        userRole,
+      }));
       return { success: true, data: result };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur exécution";
@@ -66,6 +91,7 @@ export async function agentRoutes(app: FastifyInstance) {
     const input = batchSchema.parse(request.body);
     const authHeader = request.headers.authorization;
     const token = authHeader?.replace("Bearer ", "") ?? "";
+    const userRole = request.user?.role ?? "";
 
     try {
       const result = await executeBatch(
@@ -74,11 +100,13 @@ export async function agentRoutes(app: FastifyInstance) {
           actionName: a.actionName,
           params: a.params,
           userToken: token,
+          userRole,
         })),
       );
       return result;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur batch";
+      request.log.error(err, "Agent batch failed");
       return reply.status(400).send({ error: msg });
     }
   });

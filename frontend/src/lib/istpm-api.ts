@@ -228,6 +228,10 @@ export function createPaiement(data: {
   );
 }
 
+export function updateMoisPaiementStatut(etudiantId: string, mois: string, statut: string) {
+  return api.put<{ ok: boolean }>(`/paiements-istpm/${etudiantId}/mois/${encodeURIComponent(mois)}`, { statut });
+}
+
 export function fetchPaiementStats() {
   return api.get<{
     total: number;

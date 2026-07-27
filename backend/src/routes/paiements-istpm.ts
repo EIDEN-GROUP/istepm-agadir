@@ -4,7 +4,7 @@ import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { etudiants } from "@/db/schema/etudiants";
 import { historiquePaiements } from "@/db/schema/historique-paiements";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 const paiementSchema = z.object({
   etudiantId: z.string().uuid(),
@@ -16,6 +16,12 @@ const paiementSchema = z.object({
   periode: z.string().optional().default(""),
   mois: z.string().optional().default(""),
   date: z.string().optional(),
+});
+
+const STATUTS_PAIEMENT = ["paye", "en_attente", "retard", "impaye"] as const;
+
+const moisPaiementSchema = z.object({
+  statut: z.enum(STATUTS_PAIEMENT),
 });
 
 let recuCounter = Date.now();
@@ -95,11 +101,17 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
       statut: "paye",
     });
 
+    const paiementsMensuels = (etudiant.paiementsMensuels ?? {}) as Record<string, string>;
+    if (input.mois) {
+      paiementsMensuels[input.mois] = "paye";
+    }
+
     await db
       .update(etudiants)
       .set({
         resteAPayer: String(nouveauReste),
         paiement: nouveauStatut,
+        paiementsMensuels: paiementsMensuels,
       })
       .where(eq(etudiants.id, input.etudiantId));
 
@@ -109,6 +121,29 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
       nouveauReste,
       statut: nouveauStatut,
     };
+  });
+
+  app.put("/:etudiantId/mois/:mois", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const { etudiantId, mois } = request.params as { etudiantId: string; mois: string };
+    const { statut } = moisPaiementSchema.parse(request.body);
+    const db = getDb();
+
+    const [etudiant] = await db
+      .select()
+      .from(etudiants)
+      .where(eq(etudiants.id, etudiantId))
+      .limit(1);
+    if (!etudiant) return reply.status(404).send({ error: "Étudiant introuvable" });
+
+    const paiementsMensuels = (etudiant.paiementsMensuels ?? {}) as Record<string, string>;
+    paiementsMensuels[mois] = statut;
+
+    await db
+      .update(etudiants)
+      .set({ paiementsMensuels })
+      .where(eq(etudiants.id, etudiantId));
+
+    return { ok: true, mois, statut };
   });
 
   app.get("/stats", { preHandler: [authenticate] }, async () => {
@@ -129,28 +164,33 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
 
     const etudiantsRows = await db
       .select({
-        paiement: etudiants.paiement,
-        resteAPayer: etudiants.resteAPayer,
+        fraisAnnuels: etudiants.fraisAnnuels,
+        paiementsMensuels: etudiants.paiementsMensuels,
       })
       .from(etudiants);
 
-    const enAttente = etudiantsRows
-      .filter((e) => e.paiement === "en_attente")
-      .reduce((s, e) => s + Number(e.resteAPayer), 0);
-    const impaye = etudiantsRows
-      .filter((e) => e.paiement === "impaye")
-      .reduce((s, e) => s + Number(e.resteAPayer), 0);
-    const retard = etudiantsRows
-      .filter((e) => e.paiement === "retard")
-      .reduce((s, e) => s + Number(e.resteAPayer), 0);
+    const fm = (e: { fraisAnnuels: string }) =>
+      Math.round(Number(e.fraisAnnuels) / 10);
 
-    const totalARecouvrer = etudiantsRows.reduce(
-      (s, e) => s + Number(e.resteAPayer),
-      0,
-    );
+    let enAttente = 0;
+    let impaye = 0;
+    let retard = 0;
+    for (const e of etudiantsRows) {
+      const pm = (e.paiementsMensuels ?? {}) as Record<string, string>;
+      for (const st of Object.values(pm)) {
+        if (st === "en_attente") enAttente += fm(e);
+        else if (st === "impaye") impaye += fm(e);
+        else if (st === "retard") retard += fm(e);
+      }
+    }
+
+    const totalARecouvrer = enAttente + impaye + retard;
+    const totalPotentiel = totalMontant + totalARecouvrer;
     const tauxRecouvrement =
-      totalMontant + totalARecouvrer > 0
-        ? Math.round((totalMontant / (totalMontant + totalARecouvrer)) * 100)
+      totalPotentiel > 0
+        ? Math.round((totalMontant / totalPotentiel) * 100)
+        : totalMontant > 0
+        ? 100
         : 0;
 
     return {

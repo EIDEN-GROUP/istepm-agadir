@@ -5,15 +5,22 @@ export interface ExecuteParams {
   actionName: string;
   params: Record<string, unknown>;
   userToken: string;
+  userRole: string;
 }
 
 export async function executeAction(
   app: FastifyInstance,
-  { actionName, params, userToken }: ExecuteParams,
+  { actionName, params, userToken, userRole }: ExecuteParams,
 ): Promise<unknown> {
   const action = ACTIONS.find((a) => a.name === actionName);
   if (!action) {
     throw new Error(`Action inconnue: ${actionName}`);
+  }
+
+  if (action.requiredRoles.length > 0 && !action.requiredRoles.includes(userRole)) {
+    throw new Error(
+      `Accès refusé : l'action "${actionName}" requiert le rôle ${action.requiredRoles.join(" ou ")}`,
+    );
   }
 
   let path = action.path;

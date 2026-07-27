@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, numeric, jsonb, timestamp } from "drizzle-orm/pg-core";
 
 export const etudiants = pgTable("etudiants", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -19,6 +19,7 @@ export const etudiants = pgTable("etudiants", {
   ville: text("ville").notNull().default(""),
   fraisAnnuels: numeric("frais_annuels").notNull().default("0"),
   resteAPayer: numeric("reste_a_payer").notNull().default("0"),
+  paiementsMensuels: jsonb("paiements_mensuels").notNull().default({}),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
