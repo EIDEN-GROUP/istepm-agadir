@@ -1,18 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deploy school-CRM to Docker Swarm
-#
-# Prerequisites:
-#   - Docker Engine 24+ with Swarm initialized (`docker swarm init`)
-#   - .env.production file populated
-#   - Ports 80 and 443 open on the VPS firewall
-#
-# Usage:
-#   ./deploy.sh [stack-name]
-#
-# Default stack name: school-crm
-
 STACK_NAME="${1:-school-crm}"
 
 if [ ! -f .env.production ]; then
@@ -26,37 +14,50 @@ echo "║  Deploying $STACK_NAME to Docker Swarm"
 echo "╚═══════════════════════════════════════════════════╝"
 echo ""
 
-# ── 1. Build the frontend (SPA) ─────────────────────────
-echo "→ Building frontend..."
+# ── 0. Registry config ──────────────────────────────────────
+REGISTRY="ghcr.io/eiden-group"
 
-# Read DOMAIN from .env.production (without sourcing the whole file to avoid
-# parsing issues with special characters in passwords)
-DOMAIN="$(grep -m1 '^DOMAIN=' .env.production 2>/dev/null | cut -d= -f2-)"
-DOMAIN="${DOMAIN:-localhost}"
-VITE_API_URL="https://${DOMAIN}/api"
+# ── 1. Build or pull frontend image ──────────────────────────
+if docker pull "$REGISTRY/school-crm-frontend:latest" >/dev/null 2>&1; then
+  echo "→ Pulling frontend image..."
+  docker pull "$REGISTRY/school-crm-frontend:latest"
+else
+  echo "→ Building frontend..."
+  DOMAIN="$(grep -m1 '^DOMAIN=' .env.production 2>/dev/null | cut -d= -f2-)"
+  DOMAIN="${DOMAIN:-localhost}"
+  VITE_API_URL="https://${DOMAIN}/api"
+  cd frontend
+  npm ci
+  VITE_API_URL="$VITE_API_URL" npm run build
+  cd ..
+  docker build -t "$REGISTRY/school-crm-frontend:latest" -f frontend/Dockerfile frontend/
+fi
 
-cd frontend
-npm ci
-VITE_API_URL="$VITE_API_URL" npm run build
-cd ..
+# ── 2. Build or pull backend image ──────────────────────────
+if docker pull "$REGISTRY/school-crm-api:latest" >/dev/null 2>&1; then
+  echo "→ Pulling backend image..."
+  docker pull "$REGISTRY/school-crm-api:latest"
+else
+  echo "→ Building backend image..."
+  docker build -t "$REGISTRY/school-crm-api:latest" -f backend/Dockerfile --target production backend/
+fi
 
-docker build -t school-crm-frontend:latest -f frontend/Dockerfile frontend/ \
-  && echo "  ✓ Frontend image built"
+# ── 3. Build or pull backup image ───────────────────────────
+if docker pull "$REGISTRY/school-crm-backup:latest" >/dev/null 2>&1; then
+  echo "→ Pulling backup image..."
+  docker pull "$REGISTRY/school-crm-backup:latest"
+else
+  echo "→ Building backup image..."
+  docker build -t "$REGISTRY/school-crm-backup:latest" -f docker/Dockerfile.backup .
+fi
 
-# ── 2. Build the backend (API) ──────────────────────────
-echo "→ Building backend image..."
-docker build -t school-crm-api:latest -f backend/Dockerfile --target production backend/ \
-  && echo "  ✓ Backend image built"
+# ── 4. Export env vars and deploy ────────────────────────────
+set -a
+. .env.production
+set +a
 
-# ── 3. Build the backup image ───────────────────────────
-echo "→ Building backup image..."
-docker build -t school-crm-backup:latest -f docker/Dockerfile.backup . \
-  && echo "  ✓ Backup image built"
-
-# ── 4. Deploy the stack ─────────────────────────────────
 echo "→ Deploying stack..."
-docker stack deploy -c docker-compose.production.yml --with-registry-auth "$STACK_NAME" \
-  && echo "  ✓ Stack deployed"
+docker stack deploy -c docker-compose.production.yml --with-registry-auth "$STACK_NAME"
 
 echo ""
 echo "╔═══════════════════════════════════════════════════╗"
@@ -64,6 +65,5 @@ echo "║  Deployment complete!"
 echo "║"
 echo "║  Check status: docker stack ps $STACK_NAME"
 echo "║  View logs:    docker service logs ${STACK_NAME}_backend -f"
-echo "║  Visit:        https://\${DOMAIN}"
 echo "╚═══════════════════════════════════════════════════╝"
 echo ""

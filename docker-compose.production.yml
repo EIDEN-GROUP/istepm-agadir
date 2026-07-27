@@ -1,44 +1,13 @@
 # Docker Compose file for production (Docker Swarm)
 # Deploy with: docker stack deploy -c docker-compose.production.yml school-crm
 #
-# Architecture: Both frontend (SPA) and backend API are served on the SAME domain.
-#   https://DOMAIN/      → nginx → React SPA (index.html)
-#   https://DOMAIN/api/* → Traefik → Backend API (Fastify)
-#   https://DOMAIN/health → Traefik → Backend API (health check)
+# Architecture: Both frontend (SPA) and backend API are served on the SAME domain
+#   through the existing eiden-nginx reverse proxy.
+#   https://DOMAIN/      → localhost:3003 → nginx → React SPA
+#   https://DOMAIN/api/* → localhost:3004 → Backend API (Fastify)
+#   https://DOMAIN/health → localhost:3004 → Backend API (health check)
 
 services:
-
-  traefik:
-    image: traefik:v3.3
-    restart: unless-stopped
-    command:
-      - "--providers.docker.swarmMode=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      # Redirect HTTP → HTTPS
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-    ports:
-      - target: 80
-        published: 80
-        protocol: tcp
-        mode: host
-      - target: 443
-        published: 443
-        protocol: tcp
-        mode: host
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - letsencrypt:/letsencrypt
-    networks:
-      - school-crm
-    deploy:
-      placement:
-        constraints: [node.role == manager]
 
   postgres:
     image: postgres:16-alpine
@@ -113,25 +82,17 @@ services:
         condition: none
 
   frontend:
-    image: school-crm-frontend:latest
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/eiden-group/school-crm-frontend:latest
+    ports:
+      - target: 80
+        published: 3003
+        protocol: tcp
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
       interval: 15s
       timeout: 5s
       retries: 3
-    labels:
-      - "traefik.enable=true"
-      # Main domain → frontend SPA (lower priority than the API router)
-      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
-      # Lower priority so /api/* matches the backend router first
-      - "traefik.http.routers.frontend.priority=1"
     networks:
       - school-crm
     deploy:
@@ -148,11 +109,11 @@ services:
           memory: 64M
 
   backend:
-    image: school-crm-api:latest
-    build:
-      context: ./backend
-      target: production
-      dockerfile: Dockerfile
+    image: ghcr.io/eiden-group/school-crm-api:latest
+    ports:
+      - target: 3000
+        published: 3004
+        protocol: tcp
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -166,8 +127,6 @@ services:
       MINIO_BUCKET: school-crm
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: 24h
-      # Same domain — no CORS needed for same-origin requests,
-      # but the backend still validates the Origin header when present.
       CORS_ORIGIN: https://${DOMAIN}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
@@ -192,15 +151,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-    labels:
-      - "traefik.enable=true"
-      # /api/* and /health routes → backend (higher priority than frontend)
-      # NOTE: /api prefix is NOT stripped — the backend registers routes with /api/ prefix
-      - "traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && (PathPrefix(`/api`) || Path(`/health`))"
-      - "traefik.http.routers.backend.entrypoints=websecure"
-      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.backend.priority=10"
-      - "traefik.http.services.backend.loadbalancer.server.port=3000"
     networks:
       - school-crm
     deploy:
@@ -217,7 +167,7 @@ services:
           memory: 128M
 
   backend-worker:
-    image: school-crm-api:latest
+    image: ghcr.io/eiden-group/school-crm-api:latest
     restart: unless-stopped
     command: ["node", "dist/jobs/worker.js"]
     environment:
@@ -248,10 +198,7 @@ services:
   # ═══════════════════════════════════════════════════════════
 
   db-backup:
-    image: school-crm-backup:latest
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.backup
+    image: ghcr.io/eiden-group/school-crm-backup:latest
     restart: unless-stopped
     environment:
       DB_HOST: postgres
@@ -369,12 +316,6 @@ services:
       GF_SERVER_ROOT_URL: https://monitor.${DOMAIN}
     volumes:
       - grafanadata:/var/lib/grafana
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`monitor.${DOMAIN}`)"
-      - "traefik.http.routers.grafana.entrypoints=websecure"
-      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
-      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
     networks:
       - school-crm
     deploy:
@@ -390,7 +331,6 @@ volumes:
   pgdata:
   redisdata:
   miniodata:
-  letsencrypt:
   dbbackups:
   prometheusdata:
   lokidata:

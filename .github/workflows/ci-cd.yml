@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+env:
+  REGISTRY: ghcr.io
+  DOMAIN: ${{ vars.DOMAIN || 'istepm-agadir.eiden-group.com' }}
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -15,29 +19,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
           cache-dependency-path: backend/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
-      - name: Lint code
-        run: npm run lint
-        continue-on-error: true # Lint warnings should not block CI
+      - run: npm run lint
+        continue-on-error: true
 
-      - name: Run tests
-        run: npm test
-        continue-on-error: true # No tests written yet
+      - run: npm test
+        continue-on-error: true
 
-      - name: Build TypeScript
-        run: npm run build
+      - run: npm run build
 
-      - name: Verify build output
-        run: test -f dist/index.js
+      - run: test -f dist/index.js
 
   frontend:
     runs-on: ubuntu-latest
@@ -47,28 +45,130 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
-      - name: Lint code
-        run: npm run lint
+      - run: npm run lint
         continue-on-error: true
 
-      - name: Build for production
-        run: npm run build
+      - run: npm run build
         env:
-          VITE_API_URL: https://api.example.com/api
+          VITE_API_URL: https://${{ env.DOMAIN }}/api
 
-      - name: Verify build output
-        run: test -f dist/index.html
+      - run: test -f dist/index.html
 
-  # Note: We are not running end-to-end tests here because they would require both
-  # backend and frontend to be running and a test suite set up (like Cypress or Playwright).
-  # If you have such tests, you can add a job that depends on backend and frontend and runs them.
+  docker-build:
+    needs: [backend, frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: production
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/eiden-group/school-crm-api:latest
+            ${{ env.REGISTRY }}/eiden-group/school-crm-api:${{ github.sha }}
+
+      - name: Build frontend SPA
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+        env:
+          VITE_API_URL: https://${{ env.DOMAIN }}/api
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/eiden-group/school-crm-frontend:latest
+            ${{ env.REGISTRY }}/eiden-group/school-crm-frontend:${{ github.sha }}
+
+      - name: Build and push backup image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/Dockerfile.backup
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/eiden-group/school-crm-backup:latest
+            ${{ env.REGISTRY }}/eiden-group/school-crm-backup:${{ github.sha }}
+
+  deploy:
+    needs: [docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+
+            REPO_DIR="/home/istepm-agadir/istepm-agadir"
+
+            cd "$REPO_DIR"
+
+            # Pull latest compose changes
+            git pull origin main
+
+            # Write .env.production from GitHub secret
+            cat > .env.production << 'ENVEOF'
+            ${{ secrets.ENV_PRODUCTION }}
+            ENVEOF
+
+            # Authenticate with GHCR for pulling images
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u eiden-group --password-stdin
+
+            # Pull the latest images
+            docker pull ghcr.io/eiden-group/school-crm-api:${{ github.sha }}
+            docker pull ghcr.io/eiden-group/school-crm-frontend:${{ github.sha }}
+            docker pull ghcr.io/eiden-group/school-crm-backup:${{ github.sha }}
+
+            # Retag as latest for convenience
+            docker tag ghcr.io/eiden-group/school-crm-api:${{ github.sha }} ghcr.io/eiden-group/school-crm-api:latest
+            docker tag ghcr.io/eiden-group/school-crm-frontend:${{ github.sha }} ghcr.io/eiden-group/school-crm-frontend:latest
+            docker tag ghcr.io/eiden-group/school-crm-backup:${{ github.sha }} ghcr.io/eiden-group/school-crm-backup:latest
+
+            # Export env vars from .env.production for docker stack deploy
+            set -a
+            . .env.production
+            set +a
+
+            # Deploy the stack
+            docker stack deploy -c docker-compose.production.yml school-crm --with-registry-auth --prune
+
+            # Run database migrations
+            echo "Running database migrations..."
+            docker run --rm \
+              --network school-crm \
+              -e DATABASE_URL="postgres://postgres:${DB_PASSWORD}@postgres:5432/school_crm" \
+              ghcr.io/eiden-group/school-crm-api:${{ github.sha }} \
+              node dist/db/migrate.js
+
+            echo "Deployment complete!"
