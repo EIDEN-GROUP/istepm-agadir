@@ -22,6 +22,7 @@ import { emailRoutes } from "@/routes/email";
 import { receiptRoutes } from "@/routes/receipt";
 
 import { etudiantRoutes } from "@/routes/etudiants";
+import { etudiantImportRoutes } from "@/routes/etudiants-import";
 import { formateurRoutes } from "@/routes/formateurs";
 import { examenRoutes } from "@/routes/examens";
 import { bulletinRoutes } from "@/routes/bulletins";
@@ -94,6 +95,7 @@ export async function buildApp() {
   await app.register(receiptRoutes, { prefix: "/api/receipts" });
 
   await app.register(etudiantRoutes, { prefix: "/api/etudiants" });
+  await app.register(etudiantImportRoutes, { prefix: "/api/etudiants" });
   await app.register(formateurRoutes, { prefix: "/api/formateurs" });
   await app.register(examenRoutes, { prefix: "/api/examens" });
   await app.register(bulletinRoutes, { prefix: "/api/bulletins" });

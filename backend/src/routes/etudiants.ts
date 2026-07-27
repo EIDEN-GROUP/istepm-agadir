@@ -7,7 +7,7 @@ import { notesEtudiant } from "@/db/schema/notes-etudiant";
 import { historiquePaiements } from "@/db/schema/historique-paiements";
 import { stages } from "@/db/schema/stages";
 import { bulletins } from "@/db/schema/bulletins";
-import { eq, desc, sql, or, and } from "drizzle-orm";
+import { eq, desc, sql, or, and, inArray } from "drizzle-orm";
 
 const etudiantSchema = z.object({
   cne: z.string().optional().default(""),
@@ -30,6 +30,99 @@ const etudiantSchema = z.object({
 });
 
 export async function etudiantRoutes(app: FastifyInstance) {
+  app.get("/export/csv", { preHandler: [authenticate] }, async (request, reply) => {
+    const db = getDb();
+    const query = request.query as {
+      ids?: string;
+      filiere?: string;
+      niveau?: string;
+      statut?: string;
+      search?: string;
+    };
+
+    let result = db
+      .select({
+        cne: etudiants.cne,
+        matricule: etudiants.matricule,
+        prenom: etudiants.prenom,
+        nom: etudiants.nom,
+        filiere: etudiants.filiere,
+        niveau: etudiants.niveau,
+        annee: etudiants.annee,
+        groupe: etudiants.groupe,
+        statut: etudiants.statut,
+        paiement: etudiants.paiement,
+        telephone: etudiants.telephone,
+        email: etudiants.email,
+        dateNaissance: etudiants.dateNaissance,
+        ville: etudiants.ville,
+        fraisAnnuels: etudiants.fraisAnnuels,
+      })
+      .from(etudiants)
+      .orderBy(etudiants.nom, etudiants.prenom)
+      .$dynamic();
+
+    if (query.ids) {
+      const ids = query.ids.split(",").map((s) => s.trim()).filter(Boolean);
+      if (ids.length > 0) {
+        result = result.where(inArray(etudiants.id, ids));
+      }
+    }
+
+    if (query.filiere) {
+      result = result.where(eq(etudiants.filiere, query.filiere));
+    }
+    if (query.niveau) {
+      result = result.where(eq(etudiants.niveau, query.niveau));
+    }
+    if (query.statut) {
+      result = result.where(eq(etudiants.statut, query.statut));
+    }
+    if (query.search) {
+      const q = `%${query.search}%`;
+      result = result.where(
+        or(
+          sql`${etudiants.prenom} ILIKE ${q}`,
+          sql`${etudiants.nom} ILIKE ${q}`,
+          sql`${etudiants.cne} ILIKE ${q}`,
+          sql`${etudiants.matricule} ILIKE ${q}`,
+        ),
+      );
+    }
+
+    const rows = await result;
+
+    const headers = [
+      "cne", "matricule", "prenom", "nom", "filiere", "niveau",
+      "annee", "groupe", "statut", "paiement",
+      "telephone", "email", "dateNaissance", "ville", "fraisMensuels",
+    ];
+
+    const escCsv = (v: string) => {
+      const s = String(v ?? "");
+      if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
+    const headerLine = headers.join(",");
+    const dataLines = rows.map((r) =>
+      headers
+        .map((h) => {
+          if (h === "fraisMensuels") return escCsv(String(Math.round(Number(r.fraisAnnuels) / 10)));
+          return escCsv(String((r as Record<string, unknown>)[h] ?? ""));
+        })
+        .join(","),
+    );
+
+    const csv = "\uFEFF" + headerLine + "\n" + dataLines.join("\n");
+
+    reply.header("Content-Type", "text/csv; charset=utf-8");
+    reply.header("Content-Disposition", `attachment; filename="etudiants-${new Date().toISOString().slice(0, 10)}.csv"`);
+    return reply.send(csv);
+  });
+
   app.get("/", { preHandler: [authenticate] }, async (request) => {
     const db = getDb();
     const query = request.query as {

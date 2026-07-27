@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Eye, Download, Trash2, Upload, ListFilter } from "lucide-react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { Plus, Pencil, Eye, Download, Trash2, Upload, ListFilter, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm, type NouvelEtudiant } from "@/lib/istpm-store";
-import { ImportCsvDialog, type ImportColumn } from "@/components/import-csv";
-import { fetchStudentSemestres } from "@/lib/istpm-api";
+import { ImportEtudiantsDialog } from "@/components/import-etudiants-dialog";
+import { fetchStudentSemestres, exportEtudiantsCsv } from "@/lib/istpm-api";
 import {
   FILIERES,
   NIVEAUX,
@@ -121,6 +121,36 @@ function EtudiantsPage() {
   const [editing, setEditing] = useState<Etudiant | null>(null);
   const [toDelete, setToDelete] = useState<Etudiant | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((e) => e.id)));
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -146,117 +176,30 @@ function EtudiantsPage() {
     setFormOpen(true);
   };
 
-  const exportCsv = () => {
-    const cols = [
-      "cne",
-      "matricule",
-      "prenom",
-      "nom",
-      "filiere",
-      "niveau",
-      "groupe",
-      "statut",
-      "paiement",
-    ] as const;
-    const rows = filtered.map((e) =>
-      cols.map((c) => `"${String(e[c] ?? "")}"`).join(","),
-    );
-    // BOM so Excel opens the accented French headers correctly.
-    const blob = new Blob(["﻿" + cols.join(",") + "\n" + rows.join("\n")], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "etudiants-istpm.csv";
-    a.click();
-    URL.revokeObjectURL(a.href);
-    toast.success(`${filtered.length} étudiant(s) exporté(s)`);
-  };
-
-  const colonnesImportEtudiants: ImportColumn[] = [
-    { key: "cne", label: "CNE", required: true },
-    { key: "matricule", label: "Matricule", required: true },
-    { key: "prenom", label: "Prénom", required: true },
-    { key: "nom", label: "Nom", required: true },
-    { key: "filiere", label: "Filière", required: true },
-    { key: "niveau", label: "Niveau", required: true },
-    { key: "annee", label: "Année", required: true },
-    { key: "groupe", label: "Groupe", required: true },
-    { key: "statut", label: "Statut", required: true, aliases: ["statut étudiant"] },
-    { key: "paiement", label: "Paiement", required: true, aliases: ["statut paiement", "statut_paiement"] },
-    { key: "telephone", label: "Téléphone" },
-    { key: "email", label: "E-mail" },
-    { key: "dateNaissance", label: "Date de naissance", aliases: ["date_naissance", "date naissance"] },
-    { key: "ville", label: "Ville" },
-    { key: "fraisMensuels", label: "Frais mensuels", aliases: ["frais_mensuels"] },
-  ];
-
-  const STATUT_ETUDIANT_VALUES: StatutEtudiant[] = ["inscrit", "en_attente", "diplome", "abandon"];
-  const STATUT_PAIEMENT_VALUES: StatutPaiement[] = ["paye", "en_attente", "retard", "impaye"];
-
-  const matchLabel = <T extends string>(
-    value: string,
-    values: readonly T[],
-    labels: Record<T, string>,
-  ): T | null => {
-    if (values.includes(value as T)) return value as T;
-    for (const k of values) {
-      if (labels[k].toLowerCase() === value.toLowerCase()) return k;
+  const handleExport = async (mode: "all" | "filtered" | "selected") => {
+    setExportOpen(false);
+    if (mode === "selected" && selectedIds.size === 0) {
+      toast.error("Aucun étudiant sélectionné");
+      return;
     }
-    return null;
-  };
-
-  const validateEtudiant = (values: Record<string, string>): string[] => {
-    const errs: string[] = [];
-    if (!values.cne) errs.push("CNE requis");
-    if (!values.matricule) errs.push("Matricule requis");
-    if (!values.prenom) errs.push("Prénom requis");
-    if (!values.nom) errs.push("Nom requis");
-    if (!values.filiere) errs.push("Filière requise");
-    else if (!FILIERES.includes(values.filiere as Filiere))
-      errs.push(`Filière « ${values.filiere} » invalide`);
-    if (!values.niveau) errs.push("Niveau requis");
-    else if (!NIVEAUX.includes(values.niveau as Niveau))
-      errs.push(`Niveau « ${values.niveau} » invalide`);
-    if (!values.annee) errs.push("Année requise");
-    if (!values.groupe) errs.push("Groupe requis");
-    if (!values.statut) errs.push("Statut requis");
-    else if (!matchLabel(values.statut, STATUT_ETUDIANT_VALUES, STATUT_ETUDIANT_LABEL))
-      errs.push(`Statut « ${values.statut} » invalide`);
-    if (!values.paiement) errs.push("Paiement requis");
-    else if (!matchLabel(values.paiement, STATUT_PAIEMENT_VALUES, STATUT_PAIEMENT_LABEL))
-      errs.push(`Paiement « ${values.paiement} » invalide`);
-    if (values.fraisMensuels && isNaN(Number(values.fraisMensuels)))
-      errs.push("Frais mensuels doit être un nombre");
-    return errs;
-  };
-
-  const handleImportEtudiants = (rows: Record<string, string>[]) => {
-    let compteur = 0;
-    for (const r of rows) {
-      const statut = matchLabel(r.statut, STATUT_ETUDIANT_VALUES, STATUT_ETUDIANT_LABEL) ?? "inscrit";
-      const paiement = matchLabel(r.paiement, STATUT_PAIEMENT_VALUES, STATUT_PAIEMENT_LABEL) ?? "en_attente";
-      const nouvel: NouvelEtudiant = {
-        cne: r.cne,
-        matricule: r.matricule,
-        prenom: r.prenom,
-        nom: r.nom,
-        filiere: r.filiere as Filiere,
-        niveau: r.niveau as Niveau,
-        annee: r.annee,
-        groupe: r.groupe,
-        statut,
-        paiement,
-        telephone: r.telephone ?? "",
-        email: r.email ?? "",
-        dateNaissance: r.dateNaissance ?? "",
-        ville: r.ville ?? "",
-        fraisMensuels: r.fraisMensuels ? Number(r.fraisMensuels) : 0,
-      };
-      addEtudiant(nouvel);
-      compteur++;
+    const count = mode === "all" ? etudiants.length : mode === "filtered" ? filtered.length : selectedIds.size;
+    try {
+      if (mode === "all") {
+        await exportEtudiantsCsv();
+      } else if (mode === "filtered") {
+        await exportEtudiantsCsv({
+          ...(filiere !== ALL ? { filiere } : {}),
+          ...(niveau !== ALL ? { niveau } : {}),
+          ...(statut !== ALL ? { statut } : {}),
+          ...(search ? { search } : {}),
+        });
+      } else {
+        await exportEtudiantsCsv({ ids: [...selectedIds].join(",") });
+      }
+      toast.success(`${count} étudiant(s) exporté(s)`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur d'exportation");
     }
-    toast.success(`${compteur} étudiant(s) importé(s)`);
   };
 
   return (
@@ -270,9 +213,47 @@ function EtudiantsPage() {
               <button className={cn(ghostPill, "gap-1.5")} onClick={() => setImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" /> Importer
               </button>
-              <button className={cn(ghostPill, "gap-1.5")} onClick={exportCsv}>
-                <Download className="h-3.5 w-3.5" /> Exporter
-              </button>
+              <div ref={exportRef} className="relative">
+                <button
+                  className={cn(ghostPill, "gap-1.5")}
+                  onClick={() => setExportOpen(!exportOpen)}
+                >
+                  <Download className="h-3.5 w-3.5" /> Exporter <ChevronDown className="h-3 w-3" />
+                </button>
+                {exportOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-brand/12 bg-card py-1 shadow-lg"
+                  >
+                    <button
+                      onClick={() => handleExport("all")}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-xs text-foreground transition hover:bg-brand/5"
+                    >
+                      <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                      Tous les étudiants ({etudiants.length})
+                    </button>
+                    <button
+                      onClick={() => handleExport("filtered")}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-xs text-foreground transition hover:bg-brand/5"
+                    >
+                      <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                      Filtrés ({filtered.length})
+                    </button>
+                    <button
+                      onClick={() => handleExport("selected")}
+                      disabled={selectedIds.size === 0}
+                      className={cn(
+                        "flex w-full items-center gap-2 px-4 py-2 text-xs transition",
+                        selectedIds.size > 0 ? "text-foreground hover:bg-brand/5" : "text-muted-foreground cursor-not-allowed",
+                      )}
+                    >
+                      <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                      Sélectionnés ({selectedIds.size})
+                    </button>
+                  </motion.div>
+                )}
+              </div>
               <button className={primaryPill} onClick={openCreate}>
                 <Plus className="h-4 w-4" /> Nouvelle inscription
               </button>
@@ -350,6 +331,14 @@ function EtudiantsPage() {
         empty="Aucun étudiant ne correspond à ces critères."
         head={
           <>
+            <th className="w-10">
+              <input
+                type="checkbox"
+                checked={selectedIds.size === filtered.length && filtered.length > 0}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 cursor-pointer rounded border-muted-300 text-brand focus:ring-brand/30"
+              />
+            </th>
             <th>CNE</th>
             <th>Nom &amp; prénom</th>
             <th>Filière</th>
@@ -366,9 +355,16 @@ function EtudiantsPage() {
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
-            onClick={() => setDetail(e)}
-            className={tableRow}
+            className={cn(tableRow, selectedIds.has(e.id) && "bg-brand/5")}
           >
+            <td className="w-10" onClick={(ev) => ev.stopPropagation()}>
+              <input
+                type="checkbox"
+                checked={selectedIds.has(e.id)}
+                onChange={() => toggleSelect(e.id)}
+                className="h-4 w-4 cursor-pointer rounded border-muted-300 text-brand focus:ring-brand/30"
+              />
+            </td>
             <td
               className="border-l-[3px] font-medium tabular-nums"
               style={{
@@ -489,14 +485,13 @@ function EtudiantsPage() {
         }}
       />
 
-      <ImportCsvDialog
+      <ImportEtudiantsDialog
         open={importOpen}
         onOpenChange={setImportOpen}
-        title="Importer des étudiants"
-        description="Ajouter des étudiants en lot depuis un fichier CSV"
-        columns={colonnesImportEtudiants}
-        validate={validateEtudiant}
-        onImport={handleImportEtudiants}
+        onImportComplete={() => {
+          // Trigger a re-fetch of students after import
+          window.location.reload();
+        }}
       />
     </div>
   );

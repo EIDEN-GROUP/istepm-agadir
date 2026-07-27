@@ -245,6 +245,84 @@ export function fetchPaiementStats() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Import / Export Étudiants                                          */
+/* ------------------------------------------------------------------ */
+
+export type ImportPreviewRow = {
+  index: number;
+  data: Record<string, string>;
+  errors: string[];
+  warnings: string[];
+  valid: boolean;
+};
+
+export type ImportPreviewResponse = {
+  columns: string[];
+  columnMapping: Record<string, string>;
+  missingColumns: string[];
+  unknownColumns: string[];
+  rows: ImportPreviewRow[];
+  summary: {
+    total: number;
+    valid: number;
+    invalid: number;
+    warnings: number;
+  };
+};
+
+export function previewImportEtudiants(csvText: string) {
+  return api.post<ImportPreviewResponse>("/etudiants/import/preview", { csvText });
+}
+
+export function executeImportEtudiants(rows: Record<string, string>[]) {
+  return api.post<{
+    imported: number;
+    failed: number;
+    skipped: number;
+    processingTimeMs: number;
+    errors: Array<{ index: number; message: string }>;
+  }>("/etudiants/import/execute", { rows });
+}
+
+export async function exportEtudiantsCsv(params?: {
+  ids?: string;
+  filiere?: string;
+  niveau?: string;
+  statut?: string;
+  search?: string;
+}) {
+  const base = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+  const query = new URLSearchParams();
+  if (params?.ids) query.set("ids", params.ids);
+  if (params?.filiere) query.set("filiere", params.filiere);
+  if (params?.niveau) query.set("niveau", params.niveau);
+  if (params?.statut) query.set("statut", params.statut);
+  if (params?.search) query.set("search", params.search);
+  const qs = query.toString();
+  const token = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("auth") ?? "{}").state?.token ?? "";
+    } catch { return ""; }
+  })();
+  const res = await fetch(`${base}/etudiants/export/csv${qs ? "?" + qs : ""}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Erreur d'exportation" }));
+    throw new Error(err.error || "Erreur d'exportation");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `etudiants-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Settings / Filières                                                */
 /* ------------------------------------------------------------------ */
 
