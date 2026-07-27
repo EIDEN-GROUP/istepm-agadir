@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { Plus, Pencil, Eye, Download, Archive, RotateCcw, Upload, ListFilter, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth";
+import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
 import { useIstpm, type NouvelEtudiant } from "@/lib/istpm-store";
 import { ImportEtudiantsDialog } from "@/components/import-etudiants-dialog";
 import { fetchStudentSemestres, exportEtudiantsCsv } from "@/lib/istpm-api";
@@ -21,6 +21,7 @@ import {
   type Niveau,
   type StatutEtudiant,
   type StatutPaiement,
+  FORMATEURS,
 } from "@/lib/istpm-data";
 import {
   primaryPill,
@@ -89,6 +90,14 @@ function EtudiantsPage() {
   // rather than the full roster, so the view stays focused on one class.
   const isTeacher = role === "enseignant";
 
+  // Scope assigned to the current enseignant (formateur).
+  const enseignantScope = useMemo(() => {
+    if (!isTeacher) return null;
+    const f = FORMATEURS.find((x) => x.id === DEMO_FORMATEUR_ID);
+    if (!f) return null;
+    return { filiere: f.departement, groupes: f.groupes };
+  }, [isTeacher]);
+
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
   const [niveau, setNiveau] = useState<string>(ALL);
@@ -112,9 +121,19 @@ function EtudiantsPage() {
     if (groupe !== ALL && !groupeOptions.includes(groupe)) setGroupe(ALL);
   }, [groupeOptions, groupe]);
 
+  // Pre-set scope filters for enseignant with assigned formateur.
+  useEffect(() => {
+    if (enseignantScope) {
+      setFiliere(enseignantScope.filiere);
+      if (enseignantScope.groupes.length > 0) {
+        setGroupe(enseignantScope.groupes[0]);
+      }
+    }
+  }, [enseignantScope]);
+
   // Teacher must pick all three before the roster appears.
   const needsSelection =
-    isTeacher && (filiere === ALL || niveau === ALL || groupe === ALL);
+    isTeacher && !enseignantScope && (filiere === ALL || niveau === ALL || groupe === ALL);
 
   const [detail, setDetail] = useState<Etudiant | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -157,6 +176,11 @@ function EtudiantsPage() {
     const q = search.trim().toLowerCase();
     return etudiants.filter((e) => {
       if (!showArchived && e.archived) return false;
+      // Enseignant scope: only show students in assigned filiere & groupes
+      if (enseignantScope) {
+        if (e.filiere !== enseignantScope.filiere) return false;
+        if (enseignantScope.groupes.length > 0 && !enseignantScope.groupes.includes(e.groupe)) return false;
+      }
       if (filiere !== ALL && e.filiere !== filiere) return false;
       if (niveau !== ALL && e.niveau !== niveau) return false;
       if (groupe !== ALL && e.groupe !== groupe) return false;
@@ -167,7 +191,7 @@ function EtudiantsPage() {
         .toLowerCase()
         .includes(q);
     });
-  }, [etudiants, search, showArchived, filiere, niveau, groupe, statut]);
+  }, [etudiants, search, showArchived, enseignantScope, filiere, niveau, groupe, statut]);
 
   const openCreate = () => {
     setEditing(null);
@@ -272,34 +296,9 @@ function EtudiantsPage() {
         search={search}
         onSearch={setSearch}
         placeholder="Rechercher par CNE, nom, groupe, ville…"
-        filters={[
-          {
-            id: "filiere",
-            label: "Filière",
-            value: filiere,
-            onChange: setFiliere,
-            options: FILIERES,
-            allLabel: "Toutes les filières",
-          },
-          {
-            id: "niveau",
-            label: "Semestre",
-            value: niveau,
-            onChange: setNiveau,
-            options: NIVEAUX,
-            allLabel: isTeacher ? "Choisir un semestre" : "Tous les semestres",
-          },
-          {
-            id: "groupe",
-            label: "Groupe",
-            value: groupe,
-            onChange: setGroupe,
-            options: groupeOptions,
-            allLabel: isTeacher ? "Choisir un groupe" : "Tous les groupes",
-          },
-          ...(isTeacher
-            ? []
-            : [
+        filters={
+          enseignantScope
+            ? [
                 {
                   id: "statut",
                   label: "Statut",
@@ -308,11 +307,75 @@ function EtudiantsPage() {
                   options: STATUTS.map((s) => STATUT_ETUDIANT_LABEL[s]),
                   allLabel: "Tous les statuts",
                 },
-              ]),
-        ]}
+              ]
+            : [
+                {
+                  id: "filiere",
+                  label: "Filière",
+                  value: filiere,
+                  onChange: setFiliere,
+                  options: FILIERES,
+                  allLabel: "Toutes les filières",
+                },
+                {
+                  id: "niveau",
+                  label: "Semestre",
+                  value: niveau,
+                  onChange: setNiveau,
+                  options: NIVEAUX,
+                  allLabel: isTeacher ? "Choisir un semestre" : "Tous les semestres",
+                },
+                {
+                  id: "groupe",
+                  label: "Groupe",
+                  value: groupe,
+                  onChange: setGroupe,
+                  options: groupeOptions,
+                  allLabel: isTeacher ? "Choisir un groupe" : "Tous les groupes",
+                },
+                ...(isTeacher
+                  ? []
+                  : [
+                      {
+                        id: "statut",
+                        label: "Statut",
+                        value: statut,
+                        onChange: setStatut,
+                        options: STATUTS.map((s) => STATUT_ETUDIANT_LABEL[s]),
+                        allLabel: "Tous les statuts",
+                      },
+                    ]),
+              ]
+        }
         summary={
           needsSelection ? (
             <>Choisissez une filière, un semestre et un groupe.</>
+          ) : enseignantScope ? (
+            <div className="flex items-center gap-3">
+              <span>
+                <strong className="font-semibold text-foreground">
+                  {filtered.length}
+                </strong>{" "}
+                étudiant{filtered.length > 1 ? "s" : ""}
+              </span>
+              <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-[10px] font-medium text-brand-dk">
+                {enseignantScope.filiere}
+              </span>
+              {enseignantScope.groupes.map((g) => (
+                <span key={g} className="rounded-full bg-brand/10 px-2.5 py-0.5 text-[10px] font-medium text-brand-dk">
+                  {g}
+                </span>
+              ))}
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={() => setShowArchived((v) => !v)}
+                  className="h-3.5 w-3.5 rounded border-muted-300"
+                />
+                Archivés
+              </label>
+            </div>
           ) : (
             <div className="flex items-center gap-3">
               <span>
