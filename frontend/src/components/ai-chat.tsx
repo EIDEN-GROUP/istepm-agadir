@@ -139,15 +139,31 @@ function FloatingButton({ onClick, open }: { onClick: () => void; open: boolean 
   );
 }
 
-export function AiChatFloating() {
-  const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
+const CHAT_STORAGE_KEY = "istpm-ai-chat";
+
+function loadChatHistory(): ChatMessage[] {
+  try {
+    const saved = localStorage.getItem(CHAT_STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch { /* ignore */ }
+  return [
     {
       role: "assistant",
       content:
         "Bonjour ! Je suis votre assistant IA. Je peux vous aider à gérer les étudiants, formateurs, examens, bulletins, stages, paiements et plus encore. Que souhaitez-vous faire ?",
     },
-  ]);
+  ];
+}
+
+function saveChatHistory(messages: ChatMessage[]) {
+  try {
+    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+  } catch { /* ignore */ }
+}
+
+export function AiChatFloating() {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>(loadChatHistory);
   const [pendingActions, setPendingActions] = useState<ProposedAction[]>([]);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
@@ -160,6 +176,10 @@ export function AiChatFloating() {
   }, []);
 
   useEffect(() => scrollToBottom(), [messages, pendingActions, loading, scrollToBottom]);
+
+  useEffect(() => {
+    saveChatHistory(messages);
+  }, [messages]);
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 100);

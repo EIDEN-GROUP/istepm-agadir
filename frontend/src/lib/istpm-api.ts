@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { getStoredToken } from "@/lib/auth";
 import type {
   Etudiant,
   Formateur,
@@ -299,11 +300,7 @@ export async function exportEtudiantsCsv(params?: {
   if (params?.statut) query.set("statut", params.statut);
   if (params?.search) query.set("search", params.search);
   const qs = query.toString();
-  const token = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("auth") ?? "{}").state?.token ?? "";
-    } catch { return ""; }
-  })();
+  const token = getStoredToken();
   const res = await fetch(`${base}/etudiants/export/csv${qs ? "?" + qs : ""}`, {
     headers: { Authorization: `Bearer ${token}` },
   });

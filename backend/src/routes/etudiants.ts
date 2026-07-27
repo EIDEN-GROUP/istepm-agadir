@@ -268,6 +268,10 @@ export async function etudiantRoutes(app: FastifyInstance) {
 
     return {
       ...etudiant,
+      fraisAnnuels: Number(etudiant.fraisAnnuels),
+      fraisMensuels: Math.round(Number(etudiant.fraisAnnuels) / 10),
+      resteAPayer: Number(etudiant.resteAPayer),
+      paiementsMensuels: etudiant.paiementsMensuels ?? {},
       notes,
       historique: paiements,
       stageEnCours: stageEnCours ?? null,
@@ -279,13 +283,21 @@ export async function etudiantRoutes(app: FastifyInstance) {
     const db = getDb();
     try {
       const fraisAnnuels = input.fraisMensuels * 10;
+      const insertValues: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(input)) {
+        if (val !== undefined && key !== "fraisMensuels" && key !== "fraisAnnuels") {
+          if (key === "moyenne") {
+            insertValues[key] = String(val);
+          } else {
+            insertValues[key] = val;
+          }
+        }
+      }
+      insertValues.fraisAnnuels = String(fraisAnnuels);
+      insertValues.resteAPayer = String(fraisAnnuels);
       const [etudiant] = await db
         .insert(etudiants)
-        .values({
-          ...input,
-          fraisAnnuels: String(fraisAnnuels),
-          resteAPayer: String(fraisAnnuels),
-        })
+        .values(insertValues as typeof etudiants.$inferInsert)
         .returning();
       return etudiant;
     } catch (err) {
