@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import { getDb } from "@/db";
 import { users } from "@/db/schema/users";
+import { formateurs } from "@/db/schema/formateurs";
 import { eq } from "drizzle-orm";
 import { getEnv } from "@/config/env";
 
@@ -54,6 +55,15 @@ export async function createUser(input: CreateUserInput): Promise<UserResult> {
       role: input.role ?? "admin",
     })
     .returning();
+  if (input.role === "enseignant") {
+    const [prenom, ...reste] = input.name.split(" ");
+    await db.insert(formateurs).values({
+      userId: user.id,
+      prenom: prenom ?? input.name,
+      nom: reste.join(" ") || "",
+      email: input.email,
+    });
+  }
   return toUserResult(user);
 }
 

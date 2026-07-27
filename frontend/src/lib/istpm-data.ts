@@ -185,6 +185,7 @@ export type Etudiant = {
    * Clé = mois (« septembre 2025 » … « juin 2026 »), valeur = statut du règlement.
    */
   paiementsMensuels?: Partial<Record<string, StatutPaiement>>;
+  archived: boolean;
 };
 
 export const ETUDIANTS: Etudiant[] = [
@@ -230,6 +231,7 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "paye",
     },
     stageEnCours: "CHR Hassan II   Service de Médecine interne",
+    archived: false,
   },
   {
     id: "et-2",
@@ -272,6 +274,7 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "retard",
     },
     stageEnCours: "CHR Hassan II   Bloc opératoire",
+    archived: false,
   },
   {
     id: "et-3",
@@ -313,6 +316,7 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "paye",
     },
     stageEnCours: "Hôpital Hassan II   Maternité",
+    archived: false,
   },
   {
     id: "et-4",
@@ -354,6 +358,7 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "en_attente",
     },
     stageEnCours: "Clinique Al Massira   Rééducation",
+    archived: false,
   },
   {
     id: "et-5",
@@ -395,6 +400,7 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "paye",
     },
     stageEnCours: "CHR Hassan II   Service d'imagerie",
+    archived: false,
   },
   {
     id: "et-6",
@@ -435,6 +441,7 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "impaye",
     },
     stageEnCours: "Hôpital Hassan II   Laboratoire d'analyses",
+    archived: false,
   },
   {
     id: "et-7",
@@ -475,6 +482,7 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye",
     },
+    archived: false,
   },
   {
     id: "et-8",
@@ -516,6 +524,7 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard",
     },
+    archived: false,
   },
   {
     id: "et-9",
@@ -557,6 +566,7 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "en_attente",
     },
     stageEnCours: "Hôpital préfectoral Inezgane   Maternité",
+    archived: false,
   },
   {
     id: "et-10",
@@ -596,6 +606,7 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye",
     },
+    archived: false,
   },
   {
     id: "et-11",
@@ -635,6 +646,7 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente",
     },
+    archived: false,
   },
   {
     id: "et-12",
@@ -674,6 +686,7 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye",
     },
+    archived: false,
   },
   {
     id: "et-13",
@@ -712,6 +725,7 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye",
     },
+    archived: false,
   },
   {
     id: "et-14",
@@ -751,6 +765,7 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye",
     },
+    archived: false,
   },
 ];
 

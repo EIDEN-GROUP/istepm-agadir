@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useRef } from "react";
-import { Plus, Pencil, Eye, Download, Trash2, Upload, ListFilter, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Eye, Download, Archive, RotateCcw, Upload, ListFilter, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -80,7 +80,7 @@ const STATUTS_PAIEMENT: StatutPaiement[] = [
 
 function EtudiantsPage() {
   const { role } = useAuth();
-  const { etudiants, addEtudiant, updateEtudiant, deleteEtudiant } = useIstpm();
+  const { etudiants, addEtudiant, updateEtudiant, deleteEtudiant, restoreEtudiant } = useIstpm();
   // Teachers get a read-only view; student administration is the responsable's
   // and the directeur's job.
   const canEdit = role === "directeur" || role === "responsable";
@@ -119,6 +119,7 @@ function EtudiantsPage() {
   const [detail, setDetail] = useState<Etudiant | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Etudiant | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [toDelete, setToDelete] = useState<Etudiant | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -155,6 +156,7 @@ function EtudiantsPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return etudiants.filter((e) => {
+      if (!showArchived && e.archived) return false;
       if (filiere !== ALL && e.filiere !== filiere) return false;
       if (niveau !== ALL && e.niveau !== niveau) return false;
       if (groupe !== ALL && e.groupe !== groupe) return false;
@@ -165,7 +167,7 @@ function EtudiantsPage() {
         .toLowerCase()
         .includes(q);
     });
-  }, [etudiants, search, filiere, niveau, groupe, statut]);
+  }, [etudiants, search, showArchived, filiere, niveau, groupe, statut]);
 
   const openCreate = () => {
     setEditing(null);
@@ -312,13 +314,24 @@ function EtudiantsPage() {
           needsSelection ? (
             <>Choisissez une filière, un semestre et un groupe.</>
           ) : (
-            <>
-              <strong className="font-semibold text-foreground">
-                {filtered.length}
-              </strong>{" "}
-              étudiant{filtered.length > 1 ? "s" : ""}
-              {isTeacher ? "" : ` sur ${etudiants.length}`}
-            </>
+            <div className="flex items-center gap-3">
+              <span>
+                <strong className="font-semibold text-foreground">
+                  {filtered.length}
+                </strong>{" "}
+                étudiant{filtered.length > 1 ? "s" : ""}
+                {isTeacher ? "" : ` sur ${etudiants.length}`}
+              </span>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={() => setShowArchived((v) => !v)}
+                  className="h-3.5 w-3.5 rounded border-muted-300"
+                />
+                Archivés
+              </label>
+            </div>
           )
         }
       />
@@ -355,7 +368,7 @@ function EtudiantsPage() {
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
-            className={cn(tableRow, selectedIds.has(e.id) && "bg-brand/5")}
+            className={cn(tableRow, selectedIds.has(e.id) && "bg-brand/5", e.archived && "opacity-50")}
           >
             <td className="w-10" onClick={(ev) => ev.stopPropagation()}>
               <input
@@ -419,11 +432,15 @@ function EtudiantsPage() {
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      className={iconButtonDanger}
-                      aria-label="Supprimer"
-                      onClick={() => setToDelete(e)}
+                      className={e.archived ? iconButton : iconButtonDanger}
+                      aria-label={e.archived ? "Restaurer" : "Archiver"}
+                      onClick={() => (e.archived ? restoreEtudiant(e.id) : setToDelete(e))}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      {e.archived ? (
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      ) : (
+                        <Archive className="h-3.5 w-3.5" />
+                      )}
                     </button>
                   </>
                 ) : null}
@@ -471,16 +488,16 @@ function EtudiantsPage() {
       <ConfirmDialog
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}
-        title="Supprimer cet étudiant ?"
+        title="Archiver cet étudiant ?"
         message={
           toDelete
-            ? `${toDelete.prenom} ${toDelete.nom} (${toDelete.cne}) sera retiré de la liste, ainsi que son bulletin et son stage. Cette action est irréversible.`
+            ? `${toDelete.prenom} ${toDelete.nom} (${toDelete.cne}) sera masqué des listes. Vous pourrez le restaurer à tout moment.`
             : ""
         }
         onConfirm={() => {
           if (!toDelete) return;
           deleteEtudiant(toDelete.id);
-          toast.success(`Étudiant supprimé   ${toDelete.prenom} ${toDelete.nom}`);
+          toast.success(`Étudiant archivé   ${toDelete.prenom} ${toDelete.nom}`);
           setToDelete(null);
         }}
       />

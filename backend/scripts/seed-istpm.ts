@@ -162,12 +162,17 @@ async function seed() {
 
   for (const u of users) {
     const hash = bcrypt.hashSync(u.password, 10);
-    await pool.query(
-      `INSERT INTO users (email, password_hash, name, role)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (email) DO NOTHING`,
-      [u.email, hash, u.name, u.role],
+    const existing = await pool.query(
+      `SELECT id FROM users WHERE email = $1`,
+      [u.email],
     );
+    if (existing.rows.length === 0) {
+      await pool.query(
+        `INSERT INTO users (email, password_hash, name, role)
+         VALUES ($1, $2, $3, $4)`,
+        [u.email, hash, u.name, u.role],
+      );
+    }
   }
   console.log("  ✓ 3 demo users created");
 
@@ -186,7 +191,7 @@ async function seed() {
   await pool.query(
     `INSERT INTO settings (key, value)
      VALUES ('filieres', $1::jsonb)
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+     ON CONFLICT (key) DO NOTHING`,
     [JSON.stringify(filieres)],
   );
   console.log("  ✓ 7 filieres registered");
@@ -341,15 +346,21 @@ async function seed() {
   ];
 
   for (const f of formateursData) {
+    const { rows: userRows } = await pool.query(
+      `SELECT id FROM users WHERE email = $1`,
+      [f.email],
+    );
+    const userId = userRows.length > 0 ? userRows[0].id : null;
     await pool.query(
-      `INSERT INTO formateurs (id, matricule, cin, prenom, nom, grade, departement, modules, groupes, statut, telephone, email, notes_saisies)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      `INSERT INTO formateurs (id, matricule, cin, prenom, nom, grade, departement, modules, groupes, statut, telephone, email, notes_saisies, user_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        ON CONFLICT (id) DO UPDATE SET
          prenom=EXCLUDED.prenom, nom=EXCLUDED.nom, grade=EXCLUDED.grade,
-         departement=EXCLUDED.departement, statut=EXCLUDED.statut, notes_saisies=EXCLUDED.notes_saisies`,
+         departement=EXCLUDED.departement, statut=EXCLUDED.statut, notes_saisies=EXCLUDED.notes_saisies,
+         user_id=EXCLUDED.user_id`,
       [f.id, f.matricule, f.cin, f.prenom, f.nom, f.grade, f.departement,
-       f.modules, f.groupes, f.statut,
-       f.telephone, f.email, f.notesSaisies],
+        f.modules, f.groupes, f.statut,
+        f.telephone, f.email, f.notesSaisies, userId],
     );
   }
   console.log("  ✓ 8 formateurs created");

@@ -1,0 +1,7 @@
+cne,matricule,prenom,nom,filiere,niveau,annee,groupe,statut,paiement,telephone,email,dateNaissance,ville,fraisMensuels
+G134567890,ISTPM-23-0142,Salma,El Amrani,Infirmier polyvalent,S5,3e annee,G1,inscrit,paye,+212 6 61 24 55 018,salma.elamrani@istpm.ma,2003-04-12,Agadir,3400
+J138245017,ISTPM-23-0155,Youssef,Ait Taleb,Infirmier en anesthesie-reanimation,S5,3e annee,G1,inscrit,retard,+212 6 70 11 42 88,y.aittaleb@istpm.ma,2002-11-30,Inezgane,3800
+F145908712,ISTPM-24-0203,Imane,Benkirane,Sage-femme,S3,2e annee,G2,inscrit,paye,+212 6 55 78 90 12,i.benkirane@istpm.ma,2004-02-18,Agadir,3200
+D141200983,ISTPM-22-0098,Khadija,Ouhssaine,Radiologie / Imagerie medicale,S6,3e annee,G1,inscrit,paye,+212 6 88 45 21 09,k.ouhssaine@istpm.ma,2002-05-22,Agadir,3500
+H137654210,ISTPM-22-0104,Omar,Bennani,Laboratoire / Biologie medicale,S6,3e annee,G2,inscrit,impaye,+212 6 33 90 18 45,o.bennani@istpm.ma,2002-09-14,Agadir,3300
+S144210087,ISTPM-24-0230,Fatima Zahra,Lahlou,Prothese dentaire,S1,1re annee,A,inscrit,paye,+212 6 47 22 88 90,fz.lahlou@istpm.ma,2005-01-08,Ait Melloul,3000

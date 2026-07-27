@@ -64,6 +64,7 @@ import {
   createEtudiant as apiCreateEtudiant,
   updateEtudiant as apiUpdateEtudiant,
   deleteEtudiant as apiDeleteEtudiant,
+  restoreEtudiant as apiRestoreEtudiant,
   fetchFormateurs as apiFetchFormateurs,
   createFormateur as apiCreateFormateur,
   updateFormateur as apiUpdateFormateur,
@@ -207,7 +208,7 @@ export function decisionFor(moy: number, notes: NoteModule[]): Decision {
 
 export type NouvelEtudiant = Omit<
   Etudiant,
-  "id" | "moyenne" | "notes" | "historique" | "paiementsMensuels"
+  "id" | "moyenne" | "notes" | "historique" | "paiementsMensuels" | "archived"
 >;
 export type NouveauFormateur = Omit<Formateur, "id" | "notesSaisies">;
 /** `createdBy` et `document` sont posés par le store, pas par le formulaire. */
@@ -279,6 +280,7 @@ type IstpmCtx = {
   addEtudiant: (data: NouvelEtudiant) => Etudiant;
   updateEtudiant: (id: string, patch: Partial<Etudiant>) => void;
   deleteEtudiant: (id: string) => void;
+  restoreEtudiant: (id: string) => void;
 
   addFormateur: (data: NouveauFormateur) => Formateur;
   updateFormateur: (id: string, patch: Partial<Formateur>) => void;
@@ -462,6 +464,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         notes: [],
         historique: [],
         paiementsMensuels: {},
+        archived: false,
       };
       apiCreateEtudiant(data as unknown as Record<string, unknown>).catch(() => {});
       setSnap((s) => ({ ...s, etudiants: [etudiant, ...s.etudiants] }));
@@ -492,9 +495,18 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
       apiDeleteEtudiant(id).catch(() => {});
       setSnap((s) => ({
         ...s,
-        etudiants: s.etudiants.filter((e) => e.id !== id),
-        bulletins: s.bulletins.filter((b) => b.etudiantId !== id),
-        stages: s.stages.filter((st) => st.etudiantId !== id),
+        etudiants: s.etudiants.map((e) => (e.id === id ? { ...e, archived: true } : e)),
+      }));
+    },
+    [],
+  );
+
+  const restoreEtudiant = useCallback(
+    (id: string) => {
+      apiRestoreEtudiant(id).catch(() => {});
+      setSnap((s) => ({
+        ...s,
+        etudiants: s.etudiants.map((e) => (e.id === id ? { ...e, archived: false } : e)),
       }));
     },
     [],
@@ -1217,6 +1229,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     addEtudiant,
     updateEtudiant,
     deleteEtudiant,
+    restoreEtudiant,
     addFormateur,
     updateFormateur,
     deleteFormateur,

@@ -6,6 +6,7 @@ import { formateurs } from "@/db/schema/formateurs";
 import { eq, desc, sql, or } from "drizzle-orm";
 
 const formateurSchema = z.object({
+  userId: z.string().optional(),
   matricule: z.string().optional().default(""),
   cin: z.string().optional().default(""),
   prenom: z.string().min(1, "Prénom requis"),
@@ -54,6 +55,17 @@ export async function formateurRoutes(app: FastifyInstance) {
     }
 
     return result;
+  });
+
+  app.get("/user/me", { preHandler: [authenticate] }, async (request, reply) => {
+    const db = getDb();
+    const [formateur] = await db
+      .select()
+      .from(formateurs)
+      .where(eq(formateurs.userId, request.user.id))
+      .limit(1);
+    if (!formateur) return reply.status(404).send({ error: "Aucun formateur lié à ce compte" });
+    return formateur;
   });
 
   app.get("/:id", { preHandler: [authenticate] }, async (request, reply) => {
