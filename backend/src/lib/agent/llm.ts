@@ -104,7 +104,7 @@ Tu disposes d'un registre d'actions (tools) qui correspondent aux fonctionnalit√
   ];
 
   const response = await openai.chat.completions.create({
-    model: env.AI_MODEL || "nvidia/qwen-qwen3.5-397b-a17b",
+    model: env.AI_MODEL,
     messages: apiMessages,
     tools: toolDefinitions as OpenAI.Chat.ChatCompletionTool[],
     tool_choice: "auto",

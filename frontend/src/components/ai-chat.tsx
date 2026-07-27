@@ -238,6 +238,10 @@ export function AiChatFloating() {
         ? "\n\n💡 Vérifiez que le serveur backend est en cours d'exécution et que l'URL de l'API est correcte (VITE_API_URL)."
         : msg.includes("trop de temps")
         ? "\n\n💡 Le serveur a mis trop de temps à répondre. Veuillez réessayer."
+        : msg.includes("modèle d'IA") || msg.includes("API IA")
+        ? "\n\n💡 La configuration de l'IA est incorrecte. Contactez l'administrateur."
+        : msg.includes("502") || msg.includes("Bad Gateway")
+        ? "\n\n💡 Le serveur IA a rencontré une erreur. Veuillez réessayer."
         : "";
       setMessages((prev) => [
         ...prev,

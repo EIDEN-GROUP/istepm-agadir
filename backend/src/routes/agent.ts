@@ -60,7 +60,20 @@ export async function agentRoutes(app: FastifyInstance) {
       );
       return result;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erreur analyse";
+      let msg = "Erreur de communication avec l'IA";
+      if (err instanceof Error) {
+        if ("status" in err && (err as any).status === 404) {
+          msg = "Le modèle d'IA n'est pas disponible. Vérifiez la configuration AI_MODEL dans le fichier .env.";
+        } else if ("status" in err && (err as any).status === 401) {
+          msg = "Clé API IA invalide. Vérifiez AI_API_KEY dans le fichier .env.";
+        } else if ((err as any).code === "ECONNREFUSED" || (err as any).code === "ENOTFOUND") {
+          msg = "Impossible de contacter l'API IA. Vérifiez AI_BASE_URL dans le fichier .env.";
+        } else if (err.message.includes("404")) {
+          msg = "Le modèle d'IA est introuvable. Vérifiez AI_MODEL dans le fichier .env.";
+        } else {
+          msg = err.message;
+        }
+      }
       request.log.error(err, "Agent analyze failed");
       return reply.status(502).send({ error: msg });
     }

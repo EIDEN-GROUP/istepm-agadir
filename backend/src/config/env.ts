@@ -43,7 +43,7 @@ const envSchema = z.object({
 
   AI_API_KEY: z.string().default(""),
   AI_BASE_URL: z.string().default("https://integrate.api.nvidia.com/v1"),
-  AI_MODEL: z.string().default("nvidia/qwen-qwen3.5-397b-a17b"),
+  AI_MODEL: z.string().default("meta/llama-3.1-8b-instruct"),
 
   LOG_LEVEL: z.string().default("info"),
 });

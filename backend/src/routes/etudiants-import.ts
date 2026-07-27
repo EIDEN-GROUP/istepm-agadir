@@ -139,6 +139,10 @@ export async function etudiantImportRoutes(app: FastifyInstance) {
   app.post("/import/preview", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { csvText } = z.object({ csvText: z.string().min(1, "CSV text is required") }).parse(request.body);
 
+    if (csvText.length > 10 * 1024 * 1024) {
+      return reply.status(413).send({ error: "Le fichier ne doit pas dépasser 10 Mo" });
+    }
+
     const db = getDb();
 
     const [filieresRow] = await db
@@ -296,8 +300,8 @@ export async function etudiantImportRoutes(app: FastifyInstance) {
           .from(etudiants)
           .where(
             or(
-              eq(sql`LOWER(${etudiants.cne})`, cneLower),
-              eq(sql`LOWER(${etudiants.matricule})`, matriculeLower),
+              sql`LOWER(${etudiants.cne}) = ${cneLower}`,
+              sql`LOWER(${etudiants.matricule}) = ${matriculeLower}`,
             ),
           )
           .limit(1);
