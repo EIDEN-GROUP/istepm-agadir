@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm, type NouveauFormateur } from "@/lib/istpm-store";
+import { createUser } from "@/lib/istpm-api";
 import { ImportCsvDialog, type ImportColumn } from "@/components/import-csv";
 import {
   FILIERES,
@@ -395,16 +396,24 @@ function FormateursPage() {
           key={editing?.id ?? "new"}
           initial={editing}
           onCancel={() => setFormOpen(false)}
-          onSubmit={(data) => {
-            if (editing) {
-              updateFormateur(editing.id, data);
-              toast.success(`Fiche mise à jour   ${data.prenom} ${data.nom}`);
-            } else {
-              addFormateur(data);
-              toast.success(`Formateur ajouté   ${data.prenom} ${data.nom}`);
-            }
-            setFormOpen(false);
-          }}
+    onSubmit={(data) => {
+      if (editing) {
+        updateFormateur(editing.id, data);
+        toast.success(`Fiche mise à jour   ${data.prenom} ${data.nom}`);
+      } else {
+        if (data.password && data.email) {
+          createUser({
+            email: data.email,
+            password: data.password,
+            name: `${data.prenom} ${data.nom}`,
+            role: "enseignant",
+          }).catch(() => {});
+        }
+        addFormateur(data);
+        toast.success(`Formateur ajouté   ${data.prenom} ${data.nom}`);
+      }
+      setFormOpen(false);
+    }}
         />
       ) : null}
 
@@ -460,6 +469,7 @@ function FormateurForm({
     statut: StatutFormateur;
     telephone: string;
     email: string;
+    password?: string;
   }) => void;
   onCancel: () => void;
 }) {
@@ -477,6 +487,7 @@ function FormateurForm({
     statut: (initial?.statut ?? "permanent") as StatutFormateur,
     telephone: initial?.telephone ?? "",
     email: initial?.email ?? "",
+    password: "",
   }));
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
@@ -493,6 +504,7 @@ function FormateurForm({
     else if (!/^[A-Za-z]{1,2}\d{1,6}$/.test(f.cin.trim()))
       next.cin = "Format CIN invalide (ex. JB145872)";
     if (!f.departement) next.departement = "Département obligatoire";
+    if (!f.password.trim()) next.password = "Mot de passe requis";
     if (f.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email))
       next.email = "Adresse e-mail invalide";
     if (!parseList(f.modules).length)
@@ -516,6 +528,7 @@ function FormateurForm({
       statut: f.statut,
       telephone: f.telephone,
       email: f.email,
+      password: f.password,
     });
   };
 
@@ -614,6 +627,15 @@ function FormateurForm({
         value={f.email}
         onChange={(v) => set("email", v)}
         error={errors.email}
+      />
+      <TextField
+        label="Mot de passe"
+        type="password"
+        required
+        value={f.password}
+        onChange={(v) => set("password", v)}
+        placeholder="••••••"
+        error={errors.password}
       />
     </FormDialog>
   );

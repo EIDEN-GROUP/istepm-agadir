@@ -503,9 +503,6 @@ export function createUser(data: {
   password: string;
   name: string;
   role?: string;
-  filiere?: string;
-  niveau?: string;
-  groupe?: string;
 }) {
   return api.post<UserRecord>("/auth/register", data);
 }

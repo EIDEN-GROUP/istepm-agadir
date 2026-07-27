@@ -51,6 +51,7 @@ const ROLE_USER: Record<UserRole, { name: string; email: string }> = {
 const ROLE_STORAGE_KEY = "istpm-role";
 const TOKEN_STORAGE_KEY = "istpm-token";
 const USER_STORAGE_KEY = "istpm-user";
+export const FORMATEUR_STORAGE_KEY = "istpm-selected-formateur";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
@@ -95,6 +96,8 @@ type AuthCtx = {
   login: (email: string, password: string) => Promise<void>;
   setRole: (role: UserRole) => void;
   logout: () => void;
+  selectedFormateurId: string | null;
+  setSelectedFormateurId: (id: string | null) => void;
 };
 
 const Ctx = createContext<AuthCtx>({
@@ -104,6 +107,8 @@ const Ctx = createContext<AuthCtx>({
   login: async () => {},
   setRole: () => {},
   logout: () => {},
+  selectedFormateurId: null,
+  setSelectedFormateurId: () => {},
 });
 
 function userFor(role: UserRole): AuthUser {
@@ -114,6 +119,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRoleState] = useState<UserRole | null>(null);
   const [user, setUserState] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedFormateurId, setSelectedFormateurId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem(FORMATEUR_STORAGE_KEY);
+  });
+
+  const persistSelectedFormateur = useCallback((id: string | null) => {
+    setSelectedFormateurId(id);
+    if (typeof window !== "undefined") {
+      if (id) window.localStorage.setItem(FORMATEUR_STORAGE_KEY, id);
+      else window.localStorage.removeItem(FORMATEUR_STORAGE_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     const stored = readStoredRole();
@@ -182,8 +199,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.localStorage.removeItem(ROLE_STORAGE_KEY);
     window.localStorage.removeItem(TOKEN_STORAGE_KEY);
     window.localStorage.removeItem(USER_STORAGE_KEY);
+    window.localStorage.removeItem(FORMATEUR_STORAGE_KEY);
     setRoleState(null);
     setUserState(null);
+    setSelectedFormateurId(null);
   }, []);
 
   return (
@@ -195,6 +214,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         setRole,
         logout,
+        selectedFormateurId,
+        setSelectedFormateurId: persistSelectedFormateur,
       }}
     >
       {children}
