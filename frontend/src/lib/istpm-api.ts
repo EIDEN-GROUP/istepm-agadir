@@ -43,6 +43,10 @@ export function deleteEtudiant(id: string) {
   return api.delete<{ ok: boolean }>(`/etudiants/${id}`);
 }
 
+export function restoreEtudiant(id: string) {
+  return api.post<{ ok: boolean }>(`/etudiants/${id}/restore`);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Formateurs                                                         */
 /* ------------------------------------------------------------------ */

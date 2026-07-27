@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { etudiants } from "@/db/schema/etudiants";
+import { formateurs } from "@/db/schema/formateurs";
 import { notesEtudiant } from "@/db/schema/notes-etudiant";
 import { historiquePaiements } from "@/db/schema/historique-paiements";
 import { stages } from "@/db/schema/stages";
@@ -130,12 +131,31 @@ export async function etudiantRoutes(app: FastifyInstance) {
       filiere?: string;
       niveau?: string;
       statut?: string;
+      archived?: string;
     };
     let result = db
       .select()
       .from(etudiants)
       .orderBy(desc(etudiants.createdAt))
       .$dynamic();
+
+    if (request.user.role === "enseignant") {
+      const [formateur] = await db
+        .select({ groupes: formateurs.groupes })
+        .from(formateurs)
+        .where(eq(formateurs.userId, request.user.id))
+        .limit(1);
+      if (formateur && formateur.groupes.length > 0) {
+        const g = formateur.groupes;
+        result = result.where(sql`${etudiants.groupe} = ANY(${g}::text[])`);
+      }
+    }
+
+    if (query.archived === "true") {
+      result = result.where(eq(etudiants.archived, true));
+    } else if (query.archived !== "all") {
+      result = result.where(eq(etudiants.archived, false));
+    }
 
     if (query.search) {
       const q = `%${query.search}%`;
@@ -206,6 +226,7 @@ export async function etudiantRoutes(app: FastifyInstance) {
           fraisAnnuels: Number(e.fraisAnnuels),
           fraisMensuels: Math.round(Number(e.fraisAnnuels) / 10),
           resteAPayer: Number(e.resteAPayer),
+          archived: e.archived,
           paiementsMensuels: e.paiementsMensuels ?? {},
           notes: notes.map((n) => ({
             id: n.id,
@@ -337,9 +358,14 @@ export async function etudiantRoutes(app: FastifyInstance) {
   app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
-    await db.delete(bulletins).where(eq(bulletins.etudiantId, id));
-    await db.delete(stages).where(eq(stages.etudiantId, id));
-    await db.delete(etudiants).where(eq(etudiants.id, id));
+    await db.update(etudiants).set({ archived: true }).where(eq(etudiants.id, id));
+    return { ok: true };
+  });
+
+  app.post("/:id/restore", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+    const { id } = request.params as { id: string };
+    const db = getDb();
+    await db.update(etudiants).set({ archived: false }).where(eq(etudiants.id, id));
     return { ok: true };
   });
 

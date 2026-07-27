@@ -2,6 +2,7 @@ import { pgTable, uuid, text, integer, timestamp } from "drizzle-orm/pg-core";
 
 export const formateurs = pgTable("formateurs", {
   id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id"),
   matricule: text("matricule").notNull().default(""),
   cin: text("cin").notNull().default(""),
   prenom: text("prenom").notNull(),
