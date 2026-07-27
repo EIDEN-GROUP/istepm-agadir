@@ -12,6 +12,9 @@ export type CreateUserInput = {
   password: string;
   name: string;
   role?: "admin" | "superadmin" | "directeur" | "enseignant" | "responsable";
+  filiere?: string;
+  niveau?: string;
+  groupe?: string;
 };
 
 export type UserResult = {
@@ -57,11 +60,15 @@ export async function createUser(input: CreateUserInput): Promise<UserResult> {
     .returning();
   if (input.role === "enseignant") {
     const [prenom, ...reste] = input.name.split(" ");
+    const groupes: string[] = [];
+    if (input.groupe) groupes.push(input.groupe);
     await db.insert(formateurs).values({
       userId: user.id,
       prenom: prenom ?? input.name,
       nom: reste.join(" ") || "",
       email: input.email,
+      departement: input.filiere ?? "",
+      groupes,
     });
   }
   return toUserResult(user);

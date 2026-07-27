@@ -141,13 +141,18 @@ export async function etudiantRoutes(app: FastifyInstance) {
 
     if (request.user.role === "enseignant") {
       const [formateur] = await db
-        .select({ groupes: formateurs.groupes })
+        .select({ groupes: formateurs.groupes, departement: formateurs.departement })
         .from(formateurs)
         .where(eq(formateurs.userId, request.user.id))
         .limit(1);
-      if (formateur && formateur.groupes.length > 0) {
-        const g = formateur.groupes;
-        result = result.where(sql`${etudiants.groupe} = ANY(${g}::text[])`);
+      if (formateur) {
+        if (formateur.groupes.length > 0) {
+          const g = formateur.groupes;
+          result = result.where(sql`${etudiants.groupe} = ANY(${g}::text[])`);
+        }
+        if (formateur.departement) {
+          result = result.where(eq(etudiants.filiere, formateur.departement));
+        }
       }
     }
 
