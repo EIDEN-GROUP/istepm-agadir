@@ -54,9 +54,9 @@ On every push/PR to `main` or `develop`:
 
 On push to `main` only (after CI passes):
 3. **Docker Build** — Build & push 3 images to GHCR:
-   - `ghcr.io/eiden-group/school-crm-api`
-   - `ghcr.io/eiden-group/school-crm-frontend`
-   - `ghcr.io/eiden-group/school-crm-backup`
+   - `ghcr.io/eiden-group/istepm-agadir/school-crm-api`
+   - `ghcr.io/eiden-group/istepm-agadir/school-crm-frontend`
+   - `ghcr.io/eiden-group/istepm-agadir/school-crm-backup`
 4. **Deploy** — SSH into VPS → pull images → `docker stack deploy` → run migrations
 
 ## Nginx Proxy

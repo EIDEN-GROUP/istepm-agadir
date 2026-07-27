@@ -15,7 +15,7 @@ echo "╚═══════════════════════�
 echo ""
 
 # ── 0. Registry config ──────────────────────────────────────
-REGISTRY="ghcr.io/eiden-group"
+REGISTRY="ghcr.io/eiden-group/istepm-agadir"
 
 # ── 1. Build or pull frontend image ──────────────────────────
 if docker pull "$REGISTRY/school-crm-frontend:latest" >/dev/null 2>&1; then
