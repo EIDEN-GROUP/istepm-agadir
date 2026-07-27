@@ -362,11 +362,421 @@ async function seed() {
   }
   console.log("  ✓ 9 stages created");
 
+  /* ------------------------------------------------------------------ */
+  /*  10. Events (calendar)                                              */
+  /* ------------------------------------------------------------------ */
+  const eventsData = [
+    { id: "ev-1", title: "Réunion pédagogique de rentrée", description: "Préparation de l'année universitaire 2026/27 avec l'équipe pédagogique", date: "2026-09-05", startTime: "09:00", endTime: "12:00", allDay: false, type: "reunion", color: "#3b82f6", location: "Salle de conférence", status: "confirme" },
+    { id: "ev-2", title: "Soutenance de stage", description: "Soutenance des étudiants S6 - session juillet", date: "2026-07-30", startTime: "08:30", endTime: "17:00", allDay: false, type: "soutenance", color: "#ef4444", location: "Amphi A", status: "confirme" },
+    { id: "ev-3", title: "Conseil de discipline", description: "", date: "2026-08-12", startTime: "10:00", endTime: "11:30", allDay: false, type: "reunion", color: "#f59e0b", location: "Bureau du directeur", status: "planifie" },
+    { id: "ev-4", title: "Journée portes ouvertes", description: "Présentation des filières aux futurs étudiants", date: "2026-07-19", startTime: "09:00", endTime: "16:00", allDay: false, type: "evenement", color: "#8b5cf6", location: "Hall principal", status: "confirme" },
+    { id: "ev-5", title: "Remise des diplômes", description: "Cérémonie de remise des diplômes 2025/26", date: "2026-09-20", startTime: "14:00", endTime: "18:00", allDay: false, type: "evenement", color: "#10b981", location: "Amphi A", status: "planifie" },
+    { id: "ev-6", title: "Vacances d'été", description: "Fermeture annuelle de l'établissement", date: "2026-08-01", startTime: "", endTime: "", allDay: true, type: "vacance", color: "#6b7280", location: "", status: "confirme" },
+    { id: "ev-7", title: "Réunion parents-enseignants", description: "Bilan du 1er semestre", date: "2026-12-15", startTime: "10:00", endTime: "13:00", allDay: false, type: "reunion", color: "#3b82f6", location: "Hall principal", status: "planifie" },
+    { id: "ev-8", title: "Examen de rattrapage", description: "Session de septembre", date: "2026-09-08", startTime: "09:00", endTime: "16:00", allDay: false, type: "examen", color: "#ef4444", location: "Toutes les salles", status: "confirme" },
+    { id: "ev-9", title: "Conférence : Éthique médicale", description: "Conférence animée par Pr. Alami sur l'éthique dans les soins", date: "2026-07-25", startTime: "10:00", endTime: "12:00", allDay: false, type: "evenement", color: "#8b5cf6", location: "Amphi B", status: "confirme" },
+    { id: "ev-10", title: "Atelier simulation", description: "Atelier de simulation en soins d'urgence", date: "2026-07-22", startTime: "14:00", endTime: "17:00", allDay: false, type: "formation", color: "#14b8a6", location: "Labo simulation", status: "confirme" },
+  ];
+  for (const ev of eventsData) {
+    await pool.query(
+      `INSERT INTO events (id, title, description, date, start_time, end_time, all_day, type, color, location, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (id) DO NOTHING`,
+      [ev.id, ev.title, ev.description, ev.date, ev.startTime, ev.endTime, ev.allDay, ev.type, ev.color, ev.location, ev.status],
+    );
+  }
+  console.log("  ✓ 10 events created");
+
+  /* ------------------------------------------------------------------ */
+  /*  11. Levels (academic levels)                                       */
+  /* ------------------------------------------------------------------ */
+  const levelsData = [
+    { id: "lv-1", name: "S1", cycle: "Licence", monthlyFee: 3400, maxStudents: 60 },
+    { id: "lv-2", name: "S2", cycle: "Licence", monthlyFee: 3400, maxStudents: 55 },
+    { id: "lv-3", name: "S3", cycle: "Licence", monthlyFee: 3200, maxStudents: 55 },
+    { id: "lv-4", name: "S4", cycle: "Licence", monthlyFee: 3200, maxStudents: 50 },
+    { id: "lv-5", name: "S5", cycle: "Licence", monthlyFee: 3500, maxStudents: 45 },
+    { id: "lv-6", name: "S6", cycle: "Licence", monthlyFee: 3500, maxStudents: 40 },
+  ];
+  for (const lv of levelsData) {
+    await pool.query(
+      `INSERT INTO levels (id, name, cycle, monthly_fee, max_students)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (id) DO NOTHING`,
+      [lv.id, lv.name, lv.cycle, lv.monthlyFee, lv.maxStudents],
+    );
+  }
+  console.log("  ✓ 6 levels created");
+
+  /* ------------------------------------------------------------------ */
+  /*  12. Séances (class sessions)                                       */
+  /* ------------------------------------------------------------------ */
+  const seancesData = [
+    { id: "sc-1", date: "2026-07-21", debut: "08:30", fin: "10:30", professeurId: "fo-1", module: "Soins infirmiers en médecine", filiere: "Infirmier polyvalent", salle: "Salle 101", groupe: "S5-G1", type: "cours_magistral", statut: "termine", anneeUniversitaire: "2025/26", semestre: "S5" },
+    { id: "sc-2", date: "2026-07-21", debut: "10:45", fin: "12:45", professeurId: "fo-3", module: "Obstétrique", filiere: "Sage-femme", salle: "Salle 102", groupe: "S3-G2", type: "tp", statut: "termine", anneeUniversitaire: "2025/26", semestre: "S3" },
+    { id: "sc-3", date: "2026-07-21", debut: "14:00", fin: "16:00", professeurId: "fo-4", module: "Rééducation fonctionnelle", filiere: "Kinésithérapie", salle: "Salle de rééducation", groupe: "S3-G1", type: "td", statut: "termine", anneeUniversitaire: "2025/26", semestre: "S3" },
+    { id: "sc-4", date: "2026-07-22", debut: "08:30", fin: "10:30", professeurId: "fo-2", module: "Anesthésie clinique", filiere: "Infirmier en anesthésie-réanimation", salle: "Salle 103", groupe: "S5-G1", type: "cours_magistral", statut: "termine", anneeUniversitaire: "2025/26", semestre: "S5" },
+    { id: "sc-5", date: "2026-07-22", debut: "10:45", fin: "12:45", professeurId: "fo-5", module: "Techniques de radiologie", filiere: "Radiologie / Imagerie médicale", salle: "Amphi B", groupe: "S6-G1", type: "cours_magistral", statut: "termine", anneeUniversitaire: "2025/26", semestre: "S6" },
+    { id: "sc-6", date: "2026-07-22", debut: "14:00", fin: "17:00", professeurId: "fo-6", module: "Hématologie", filiere: "Laboratoire / Biologie médicale", salle: "Labo biologie", groupe: "S6-G2", type: "tp", statut: "en_cours", anneeUniversitaire: "2025/26", semestre: "S6" },
+    { id: "sc-7", date: "2026-07-23", debut: "08:30", fin: "10:30", professeurId: "fo-7", module: "Prothèse fixe (TP)", filiere: "Prothèse dentaire", salle: "Atelier prothèse", groupe: "S1-A", type: "tp", statut: "planifie", anneeUniversitaire: "2025/26", semestre: "S1" },
+    { id: "sc-8", date: "2026-07-23", debut: "10:45", fin: "12:45", professeurId: "fo-8", module: "Pharmacologie", filiere: "Infirmier polyvalent", salle: "Salle 104", groupe: "S5-G1", type: "cours_magistral", statut: "planifie", anneeUniversitaire: "2025/26", semestre: "S5" },
+    { id: "sc-9", date: "2026-07-23", debut: "14:00", fin: "16:00", professeurId: "fo-1", module: "Hygiène hospitalière", filiere: "Infirmier polyvalent", salle: "Salle 101", groupe: "S1-B", type: "cours_magistral", statut: "planifie", anneeUniversitaire: "2025/26", semestre: "S1" },
+    { id: "sc-10", date: "2026-07-24", debut: "08:30", fin: "12:00", professeurId: "fo-2", module: "Réanimation et soins intensifs", filiere: "Infirmier en anesthésie-réanimation", salle: "Labo simulation 2", groupe: "S5-G1", type: "tp", statut: "planifie", anneeUniversitaire: "2025/26", semestre: "S5" },
+  ];
+  for (const sc of seancesData) {
+    await pool.query(
+      `INSERT INTO seances (id, date, debut, fin, professeur_id, module, filiere, salle, groupe, type, statut, annee_universitaire, semestre)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT (id) DO NOTHING`,
+      [sc.id, sc.date, sc.debut, sc.fin, sc.professeurId, sc.module, sc.filiere, sc.salle, sc.groupe, sc.type, sc.statut, sc.anneeUniversitaire, sc.semestre],
+    );
+  }
+  console.log("  ✓ 10 seances created");
+
+  /* ------------------------------------------------------------------ */
+  /*  13. Attendance sessions & attendance records                        */
+  /* ------------------------------------------------------------------ */
+  const attendanceSessionData = [
+    { id: "as-1", seanceId: "sc-1", date: "2026-07-21", statut: "termine" },
+    { id: "as-2", seanceId: "sc-2", date: "2026-07-21", statut: "termine" },
+    { id: "as-3", seanceId: "sc-3", date: "2026-07-21", statut: "termine" },
+    { id: "as-4", seanceId: "sc-4", date: "2026-07-22", statut: "termine" },
+    { id: "as-5", seanceId: "sc-5", date: "2026-07-22", statut: "termine" },
+  ];
+  for (const a of attendanceSessionData) {
+    await pool.query(
+      `INSERT INTO attendance_session (id, seance_id, date, statut)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (id) DO NOTHING`,
+      [a.id, a.seanceId, a.date, a.statut],
+    );
+  }
+  const attendanceRecords = [
+    { seanceId: "sc-1", etudiantId: "et-1", present: true, justifie: false },
+    { seanceId: "sc-1", etudiantId: "et-8", present: false, justifie: true, note: "Rendez-vous médical" },
+    { seanceId: "sc-2", etudiantId: "et-3", present: true, justifie: false },
+    { seanceId: "sc-2", etudiantId: "et-9", present: true, justifie: false },
+    { seanceId: "sc-3", etudiantId: "et-4", present: false, justifie: false },
+    { seanceId: "sc-3", etudiantId: "et-10", present: true, justifie: false },
+    { seanceId: "sc-4", etudiantId: "et-2", present: true, justifie: false },
+    { seanceId: "sc-4", etudiantId: "et-12", present: true, justifie: false },
+  ];
+  for (const ar of attendanceRecords) {
+    await pool.query(
+      `INSERT INTO attendance (seance_id, etudiant_id, present, justifie, note)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [ar.seanceId, ar.etudiantId, ar.present, ar.justifie, ar.note ?? null],
+    );
+  }
+  console.log("  ✓ 5 attendance sessions + 8 attendance records created");
+
+  /* ------------------------------------------------------------------ */
+  /*  14. Notes_examen (exam-level grades)                                */
+  /* ------------------------------------------------------------------ */
+  const notesExamenData = [
+    { examenId: "ex-4", etudiantId: "et-4", theorique: 12.0, pratique: 11.5 },
+    { examenId: "ex-4", etudiantId: "et-10", theorique: 14.5, pratique: 13.5 },
+    { examenId: "ex-7", etudiantId: "et-7", theorique: 14.0, pratique: 12.5 },
+    { examenId: "ex-7", etudiantId: "et-8", theorique: 11.0, pratique: 10.5 },
+    { examenId: "ex-6", etudiantId: "et-6", theorique: 8.5, pratique: 9.0 },
+    { examenId: "ex-6", etudiantId: "et-13", theorique: 9.0, pratique: 8.0 },
+  ];
+  for (const ne of notesExamenData) {
+    await pool.query(
+      `INSERT INTO notes_examen (examen_id, etudiant_id, theorique, pratique)
+       VALUES ($1,$2,$3,$4)`,
+      [ne.examenId, ne.etudiantId, String(ne.theorique), String(ne.pratique)],
+    );
+  }
+  console.log("  ✓ 6 exam-grade records created");
+
+  /* ------------------------------------------------------------------ */
+  /*  15. School vacations & holidays                                    */
+  /* ------------------------------------------------------------------ */
+  const vacationsData = [
+    { id: "va-1", startDate: "2026-08-01", endDate: "2026-08-31", label: "Vacances d'été" },
+    { id: "va-2", startDate: "2026-12-22", endDate: "2027-01-05", label: "Vacances d'hiver" },
+    { id: "va-3", startDate: "2027-04-10", endDate: "2027-04-25", label: "Vacances de printemps" },
+  ];
+  for (const v of vacationsData) {
+    await pool.query(
+      `INSERT INTO school_vacations (id, start_date, end_date, label)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (id) DO NOTHING`,
+      [v.id, v.startDate, v.endDate, v.label],
+    );
+  }
+  const holidaysData = [
+    { id: "ho-1", date: "2026-07-30", label: "Fête du Trône" },
+    { id: "ho-2", date: "2026-08-14", label: "Fête de la Jeunesse" },
+    { id: "ho-3", date: "2026-08-20", label: "Révolution du Roi et du Peuple" },
+    { id: "ho-4", date: "2026-11-06", label: "Anniversaire de la Marche Verte" },
+    { id: "ho-5", date: "2026-11-18", label: "Fête de l'Indépendance" },
+  ];
+  for (const h of holidaysData) {
+    await pool.query(
+      `INSERT INTO holidays (id, date, label)
+       VALUES ($1,$2,$3)
+       ON CONFLICT (id) DO NOTHING`,
+      [h.id, h.date, h.label],
+    );
+  }
+  const calendarExceptionsData = [
+    { id: "ce-1", date: "2026-07-30", label: "Fête du Trône (jour férié)" },
+    { id: "ce-2", date: "2026-08-14", label: "Fête de la Jeunesse (jour férié)" },
+    { id: "ce-3", date: "2026-08-20", label: "Révolution (jour férié)" },
+  ];
+  for (const ce of calendarExceptionsData) {
+    await pool.query(
+      `INSERT INTO calendar_exceptions (id, date, label)
+       VALUES ($1,$2,$3)
+       ON CONFLICT (id) DO NOTHING`,
+      [ce.id, ce.date, ce.label],
+    );
+  }
+  console.log("  ✓ 3 vacations + 5 holidays + 3 calendar exceptions created");
+
+  /* ------------------------------------------------------------------ */
+  /*  16. Teacher availability                                            */
+  /* ------------------------------------------------------------------ */
+  const availData = [
+    { teacherId: "fo-1", dayOfWeek: 1, startTime: "08:30", endTime: "16:30" },
+    { teacherId: "fo-1", dayOfWeek: 2, startTime: "08:30", endTime: "16:30" },
+    { teacherId: "fo-1", dayOfWeek: 3, startTime: "08:30", endTime: "12:30" },
+    { teacherId: "fo-1", dayOfWeek: 4, startTime: "08:30", endTime: "16:30" },
+    { teacherId: "fo-2", dayOfWeek: 1, startTime: "10:00", endTime: "18:00" },
+    { teacherId: "fo-2", dayOfWeek: 3, startTime: "08:30", endTime: "12:30" },
+    { teacherId: "fo-2", dayOfWeek: 5, startTime: "08:30", endTime: "14:00" },
+    { teacherId: "fo-3", dayOfWeek: 2, startTime: "08:30", endTime: "16:30" },
+    { teacherId: "fo-3", dayOfWeek: 4, startTime: "08:30", endTime: "12:30" },
+    { teacherId: "fo-4", dayOfWeek: 1, startTime: "14:00", endTime: "18:00" },
+    { teacherId: "fo-4", dayOfWeek: 3, startTime: "14:00", endTime: "18:00" },
+    { teacherId: "fo-5", dayOfWeek: 2, startTime: "08:30", endTime: "14:00" },
+    { teacherId: "fo-5", dayOfWeek: 5, startTime: "08:30", endTime: "12:30" },
+  ];
+  for (const av of availData) {
+    await pool.query(
+      `INSERT INTO teacher_availability (teacher_id, day_of_week, start_time, end_time)
+       VALUES ($1,$2,$3,$4)`,
+      [av.teacherId, av.dayOfWeek, av.startTime, av.endTime],
+    );
+  }
+  console.log("  ✓ 14 teacher-availability slots created");
+
+  /* ------------------------------------------------------------------ */
+  /*  17. Planifications                                                 */
+  /* ------------------------------------------------------------------ */
+  const planificationsData = [
+    { id: "pl-1", date: "2026-09-05", time: "09:00", title: "Réunion de rentrée", detail: "Préparation année 2026/27", tone: "important" },
+    { id: "pl-2", date: "2026-09-12", time: "10:00", title: "Calendrier des examens", detail: "Validation du calendrier S1", tone: "urgent" },
+    { id: "pl-3", date: "2026-09-20", time: "14:00", title: "Remise des diplômes", detail: "Cérémonie officielle", tone: "normal" },
+    { id: "pl-4", date: "2026-10-01", time: "08:30", title: "Début des cours S1", detail: "Rentrée académique", tone: "important" },
+    { id: "pl-5", date: "2026-10-15", time: "11:00", title: "Commission pédagogique", detail: "Suivi des programmes", tone: "normal" },
+  ];
+  for (const pl of planificationsData) {
+    await pool.query(
+      `INSERT INTO planifications (id, date, time, title, detail, tone)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (id) DO NOTHING`,
+      [pl.id, pl.date, pl.time, pl.title, pl.detail, pl.tone],
+    );
+  }
+  console.log("  ✓ 5 planifications created");
+
+  /* ------------------------------------------------------------------ */
+  /*  18. Notifications                                                   */
+  /* ------------------------------------------------------------------ */
+  const notificationsData = [
+    { id: "nt-1", type: "info", title: "Nouvel étudiant inscrit", message: "Fatima Zahra Lahlou a été inscrite en Prothèse dentaire S1", link: "/dashboard/etudiants/et-7" },
+    { id: "nt-2", type: "warning", title: "Paiement en retard", message: "Youssef Ait Taleb a un retard de paiement de 13 000 DH", link: "/dashboard/etudiants/et-2" },
+    { id: "nt-3", type: "success", title: "Stages validés", message: "Ayoub Naciri a validé son stage avec une note de 17/20", link: "/dashboard/stages/st-8" },
+    { id: "nt-4", type: "info", title: "Examen programmé", message: "Examen de Soins infirmiers programmé le 28/07/2026 à 09:00", link: "/dashboard/examens/ex-1" },
+    { id: "nt-5", type: "warning", title: "Doublon potentiel", message: "Un étudiant avec le CNE C139887654 est déjà inscrit", link: "/dashboard/etudiants" },
+  ];
+  for (const n of notificationsData) {
+    await pool.query(
+      `INSERT INTO notifications (id, type, title, message, link)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (id) DO NOTHING`,
+      [n.id, n.type, n.title, n.message, n.link],
+    );
+  }
+  console.log("  ✓ 5 notifications created");
+
+  /* ------------------------------------------------------------------ */
+  /*  19. Appointments                                                   */
+  /* ------------------------------------------------------------------ */
+  const appointmentsData = [
+    { id: "ap-1", name: "Ahmed Benali", email: "ahmed.benali@email.ma", phone: "+212 6 11 22 33 44", subject: "Inscription Infirmier polyvalent", type: "inscription", status: "confirme", age: "19", message: "Souhaite s'inscrire pour la rentrée 2026/27", dateTable: "2026-08-15" },
+    { id: "ap-2", name: "Nadia Oubella", email: "nadia.oubella@email.ma", phone: "+212 6 55 66 77 88", subject: "Réorientation Sage-femme", type: "information", status: "nouveau", age: "22", message: "Étudiante en 2e année souhaite des informations sur la filière Sage-femme", dateTable: "2026-08-20" },
+    { id: "ap-3", name: "Dr. Karim Hassani", email: "k.hassani@chu-agadir.ma", phone: "+212 6 99 88 77 66", subject: "Convention de stage", type: "partenariat", status: "en_cours", age: "", message: "Propose une convention de stage pour 3 étudiants en anesthésie", dateTable: "2026-07-25" },
+  ];
+  for (const ap of appointmentsData) {
+    await pool.query(
+      `INSERT INTO appointments (id, name, email, phone, subject, type, status, age, message, date_table)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       ON CONFLICT (id) DO NOTHING`,
+      [ap.id, ap.name, ap.email, ap.phone, ap.subject, ap.type, ap.status, ap.age, ap.message, ap.dateTable],
+    );
+  }
+  console.log("  ✓ 3 appointments created");
+
+  /* ------------------------------------------------------------------ */
+  /*  20. Centers & center admins (multi-center support)                  */
+  /* ------------------------------------------------------------------ */
+  const centersData = [
+    { id: "ct-1", name: "ISTPM Agadir", city: "Agadir", contactEmail: "contact@istpm-agadir.ma", contactPhone: "+212 5 28 22 11 00", plan: "premium", status: "active", monthlyPrice: 29900, studentsCount: 120, isPrimary: true, notes: "Siège principal" },
+    { id: "ct-2", name: "ISTPM Inezgane", city: "Inezgane", contactEmail: "contact.inezgane@istpm-agadir.ma", contactPhone: "+212 5 28 33 22 11", plan: "standard", status: "active", monthlyPrice: 19900, studentsCount: 65, isPrimary: false, notes: "Antenne Inezgane" },
+  ];
+  for (const c of centersData) {
+    await pool.query(
+      `INSERT INTO centers (id, name, city, contact_email, contact_phone, plan, status, monthly_price, students_count, is_primary, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (id) DO NOTHING`,
+      [c.id, c.name, c.city, c.contactEmail, c.contactPhone, c.plan, c.status, c.monthlyPrice, c.studentsCount, c.isPrimary, c.notes],
+    );
+  }
+  // center admins — link the directeur user to the primary center
+  await pool.query(
+    `INSERT INTO center_admins (center_id, profile_id)
+     SELECT $1, id FROM users WHERE email = 'direction@istpm-agadir.ma'
+     ON CONFLICT DO NOTHING`,
+    ["ct-1"],
+  );
+  console.log("  ✓ 2 centers + 1 center admin created");
+
+  /* ------------------------------------------------------------------ */
+  /*  21. Employees (staff records)                                       */
+  /* ------------------------------------------------------------------ */
+  const employeesData = [
+    { id: "em-1", fullName: "Dr. Youssef Benali", position: "Directeur", department: "Direction", email: "direction@istpm-agadir.ma", personalEmail: "y.benali@email.ma", phone: "+212 6 61 11 22 33", cin: "AB123456", birthDate: "1975-03-15", hireDate: "2018-09-01", address: "12 Rue Hassan II, Agadir", contractType: "cdi", salary: 25000, status: "actif" },
+    { id: "em-2", fullName: "M. Rachid El Ouafi", position: "Responsable pédagogique", department: "Pédagogie", email: "responsable@istpm-agadir.ma", personalEmail: "r.ouafi@email.ma", phone: "+212 6 62 33 44 55", cin: "CD789012", birthDate: "1985-07-22", hireDate: "2019-10-01", address: "8 Rue Mohammed V, Agadir", contractType: "cdi", salary: 18000, status: "actif" },
+    { id: "em-3", fullName: "Mme Salma Ait Taleb", position: "Enseignante", department: "Pédagogie", email: "enseignant@istpm-agadir.ma", personalEmail: "s.ait taleb@email.ma", phone: "+212 6 63 44 55 66", cin: "EF345678", birthDate: "1990-11-10", hireDate: "2020-02-15", address: "5 Rue Al Qods, Agadir", contractType: "cdi", salary: 14000, status: "actif" },
+    { id: "em-4", fullName: "Mme Fatima Hassani", position: "Secrétaire générale", department: "Administration", email: "secretariat@istpm-agadir.ma", personalEmail: "f.hassani@email.ma", phone: "+212 6 64 55 66 77", cin: "GH901234", birthDate: "1988-09-05", hireDate: "2021-01-10", address: "3 Rue de la Liberté, Agadir", contractType: "cdi", salary: 12000, status: "actif" },
+  ];
+  for (const em of employeesData) {
+    await pool.query(
+      `INSERT INTO employees (id, full_name, position, department, email, personal_email, phone, cin, birth_date, hire_date, address, contract_type, salary, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       ON CONFLICT (id) DO NOTHING`,
+      [em.id, em.fullName, em.position, em.department, em.email, em.personalEmail, em.phone, em.cin, em.birthDate, em.hireDate, em.address, em.contractType, String(em.salary), em.status],
+    );
+  }
+  console.log("  ✓ 4 employees created");
+
+  /* ------------------------------------------------------------------ */
+  /*  22. CRM clients (famille / crèche module)                          */
+  /* ------------------------------------------------------------------ */
+  const clientsData = [
+    { id: "cl-1", parentName: "M. Hassan El Fassi", childName: "Amine El Fassi", childAge: "4", email: "h.elfassi@email.ma", email2: "amine.ecole@email.ma", phone: "+212 6 11 22 33 44", phone2: "", cin: "AA123456", address: "15 Av. des FAR, Agadir", childNames: [{ name: "Amine", age: 4 }], subscribedFrais: [{ name: "Mensualité", montant: 2500 }], dob: "2022-03-10", level: "PS", crmStage: "actif", paymentStatus: "a_jour", monthlyFee: 2500, debt: 0, overdue: false, paymentDay: 5, notes: "Famille recommandée par Dr. Benali", whatsappOptin: true, transport: true, cantine: true, garderie: false, activites: true, fratrie: 0, remise: 0, subscribedServices: [{ name: "Transport", montant: 500 }, { name: "Cantine", montant: 400 }] },
+    { id: "cl-2", parentName: "Mme Nadia Oubella", childName: "Sara Oubella", childAge: "5", email: "n.oubella@email.ma", phone: "+212 6 55 66 77 88", cin: "BB789012", address: "8 Rue Al Qods, Agadir", childNames: [{ name: "Sara", age: 5 }], subscribedFrais: [{ name: "Mensualité", montant: 2500 }], dob: "2021-06-15", level: "MS", crmStage: "actif", paymentStatus: "retard", monthlyFee: 2500, debt: 2500, overdue: true, paymentDay: 10, notes: "Retard de paiement de 1 mois", whatsappOptin: true, transport: false, cantine: true, garderie: false, activites: false, fratrie: 0, remise: 0, subscribedServices: [{ name: "Cantine", montant: 400 }] },
+  ];
+  for (const cl of clientsData) {
+    await pool.query(
+      `INSERT INTO clients (id, parent_name, child_name, child_age, email, email2, phone, phone2, cin, address, child_names, subscribed_frais, dob, level, crm_stage, payment_status, monthly_fee, debt, overdue, payment_day, notes, whatsapp_optin, transport, cantine, garderie, activites, fratrie, remise, subscribed_services)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29::jsonb)
+       ON CONFLICT (id) DO NOTHING`,
+      [cl.id, cl.parentName, cl.childName, cl.childAge, cl.email, cl.email2, cl.phone, cl.phone2, cl.cin, cl.address,
+       JSON.stringify(cl.childNames), JSON.stringify(cl.subscribedFrais), cl.dob, cl.level, cl.crmStage,
+       cl.paymentStatus, cl.monthlyFee, cl.debt, cl.overdue, cl.paymentDay, cl.notes,
+       cl.whatsappOptin, cl.transport, cl.cantine, cl.garderie, cl.activites, cl.fratrie, cl.remise,
+       JSON.stringify(cl.subscribedServices)],
+    );
+  }
+  // Invoices + payments for CRM
+  await pool.query(
+    `INSERT INTO invoices (client_id, period, amount_due, amount_paid, due_date, status)
+     VALUES ($1,'2026-07',2500,2500,'2026-07-05','payee')
+     ON CONFLICT DO NOTHING`,
+    ["cl-1"],
+  );
+  await pool.query(
+    `INSERT INTO invoices (client_id, period, amount_due, amount_paid, due_date, status)
+     VALUES ($1,'2026-07',2500,0,'2026-07-10','impayee'),
+            ($1,'2026-08',2900,0,'2026-08-10','impayee')
+     ON CONFLICT DO NOTHING`,
+    ["cl-2"],
+  );
+  await pool.query(
+    `INSERT INTO payments (client_id, amount, date, mode, period, receipt)
+     VALUES ($1,2500,'2026-07-05','Virement','2026-07','REC-2026-07-001')
+     ON CONFLICT DO NOTHING`,
+    ["cl-1"],
+  );
+  console.log("  ✓ 2 CRM clients + 3 invoices + 1 payment created");
+
+  /* ------------------------------------------------------------------ */
+  /*  23. Support sessions & messages                                     */
+  /* ------------------------------------------------------------------ */
+  const supportSessionsData = [
+    { id: "ss-1", status: "open" },
+    { id: "ss-2", status: "resolved" },
+  ];
+  for (const ss of supportSessionsData) {
+    await pool.query(
+      `INSERT INTO support_sessions (id, status)
+       VALUES ($1,$2)
+       ON CONFLICT (id) DO NOTHING`,
+      [ss.id, ss.status],
+    );
+  }
+  await pool.query(
+    `INSERT INTO support_messages (session_id, sender_id, sender_role, content)
+     SELECT 'ss-1', id, 'directeur', 'Bonjour, je rencontre un problème avec l''export PDF des bulletins.'
+     FROM users WHERE email = 'direction@istpm-agadir.ma'`,
+  );
+  await pool.query(
+    `INSERT INTO support_messages (session_id, sender_role, content)
+     VALUES ('ss-1', 'support', 'Bonjour Dr. Benali. Pouvez-vous préciser le problème ?')`,
+  );
+  console.log("  ✓ 2 support sessions + 2 messages created");
+
+  /* ------------------------------------------------------------------ */
+  /*  24. User preferences, demo requests, email logs, reminders, WhatsApp */
+  /* ------------------------------------------------------------------ */
+  // User preferences
+  await pool.query(
+    `INSERT INTO user_preferences (user_id, preferences)
+     SELECT id, '{"theme":"system","notifications":true,"language":"fr"}'::jsonb
+     FROM users
+     ON CONFLICT DO NOTHING`,
+  );
+  // Demo requests
+  await pool.query(
+    `INSERT INTO demo_requests (center, email, phone, preferred_date, message)
+     VALUES ('Clinique Al Massira','contact@almassira.ma','+212 5 28 44 55 66','2026-08-10','Souhaite une démonstration du logiciel pour notre clinique')`,
+  );
+  // Email log
+  await pool.query(
+    `INSERT INTO email_logs (recipient, subject, type, status, error_msg)
+     VALUES ('direction@istpm-agadir.ma','Bienvenue sur ISTPM','welcome','envoye',NULL)`,
+  );
+  // Reminder
+  await pool.query(
+    `INSERT INTO reminders (title, message, remind_at, sent, method)
+     VALUES ('Soutenance de stage','Rappel : soutenance des étudiants S6 demain à 08:30',NOW() + INTERVAL '1 day',false,'email')`,
+  );
+  // WhatsApp message
+  await pool.query(
+    `INSERT INTO whatsapp_messages (phone, direction, content, status)
+     VALUES ('+212 6 11 22 33 44','sortant','Votre facture ISTPM du mois est disponible.','envoye')`,
+  );
+  console.log("  ✓ preferences, demo request, email log, reminder, WhatsApp message created");
+
   console.log("\n✅ Seed complete!");
   console.log("Demo accounts:");
   console.log("  direction@istpm-agadir.ma / directeur123  (directeur)");
   console.log("  enseignant@istpm-agadir.ma / enseignant123 (enseignant)");
   console.log("  responsable@istpm-agadir.ma / responsable123 (responsable)");
+  console.log("");
+  console.log("Created entities:");
+  console.log("  3 roles · 3 users · 7 filieres · 14 etudiants · 38 notes");
+  console.log("  30 paiements · 8 formateurs · 10 examens · 10 bulletins · 9 stages");
+  console.log("  10 events · 6 levels · 10 seances · 5+8 attendance · 6 notes_examen");
+  console.log("  3 vacations · 5 holidays · 3 calendar exceptions · 14 availabilities");
+  console.log("  5 planifications · 5 notifications · 3 appointments");
+  console.log("  2 centers · 4 employees · 2 CRM clients · 3 invoices · 1 payment");
+  console.log("  2 support sessions · preferences · demo request · email · reminder · WhatsApp");
 
   await pool.end();
 }
