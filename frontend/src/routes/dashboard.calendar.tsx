@@ -21,7 +21,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth, DEMO_FORMATEUR_ID, getStoredRole } from "@/lib/auth";
+import { useAuth, getStoredRole } from "@/lib/auth";
 import { canAccess } from "@/lib/dashboard-i18n";
 import {
   useIstpm,
@@ -118,7 +118,7 @@ function resumeConflits(conflits: Conflit[]) {
 /* ------------------------------------------------------------------ */
 
 function PlanningPage() {
-  const { role } = useAuth();
+  const { role, selectedFormateurId } = useAuth();
   const {
     seances,
     formateurs,
@@ -163,9 +163,9 @@ const [importOpen, setImportOpen] = useState(false);
   const visibles = useMemo(
     () =>
       estEnseignant
-        ? seances.filter((s) => s.professeurId === DEMO_FORMATEUR_ID)
+        ? seances.filter((s) => s.professeurId === (selectedFormateurId ?? ""))
         : seances,
-    [seances, estEnseignant],
+    [seances, estEnseignant, selectedFormateurId],
   );
 
   const modules = useMemo(

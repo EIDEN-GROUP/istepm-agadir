@@ -25,7 +25,7 @@ import {
   Activity,
   type LucideProps,
 } from "lucide-react";
-import { useAuth, ROLE_META, DEMO_FORMATEUR_ID } from "@/lib/auth";
+import { useAuth, ROLE_META } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
 import {
   fmtMAD,
@@ -949,7 +949,8 @@ function DashboardDirecteur() {
 function DashboardEnseignant() {
   const { tab, setTab, direction } = useTabs();
   const { formateurs, seances, examens, bulletins, etudiants } = useIstpm();
-  const moi = formateurs.find((f) => f.id === DEMO_FORMATEUR_ID);
+  const { selectedFormateurId } = useAuth();
+  const moi = formateurs.find((f) => f.id === selectedFormateurId);
   const mesExamens = useMemo(() => (moi ? examens.filter((x) => moi.modules.includes(x.module)) : []), [examens, moi]);
   const seancesAujourdhui = useMemo(() => seances.filter((s) => s.date === today && s.professeurId === moi?.id), [seances, moi?.id]);
   const mesSeances = useMemo(() => seances.filter((s) => s.professeurId === moi?.id).slice().sort((a, b) => (a.date < b.date ? -1 : 1)), [seances, moi?.id]);

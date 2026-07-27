@@ -27,6 +27,7 @@ import { ROLES, ROLE_META, useAuth } from "@/lib/auth";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
 import { useIstpm } from "@/lib/istpm-store";
 import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { AiChatFloating } from "@/components/ai-chat";
 import {
   Select,
@@ -293,13 +294,14 @@ function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
       <Select
         value={role}
         onValueChange={handleSelectRole}
-        aria-label="Changer de profil"
-        className={cn(
-          "h-9 rounded-xl border-brand/15 bg-brand/5 text-xs font-medium text-foreground shadow-none transition-colors hover:bg-brand/10 focus:ring-0 focus:ring-offset-0 [&>svg]:text-muted-foreground data-[state=open]:bg-brand/10",
-          collapsed ? "w-9 justify-center px-0 [&>svg:last-child]:hidden" : "w-full px-3",
-        )}
       >
-        <SelectTrigger>
+        <SelectTrigger
+          aria-label="Changer de profil"
+          className={cn(
+            "h-9 rounded-xl border-brand/15 bg-brand/5 text-xs font-medium text-foreground shadow-none transition-colors hover:bg-brand/10 focus:ring-0 focus:ring-offset-0 [&>svg]:text-muted-foreground data-[state=open]:bg-brand/10",
+            collapsed ? "w-9 justify-center px-0 [&>svg:last-child]:hidden" : "w-full px-3",
+          )}
+        >
           {collapsed ? (
             <UserCog className="h-4 w-4 shrink-0 text-brand" />
           ) : (
