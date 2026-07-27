@@ -35,7 +35,7 @@ import {
   TYPE_EXAMEN_LABEL,
   fmtMAD,
 } from "@/lib/istpm-data";
-import { useIstpm } from "@/lib/istpm-store";
+import { useIstpm, type NouveauFormateur } from "@/lib/istpm-store";
 import {
   fetchSettings,
   updateSetting,
@@ -580,6 +580,7 @@ function NewUserForm({
   onClose: () => void;
   onCreated: (user: UserRecord) => void;
 }) {
+  const { addFormateur } = useIstpm();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -603,6 +604,22 @@ function NewUserForm({
         ...(isEnseignant ? { filiere, niveau, groupe } : {}),
       });
       onCreated(user);
+      if (isEnseignant) {
+        const [prenom, ...reste] = name.trim().split(" ");
+        addFormateur({
+          prenom: prenom ?? name.trim(),
+          nom: reste.join(" ") || "",
+          email: email.trim(),
+          departement: filiere as NouveauFormateur["departement"],
+          groupes: groupe ? [groupe] : [],
+          matricule: "",
+          cin: "",
+          grade: "vacataire",
+          telephone: "",
+          statut: "permanent",
+          modules: [],
+        });
+      }
       toast.success(`Utilisateur "${name}" créé`);
     } catch {
       toast.error("Erreur lors de la création");
