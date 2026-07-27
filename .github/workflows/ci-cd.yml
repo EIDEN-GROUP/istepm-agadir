@@ -163,10 +163,19 @@ jobs:
             # Deploy the stack
             docker stack deploy -c docker-compose.production.yml school-crm --with-registry-auth --prune
 
+            # Wait for postgres to be ready
+            echo "Waiting for postgres to be ready..."
+            for i in $(seq 1 30); do
+              docker run --rm --network school-crm_school-crm \
+                postgres:16-alpine pg_isready -h postgres -U postgres 2>/dev/null && break
+              echo "  Waiting... ($i)"
+              sleep 3
+            done
+
             # Run database migrations
             echo "Running database migrations..."
             docker run --rm \
-              --network school-crm \
+              --network school-crm_school-crm \
               -e DATABASE_URL="postgres://postgres:${DB_PASSWORD}@postgres:5432/school_crm" \
               ghcr.io/eiden-group/istepm-agadir/school-crm-api:${{ github.sha }} \
               node dist/db/migrate.js
