@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { ROLES, ROLE_META, useAuth } from "@/lib/auth";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
+import { useIstpm } from "@/lib/istpm-store";
 import { Toaster } from "@/components/ui/sonner";
 import { AiChatFloating } from "@/components/ai-chat";
 import {
@@ -33,6 +34,11 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
@@ -261,42 +267,106 @@ function NavGroupBlock({
 
 function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
   const { role, setRole } = useAuth();
+  const { formateurs } = useIstpm();
   const navigate = useNavigate();
   if (!role) return null;
 
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedFormateurId, setSelectedFormateurId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem("istpm-selected-formateur");
+  });
+
+  const handleSelectRole = (next: (typeof ROLES)[number]) => {
+    // If it's not enseignant, directly switch role
+    if (next !== "enseignant") {
+      setRole(next);
+      navigate({ to: "/dashboard" });
+      return;
+    }
+    // If it's enseignant, open the formateur picker
+    setPickerOpen(true);
+  };
+
   return (
-    <Select
-      value={role}
-      onValueChange={(next) => {
-        setRole(next as (typeof ROLES)[number]);
-        // Avoid being stranded on a page the new role cannot reach.
-        navigate({ to: "/dashboard" });
-      }}
-    >
-      <SelectTrigger
+    <>
+      <Select
+        value={role}
+        onValueChange={handleSelectRole}
         aria-label="Changer de profil"
         className={cn(
           "h-9 rounded-xl border-brand/15 bg-brand/5 text-xs font-medium text-foreground shadow-none transition-colors hover:bg-brand/10 focus:ring-0 focus:ring-offset-0 [&>svg]:text-muted-foreground data-[state=open]:bg-brand/10",
           collapsed ? "w-9 justify-center px-0 [&>svg:last-child]:hidden" : "w-full px-3",
         )}
       >
-        {collapsed ? (
-          <UserCog className="h-4 w-4 shrink-0 text-brand" />
-        ) : (
-          <span className="flex min-w-0 items-center gap-2">
+        <SelectTrigger>
+          {collapsed ? (
             <UserCog className="h-4 w-4 shrink-0 text-brand" />
-            <span className="truncate">{ROLE_META[role].short}</span>
-          </span>
-        )}
-      </SelectTrigger>
-      <SelectContent className="rounded-2xl border-brand/15">
-        {ROLES.map((r) => (
-          <SelectItem key={r} value={r} className="text-xs">
-            {ROLE_META[r].label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+          ) : (
+            <span className="flex min-w-0 items-center gap-2">
+              <UserCog className="h-4 w-4 shrink-0 text-brand" />
+              <span className="truncate">{ROLE_META[role].short}</span>
+            </span>
+          )}
+        </SelectTrigger>
+        <SelectContent className="rounded-2xl border-brand/15">
+          {ROLES.map((r) => (
+            <SelectItem key={r} value={r} className="text-xs">
+              {ROLE_META[r].label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Formateur picker dialog */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="w-[300px] max-h-[80vh] overflow-y-auto">
+          <DialogTitle className="text-lg font-medium">
+            Sélectionner un formateur
+          </DialogTitle>
+          <div className="py-4 space-y-2">
+            {formateurs.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => {
+                  // Store the selected formateur ID
+                  window.localStorage.setItem("istpm-selected-formateur", f.id);
+                  // Switch to enseignant role
+                  setRole("enseignant");
+                  // Close picker and navigate
+                  setPickerOpen(false);
+                  navigate({ to: "/dashboard" });
+                  toast.success(`Formateur sélectionné : ${f.prenom} ${f.nom}`);
+                }}
+                className={cn(
+                  "w-full text-left py-2 px-3 rounded border border-brand/10 hover:bg-brand/5",
+                  selectedFormateurId === f.id ? "bg-brand/20" : ""
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="flex-shrink-0">
+                    <div className="h-6 w-6 rounded bg-brand/20 flex items-center justify-center text-sm font-medium">
+                      {f.prenom[0]}{f.nom[0]}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-medium">{f.prenom} {f.nom}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {f.departement} • {f.groupes.join(", ")}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+            {formateurs.length === 0 && (
+              <div className="py-4 text-center text-xs text-muted-foreground">
+                Aucun formateur disponible
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

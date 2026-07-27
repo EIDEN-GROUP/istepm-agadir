@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { Plus, Pencil, Eye, Download, Archive, RotateCcw, Upload, ListFilter, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { useIstpm, type NouvelEtudiant } from "@/lib/istpm-store";
 import { ImportEtudiantsDialog } from "@/components/import-etudiants-dialog";
 import { fetchStudentSemestres, exportEtudiantsCsv } from "@/lib/istpm-api";
@@ -80,7 +80,7 @@ const STATUTS_PAIEMENT: StatutPaiement[] = [
 ];
 
 function EtudiantsPage() {
-  const { role } = useAuth();
+  const { role, selectedFormateurId } = useAuth();
   const { etudiants, addEtudiant, updateEtudiant, deleteEtudiant, restoreEtudiant } = useIstpm();
   // Teachers get a read-only view; student administration is the responsable's
   // and the directeur's job.
@@ -93,10 +93,11 @@ function EtudiantsPage() {
   // Scope assigned to the current enseignant (formateur).
   const enseignantScope = useMemo(() => {
     if (!isTeacher) return null;
-    const f = FORMATEURS.find((x) => x.id === DEMO_FORMATEUR_ID);
+    if (!selectedFormateurId) return null;
+    const f = FORMATEURS.find((x) => x.id === selectedFormateurId);
     if (!f) return null;
     return { filiere: f.departement, groupes: f.groupes };
-  }, [isTeacher]);
+  }, [isTeacher, selectedFormateurId]);
 
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
@@ -132,8 +133,9 @@ function EtudiantsPage() {
   }, [enseignantScope]);
 
   // Teacher must pick all three before the roster appears.
+  const noFormateur = isTeacher && !selectedFormateurId;
   const needsSelection =
-    isTeacher && !enseignantScope && (filiere === ALL || niveau === ALL || groupe === ALL);
+    isTeacher && !noFormateur && !enseignantScope && (filiere === ALL || niveau === ALL || groupe === ALL);
 
   const [detail, setDetail] = useState<Etudiant | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -348,7 +350,9 @@ function EtudiantsPage() {
               ]
         }
         summary={
-          needsSelection ? (
+          noFormateur ? (
+            <>Sélectionnez un formateur dans le menu de navigation.</>
+          ) : needsSelection ? (
             <>Choisissez une filière, un semestre et un groupe.</>
           ) : enseignantScope ? (
             <div className="flex items-center gap-3">
@@ -399,7 +403,16 @@ function EtudiantsPage() {
         }
       />
 
-      {needsSelection ? (
+      {noFormateur ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <p className="text-sm font-medium text-muted-foreground">
+            Veuillez sélectionner un formateur dans le menu de navigation
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground/60">
+            Cliquez sur le sélecteur de profil dans la barre latérale et choisissez "Enseignant (formateur)"
+          </p>
+        </div>
+      ) : needsSelection ? (
         <SelectionPrompt />
       ) : (
       <DataTable
