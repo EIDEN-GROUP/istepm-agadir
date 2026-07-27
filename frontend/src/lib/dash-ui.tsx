@@ -48,19 +48,19 @@ export const eyebrowClass =
 const focusRing =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-/** Primary pill button (red gradient, white text)   the app's main CTA (brand red accent). */
+/** Primary pill button   solid teal, one colour, with a light shadow. Main CTA. */
 export const primaryPill =
-  "inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-alert to-alert-dk px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_-14px_rgb(var(--istpm-shadow)/0.85)] transition-all duration-200 hover:brightness-[1.06] hover:shadow-[0_18px_38px_-14px_rgb(var(--istpm-shadow)/0.95)] active:scale-[0.98] " +
+  "inline-flex items-center gap-2 rounded-full bg-med px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_12px_-4px_rgb(var(--istpm-shadow)/0.3)] transition-all duration-200 hover:bg-med-dk active:scale-[0.98] " +
   focusRing;
 
 /** Solid dark-teal pill button (secondary emphasis). */
 export const navyPill =
-  "inline-flex items-center gap-2 rounded-full bg-brand-dk px-5 py-2.5 text-sm font-medium text-white shadow-[0_14px_30px_-14px_rgb(var(--istpm-shadow)/0.6)] transition-all duration-200 hover:bg-brand-md active:scale-[0.98] " +
+  "inline-flex items-center gap-2 rounded-full bg-brand-dk px-5 py-2.5 text-sm font-medium text-white shadow-[0_4px_12px_-4px_rgb(var(--istpm-shadow)/0.28)] transition-all duration-200 hover:bg-brand-md active:scale-[0.98] " +
   focusRing;
 
-/** Destructive pill button   red, reserved for irreversible actions. */
+/** Destructive pill button   solid red, reserved for irreversible actions. */
 export const dangerPill =
-  "inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-alert to-alert-dk px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_-14px_rgba(229,30,38,0.7)] transition-all duration-200 hover:brightness-[1.06] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alert/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "inline-flex items-center gap-2 rounded-full bg-alert px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_12px_-4px_rgba(229,30,38,0.35)] transition-all duration-200 hover:bg-alert-dk active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alert/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /** Ghost / secondary pill button. */
 export const ghostPill =

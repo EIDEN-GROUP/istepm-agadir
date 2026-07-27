@@ -237,7 +237,7 @@ export function ComboBoxField<T extends string>({
             aria-expanded={open}
             className={cn(
               softSelectTrigger,
-              "flex w-full items-center justify-between px-3 text-sm",
+              "flex w-full items-center justify-between px-3 text-sm p-7",
               !selected && "text-muted-foreground/70",
               error && "border-alert",
             )}

@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Eye, EyeOff, Loader2, Lock, Mail, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 /**
- * Écran de connexion   panneau de marque à gauche, formulaire à droite.
+ * Écran de connexion   minimaliste, centré, aux accents de la couleur de marque.
+ *
+ * Pas d'illustration ni de panneau : une colonne centrée, beaucoup de blanc, la
+ * marque en teal et un unique point focal (le formulaire). Le CTA est une pilule
+ * teal pleine largeur.
  *
  * L'authentification est celle du backend (`POST /auth/login`) : aucun choix de
  * profil n'est proposé, le rôle est déduit du compte renvoyé par le serveur.
@@ -38,161 +43,133 @@ function LoginPage() {
     }
   };
 
+  const fieldClass =
+    "w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground/55 focus:border-brand focus:ring-4 focus:ring-brand/12";
 
   return (
-    <div className="anim-rise relative min-h-dvh w-full overflow-hidden bg-white">
-      {/* La grille occupe toute la hauteur : le partage marque / formulaire
-          tient l'écran entier plutôt que de flotter en haut de page. */}
-      <div className="grid min-h-dvh md:grid-cols-[1.05fr_1fr]">
-          {/* Panneau de marque */}
-          <div className="relative hidden bg-gradient-to-br from-brand-dk via-brand to-brand-md md:block">
+    <div className="relative grid min-h-dvh place-items-center overflow-hidden bg-white px-6 py-10">
+      {/* Un seul accent de marque : un halo teal très discret en haut, sinon du blanc. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[42rem] max-w-none -translate-x-1/2 rounded-full opacity-60 blur-3xl"
+        style={{
+          background:
+            "radial-gradient(circle, color-mix(in srgb, var(--istpm-teal) 12%, transparent) 0%, transparent 70%)",
+        }}
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="relative w-full max-w-sm"
+      >
+        {/* Marque */}
+        <div className="flex flex-col items-center text-center">
+          <span className="grid h-16 w-16 place-items-center rounded-2xl bg-brand shadow-[0_10px_28px_-12px_rgb(var(--istpm-shadow)/0.5)]">
             <img
               src="/istpm-logo-mark.svg"
-              alt=""
-              aria-hidden
-              className="pointer-events-none absolute -bottom-16 -left-16 w-[26rem] max-w-none opacity-10"
+              alt="ISTEPM Agadir"
+              className="h-10 w-10 brightness-0 invert"
             />
-
-            <div className="relative flex h-full flex-col justify-between p-10">
-              <img
-                src="/istpm-logo-mark.svg"
-                alt="ISTEPM Agadir"
-                className="h-20 w-20 brightness-0 invert anim-fade"
-              />
-              <div className="anim-rise-sm max-w-xs pe-10">
-                <p className="font-display text-2xl font-bold leading-tight text-white">
-                  Institut spécialisé des techniques paramédicales
-                </p>
-                <p className="mt-3 text-sm leading-relaxed text-white/75">
-                  Gestion des étudiants, des examens, des stages cliniques et du
-                  recouvrement   en un seul espace.
-                </p>
-              </div>
-            </div>
-
-            {/* Bord incurvé : la courbe blanche mord sur le panneau teal. */}
-            <svg
-              aria-hidden
-              viewBox="0 0 100 400"
-              preserveAspectRatio="none"
-              className="absolute inset-y-0 -right-px h-full w-[70px] text-white"
-            >
-              <path
-                d="M45,0 C95,110 -5,230 45,400 L100,400 L100,0 Z"
-                fill="currentColor"
-              />
-            </svg>
-          </div>
-
-          {/* Formulaire */}
-          <div className="flex flex-col justify-center p-8 sm:p-10">
-            {/* Marque compacte   visible seulement quand le panneau est masqué. */}
-            <div className="mb-6 flex items-center gap-3 md:hidden">
-              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand">
-                <img
-                  src="/istpm-logo-mark.svg"
-                  alt="ISTEPM Agadir"
-                  className="h-8 w-8 brightness-0 invert"
-                />
-              </span>
-              <span className="font-display text-lg font-bold tracking-tight text-foreground">
-                ISTEPM Agadir
-              </span>
-            </div>
-
-            <div className="anim-rise-sm">
-              <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
-                Bienvenue
-              </h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                Connectez-vous pour accéder à votre espace
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="mt-7 space-y-4">
-              {error ? (
-                <div
-                  role="alert"
-                  className="anim-shake rounded-2xl bg-alert/10 px-4 py-3 text-sm font-medium text-alert"
-                >
-                  {error}
-                </div>
-              ) : null}
-
-              <div className="relative">
-                <Mail className="pointer-events-none absolute start-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Adresse e-mail"
-                  autoComplete="email"
-                  autoFocus
-                  aria-label="Adresse e-mail"
-                  className="w-full rounded-full border border-brand/20 bg-brand-wash/60 py-3.5 ps-11 pe-4 text-sm text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground/60 focus:border-brand focus:bg-white focus:ring-4 focus:ring-brand/15"
-                />
-              </div>
-
-              <div className="relative">
-                <Lock className="pointer-events-none absolute start-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
-                <input
-                  type={showPw ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mot de passe"
-                  autoComplete="current-password"
-                  aria-label="Mot de passe"
-                  className="w-full rounded-full border border-brand/20 bg-brand-wash/60 py-3.5 ps-11 pe-12 text-sm text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground/60 focus:border-brand focus:bg-white focus:ring-4 focus:ring-brand/15"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  aria-label={
-                    showPw
-                      ? "Masquer le mot de passe"
-                      : "Afficher le mot de passe"
-                  }
-                  tabIndex={-1}
-                  className="absolute end-4 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-brand-dk"
-                >
-                  {showPw ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className={cn(
-                  "group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-full bg-brand px-6 py-3.5 text-sm font-bold text-white",
-                  "shadow-[0_16px_32px_-14px_rgb(var(--istpm-shadow)/0.9)] transition-all duration-300",
-                  "hover:bg-brand-dk hover:shadow-[0_20px_40px_-14px_rgb(var(--istpm-shadow)/1)] active:scale-[0.985]",
-                  "disabled:cursor-not-allowed disabled:opacity-70",
-                )}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Connexion…
-                  </>
-                ) : (
-                  <>
-                    Se connecter
-                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            <p className="mt-7 text-center text-[11px] leading-relaxed text-muted-foreground">
-              Plateforme de gestion des formations paramédicales
-            </p>
-          </div>
+          </span>
+          <h1 className="mt-6 font-display text-2xl font-bold tracking-tight text-foreground">
+            Connexion
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Accédez à votre espace ISTEPM Agadir
+          </p>
         </div>
-      </div>
+
+        <form onSubmit={handleSubmit} className="mt-9 space-y-5">
+          {error ? (
+            <div
+              role="alert"
+              className="anim-shake rounded-xl bg-alert/10 px-4 py-3 text-sm font-medium text-alert"
+            >
+              {error}
+            </div>
+          ) : null}
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="login-email"
+              className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+            >
+              Identifiant
+            </label>
+            <input
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Adresse e-mail"
+              autoComplete="email"
+              autoFocus
+              className={fieldClass}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="login-password"
+              className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+            >
+              Mot de passe
+            </label>
+            <div className="relative">
+              <input
+                id="login-password"
+                type={showPw ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mot de passe"
+                autoComplete="current-password"
+                className={cn(fieldClass, "pe-11")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((v) => !v)}
+                aria-label={
+                  showPw ? "Masquer le mot de passe" : "Afficher le mot de passe"
+                }
+                tabIndex={-1}
+                className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-brand-dk"
+              >
+                {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className={cn(
+              "group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3 text-sm font-bold text-white",
+              "shadow-[0_4px_14px_-4px_rgb(var(--istpm-shadow)/0.32)] transition-all duration-300",
+              "hover:bg-brand-dk active:scale-[0.985]",
+              "disabled:cursor-not-allowed disabled:opacity-70",
+            )}
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Connexion…
+              </>
+            ) : (
+              <>
+                Se connecter
+                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+              </>
+            )}
+          </button>
+        </form>
+
+        <p className="mt-8 text-center text-[11px] leading-relaxed text-muted-foreground">
+          Plateforme de gestion des formations paramédicales
+        </p>
+      </motion.div>
+    </div>
   );
 }
 

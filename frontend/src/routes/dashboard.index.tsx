@@ -45,9 +45,25 @@ import {
   avatarChip,
   initials,
   primaryPill,
+  eyebrowClass,
+  dashTooltip,
+  dashCursor,
 } from "@/lib/dash-ui";
 import { DashTabs, DashTabPanel, type DashTab } from "@/components/dash-tabs";
-import { AreaTrend, LineTrend, BarSeries, HBarSeries, DonutChart } from "@/components/dash-charts";
+import { AreaTrend, LineTrend, BarSeries, HBarSeries, DonutChart, type ChartDatum } from "@/components/dash-charts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
@@ -271,7 +287,7 @@ function KpiCard({
       className={cn(
         "group relative overflow-hidden p-4 sm:p-5",
         accent
-          ? "rounded-3xl bg-gradient-to-br from-alert to-alert-dk text-white shadow-[0_18px_40px_-18px_rgb(var(--istpm-shadow)/0.6)]"
+          ? "rounded-3xl bg-gradient-to-br from-med to-med-dk text-white shadow-[0_18px_40px_-18px_rgb(var(--istpm-shadow)/0.6)]"
           : cn(softCard, "transition-shadow duration-300 hover:[box-shadow:var(--edge-highlight),var(--elevation-4)]"),
       )}
     >
@@ -335,6 +351,215 @@ function KpiGrid({ children }: { children: ReactNode }) {
       className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5"
     >
       {children}
+    </motion.div>
+  );
+}
+
+/**
+ * Combined « Taux de réussite » / « Total à recouvrer » card.
+ *
+ * A segmented switch flips between the two metrics; each shows its headline
+ * figure and a compact bar chart (success rate per filière, or the outstanding
+ * amount broken down by payment status). Spans two columns so it flexes in the
+ * KPI grid beside the four stat cards.
+ */
+type PerfMetric = "reussite" | "recouvrement";
+
+/** Recouvrement palette   teal / amber / coral (reference « Mail Statistic » donut). */
+const RECOUV_COLORS = ["#029994", "#f0a92e", "#ee6c4d"];
+
+type PieDatum = { name: string; value: number; color: string };
+
+/** White percentage label centred on each donut slice (skips tiny slivers). */
+function renderDonutPct({
+  cx, cy, midAngle, innerRadius, outerRadius, percent,
+}: {
+  cx: number; cy: number; midAngle: number;
+  innerRadius: number; outerRadius: number; percent: number;
+}) {
+  if (percent < 0.05) return null;
+  const RAD = Math.PI / 180;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + r * Math.cos(-midAngle * RAD);
+  const y = cy + r * Math.sin(-midAngle * RAD);
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="#ffffff"
+      fontSize={12}
+      fontWeight={700}
+      textAnchor="middle"
+      dominantBaseline="central"
+    >
+      {Math.round(percent * 100)}%
+    </text>
+  );
+}
+
+/**
+ * Flat donut (reference « Mail Statistic » card): a clean ring with the share
+ * printed in white on each slice, paired with a colour-dotted legend.
+ */
+function RecouvrementDonut({ data }: { data: PieDatum[] }) {
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart>
+        <Pie
+          data={data}
+          dataKey="value"
+          nameKey="name"
+          cx="50%"
+          cy="50%"
+          innerRadius="56%"
+          outerRadius="92%"
+          paddingAngle={1.5}
+          startAngle={90}
+          endAngle={-270}
+          stroke="var(--card)"
+          strokeWidth={3}
+          labelLine={false}
+          label={renderDonutPct}
+          animationDuration={600}
+        >
+          {data.map((d, i) => (
+            <Cell key={i} fill={d.color} />
+          ))}
+        </Pie>
+        <Tooltip contentStyle={dashTooltip} formatter={(v: number, n: string) => [fmtMAD(v), n]} />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+}
+
+function MetricSwitchChart({
+  reussite, aRecouvrer, reussiteData, recouvrementData,
+}: {
+  reussite: number;
+  aRecouvrer: number;
+  reussiteData: ChartDatum[];
+  recouvrementData: ChartDatum[];
+}) {
+  const [metric, setMetric] = useState<PerfMetric>("reussite");
+  const isReussite = metric === "reussite";
+  const color = "var(--chart-2)";
+  const gid = "msc-reussite";
+
+  return (
+    <motion.div
+      whileHover={{ y: -3 }}
+      transition={{ type: "spring", stiffness: 350, damping: 25 }}
+      className={cn(softCard, "flex flex-col p-4 sm:p-5")}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={eyebrowClass}>
+            {isReussite ? "Taux de réussite" : "Total À recouvrer"}
+          </p>
+          <p className="mt-1 font-display text-2xl font-bold leading-none tracking-tight text-foreground">
+            {isReussite ? `${reussite} %` : fmtMAD(aRecouvrer)}
+          </p>
+        </div>
+
+        <div
+          role="tablist"
+          aria-label="Choisir la métrique"
+          className="flex shrink-0 items-center gap-1 rounded-full border border-brand/12 bg-muted/60 p-1"
+        >
+          {(
+            [
+              ["reussite", "Réussite"],
+              ["recouvrement", "Recouvrement"],
+            ] as const
+          ).map(([key, tabLabel]) => {
+            const active = metric === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setMetric(key)}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                  active
+                    ? "bg-brand text-white shadow-[0_2px_8px_-3px_rgb(var(--istpm-shadow)/0.5)]"
+                    : "text-muted-foreground hover:text-brand-dk",
+                )}
+              >
+                {tabLabel}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Fondu doux au changement de métrique. Le conteneur garde une hauteur
+          fixe et reste monté, pour que ResponsiveContainer mesure tout de suite
+          (pas de « blanc » au basculement). */}
+      <div className="relative mt-3 h-[172px]">
+        {isReussite ? (
+          <motion.div
+            key="reussite"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="h-full w-full"
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={reussiteData} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+                <defs>
+                  <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} stopOpacity={0.95} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0.5} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.5} stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} stroke="var(--muted-foreground)" />
+                <YAxis
+                  width={34}
+                  allowDecimals={false}
+                  domain={[0, 100]}
+                  tick={{ fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                  stroke="var(--muted-foreground)"
+                />
+                <Tooltip contentStyle={dashTooltip} cursor={dashCursor} formatter={(v: number) => [`${v} %`, "Réussite"]} />
+                <Bar dataKey="value" maxBarSize={34} radius={[6, 6, 0, 0]} fill={`url(#${gid})`} animationDuration={600} />
+              </BarChart>
+            </ResponsiveContainer>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="recouvrement"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="flex h-full items-center gap-4"
+          >
+            <div className="h-full w-[52%] shrink-0">
+              <RecouvrementDonut
+                data={recouvrementData.map((d, i) => ({
+                  ...d,
+                  color: RECOUV_COLORS[i % RECOUV_COLORS.length],
+                }))}
+              />
+            </div>
+            <ul className="min-w-0 flex-1 space-y-3.5">
+              {recouvrementData.map((d, i) => (
+                <li key={d.name} className="flex items-center gap-2.5">
+                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: RECOUV_COLORS[i % RECOUV_COLORS.length] }} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-foreground">{d.name}</span>
+                    <span className="block text-xs text-muted-foreground">{fmtMAD(d.value)}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+      </div>
     </motion.div>
   );
 }
@@ -627,7 +852,14 @@ const DIRECTOR_TABS: DashTab[] = [
 
 function DashboardDirecteur() {
   const { tab, setTab, direction } = useTabs();
-  const { dashboard, formateurs, seances, examens, bulletins, etudiants, aTraiter, repartitionFiliere, repartitionNiveau } = useIstpm();
+  const { dashboard, financier, reussiteFiliere, formateurs, seances, examens, bulletins, etudiants, aTraiter, repartitionFiliere, repartitionNiveau } = useIstpm();
+
+  // Décomposition du « reste à recouvrer » par statut de paiement, pour le graphe.
+  const recouvrementData = useMemo<ChartDatum[]>(() => [
+    { name: "En attente", value: financier.enAttente },
+    { name: "Retard", value: financier.retard },
+    { name: "Impayé", value: financier.impaye },
+  ], [financier]);
 
   const seancesAujourdhui = useMemo(() => seances.filter((s) => s.date === today), [seances]);
   // « Étudiants actifs » = ceux dont la scolarité est en cours (statut inscrit),
@@ -646,15 +878,23 @@ function DashboardDirecteur() {
       <DashWorkspace tabs={DIRECTOR_TABS} tab={tab} onChange={setTab} direction={direction}>
         {tab === 0 ? (
           <div className="space-y-6 mt-5">
-            <KpiGrid>
-              <KpiCard label="Étudiants actifs" value={etudiantsActifs} icon={Users} />
-              <KpiCard label="Formateurs actifs" value={dashboard.formateursActifs} />
-              <KpiCard label="Taux de réussite" value={`${dashboard.tauxReussite} %`} tone="blue" icon={CheckCircle2} />
-              <KpiCard label="Total À recouvrer" value={fmtMAD(dashboard.totalARecouvrer)} tone="red" icon={Wallet} />
-              <KpiCard label="Séances aujourd&rsquo;hui" value={seancesAujourdhui.length} icon={Calendar} />
-              <KpiCard label="Examens À venir" value={aTraiter.examensAVenir} tone="amber" icon={BookOpen} />
-              <KpiCard label="Bulletins À publier" value={aTraiter.bulletinsAPublier} tone="amber" icon={PenLine} />
-            </KpiGrid>
+            {/* Les cartes de stats et le graphe « réussite / recouvrement »
+                partagent la même grille : le graphe occupe deux colonnes et se
+                cale avec les quatre autres cartes. */}
+            <div className="grid grid-cols-1 gap-3 min-[500px]:grid-cols-2 sm:gap-4 lg:grid-cols-2 xl:grid-cols-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <KpiCard label="Étudiants actifs" value={etudiantsActifs} icon={Users} />
+                <KpiCard label="Formateurs actifs" value={dashboard.formateursActifs} />
+                <KpiCard label="Examens À venir" value={aTraiter.examensAVenir} tone="amber" icon={BookOpen} />
+                <KpiCard label="Bulletins À publier" value={aTraiter.bulletinsAPublier} tone="amber" icon={PenLine} />
+              </div>
+              <MetricSwitchChart
+                reussite={dashboard.tauxReussite}
+                aRecouvrer={dashboard.totalARecouvrer}
+                reussiteData={reussiteFiliere}
+                recouvrementData={recouvrementData}
+              />
+            </div>
             <Section title="Aujourd&rsquo;hui" action={<SectionLink to="/dashboard/calendar">Voir le planning</SectionLink>}>
               <AujourdhuiTable seances={seancesAujourdhui} />
             </Section>

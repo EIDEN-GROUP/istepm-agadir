@@ -1,4 +1,5 @@
 import { createRootRoute, Outlet, Link } from "@tanstack/react-router";
+import { MotionConfig } from "framer-motion";
 
 function NotFoundComponent() {
   return (
@@ -27,8 +28,13 @@ function NotFoundComponent() {
 export const Route = createRootRoute({
   notFoundComponent: NotFoundComponent,
   component: () => (
-    <div className="relative">
-      <Outlet />
-    </div>
+    // App-wide motion defaults: one smooth easing curve for every framer-motion
+    // component that doesn't override it, and `reducedMotion="user"` so the whole
+    // app honours the OS "reduce motion" setting automatically.
+    <MotionConfig reducedMotion="user" transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}>
+      <div className="relative">
+        <Outlet />
+      </div>
+    </MotionConfig>
   ),
 });

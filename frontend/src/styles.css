@@ -51,6 +51,13 @@
   --color-alert: var(--istpm-red);
   --color-alert-dk: var(--istpm-red-dk);
   --color-alert-pale: var(--istpm-red-pale);
+  /* Medical accent   healing green (pharmacy / paramedical cross). Replaces the
+     old red brand accent on active nav, primary CTAs and the lead KPI, so red is
+     now reserved strictly for errors and negative states. */
+  --color-med: var(--istpm-med);
+  --color-med-dk: var(--istpm-med-dk);
+  --color-med-lt: var(--istpm-med-lt);
+  --color-med-pale: var(--istpm-med-pale);
   --color-warn: var(--istpm-amber);
   --color-warn-pale: var(--istpm-amber-pale);
   --color-info: var(--istpm-blue);
@@ -95,6 +102,13 @@
   --istpm-red-dk: #b3141b;
   --istpm-red-lt: #f4626a;
   --istpm-red-pale: #fbdcdd;
+
+  /* Medical accent   the teal brand family, used as a gradient on the active nav
+     tile, the lead KPI and other accent surfaces. Red stays reserved for errors. */
+  --istpm-med: #029994;
+  --istpm-med-dk: #017a76;
+  --istpm-med-lt: #4db8b4;
+  --istpm-med-pale: #d6efee;
 
   --istpm-amber: #d98324;
   --istpm-amber-pale: #fbebd6;
@@ -305,6 +319,14 @@
   --edge-highlight: inset 0 1px 0 rgb(255 255 255 / 0.06);
 }
 
+/* Anti-FOUC reveal. Higher specificity than the inline `#root { opacity: 0 }` in
+   index.html (and unlayered), so once this bundled stylesheet applies   whenever
+   that is   it wins and the app fades in instead of flashing unstyled content. */
+html #root {
+  opacity: 1;
+  transition: opacity 0.25s ease;
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -328,6 +350,21 @@
     -webkit-font-smoothing: antialiased;
   }
   h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
+
+  /**
+   * App-wide smooth motion for interactive controls: hover / focus / active
+   * colour and shadow changes ease in one shared curve instead of snapping.
+   * `transform` and `opacity` are deliberately left out so this never fights
+   * framer-motion's JS-driven animations. Per-element Tailwind `transition-*`
+   * utilities still win, and the prefers-reduced-motion block below disables it.
+   */
+  a, button, summary, label,
+  input, select, textarea,
+  [role="button"], [role="tab"], [role="switch"], [role="menuitem"] {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow, outline-color;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    transition-duration: 200ms;
+  }
 
   /**
    * App-wide scrollbars (overflow areas + main document).

@@ -125,7 +125,7 @@ export function ImportEtudiantsDialog({
       <DialogContent className={cn(dialogSurfaceWide, "max-w-5xl")}>
         <DialogTitle className="sr-only">Importer des étudiants</DialogTitle>
 
-        <div className="space-y-5">
+        <div className="space-y-5 py-10 px-7">
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-brand/12 text-brand-dk">
               <FileUp className="h-5 w-5" />

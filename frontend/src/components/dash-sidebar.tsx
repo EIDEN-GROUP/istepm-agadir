@@ -136,7 +136,7 @@ function NavRow({
         ROW_BASE,
         collapsed ? "justify-center px-0" : nested && "ps-9",
         active
-          ? "bg-gradient-to-b from-alert to-alert-dk text-white shadow-[0_10px_22px_-10px_rgb(var(--istpm-shadow)/0.55)]"
+          ? "bg-gradient-to-b from-med to-med-dk text-white shadow-[0_10px_22px_-10px_rgb(var(--istpm-shadow)/0.55)]"
           : "text-muted-foreground hover:bg-brand/8 hover:text-brand-dk",
       )}
     >
@@ -192,7 +192,7 @@ function NavGroupBlock({
           ROW_BASE,
           "w-full justify-center px-0",
           hasActiveChild
-            ? "bg-alert/12 text-alert-dk"
+            ? "bg-med/12 text-med-dk"
             : "text-muted-foreground hover:bg-brand/8 hover:text-brand-dk",
         )}
       >
@@ -211,7 +211,7 @@ function NavGroupBlock({
           ROW_BASE,
           "w-full",
           hasActiveChild && !open
-            ? "bg-alert/12 text-alert-dk"
+            ? "bg-med/12 text-med-dk"
             : "text-muted-foreground hover:bg-brand/8 hover:text-brand-dk",
         )}
       >
@@ -461,25 +461,33 @@ function SidebarBody({
 
 const RAIL_TILE =
   "grid h-11 w-11 place-items-center rounded-2xl outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-brand/50";
-/** Active tile   filled red squircle with a white glyph (brand red accent). */
+/** Active tile   filled medical-green squircle with a white glyph. */
 const RAIL_TILE_ACTIVE =
-  "bg-gradient-to-b from-alert to-alert-dk text-white shadow-[0_12px_24px_-12px_rgb(var(--istpm-shadow)/0.7)]";
+  "bg-gradient-to-b from-med to-med-dk text-white shadow-[0_12px_24px_-12px_rgb(var(--istpm-shadow)/0.7)]";
 const RAIL_TILE_IDLE =
   "text-muted-foreground/75 hover:bg-ink/[0.05] hover:text-foreground";
 
 /** Small floating pill revealed to the right of a rail icon on hover. */
 function FlyoutPill({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-lg border border-brand/10 bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-[var(--elevation-3)]">
+    <span className="block whitespace-nowrap rounded-lg border border-brand/10 bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-[var(--elevation-3)]">
       {children}
     </span>
   );
 }
 
-/** Absolutely-positioned hover reveal anchored to the inline-end of a rail row. */
+/**
+ * Absolutely-positioned hover reveal anchored to the inline-end of a rail row.
+ *
+ * The gap between the icon and the panel is drawn with padding (`ps-3`), not a
+ * margin: a margin would leave a transparent dead zone that is not part of any
+ * hovered element, so moving the cursor across it drops `group-hover/rail` and
+ * the panel vanishes before it can be reached. Padding keeps that bridge inside
+ * the flyout's own box, so hover survives the trip to the links inside.
+ */
 function RailFlyout({ children }: { children: ReactNode }) {
   return (
-    <div className="pointer-events-none absolute w-36 start-full top-1/2 z-50 ms-3 -translate-x-1 -translate-y-1/2 opacity-0 transition-all duration-150 group-hover/rail:pointer-events-auto group-hover/rail:translate-x-0 group-hover/rail:opacity-100">
+    <div className="pointer-events-none absolute start-full top-1/2 z-50 ps-3 -translate-x-1 -translate-y-1/2 opacity-0 transition-all duration-150 group-hover/rail:pointer-events-auto group-hover/rail:translate-x-0 group-hover/rail:opacity-100">
       {children}
     </div>
   );
@@ -551,7 +559,7 @@ function RailGroup({
                   className={cn(
                     "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors",
                     a
-                      ? "bg-alert/12 text-alert-dk"
+                      ? "bg-med/12 text-med-dk"
                       : "text-muted-foreground hover:bg-brand/8 hover:text-brand-dk",
                   )}
                 >
