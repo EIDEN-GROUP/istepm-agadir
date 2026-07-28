@@ -17,7 +17,11 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
-import { makePlaceholderPdf } from "@/lib/doc-store";
+import {
+  makeStageDocPdf,
+  buildStageEmailHtml,
+  loadLogoDataUrl,
+} from "@/lib/branded-doc";
 import {
   FILIERES,
   NIVEAUX,
@@ -25,10 +29,12 @@ import {
   STATUT_STAGE_TONE,
   fmtDate,
   type Stage,
+  type Etudiant,
   type Filiere,
   type Niveau,
   type StatutStage,
 } from "@/lib/istpm-data";
+import { sendEmailApi } from "@/lib/istpm-api";
 import {
   softCard,
   eyebrowClass,
@@ -92,48 +98,8 @@ const STATUTS: StatutStage[] = [
  * livrer. Le document est maintenant généré localement, au même format que les
  * sujets d'examen.
  */
-function downloadStageDoc(s: Stage, kind: "convention" | "rapport") {
-  const titre =
-    kind === "convention"
-      ? "Convention de stage clinique"
-      : "Rapport de stage clinique";
-
-  const lignes = [
-    "ISTEPM Agadir - Institut specialise des techniques paramedicales",
-    "",
-    titre,
-    "",
-    `Etudiant : ${s.prenom} ${s.nom}`,
-    `CNE : ${s.cne}`,
-    `Filiere : ${s.filiere} (${s.niveau})`,
-    "",
-    `Structure d'accueil : ${s.structure}`,
-    `Service : ${s.service}`,
-    `Periode : ${fmtDate(s.debut)} au ${fmtDate(s.fin)}`,
-    "",
-    `Tuteur clinique : ${s.encadrantClinique || "-"}`,
-    `Tuteur academique : ${s.tuteurAcademique || "-"}`,
-  ];
-
-  if (kind === "rapport") {
-    lignes.push(
-      "",
-      `Note de soutenance : ${
-        s.noteSoutenance !== undefined
-          ? `${s.noteSoutenance.toFixed(2)} / 20`
-          : "non soutenu"
-      }`,
-    );
-  } else {
-    lignes.push(
-      "",
-      `Convention : ${s.conventionSignee ? "signee" : "en attente de signature"}`,
-    );
-  }
-
-  lignes.push("", "Document de demonstration genere localement.");
-
-  const blob = makePlaceholderPdf(lignes);
+async function downloadStageDoc(s: Stage, kind: "convention" | "rapport") {
+  const blob = await makeStageDocPdf(s, kind);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -698,38 +664,27 @@ function StagesPage() {
                     if (!to) return;
                     const s = emailTarget!;
                     try {
-                      const lignes = [
-                        "ISTEPM Agadir - Institut specialise des techniques paramedicales",
-                        "",
-                        "Convention de stage clinique",
-                        "",
-                        `Etudiant : ${s.prenom} ${s.nom}`,
-                        `CNE : ${s.cne}`,
-                        `Filiere : ${s.filiere} (${s.niveau})`,
-                        "",
-                        `Structure d'accueil : ${s.structure}`,
-                        `Service : ${s.service}`,
-                        `Periode : ${fmtDate(s.debut)} au ${fmtDate(s.fin)}`,
-                        "",
-                        `Tuteur clinique : ${s.encadrantClinique || "-"}`,
-                        `Tuteur academique : ${s.tuteurAcademique || "-"}`,
-                        "",
-                        `Convention : ${s.conventionSignee ? "signee" : "en attente de signature"}`,
-                        "",
-                        "Document de demonstration genere localement.",
-                      ];
-                      const blob = makePlaceholderPdf(lignes);
+                      const [blob, logoDataUrl] = await Promise.all([
+                        makeStageDocPdf(s, "convention"),
+                        loadLogoDataUrl(),
+                      ]);
                       const buf = await blob.arrayBuffer();
                       const base64 = btoa(
                         new Uint8Array(buf).reduce(
-                          (s, b) => s + String.fromCharCode(b),
+                          (acc, b) => acc + String.fromCharCode(b),
                           "",
                         ),
+                      );
+                      const { html, text } = buildStageEmailHtml(
+                        s,
+                        "convention",
+                        logoDataUrl,
                       );
                       const res = await sendEmailApi({
                         to,
                         subject: `Convention de stage — ${s.prenom} ${s.nom}`,
-                        html: `<p>Veuillez trouver ci-joint la convention de stage de <strong>${s.prenom} ${s.nom}</strong> (${s.cne}, ${s.filiere}, ${s.niveau}).</p><p>Structure d'accueil : ${s.structure}<br/>Service : ${s.service}<br/>Période : ${s.debut} → ${s.fin}</p>`,
+                        html,
+                        text,
                         attachments: [
                           {
                             filename: `convention-${s.nom.toLowerCase()}-${s.cne}.pdf`,

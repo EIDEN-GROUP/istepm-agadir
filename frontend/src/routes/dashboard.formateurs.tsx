@@ -63,6 +63,9 @@ import { cn } from "@/lib/utils";
 
 
 
+/** Configuration d'un groupe encadré par un formateur (effectif rattaché). */
+type GroupConfig = { name: string; studentCount: number };
+
 const GRADES: GradeFormateur[] = ["PES", "vacataire", "formateur_clinique"];
 const STATUTS: StatutFormateur[] = ["permanent", "vacataire", "en_conge"];
 
