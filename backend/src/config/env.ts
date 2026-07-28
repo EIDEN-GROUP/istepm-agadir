@@ -1,6 +1,10 @@
 import dotenv from "dotenv";
 import path from "path";
+import { fileURLToPath } from "url";
 import { z } from "zod";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load .env from backend/ (dev defaults), then .env.production from project root (prod overrides)
 dotenv.config({ path: path.resolve(__dirname, "..", "..", ".env") });
