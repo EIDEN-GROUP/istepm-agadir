@@ -66,11 +66,11 @@ function LoginPage() {
       >
         {/* Marque */}
         <div className="flex flex-col items-center text-center">
-          <span className="grid h-16 w-16 place-items-center rounded-2xl bg-brand shadow-[0_10px_28px_-12px_rgb(var(--istpm-shadow)/0.5)]">
+          <span className="grid place-items-center">
             <img
-              src="/istpm-logo-mark.svg"
+              src="/istpm-logo.svg"
               alt="ISTEPM Agadir"
-              className="h-10 w-10 brightness-0 invert"
+              className="h-25 w-25 rounded-full"
             />
           </span>
           <h1 className="mt-6 font-display text-2xl font-bold tracking-tight text-foreground">

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, BellRing, Eye, Receipt, ListChecks, CalendarDays, Search } from "lucide-react";
+import { Plus, BellRing, Eye, Receipt, ListChecks, CalendarDays, Search, Check, Clock, AlertTriangle, Ban } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -78,6 +79,14 @@ const MODES: LignePaiement["mode"][] = [
   "Chèque",
 ];
 const STATUTS: StatutPaiement[] = ["paye", "en_attente", "retard", "impaye"];
+
+/** Icône de statut de règlement — repère visuel humain, lisible d'un coup d'œil. */
+const STATUT_PAIEMENT_ICON: Record<StatutPaiement, LucideIcon> = {
+  paye: Check,
+  en_attente: Clock,
+  retard: AlertTriangle,
+  impaye: Ban,
+};
 
 function PaiementsPage() {
   const { role } = useAuth();
@@ -464,14 +473,23 @@ function MonthlyTracker({
     ? months.filter((m) => statutMois(m) === "paye").length
     : 0;
 
+  const pctRegles = months.length
+    ? Math.round((nbRegles / months.length) * 100)
+    : 0;
+
   return (
-    <section className={cn(softCard, "p-4 sm:p-5")}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <p className="max-w-xs text-sm text-muted-foreground">
-          Statut de règlement, mois par mois, pour un étudiant donné.
-        </p>
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="w-full sm:w-44">
+    <section className={cn(softCard, "overflow-hidden p-4 sm:p-6")}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-brand/10 text-brand-dk">
+            <CalendarDays className="h-5 w-5" />
+          </span>
+          <p className="max-w-xs pt-1 text-sm text-muted-foreground">
+            Statut de règlement, mois par mois, pour un étudiant donné.
+          </p>
+        </div>
+
+        <div className="w-full sm:w-44">
             <SelectField
               label="Année universitaire"
               value={academicYear}
@@ -495,81 +513,101 @@ function MonthlyTracker({
             searchPlaceholder="Nom, prénom ou CNE…"
             emptyText="Aucun étudiant trouvé."
           />
-        </div>
+          </div>
       </div>
-    </div>
 
       {etudiant ? (
         <>
-          <p className="mt-3 text-xs text-muted-foreground">
-            <strong className="font-semibold text-foreground">{nbRegles}</strong>{" "}
-            mois payé(s) sur {months.length} · <strong className="font-semibold text-foreground">{fmtMAD(etudiant.fraisMensuels)}</strong>/mois
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {months.map((m) => {
+          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5">
+            {months.map((m, i) => {
               const st = statutMois(m);
               const montant = montantMois(m);
+              const color = TONE_COLORS[STATUT_PAIEMENT_TONE[st]];
+              const StIcon = STATUT_PAIEMENT_ICON[st];
+              const [moisNom = m, annee = ""] = m.split(" ");
               return (
-                <div
+                <motion.div
                   key={m}
-                  className={cn(
-                    "rounded-2xl border px-3 py-2.5",
-                    st === "paye"
-                      ? "border-brand/25 bg-brand/5"
-                      : "border-brand/12 bg-muted/40",
-                  )}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.035, ease: [0.22, 1, 0.36, 1] }}
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-brand/12 bg-card shadow-[0_1px_2px_rgb(var(--istpm-shadow)/0.04)] transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand/25 hover:shadow-[0_10px_24px_-14px_rgb(var(--istpm-shadow)/0.5)]"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold capitalize text-foreground">
-                      {m}
-                    </p>
+                  {/* Bandeau teinté par le statut — repère « ticket » lisible */}
+                  <div
+                    className="flex items-start justify-between gap-2 px-3.5 py-2.5"
+                    style={{
+                      backgroundColor: `color-mix(in srgb, ${color} 9%, transparent)`,
+                    }}
+                  >
+                    <div className="min-w-0">
+                      <p className="font-display text-sm font-bold capitalize leading-tight text-foreground">
+                        {moisNom}
+                      </p>
+                      <p className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                        {annee}
+                      </p>
+                    </div>
                     <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: TONE_COLORS[STATUT_PAIEMENT_TONE[st]] }}
-                    />
-                  </div>
-                  {canEdit ? (
-                    <Select
-                      value={st}
-                      onValueChange={(v) =>
-                        setMoisPaiementStatut(etudiant.id, m, v as StatutPaiement)
-                      }
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded-full"
+                      style={{
+                        backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`,
+                        color,
+                      }}
                     >
-                      <SelectTrigger
-                        className={cn(softSelectTrigger, "mt-2 h-8 w-full text-xs")}
-                        aria-label={`Statut de ${m}`}
+                      <StIcon className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+
+                  {/* Corps — statut modifiable + montant réglé */}
+                  <div className="flex flex-1 flex-col gap-2 px-3.5 pb-3 pt-2.5">
+                    {canEdit ? (
+                      <Select
+                        value={st}
+                        onValueChange={(v) =>
+                          setMoisPaiementStatut(etudiant.id, m, v as StatutPaiement)
+                        }
                       >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className={softSelectContent}>
-                        {STATUTS.map((s) => (
-                          <SelectItem key={s} value={s} className="text-xs">
-                            {STATUT_PAIEMENT_LABEL[s]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <p className="mt-2">
-                      <span className={toneBadge(STATUT_PAIEMENT_TONE[st])}>
+                        <SelectTrigger
+                          className={cn(softSelectTrigger, "h-8 w-full text-xs")}
+                          aria-label={`Statut de ${m}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className={softSelectContent}>
+                          {STATUTS.map((s) => (
+                            <SelectItem key={s} value={s} className="text-xs">
+                              {STATUT_PAIEMENT_LABEL[s]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className={cn(toneBadge(STATUT_PAIEMENT_TONE[st]), "w-fit")}>
                         {STATUT_PAIEMENT_LABEL[st]}
                       </span>
-                    </p>
-                  )}
-                  {montant > 0 ? (
-                    <p className="mt-1.5 text-[11px] font-medium tabular-nums text-muted-foreground">
-                      {fmtMAD(montant)}
-                    </p>
-                  ) : null}
-                </div>
+                    )}
+                    {montant > 0 ? (
+                      <p className="flex items-center gap-1.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+                        <Receipt className="h-3 w-3 shrink-0 opacity-60" />
+                        {fmtMAD(montant)}
+                      </p>
+                    ) : null}
+                  </div>
+                </motion.div>
               );
             })}
           </div>
         </>
       ) : (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Sélectionner un étudiant pour afficher son suivi mensuel.
-        </p>
+        <div className="mt-6 flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-brand/20 py-12 text-center">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-brand/8 text-muted-foreground/60">
+            <CalendarDays className="h-5 w-5" />
+          </span>
+          <p className="text-sm text-muted-foreground">
+            Sélectionner un étudiant pour afficher son suivi mensuel.
+          </p>
+        </div>
       )}
     </section>
   );
@@ -774,21 +812,6 @@ function PaiementForm({
           </div>
         </FullWidth>
       ) : null}
-      <NumberField
-        label="Montant"
-        required
-        suffix="MAD"
-        min={0}
-        value={f.montant}
-        onChange={(v) => set("montant", v)}
-        error={errors.montant}
-      />
-      <SelectField
-        label="Mode de règlement"
-        value={f.mode}
-        onChange={(v) => set("mode", v)}
-        options={MODES}
-      />
       <SelectField
         label="Mois réglé"
         required
@@ -798,6 +821,21 @@ function PaiementForm({
           value: m,
           label: m.charAt(0).toUpperCase() + m.slice(1),
         }))}
+      />
+      <SelectField
+        label="Mode de règlement"
+        value={f.mode}
+        onChange={(v) => set("mode", v)}
+        options={MODES}
+      />
+      <NumberField
+        label="Montant"
+        required
+        suffix="MAD"
+        min={0}
+        value={f.montant}
+        onChange={(v) => set("montant", v)}
+        error={errors.montant}
       />
       <TextField
         label="Date"

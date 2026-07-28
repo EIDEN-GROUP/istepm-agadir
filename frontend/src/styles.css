@@ -711,6 +711,81 @@ html #root {
   }
 }
 
+/* ------------------------------------------------------------------
+ * Tableaux → cartes empilées sur téléphone (≤ 639px).
+ *
+ * Les tables de liste sont denses et larges (min-width 900px) : sur mobile,
+ * plutôt qu'un défilement horizontal, chaque ligne devient une carte et
+ * chaque cellule affiche son intitulé de colonne (injecté en `data-label`
+ * par `DataTable`). Les tablettes (640–1023px) gardent la table compacte
+ * défilante définie plus haut. Portée : `.dash-table` sous le main du CRM.
+ * ------------------------------------------------------------------ */
+@media (max-width: 639px) {
+  [data-dashboard-main] table.dash-table {
+    display: block;
+    min-width: 0 !important;
+    width: 100%;
+  }
+  /* En-tête masqué : l'intitulé est repris par chaque cellule (data-label). */
+  [data-dashboard-main] table.dash-table thead {
+    display: none;
+  }
+  [data-dashboard-main] table.dash-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  [data-dashboard-main] table.dash-table tbody tr {
+    display: block;
+    height: auto !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: 1rem;
+    background: var(--card);
+    padding: 0.35rem 0.9rem;
+    box-shadow: var(--elevation-1);
+  }
+  [data-dashboard-main] table.dash-table tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0;
+    white-space: normal !important;
+    border: 0 !important;
+    padding: 0.42rem 0 !important;
+    text-align: end;
+  }
+  [data-dashboard-main] table.dash-table tbody td + td {
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent) !important;
+  }
+  /* Intitulé de colonne, à gauche de la valeur. */
+  [data-dashboard-main] table.dash-table tbody td[data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    margin-inline-end: auto;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted-foreground);
+    text-align: start;
+  }
+  /* Cellules sans intitulé utile (actions) : la valeur occupe toute la largeur. */
+  [data-dashboard-main] table.dash-table tbody td:not([data-label]) {
+    justify-content: flex-end;
+  }
+  /* Cellule tronquée (nom, etc.) : autorisée à se replier sur mobile. */
+  [data-dashboard-main] table.dash-table tbody td > .truncate,
+  [data-dashboard-main] table.dash-table tbody td .max-w-\[15rem\] {
+    max-width: none !important;
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+  }
+}
+
 /* Barre de progression indéterminée   va-et-vient continu (rideau de transition). */
 @keyframes brand-progress {
   0% {
