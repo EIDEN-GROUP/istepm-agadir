@@ -13,12 +13,14 @@ RUN npx tsc
 FROM node:22-alpine AS production
 WORKDIR /app
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/src ./src
+COPY --from=build /app/tsconfig.json ./tsconfig.json
 COPY --from=base /app/node_modules ./node_modules
 COPY package*.json ./
 COPY drizzle.config.ts ./
 COPY migrations ./migrations
 EXPOSE 3000
-CMD ["node", "dist/index.js"]
+CMD ["node", "--import", "tsx/esm", "dist/index.js"]
 
 FROM node:22-alpine AS development
 RUN apk add --no-cache curl

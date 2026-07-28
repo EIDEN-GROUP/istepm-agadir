@@ -12,6 +12,7 @@ import { bulletins } from "@/db/schema/bulletins";
 import { stages } from "@/db/schema/stages";
 import { historiquePaiements } from "@/db/schema/historique-paiements";
 import { notesEtudiant } from "@/db/schema/notes-etudiant";
+import { groupConfigs } from "@/db/schema/groupConfigs";
 import { eq, desc, asc } from "drizzle-orm";
 
 const settingSchema = z.object({
@@ -110,6 +111,55 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  /* ------------------------------------------------------------------ */
+  /* Group Configs                                                        */
+  /* ------------------------------------------------------------------ */
+  const groupConfigSchema = z.object({
+    name: z.string().min(1, "Nom du groupe requis"),
+    semester: z.string().min(1, "Semestre requis"),
+    studentCount: z.number().int().min(0).optional().default(0),
+  });
+
+  app.get("/groups", { preHandler: [authenticate] }, async () => {
+    const db = getDb();
+    return db.select().from(groupConfigs).orderBy(asc(groupConfigs.semester), asc(groupConfigs.name));
+  });
+
+  app.post("/groups", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const input = groupConfigSchema.parse(request.body);
+    const db = getDb();
+    try {
+      const [config] = await db.insert(groupConfigs).values(input).returning();
+      return config;
+    } catch {
+      return reply.status(409).send({ error: "Ce groupe existe déjà" });
+    }
+  });
+
+  app.put("/groups/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = groupConfigSchema.partial().parse(request.body);
+    const db = getDb();
+    const values: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(input)) {
+      if (val !== undefined) values[key] = val;
+    }
+    const [updated] = await db
+      .update(groupConfigs)
+      .set(values)
+      .where(eq(groupConfigs.id, id))
+      .returning();
+    if (!updated) return reply.status(404).send({ error: "Groupe introuvable" });
+    return updated;
+  });
+
+  app.delete("/groups/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+    const { id } = request.params as { id: string };
+    const db = getDb();
+    await db.delete(groupConfigs).where(eq(groupConfigs.id, id));
+    return { ok: true };
+  });
+
   app.get("/filieres", { preHandler: [authenticate] }, async () => {
     const db = getDb();
     const [row] = await db
@@ -169,6 +219,22 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { filieres: list };
   });
 
+  const structSchema = z.object({
+    nom: z.string().min(1),
+    capacite: z.number().int().min(1).optional().default(5),
+  });
+
+  /** Normalise structures data: legacy string[] → { nom, capacite }[]. */
+  function asStructs(v: unknown): { nom: string; capacite: number }[] {
+    if (!Array.isArray(v)) return [];
+    return v.map((s: unknown) => {
+      if (typeof s === "string") return { nom: s, capacite: 5 };
+      if (typeof s === "object" && s && "nom" in (s as Record<string, unknown>))
+        return { nom: (s as Record<string, string>).nom, capacite: Number((s as Record<string, number>).capacite) || 5 };
+      return { nom: "?", capacite: 5 };
+    });
+  }
+
   app.get("/structures", { preHandler: [authenticate] }, async () => {
     const db = getDb();
     const [row] = await db
@@ -176,11 +242,11 @@ export async function settingsRoutes(app: FastifyInstance) {
       .from(settings)
       .where(eq(settings.key, "structures_accueil"))
       .limit(1);
-    return row?.value ?? [];
+    return asStructs(row?.value);
   });
 
   app.post("/structures", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
-    const { nom } = z.object({ nom: z.string().min(1) }).parse(request.body);
+    const { nom, capacite } = structSchema.parse(request.body);
     const db = getDb();
     const [row] = await db
       .select()
@@ -188,12 +254,12 @@ export async function settingsRoutes(app: FastifyInstance) {
       .where(eq(settings.key, "structures_accueil"))
       .limit(1);
 
-    const list: string[] = (row?.value as string[]) ?? [];
-    if (list.includes(nom)) {
+    const list = asStructs(row?.value);
+    if (list.some((s) => s.nom === nom)) {
       return reply.status(409).send({ error: "Cette structure existe déjà" });
     }
-    list.push(nom);
-    list.sort();
+    list.push({ nom, capacite });
+    list.sort((a, b) => a.nom.localeCompare(b.nom));
 
     if (row) {
       await db
@@ -206,9 +272,12 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { structures: list };
   });
 
+  // Update: change name and/or capacity
   app.put("/structures/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { nom } = request.params as { nom: string };
-    const { nouveauNom } = z.object({ nouveauNom: z.string().min(1) }).parse(request.body);
+    const body = z
+      .object({ nouveauNom: z.string().min(1).optional(), capacite: z.number().int().min(1).optional() })
+      .parse(request.body);
     const db = getDb();
     const [row] = await db
       .select()
@@ -217,13 +286,16 @@ export async function settingsRoutes(app: FastifyInstance) {
       .limit(1);
     if (!row) return reply.status(404).send({ error: "Aucune structure enregistrée" });
 
-    const list: string[] = (row.value as string[]) ?? [];
-    const idx = list.indexOf(nom);
+    const list = asStructs(row.value);
+    const idx = list.findIndex((s) => s.nom === nom);
     if (idx === -1) return reply.status(404).send({ error: "Structure introuvable" });
-    if (list.includes(nouveauNom))
+
+    const newName = body.nouveauNom ?? nom;
+    if (newName !== nom && list.some((s) => s.nom === newName))
       return reply.status(409).send({ error: "Ce nom existe déjà" });
-    list[idx] = nouveauNom;
-    list.sort();
+
+    list[idx] = { nom: newName, capacite: body.capacite ?? list[idx].capacite };
+    list.sort((a, b) => a.nom.localeCompare(b.nom));
 
     await db
       .update(settings)
@@ -242,8 +314,8 @@ export async function settingsRoutes(app: FastifyInstance) {
       .limit(1);
     if (!row) return reply.status(404).send({ error: "Aucune structure enregistrée" });
 
-    const list: string[] = (row.value as string[]) ?? [];
-    const idx = list.indexOf(nom);
+    const list = asStructs(row.value);
+    const idx = list.findIndex((s) => s.nom === nom);
     if (idx === -1) return reply.status(404).send({ error: "Structure introuvable" });
     list.splice(idx, 1);
 

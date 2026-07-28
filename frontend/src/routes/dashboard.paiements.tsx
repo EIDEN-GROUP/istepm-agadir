@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, BellRing, Eye, Receipt, ListChecks, CalendarDays, Search, Check, Clock, AlertTriangle, Ban } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -80,8 +80,7 @@ const MODES: LignePaiement["mode"][] = [
 ];
 const STATUTS: StatutPaiement[] = ["paye", "en_attente", "retard", "impaye"];
 
-/** Icône de statut de règlement — repère visuel humain, lisible d'un coup d'œil. */
-const STATUT_PAIEMENT_ICON: Record<StatutPaiement, LucideIcon> = {
+const STATUT_PAIEMENT_ICON: Record<StatutPaiement, typeof Check> = {
   paye: Check,
   en_attente: Clock,
   retard: AlertTriangle,
@@ -502,17 +501,17 @@ function MonthlyTracker({
           </div>
           <div className="w-full max-w-xs">
             <ComboBoxField
-            label="Étudiant"
-            value={etudiantId}
-            onChange={setEtudiantId}
-            options={etudiants.map((e) => ({
-              value: e.id,
-              label: `${e.prenom} ${e.nom}   ${e.cne}`,
-            }))}
-            placeholder="Choisir un étudiant…"
-            searchPlaceholder="Nom, prénom ou CNE…"
-            emptyText="Aucun étudiant trouvé."
-          />
+              label="Étudiant"
+              value={etudiantId}
+              onChange={setEtudiantId}
+              options={etudiants.map((e) => ({
+                value: e.id,
+                label: `${e.prenom} ${e.nom}   ${e.cne}`,
+              }))}
+              placeholder="Choisir un étudiant…"
+              searchPlaceholder="Nom, prénom ou CNE…"
+              emptyText="Aucun étudiant trouvé."
+            />
           </div>
       </div>
 
@@ -746,9 +745,9 @@ function PaiementForm({
     etudiantId: "",
     montant: "" as number | "",
     mode: "Espèces" as LignePaiement["mode"],
+    statut: "paye" as StatutPaiement,
     mois: getDefaultMois(academicYear),
     date: new Date().toISOString().slice(0, 10),
-    statut: "paye" as StatutPaiement,
   });
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
@@ -812,6 +811,15 @@ function PaiementForm({
           </div>
         </FullWidth>
       ) : null}
+      <SelectField
+        label="Statut"
+        value={f.statut}
+        onChange={(v) => set("statut", v)}
+        options={STATUTS.map((s) => ({
+          value: s,
+          label: STATUT_PAIEMENT_LABEL[s],
+        }))}
+      />
       <SelectField
         label="Mois réglé"
         required

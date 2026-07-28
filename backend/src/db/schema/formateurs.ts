@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
 
 export const formateurs = pgTable("formateurs", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -15,6 +15,7 @@ export const formateurs = pgTable("formateurs", {
   telephone: text("telephone").notNull().default(""),
   email: text("email").notNull().default(""),
   notesSaisies: integer("notes_saisies").notNull().default(0),
+  archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

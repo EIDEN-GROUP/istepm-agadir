@@ -4,6 +4,7 @@ import {
   Plus,
   Trash2,
   RotateCcw,
+  Save,
   Users,
   ShieldCheck,
   GraduationCap,
@@ -28,13 +29,14 @@ import { useAuth, ROLE_META, type UserRole } from "@/lib/auth";
 import {
   NIVEAUX,
   SALLES,
-  GROUPES,
   FILIERES,
   CRENEAUX,
   ANNEES_UNIVERSITAIRES,
   TYPE_EXAMEN_LABEL,
   fmtMAD,
   type ModuleRecord,
+  type GroupConfig,
+  type StructureAccueil,
 } from "@/lib/istpm-data";
 import { useIstpm } from "@/lib/istpm-store";
 import {
@@ -933,6 +935,210 @@ function NewUserForm({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Groupes / classes  registre des groupes avec comptage d'étudiants  */
+/* ------------------------------------------------------------------ */
+
+function GroupesSection() {
+  const { groupConfigs, addGroupConfig, updateGroupConfig, deleteGroupConfig } = useIstpm();
+  const [activeSemester, setActiveSemester] = useState<string>("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<GroupConfig | null>(null);
+  const [form, setForm] = useState({ name: "", semester: "", studentCount: 0 });
+  const [errors, setErrors] = useState<{ name?: string }>({});
+  const [toDelete, setToDelete] = useState<GroupConfig | null>(null);
+
+  const semesters = [...new Set(groupConfigs.map((g) => g.semester))].sort();
+  const active = activeSemester || semesters[0] || "";
+  const filtered = groupConfigs.filter((g) => g.semester === active);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ name: "", semester: active || semesters[0] || "", studentCount: 0 });
+    setErrors({});
+    setDialogOpen(true);
+  };
+
+  const openEdit = (g: GroupConfig) => {
+    setEditing(g);
+    setForm({ name: g.name, semester: g.semester, studentCount: g.studentCount });
+    setErrors({});
+    setDialogOpen(true);
+  };
+
+  const submit = () => {
+    if (!form.name.trim()) {
+      setErrors({ name: "Nom du groupe obligatoire" });
+      return;
+    }
+    if (editing) {
+      updateGroupConfig(editing.id, {
+        name: form.name.trim(),
+        semester: form.semester,
+        studentCount: Number(form.studentCount) || 0,
+      });
+      toast.success("Groupe mis à jour");
+    } else {
+      addGroupConfig({
+        name: form.name.trim(),
+        semester: form.semester,
+        studentCount: Number(form.studentCount) || 0,
+      });
+      toast.success(`Groupe ajouté   ${form.name.trim()}`);
+    }
+    setDialogOpen(false);
+  };
+
+  const confirmDelete = () => {
+    if (!toDelete) return;
+    const t = toDelete;
+    setToDelete(null);
+    deleteGroupConfig(t.id);
+    toast.success(`Groupe supprimé   ${t.name}`);
+  };
+
+  return (
+    <Carte
+      id="groupes"
+      action={
+        <div className="flex items-center gap-2">
+          <span className={toneBadge("neutral")}>{groupConfigs.length}</span>
+          <button
+            type="button"
+            onClick={openCreate}
+            className={cn(ghostPill, "h-7 gap-1 px-2.5 text-[11px]")}
+          >
+            <Plus className="h-3 w-3" /> Ajouter
+          </button>
+        </div>
+      }
+    >
+      {/* Semester tabs */}
+      <div className="mb-3 flex flex-wrap gap-1">
+        {semesters.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setActiveSemester(s)}
+            className={cn(
+              "rounded-full px-3 py-1 text-[11px] font-medium transition-colors",
+              active === s
+                ? "bg-brand/20 text-brand-dk"
+                : "bg-brand/5 text-muted-foreground hover:bg-brand/10",
+            )}
+          >
+            {s}
+            <span className="ml-1 text-[10px] opacity-60">
+              {groupConfigs.filter((g) => g.semester === s).length}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Group list */}
+      <div className="space-y-1.5">
+        {filtered.length === 0 ? (
+          <p className="py-3 text-center text-xs text-muted-foreground">
+            Aucun groupe pour ce semestre.
+          </p>
+        ) : (
+          filtered.map((g) => (
+            <div
+              key={g.id}
+              className="flex items-center justify-between gap-3 rounded-xl border border-brand/12 px-3 py-2"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-foreground">
+                  {g.name}
+                </span>
+              </span>
+              <span className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-muted-foreground">
+                  <input
+                    type="number"
+                    min={0}
+                    value={g.studentCount}
+                    onChange={(e) => {
+                      const v = Math.max(0, parseInt(e.target.value) || 0);
+                      updateGroupConfig(g.id, { studentCount: v });
+                    }}
+                    className={cn(softInput, "h-7 w-16 text-center text-xs")}
+                  />
+                </span>
+                <span className="text-[10px] text-muted-foreground min-w-[3ch]">
+                  étud.
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Modifier ${g.name}`}
+                  onClick={() => openEdit(g)}
+                  className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk"
+                >
+                  <PenLine className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Supprimer ${g.name}`}
+                  onClick={() => setToDelete(g)}
+                  className={iconButtonDanger}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+
+      <FormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title={editing ? "Modifier le groupe" : "Nouveau groupe"}
+        subtitle="Définissez le nom et le semestre du groupe."
+        submitLabel={editing ? "Enregistrer" : "Ajouter"}
+        onSubmit={submit}
+      >
+        <FullWidth>
+          <TextField
+            label="Nom du groupe"
+            value={form.name}
+            onChange={(v) => setForm((f) => ({ ...f, name: v }))}
+            placeholder="S2-C"
+            error={errors.name}
+            required
+          />
+        </FullWidth>
+        <FullWidth>
+          <ComboBoxField
+            label="Semestre"
+            value={form.semester}
+            onChange={(v) => setForm((f) => ({ ...f, semester: v }))}
+            options={semesters.map((s) => ({ value: s, label: s }))}
+            placeholder="Sélectionner le semestre…"
+            searchPlaceholder="Rechercher un semestre…"
+            required
+          />
+        </FullWidth>
+        <NumberField
+          label="Nombre d'étudiants"
+          value={form.studentCount}
+          onChange={(v) => setForm((f) => ({ ...f, studentCount: typeof v === "number" ? v : 0 }))}
+          min={0}
+        />
+      </FormDialog>
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        onOpenChange={(o) => { if (!o) setToDelete(null); }}
+        title={toDelete ? `Supprimer le groupe "${toDelete.name}" ?` : ""}
+        message="Cette action est irréversible."
+        confirmLabel="Supprimer"
+        onConfirm={confirmDelete}
+      />
+    </Carte>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 
 function SettingsPage() {
   const { role } = useAuth();
@@ -942,6 +1148,10 @@ function SettingsPage() {
     examens,
     filieres,
     structuresAccueil,
+    groupConfigs,
+    addGroupConfig,
+    updateGroupConfig,
+    deleteGroupConfig,
     addStructureAccueil,
     updateStructureAccueil,
     deleteStructureAccueil,
@@ -954,13 +1164,15 @@ function SettingsPage() {
   /* État local des réglages   non persisté côté serveur. */
   const [annees, setAnnees] = useState<string[]>([...ANNEES_UNIVERSITAIRES]);
   const [semestres, setSemestres] = useState<string[]>([...NIVEAUX]);
-  const [groupes, setGroupes] = useState<string[]>([...GROUPES]);
   const [salles, setSalles] = useState<string[]>([...SALLES]);
   const [creneaux, setCreneaux] = useState<string[]>(
     CRENEAUX.map((c) => `${c.debut} – ${c.fin}`),
   );
   const [listeFilieres, setListeFilieres] = useState<string[]>([...filieres]);
-  const [listeStructures, setListeStructures] = useState<string[]>([...structuresAccueil]);
+  const [listeStructures, setListeStructures] = useState<StructureAccueil[]>(
+    structuresAccueil.map((s) => (typeof s === "string" ? { nom: s, capacite: 5 } : s)),
+  );
+  const [nouvelleStructure, setNouvelleStructure] = useState("");
   const [typesExamen, setTypesExamen] = useState<string[]>(
     Object.values(TYPE_EXAMEN_LABEL),
   );
@@ -996,8 +1208,6 @@ function SettingsPage() {
   /* --------- API sync --------- */
   const filieresRef = useRef(listeFilieres);
   filieresRef.current = listeFilieres;
-  const structuresRef = useRef(listeStructures);
-  structuresRef.current = listeStructures;
 
   useEffect(() => {
     fetchSettings()
@@ -1006,8 +1216,6 @@ function SettingsPage() {
           setAnnees(data.annees_universitaires as string[]);
         if (Array.isArray(data.semestres))
           setSemestres(data.semestres as string[]);
-        if (Array.isArray(data.groupes))
-          setGroupes(data.groupes as string[]);
         if (Array.isArray(data.salles))
           setSalles(data.salles as string[]);
         if (Array.isArray(data.creneaux))
@@ -1249,15 +1457,7 @@ function SettingsPage() {
         );
 
       case "groupes":
-        return (
-          <Carte id="groupes">
-            <ListeEditable
-              valeurs={groupes}
-              onChange={(v) => { setGroupes(v); updateSetting("groupes", v).catch(() => {}); }}
-              placeholder="S2-C"
-            />
-          </Carte>
-        );
+        return <GroupesSection />;
 
       case "salles":
         return (
@@ -1649,18 +1849,111 @@ function SettingsPage() {
       case "structures":
         return (
           <Carte id="structures">
-            <ListeEditable
-              valeurs={listeStructures}
-              onChange={(v) => {
-                const oldList = structuresRef.current;
-                const added = v.filter((x) => !oldList.includes(x));
-                const removed = oldList.filter((x) => !v.includes(x));
-                added.forEach((nom) => addStructureAccueil(nom));
-                removed.forEach((nom) => deleteStructureAccueil(nom));
-                setListeStructures(v);
-              }}
-              placeholder="CHU Mohammed VI   Marrakech"
-            />
+            <div className="space-y-3">
+              {listeStructures.map((s, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-xl border border-brand/12 bg-card px-3 py-2">
+                  <span className="min-w-0 flex-1 text-sm font-medium text-foreground">{s.nom}</span>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span>Cap.</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={s.capacite}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (v >= 1) {
+                          const next = listeStructures.map((st, j) =>
+                            j === i ? { ...st, capacite: v } : st,
+                          );
+                          setListeStructures(next);
+                        }
+                      }}
+                      className="h-7 w-16 rounded-lg border-brand/20 text-center text-xs tabular-nums"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className={ghostPill + " text-alert p-1.5"}
+                    aria-label={`Supprimer ${s.nom}`}
+                    onClick={() => {
+                      const next = listeStructures.filter((_, j) => j !== i);
+                      setListeStructures(next);
+                      deleteStructureAccueil(s.nom);
+                      toast.success(`Supprimée   ${s.nom}`);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Ajouter une structure…"
+                  value={nouvelleStructure}
+                  onChange={(e) => setNouvelleStructure(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const nom = nouvelleStructure.trim();
+                      if (nom && !listeStructures.some((s) => s.nom === nom)) {
+                        const next = [...listeStructures, { nom, capacite: 5 }].sort((a, b) =>
+                          a.nom.localeCompare(b.nom),
+                        );
+                        setListeStructures(next);
+                        addStructureAccueil(nom, 5);
+                        setNouvelleStructure("");
+                        toast.success(`Ajoutée   ${nom}`);
+                      } else if (nom) {
+                        toast.error("Cette structure existe déjà");
+                      }
+                    }
+                  }}
+                  className={cn(softInput, "h-9 flex-1 text-sm")}
+                />
+                <button
+                  type="button"
+                  className={cn(primaryPill, "h-9 px-4 text-sm")}
+                  onClick={() => {
+                    const nom = nouvelleStructure.trim();
+                    if (nom && !listeStructures.some((s) => s.nom === nom)) {
+                      const next = [...listeStructures, { nom, capacite: 5 }].sort((a, b) =>
+                        a.nom.localeCompare(b.nom),
+                      );
+                      setListeStructures(next);
+                      addStructureAccueil(nom, 5);
+                      setNouvelleStructure("");
+                      toast.success(`Ajoutée   ${nom}`);
+                    } else if (nom) {
+                      toast.error("Cette structure existe déjà");
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+              {listeStructures.some((st) => {
+                const orig = structuresAccueil.find((x) => x.nom === st.nom);
+                return orig && orig.capacite !== st.capacite;
+              }) ? (
+                <div className="flex justify-end border-t border-brand/12 pt-3">
+                  <button
+                    type="button"
+                    className={cn(primaryPill, "h-9 gap-1.5 px-5 text-sm")}
+                    onClick={() => {
+                      for (const st of listeStructures) {
+                        const original = structuresAccueil.find((x) => x.nom === st.nom);
+                        if (original && original.capacite !== st.capacite) {
+                          updateStructureAccueil(st.nom, { capacite: st.capacite });
+                        }
+                      }
+                      toast.success("Capacités enregistrées");
+                    }}
+                  >
+                    <Save className="h-4 w-4" /> Enregistrer les capacités
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </Carte>
         );
 

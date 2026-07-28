@@ -395,7 +395,7 @@ function StagesPage() {
             label: "Structure",
             value: structure,
             onChange: setStructure,
-            options: structuresAccueil,
+            options: structuresAccueil.map((s) => s.nom),
             allLabel: "Toutes les structures",
           },
           {
@@ -729,7 +729,7 @@ function StagesPage() {
           key={editing?.id ?? "new"}
           initial={editing}
           etudiants={etudiants}
-          structuresAccueil={structuresAccueil}
+          structuresAccueil={structuresAccueil.map((s) => s.nom)}
           onCancel={() => setFormOpen(false)}
           onSubmit={(data) => {
             if (editing) {

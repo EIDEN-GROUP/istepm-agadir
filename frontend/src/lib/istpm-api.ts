@@ -3,6 +3,7 @@ import { getStoredToken } from "@/lib/auth";
 import type {
   Etudiant,
   Formateur,
+  GroupConfig,
   Examen,
   Bulletin,
   Stage,
@@ -73,6 +74,34 @@ export function updateFormateur(id: string, data: Record<string, unknown>) {
 
 export function deleteFormateur(id: string) {
   return api.delete<{ ok: boolean }>(`/formateurs/${id}`);
+}
+
+export function archiveFormateur(id: string, data: { groupReassignments: Array<{ groupName: string; targetFormateurId: string }>; filiereReassignment?: { targetFormateurId: string } }) {
+  return api.post<Formateur>(`/formateurs/${id}/archive`, data);
+}
+
+export function restoreFormateur(id: string) {
+  return api.post<Formateur>(`/formateurs/${id}/restore`);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Group Configs                                                      */
+/* ------------------------------------------------------------------ */
+
+export function fetchGroupConfigs() {
+  return api.get<GroupConfig[]>("/settings/groups");
+}
+
+export function createGroupConfig(data: { name: string; semester: string; studentCount?: number }) {
+  return api.post<GroupConfig>("/settings/groups", data);
+}
+
+export function updateGroupConfig(id: string, data: { name?: string; semester?: string; studentCount?: number }) {
+  return api.put<GroupConfig>(`/settings/groups/${id}`, data);
+}
+
+export function deleteGroupConfig(id: string) {
+  return api.delete<{ ok: boolean }>(`/settings/groups/${id}`);
 }
 
 /* ------------------------------------------------------------------ */
@@ -412,20 +441,22 @@ export function deleteFiliereApi(nom: string) {
   return api.delete<{ filieres: string[] }>(`/settings/filieres/${nom}`);
 }
 
+import type { StructureAccueil } from "@/lib/istpm-data";
+
 export function fetchStructuresApi() {
-  return api.get<string[]>("/settings/structures");
+  return api.get<StructureAccueil[]>("/settings/structures");
 }
 
-export function createStructureApi(nom: string) {
-  return api.post<{ structures: string[] }>("/settings/structures", { nom });
+export function createStructureApi(nom: string, capacite = 5) {
+  return api.post<{ structures: StructureAccueil[] }>("/settings/structures", { nom, capacite });
 }
 
-export function updateStructureApi(nom: string, nouveauNom: string) {
-  return api.put<{ structures: string[] }>(`/settings/structures/${encodeURIComponent(nom)}`, { nouveauNom });
+export function updateStructureApi(nom: string, body: { nouveauNom?: string; capacite?: number }) {
+  return api.put<{ structures: StructureAccueil[] }>(`/settings/structures/${encodeURIComponent(nom)}`, body);
 }
 
 export function deleteStructureApi(nom: string) {
-  return api.delete<{ structures: string[] }>(`/settings/structures/${encodeURIComponent(nom)}`);
+  return api.delete<{ structures: StructureAccueil[] }>(`/settings/structures/${encodeURIComponent(nom)}`);
 }
 
 /* ------------------------------------------------------------------ */

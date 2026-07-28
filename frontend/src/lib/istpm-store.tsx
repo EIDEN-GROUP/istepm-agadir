@@ -34,6 +34,7 @@ import {
   FILIERE_COURT,
   type Etudiant,
   type Formateur,
+  type GroupConfig,
   type Examen,
   type Bulletin,
   type Stage,
@@ -46,6 +47,7 @@ import {
   ajouterMinutes,
   STRUCTURES_ACCUEIL,
   DEFAULT_MODULES,
+  DEFAULT_GROUP_CONFIGS,
   type ModuleRecord,
   type LignePaiement,
   type NoteModule,
@@ -54,6 +56,7 @@ import {
   type Mention,
   type Decision,
   type ExamDocument,
+  type StructureAccueil,
 } from "@/lib/istpm-data";
 import {
   deleteDoc,
@@ -71,6 +74,12 @@ import {
   createFormateur as apiCreateFormateur,
   updateFormateur as apiUpdateFormateur,
   deleteFormateur as apiDeleteFormateur,
+  archiveFormateur as apiArchiveFormateur,
+  restoreFormateur as apiRestoreFormateur,
+  fetchGroupConfigs as apiFetchGroupConfigs,
+  createGroupConfig as apiCreateGroupConfig,
+  updateGroupConfig as apiUpdateGroupConfig,
+  deleteGroupConfig as apiDeleteGroupConfig,
   fetchExamens as apiFetchExamens,
   createExamen as apiCreateExamen,
   updateExamen as apiUpdateExamen,
@@ -127,8 +136,9 @@ type Snapshot = {
   activite: ActiviteItem[];
   seances: Seance[];
   filieres: string[];
-  structuresAccueil: string[];
+  structuresAccueil: StructureAccueil[];
   modules: ModuleRecord[];
+  groupConfigs: GroupConfig[];
 };
 
 function seedModules(): ModuleRecord[] {
@@ -146,8 +156,9 @@ function seed(): Snapshot {
     activite: ACTIVITE_RECENTE,
     seances: SEANCES,
     filieres: [...FILIERES],
-    structuresAccueil: [...STRUCTURES_ACCUEIL],
+    structuresAccueil: structuredClone(STRUCTURES_ACCUEIL),
     modules: seedModules(),
+    groupConfigs: structuredClone(DEFAULT_GROUP_CONFIGS),
   }) as Snapshot;
 }
 
@@ -162,6 +173,7 @@ function load(): Snapshot {
 
     // Backfill fields added after this snapshot was persisted.
     if (!Array.isArray(parsed.modules)) parsed.modules = seedModules();
+    if (!Array.isArray(parsed.groupConfigs)) parsed.groupConfigs = structuredClone(DEFAULT_GROUP_CONFIGS);
 
     // Rebase seance dates to the current week.
     // Seed‑pattern seances ("se-0-…", "se-1-…") have dates frozen at save
@@ -264,8 +276,9 @@ type IstpmCtx = {
   activite: ActiviteItem[];
   seances: Seance[];
   filieres: string[];
-  structuresAccueil: string[];
+  structuresAccueil: StructureAccueil[];
   modules: ModuleRecord[];
+  groupConfigs: GroupConfig[];
 
   /* Dérivés */
   paiements: PaiementLigne[];
@@ -304,6 +317,12 @@ type IstpmCtx = {
   addFormateur: (data: NouveauFormateur) => Formateur;
   updateFormateur: (id: string, patch: Partial<Formateur>) => void;
   deleteFormateur: (id: string) => void;
+  archiveFormateur: (id: string, groupReassignments: Array<{ groupName: string; targetFormateurId: string }>, filiereReassignment?: { targetFormateurId: string }) => void;
+  restoreFormateur: (id: string) => void;
+
+  addGroupConfig: (data: { name: string; semester: string; studentCount?: number }) => GroupConfig;
+  updateGroupConfig: (id: string, patch: { name?: string; semester?: string; studentCount?: number }) => void;
+  deleteGroupConfig: (id: string) => void;
 
   /** `createdBy` reçoit `auteurId`   l'auteur est toujours enregistré. */
   addExamen: (data: NouvelExamen, auteurId: string) => Examen;
@@ -337,8 +356,8 @@ type IstpmCtx = {
   addFiliere: (nom: string) => void;
   deleteFiliere: (nom: string) => void;
 
-  addStructureAccueil: (nom: string) => void;
-  updateStructureAccueil: (oldName: string, newName: string) => void;
+  addStructureAccueil: (nom: string, capacite?: number) => void;
+  updateStructureAccueil: (oldName: string, body: { nouveauNom?: string; capacite?: number }) => void;
   deleteStructureAccueil: (nom: string) => void;
 
   addModule: (data: Omit<ModuleRecord, "id">) => void;
@@ -452,8 +471,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           bulletins: prefer(s.bulletins, bulletins as Bulletin[]),
           stages: prefer(s.stages, stages as Stage[]),
           seances: prefer(s.seances, seances as Seance[]),
-          structuresAccueil: (structures as string[])?.length
-            ? (structures as string[])
+          structuresAccueil: (structures as StructureAccueil[])?.length
+            ? (structures as StructureAccueil[])
             : s.structuresAccueil,
         }));
       } catch {
@@ -579,6 +598,84 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
       setSnap((s) => ({
         ...s,
         formateurs: s.formateurs.filter((f) => f.id !== id),
+      }));
+    },
+    [],
+  );
+
+  const archiveFormateur = useCallback(
+    (id: string, groupReassignments: Array<{ groupName: string; targetFormateurId: string }>, filiereReassignment?: { targetFormateurId: string }) => {
+      apiArchiveFormateur(id, { groupReassignments, filiereReassignment }).catch(() => {});
+      setSnap((s) => {
+        let formateurs = s.formateurs.map((f) =>
+          f.id === id ? { ...f, archived: true } : f,
+        );
+        // Reassign groups in the store
+        for (const r of groupReassignments) {
+          const target = formateurs.find((f) => f.id === r.targetFormateurId);
+          if (target && !target.groupes.includes(r.groupName)) {
+            formateurs = formateurs.map((f) =>
+              f.id === r.targetFormateurId
+                ? { ...f, groupes: [...f.groupes, r.groupName] }
+                : f,
+            );
+          }
+          formateurs = formateurs.map((f) =>
+            f.id === id
+              ? { ...f, groupes: f.groupes.filter((g) => g !== r.groupName) }
+              : f,
+          );
+        }
+        return { ...s, formateurs };
+      });
+    },
+    [],
+  );
+
+  const restoreFormateur = useCallback(
+    (id: string) => {
+      apiRestoreFormateur(id).catch(() => {});
+      setSnap((s) => ({
+        ...s,
+        formateurs: s.formateurs.map((f) =>
+          f.id === id ? { ...f, archived: false } : f,
+        ),
+      }));
+    },
+    [],
+  );
+
+  /* ---------------- Group Configs ---------------- */
+
+  const addGroupConfig = useCallback(
+    (data: { name: string; semester: string; studentCount?: number }) => {
+      const config: GroupConfig = { id: `gc-${Date.now()}`, ...data, studentCount: data.studentCount ?? 0 };
+      apiCreateGroupConfig(data).catch(() => {});
+      setSnap((s) => ({ ...s, groupConfigs: [...s.groupConfigs, config] }));
+      return config;
+    },
+    [],
+  );
+
+  const updateGroupConfig = useCallback(
+    (id: string, patch: { name?: string; semester?: string; studentCount?: number }) => {
+      apiUpdateGroupConfig(id, patch).catch(() => {});
+      setSnap((s) => ({
+        ...s,
+        groupConfigs: s.groupConfigs.map((g) =>
+          g.id === id ? { ...g, ...patch } : g,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const deleteGroupConfig = useCallback(
+    (id: string) => {
+      apiDeleteGroupConfig(id).catch(() => {});
+      setSnap((s) => ({
+        ...s,
+        groupConfigs: s.groupConfigs.filter((g) => g.id !== id),
       }));
     },
     [],
@@ -973,25 +1070,27 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   /* ---------------- Structures d'accueil ---------------- */
 
   const addStructureAccueil = useCallback(
-    (nom: string) => {
-      createStructureApi(nom).catch(() => {});
+    (nom: string, capacite = 5) => {
+      createStructureApi(nom, capacite).catch(() => {});
       setSnap((s) => ({
         ...s,
-        structuresAccueil: s.structuresAccueil.includes(nom)
+        structuresAccueil: s.structuresAccueil.some((st) => st.nom === nom)
           ? s.structuresAccueil
-          : [...s.structuresAccueil, nom],
+          : [...s.structuresAccueil, { nom, capacite }],
       }));
     },
     [],
   );
 
   const updateStructureAccueil = useCallback(
-    (oldName: string, newName: string) => {
-      updateStructureApi(oldName, newName).catch(() => {});
+    (oldName: string, body: { nouveauNom?: string; capacite?: number }) => {
+      updateStructureApi(oldName, body).catch(() => {});
       setSnap((s) => ({
         ...s,
         structuresAccueil: s.structuresAccueil.map((st) =>
-          st === oldName ? newName : st,
+          st.nom === oldName
+            ? { nom: body.nouveauNom ?? st.nom, capacite: body.capacite ?? st.capacite }
+            : st,
         ),
       }));
     },
@@ -1003,7 +1102,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
       deleteStructureApi(nom).catch(() => {});
       setSnap((s) => ({
         ...s,
-        structuresAccueil: s.structuresAccueil.filter((st) => st !== nom),
+        structuresAccueil: s.structuresAccueil.filter((st) => st.nom !== nom),
       }));
     },
     [],
@@ -1309,6 +1408,11 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     addFormateur,
     updateFormateur,
     deleteFormateur,
+    archiveFormateur,
+    restoreFormateur,
+    addGroupConfig,
+    updateGroupConfig,
+    deleteGroupConfig,
     addExamen,
     updateExamen,
     deleteExamen,

@@ -174,7 +174,7 @@ export function SelectField<T extends string>({
   );
   return (
     <FieldShell label={label} error={error} required={required}>
-      <Select value={value} onValueChange={(v) => onChange(v as T)}>
+      <Select value={value || undefined} onValueChange={(v) => onChange(v as T)}>
         <SelectTrigger
           className={cn(
             softSelectTrigger,
@@ -237,9 +237,6 @@ export function ComboBoxField<T extends string>({
             aria-expanded={open}
             className={cn(
               softSelectTrigger,
-              // `softSelectTrigger` ne pose qu'une COULEUR de bordure ; sans
-              // `border` (largeur), le champ paraît sans contour. On l'ajoute
-              // pour qu'il se lise comme un vrai champ, à hauteur `h-10`.
               "flex w-full items-center justify-between border px-3 text-sm",
               !selected && "text-muted-foreground/70",
               error && "border-alert",

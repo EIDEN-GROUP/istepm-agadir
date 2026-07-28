@@ -60,11 +60,7 @@ function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
-/**
- * Charge et rasterise le logo (fond blanc, JPEG). Le fond blanc permet de
- * l'embarquer sans canal alpha dans le PDF (DCTDecode) et de le poser sur une
- * pastille blanche ; sur fond blanc l'e-mail rend à l'identique.
- */
+
 async function loadLogo(): Promise<LogoRaster | null> {
   if (logoPromise) return logoPromise;
   logoPromise = (async () => {
@@ -72,8 +68,7 @@ async function loadLogo(): Promise<LogoRaster | null> {
       const res = await fetch(`${import.meta.env.BASE_URL}istpm-logo.svg`);
       if (!res.ok) return null;
       let svg = await res.text();
-      // Le SVG n'a pas d'attributs width/height : sans eux, le canvas ne
-      // connaît pas la taille intrinsèque de l'image. On les injecte.
+
       const wPx = 320;
       const hPx = Math.round(wPx / LOGO_ASPECT);
       if (!/<svg[^>]*\swidth=/.test(svg)) {
@@ -104,7 +99,7 @@ async function loadLogo(): Promise<LogoRaster | null> {
   return logoPromise;
 }
 
-/** Data-URL JPEG du logo, pour les `<img>` d'e-mail. `null` si indisponible. */
+
 export async function loadLogoDataUrl(): Promise<string | null> {
   return (await loadLogo())?.dataUrl ?? null;
 }
@@ -181,12 +176,12 @@ function stageSections(s: Stage, kind: Kind): Section[] {
 
 const enc = new TextEncoder();
 
-/** Échappe les caractères réservés d'une chaîne littérale PDF. */
+
 function escapePdf(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
-/** Réduit à l'ASCII imprimable (Helvetica WinAnsi n'a pas les accents). */
+
 function toAscii(s: string): string {
   return s
     .normalize("NFD")
@@ -196,7 +191,7 @@ function toAscii(s: string): string {
 
 const pdfText = (s: string) => escapePdf(toAscii(s));
 
-/** Composante 0–1 d'une couleur hex, formatée pour un opérateur PDF. */
+
 function hexToPdfRgb(hex: string): string {
   const n = parseInt(hex.slice(1), 16);
   const r = ((n >> 16) & 255) / 255;
@@ -216,10 +211,7 @@ const PDF = {
   pale: hexToPdfRgb(BRAND.tealPale),
 };
 
-/**
- * Construit le flux de dessin (opérateurs PDF) d'une page A4 (595 × 842 pt,
- * origine en bas à gauche).
- */
+
 function buildContentStream(
   title: string,
   sections: Section[],
@@ -256,7 +248,7 @@ function buildContentStream(
     textX = chipX + CHIP + 18;
   }
 
-  // — Titre + institution dans l'en-tête —
+
   ops.push(
     `${PDF.white} rg BT /F2 17 Tf ${textX} 802 Td (${pdfText(title)}) Tj ET`,
   );
@@ -271,7 +263,7 @@ function buildContentStream(
     )}) Tj ET`,
   );
 
-  // — Corps : sections clé / valeur —
+
   const LEFT = 60;
   const VALUE_X = 230;
   const RIGHT = 535;
@@ -300,7 +292,7 @@ function buildContentStream(
     y -= 16;
   }
 
-  // — Pied de page —
+
   ops.push(`${PDF.teal} rg ${LEFT} 96 ${RIGHT - LEFT} 2 re f`);
   ops.push(
     `${PDF.muted} rg BT /F1 8 Tf ${LEFT} 80 Td (${pdfText(
@@ -316,13 +308,7 @@ function buildContentStream(
   return ops.join("\n");
 }
 
-/**
- * Assemble le PDF final (octets bruts).
- *
- * Construit en `Uint8Array` et non en chaîne : le flux d'image JPEG est binaire
- * et une chaîne JS passée à `Blob` serait ré-encodée en UTF-8, corrompant les
- * octets. Les décalages de la table xref sont donc calculés en octets.
- */
+
 export async function makeStageDocPdf(s: Stage, kind: Kind): Promise<Blob> {
   const logo = await loadLogo();
   const sections = stageSections(s, kind);
@@ -415,10 +401,7 @@ const escapeHtml = (s: string) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-/**
- * Construit le corps HTML (tables + styles inline, compatibles clients mail) et
- * une version texte de repli, pour la notification d'envoi de document.
- */
+
 export function buildStageEmailHtml(
   s: Stage,
   kind: Kind,
@@ -469,7 +452,7 @@ export function buildStageEmailHtml(
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px -12px rgba(18,59,58,.35);">
 
-        <!-- En-tête -->
+
         <tr><td style="padding:24px 32px 20px;background:#ffffff;">
           <table role="presentation" cellpadding="0" cellspacing="0"><tr>
             <td style="padding-right:14px;vertical-align:middle;">${logoCell}</td>
@@ -486,7 +469,7 @@ export function buildStageEmailHtml(
           BRAND.teal
         };font-size:0;line-height:0;">&nbsp;</td></tr>
 
-        <!-- Titre -->
+
         <tr><td style="padding:26px 32px 4px;">
           <h1 style="margin:0;font:700 20px/1.3 Arial,Helvetica,sans-serif;color:${
             BRAND.ink
@@ -507,10 +490,9 @@ export function buildStageEmailHtml(
           </p>
         </td></tr>
 
-        <!-- Détails -->
         ${rowsHtml}
 
-        <!-- Pièce jointe -->
+
         <tr><td style="padding:24px 32px 4px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${
             BRAND.tealWash
@@ -523,7 +505,7 @@ export function buildStageEmailHtml(
           </table>
         </td></tr>
 
-        <!-- Pied de page -->
+
         <tr><td style="padding:26px 32px;background:${
           BRAND.ink
         };margin-top:24px;">

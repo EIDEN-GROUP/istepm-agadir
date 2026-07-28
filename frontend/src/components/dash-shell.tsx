@@ -590,12 +590,10 @@ function SendMessageModal({
           const em = await api.post<{ ok: boolean; error?: string }>(
             "/email/send",
             {
-              data: {
-                to: client.email,
-                subject: "Message de l'école",
-                message: content,
-                parentName: client.parent_name,
-              },
+              to: client.email,
+              subject: "Message de l'école",
+              message: content,
+              parentName: client.parent_name,
             },
           );
           if (!em.ok) throw new Error(em.error ?? "Erreur email");

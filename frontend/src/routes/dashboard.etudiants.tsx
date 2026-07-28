@@ -106,8 +106,7 @@ function EtudiantsPage() {
       filiere: currentFormateur.departement,
       niveaux,
       groupes: currentFormateur.groupes,
-      // Modules enseignés par le formateur : ce qu'il doit voir/suivre pour ses
-      // étudiants (les notes de SES modules), sans jamais toucher au paiement.
+
       modules: currentFormateur.modules,
     };
   }, [isTeacher, currentFormateur]);
@@ -117,8 +116,7 @@ function EtudiantsPage() {
   const [niveau, setNiveau] = useState<string>(ALL);
   const [groupe, setGroupe] = useState<string>(ALL);
   const [statut, setStatut] = useState<string>(ALL);
-  // Module choisi par le formateur : sélectionne le module dont on affiche la
-  // note dans la table. « Tous » montre la note de chacun de ses modules.
+
   const [moduleFilter, setModuleFilter] = useState<string>(ALL);
 
   // Groups relevant to the current filière / semestre choice, so the teacher's
@@ -321,6 +319,14 @@ function EtudiantsPage() {
                   options: enseignantScope.modules,
                   allLabel: "Tous mes modules",
                 },
+                {
+                  id: "module",
+                  label: "Module",
+                  value: moduleFilter,
+                  onChange: setModuleFilter,
+                  options: enseignantScope.modules,
+                  allLabel: "Tous mes modules",
+                },
               ]
             : [
                 {
@@ -361,16 +367,16 @@ function EtudiantsPage() {
                     ]),
               ]
         }
-        summary={
-          noFormateur ? (
-            <>Sélectionnez un formateur dans le menu de navigation.</>
-          ) : needsSelection ? (
-            enseignantScope ? (
-              <>Choisissez un semestre et un groupe.</>
-            ) : (
-              <>Choisissez une filière, un semestre et un groupe.</>
-            )
-          ) : enseignantScope ? (
+          summary={
+            noFormateur ? (
+              <>Sélectionnez un formateur dans le menu de navigation.</>
+            ) : needsSelection ? (
+              enseignantScope ? (
+                <>Choisissez un semestre et un groupe.</>
+              ) : (
+                <>Choisissez une filière, un semestre et un groupe.</>
+              )
+            ) : enseignantScope ? (
             <div className="flex items-center gap-3">
               <span>
                 <strong className="font-semibold text-foreground">
@@ -685,7 +691,7 @@ function SelectionPrompt({ scoped = false }: { scoped?: boolean }) {
       </span>
       <div className="max-w-sm space-y-1.5">
         <h3 className="font-display text-lg font-bold tracking-tight text-foreground">
-          Choisissez un groupe à afficher
+          {scoped ? "Choisissez un semestre et un groupe" : "Choisissez un groupe à afficher"}
         </h3>
         <p className="text-sm leading-relaxed text-muted-foreground">
           Sélectionnez{" "}

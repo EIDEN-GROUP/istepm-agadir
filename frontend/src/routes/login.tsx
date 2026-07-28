@@ -70,7 +70,7 @@ function LoginPage() {
             <img
               src="/istpm-logo.svg"
               alt="ISTEPM Agadir"
-              className="h-25 w-25 rounded-full"
+              className="h-28 w-28 rounded-full"
             />
           </span>
           <h1 className="mt-6 font-display text-2xl font-bold tracking-tight text-foreground">

@@ -726,7 +726,7 @@ html #root {
     min-width: 0 !important;
     width: 100%;
   }
-  /* En-tête masqué : l'intitulé est repris par chaque cellule (data-label). */
+
   [data-dashboard-main] table.dash-table thead {
     display: none;
   }
@@ -760,7 +760,7 @@ html #root {
   [data-dashboard-main] table.dash-table tbody td + td {
     border-top: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent) !important;
   }
-  /* Intitulé de colonne, à gauche de la valeur. */
+
   [data-dashboard-main] table.dash-table tbody td[data-label]::before {
     content: attr(data-label);
     flex: 0 0 auto;
@@ -772,11 +772,9 @@ html #root {
     color: var(--muted-foreground);
     text-align: start;
   }
-  /* Cellules sans intitulé utile (actions) : la valeur occupe toute la largeur. */
   [data-dashboard-main] table.dash-table tbody td:not([data-label]) {
     justify-content: flex-end;
   }
-  /* Cellule tronquée (nom, etc.) : autorisée à se replier sur mobile. */
   [data-dashboard-main] table.dash-table tbody td > .truncate,
   [data-dashboard-main] table.dash-table tbody td .max-w-\[15rem\] {
     max-width: none !important;
