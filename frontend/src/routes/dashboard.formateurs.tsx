@@ -877,3 +877,7 @@ function ArchiveFormateurDialog({
     </Dialog>
   );
 }
+
+export const Route = createFileRoute("/dashboard/formateurs")({
+  component: FormateursPage,
+});
