@@ -55,12 +55,12 @@ export function BrandLoader({
             initial={{ opacity: 0, scale: 0.6, y: 6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.7, ease: EASE }}
-            className="relative grid h-24 w-24 place-items-center rounded-[1.75rem] bg-card shadow-[var(--edge-highlight),var(--elevation-3)] ring-1 ring-brand/12"
+            className="relative grid place-items-center"
           >
             <motion.img
-              src="/istpm-logo-mark.svg"
+              src="/istpm-logo.svg"
               alt={`${label} logo`}
-              className="h-14 w-14"
+              className="h-28 w-28"
               animate={{ scale: [1, 1.06, 1] }}
               transition={{ duration: 2.2, ease: "easeInOut", repeat: Infinity }}
             />

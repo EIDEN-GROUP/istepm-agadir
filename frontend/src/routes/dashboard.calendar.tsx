@@ -21,10 +21,11 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth, getStoredRole } from "@/lib/auth";
+import { useAuth, DEMO_FORMATEUR_ID, getStoredRole } from "@/lib/auth";
 import { canAccess } from "@/lib/dashboard-i18n";
 import {
   useIstpm,
+  useCurrentFormateur,
   type Conflit,
   type ConflitCandidate,
 } from "@/lib/istpm-store";
@@ -118,7 +119,7 @@ function resumeConflits(conflits: Conflit[]) {
 /* ------------------------------------------------------------------ */
 
 function PlanningPage() {
-  const { role, selectedFormateurId } = useAuth();
+  const { role } = useAuth();
   const {
     seances,
     formateurs,
@@ -133,6 +134,7 @@ function PlanningPage() {
   // séances ; l'enseignant consulte uniquement son propre planning.
   const canEdit = role === "responsable" || role === "directeur";
   const estEnseignant = role === "enseignant";
+  const moiFormateur = useCurrentFormateur();
 
   const [vue, setVue] = useState<VueCalendrier>("semaine");
   const [curseur, setCurseur] = useState(() => new Date());
@@ -160,12 +162,13 @@ const [importOpen, setImportOpen] = useState(false);
   }, [formateurs]);
 
   /** L'enseignant ne voit que ses propres séances. */
+  const moiId = moiFormateur?.id ?? DEMO_FORMATEUR_ID;
   const visibles = useMemo(
     () =>
       estEnseignant
-        ? seances.filter((s) => s.professeurId === (selectedFormateurId ?? ""))
+        ? seances.filter((s) => s.professeurId === moiId)
         : seances,
-    [seances, estEnseignant, selectedFormateurId],
+    [seances, estEnseignant, moiId],
   );
 
   const modules = useMemo(

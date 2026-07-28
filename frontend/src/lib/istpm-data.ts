@@ -48603,6 +48603,28 @@ export const STATUT_FORMATEUR_TONE: Record<StatutFormateur, BadgeTone> = {
   en_conge: "amber",
 };
 
+export type GroupConfig = {
+  id: string;
+  name: string;
+  semester: string;
+  studentCount: number;
+};
+
+export const DEFAULT_GROUP_CONFIGS: GroupConfig[] = [
+  { id: "gc-1", name: "S1-A", semester: "S1", studentCount: 0 },
+  { id: "gc-2", name: "S1-B", semester: "S1", studentCount: 0 },
+  { id: "gc-3", name: "S2-A", semester: "S2", studentCount: 0 },
+  { id: "gc-4", name: "S2-B", semester: "S2", studentCount: 0 },
+  { id: "gc-5", name: "S3-G1", semester: "S3", studentCount: 0 },
+  { id: "gc-6", name: "S3-G2", semester: "S3", studentCount: 0 },
+  { id: "gc-7", name: "S4-G1", semester: "S4", studentCount: 0 },
+  { id: "gc-8", name: "S4-G2", semester: "S4", studentCount: 0 },
+  { id: "gc-9", name: "S5-G1", semester: "S5", studentCount: 0 },
+  { id: "gc-10", name: "S5-G2", semester: "S5", studentCount: 0 },
+  { id: "gc-11", name: "S6-G1", semester: "S6", studentCount: 0 },
+  { id: "gc-12", name: "S6-G2", semester: "S6", studentCount: 0 },
+];
+
 export type Formateur = {
   id: string;
   matricule: string;
@@ -48617,6 +48639,7 @@ export type Formateur = {
   telephone: string;
   email: string;
   notesSaisies: number;
+  archived?: boolean;
 };
 
 export const FORMATEURS: Formateur[] = [

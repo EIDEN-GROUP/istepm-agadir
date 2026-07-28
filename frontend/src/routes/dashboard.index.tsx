@@ -26,7 +26,7 @@ import {
   type LucideProps,
 } from "lucide-react";
 import { useAuth, ROLE_META } from "@/lib/auth";
-import { useIstpm } from "@/lib/istpm-store";
+import { useIstpm, useCurrentFormateur } from "@/lib/istpm-store";
 import {
   fmtMAD,
   fmtDate,
@@ -370,8 +370,8 @@ const RECOUV_COLORS = ["#029994", "#f0a92e", "#ee6c4d"];
 
 type PieDatum = { name: string; value: number; color: string };
 
-/** White percentage label centred on each donut slice (skips tiny slivers). */
-function renderDonutPct({
+/** White percentage label centred on each pie slice (skips tiny slivers). */
+function renderPiePct({
   cx, cy, midAngle, innerRadius, outerRadius, percent,
 }: {
   cx: number; cy: number; midAngle: number;
@@ -379,7 +379,9 @@ function renderDonutPct({
 }) {
   if (percent < 0.05) return null;
   const RAD = Math.PI / 180;
-  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+  // Sur un camembert plein (innerRadius 0), on place l'étiquette vers le centre
+  // de masse de la part (~0,6 du rayon) plutôt qu'à mi-hauteur de l'anneau.
+  const r = innerRadius + (outerRadius - innerRadius) * 0.6;
   const x = cx + r * Math.cos(-midAngle * RAD);
   const y = cy + r * Math.sin(-midAngle * RAD);
   return (
@@ -398,10 +400,11 @@ function renderDonutPct({
 }
 
 /**
- * Flat donut (reference « Mail Statistic » card): a clean ring with the share
- * printed in white on each slice, paired with a colour-dotted legend.
+ * Camembert plein : chaque part est remplie jusqu'au centre, la valeur en %
+ * imprimée en blanc dessus, avec une fine séparation blanche entre les parts,
+ * accompagné d'une légende à pastilles de couleur.
  */
-function RecouvrementDonut({ data }: { data: PieDatum[] }) {
+function RecouvrementPie({ data }: { data: PieDatum[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <PieChart>
@@ -411,15 +414,15 @@ function RecouvrementDonut({ data }: { data: PieDatum[] }) {
           nameKey="name"
           cx="50%"
           cy="50%"
-          innerRadius="56%"
+          innerRadius={0}
           outerRadius="92%"
-          paddingAngle={1.5}
+          paddingAngle={0}
           startAngle={90}
           endAngle={-270}
           stroke="var(--card)"
-          strokeWidth={3}
+          strokeWidth={2}
           labelLine={false}
-          label={renderDonutPct}
+          label={renderPiePct}
           animationDuration={600}
         >
           {data.map((d, i) => (
@@ -539,7 +542,7 @@ function MetricSwitchChart({
             className="flex h-full items-center gap-4"
           >
             <div className="h-full w-[52%] shrink-0">
-              <RecouvrementDonut
+              <RecouvrementPie
                 data={recouvrementData.map((d, i) => ({
                   ...d,
                   color: RECOUV_COLORS[i % RECOUV_COLORS.length],
@@ -948,9 +951,8 @@ function DashboardDirecteur() {
 
 function DashboardEnseignant() {
   const { tab, setTab, direction } = useTabs();
-  const { formateurs, seances, examens, bulletins, etudiants } = useIstpm();
-  const { selectedFormateurId } = useAuth();
-  const moi = formateurs.find((f) => f.id === selectedFormateurId);
+  const { seances, examens, bulletins, etudiants } = useIstpm();
+  const moi = useCurrentFormateur();
   const mesExamens = useMemo(() => (moi ? examens.filter((x) => moi.modules.includes(x.module)) : []), [examens, moi]);
   const seancesAujourdhui = useMemo(() => seances.filter((s) => s.date === today && s.professeurId === moi?.id), [seances, moi?.id]);
   const mesSeances = useMemo(() => seances.filter((s) => s.professeurId === moi?.id).slice().sort((a, b) => (a.date < b.date ? -1 : 1)), [seances, moi?.id]);

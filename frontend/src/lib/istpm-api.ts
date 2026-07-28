@@ -3,6 +3,7 @@ import { getStoredToken } from "@/lib/auth";
 import type {
   Etudiant,
   Formateur,
+  GroupConfig,
   Examen,
   Bulletin,
   Stage,
@@ -73,6 +74,34 @@ export function updateFormateur(id: string, data: Record<string, unknown>) {
 
 export function deleteFormateur(id: string) {
   return api.delete<{ ok: boolean }>(`/formateurs/${id}`);
+}
+
+export function archiveFormateur(id: string, data: { groupReassignments: Array<{ groupName: string; targetFormateurId: string }>; filiereReassignment?: { targetFormateurId: string } }) {
+  return api.post<Formateur>(`/formateurs/${id}/archive`, data);
+}
+
+export function restoreFormateur(id: string) {
+  return api.post<Formateur>(`/formateurs/${id}/restore`);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Group Configs                                                      */
+/* ------------------------------------------------------------------ */
+
+export function fetchGroupConfigs() {
+  return api.get<GroupConfig[]>("/settings/groups");
+}
+
+export function createGroupConfig(data: { name: string; semester: string; studentCount?: number }) {
+  return api.post<GroupConfig>("/settings/groups", data);
+}
+
+export function updateGroupConfig(id: string, data: { name?: string; semester?: string; studentCount?: number }) {
+  return api.put<GroupConfig>(`/settings/groups/${id}`, data);
+}
+
+export function deleteGroupConfig(id: string) {
+  return api.delete<{ ok: boolean }>(`/settings/groups/${id}`);
 }
 
 /* ------------------------------------------------------------------ */

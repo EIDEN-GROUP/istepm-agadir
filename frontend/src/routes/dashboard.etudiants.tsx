@@ -106,6 +106,7 @@ function EtudiantsPage() {
       filiere: currentFormateur.departement,
       niveaux,
       groupes: currentFormateur.groupes,
+      modules: currentFormateur.modules,
     };
   }, [isTeacher, currentFormateur]);
 
@@ -114,6 +115,7 @@ function EtudiantsPage() {
   const [niveau, setNiveau] = useState<string>(ALL);
   const [groupe, setGroupe] = useState<string>(ALL);
   const [statut, setStatut] = useState<string>(ALL);
+  const [moduleFilter, setModuleFilter] = useState<string>(ALL);
 
   // Groups relevant to the current filière / semestre choice, so the teacher's
   // group picker only offers real classes.
@@ -141,13 +143,17 @@ function EtudiantsPage() {
       setFiliere(enseignantScope.filiere);
       setNiveau(ALL);
       setGroupe(ALL);
+      setModuleFilter(ALL);
     }
   }, [enseignantScope]);
 
-  // Teacher must pick all three before the roster appears.
+  // Teacher must pick all three before the roster appears. Même avec une
+  // portée de formateur (filière verrouillée sur son département), on exige un
+  // choix explicite de semestre et de groupe : la table reste masquée tant que
+  // le formateur n'a pas sélectionné filière + semestre + groupe.
   const noFormateur = isTeacher && !selectedFormateurId;
   const needsSelection =
-    isTeacher && !noFormateur && !enseignantScope && (filiere === ALL || niveau === ALL || groupe === ALL);
+    isTeacher && !noFormateur && (filiere === ALL || niveau === ALL || groupe === ALL);
 
   const [detail, setDetail] = useState<Etudiant | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -303,6 +309,14 @@ function EtudiantsPage() {
                   options: groupeOptions,
                   allLabel: "Tous les groupes",
                 },
+                {
+                  id: "module",
+                  label: "Module",
+                  value: moduleFilter,
+                  onChange: setModuleFilter,
+                  options: enseignantScope.modules,
+                  allLabel: "Tous mes modules",
+                },
               ]
             : [
                 {
@@ -347,7 +361,7 @@ function EtudiantsPage() {
           noFormateur ? (
             <>Sélectionnez un formateur dans le menu de navigation.</>
           ) : needsSelection ? (
-            <>Choisissez une filière, un semestre et un groupe.</>
+            <>Choisissez une filière, un semestre et un groupe (ou un module).</>
           ) : enseignantScope ? (
             <div className="flex items-center gap-3">
               <span>
@@ -398,7 +412,7 @@ function EtudiantsPage() {
           </p>
         </div>
       ) : needsSelection ? (
-        <SelectionPrompt />
+        <SelectionPrompt scoped={!!enseignantScope} />
       ) : (
       <>
       <div className="flex items-center gap-3 rounded-2xl border border-brand/12 bg-card px-4 py-3">
@@ -436,7 +450,14 @@ function EtudiantsPage() {
             <th>Filière</th>
             <th className="text-center">Niveau</th>
             <th>Statut</th>
-            <th>Paiement</th>
+            {enseignantScope ? (
+              <>
+                <th className="text-center">Note</th>
+                <th className="text-right">Moyenne</th>
+              </>
+            ) : (
+              <th>Paiement</th>
+            )}
             <th className="w-28 text-center">Actions</th>
           </>
         }
@@ -476,11 +497,35 @@ function EtudiantsPage() {
                 {STATUT_ETUDIANT_LABEL[e.statut]}
               </span>
             </td>
-            <td>
-              <span className={toneBadge(STATUT_PAIEMENT_TONE[e.paiement])}>
-                {STATUT_PAIEMENT_LABEL[e.paiement]}
-              </span>
-            </td>
+            {enseignantScope ? (
+              <>
+                <td className="text-center">
+                  {(() => {
+                    const mNote = moduleFilter !== ALL
+                      ? e.notes.find((n) => n.module === moduleFilter)
+                      : null;
+                    return (
+                      <span className={toneBadge(mNote ? "teal" : "neutral")}>
+                        {mNote ? `${mNote.note.toFixed(1)}/20` : "—"}
+                      </span>
+                    );
+                  })()}
+                </td>
+                <td className="text-right tabular-nums">
+                  {e.moyenne > 0 ? (
+                    <span className="font-medium">{e.moyenne.toFixed(2)}</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+              </>
+            ) : (
+              <td>
+                <span className={toneBadge(STATUT_PAIEMENT_TONE[e.paiement])}>
+                  {STATUT_PAIEMENT_LABEL[e.paiement]}
+                </span>
+              </td>
+            )}
             <td
               className="text-center"
               onClick={(ev) => ev.stopPropagation()}
@@ -591,7 +636,7 @@ function EtudiantsPage() {
 /*  Invite de sélection (vue formateur)                                */
 /* ------------------------------------------------------------------ */
 
-function SelectionPrompt() {
+function SelectionPrompt({ scoped = false }: { scoped?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -606,13 +651,24 @@ function SelectionPrompt() {
       </span>
       <div className="max-w-sm space-y-1.5">
         <h3 className="font-display text-lg font-bold tracking-tight text-foreground">
-          Choisissez un groupe à afficher
+          {scoped ? "Choisissez un semestre et un groupe" : "Choisissez un groupe à afficher"}
         </h3>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Sélectionnez une <strong className="font-semibold text-foreground">filière</strong>,
-          un <strong className="font-semibold text-foreground">semestre</strong> et un{" "}
-          <strong className="font-semibold text-foreground">groupe</strong> ci-dessus pour
-          afficher la liste des étudiants concernés.
+          {scoped ? (
+            <>
+              Choisissez un <strong className="font-semibold text-foreground">semestre</strong>,
+              un <strong className="font-semibold text-foreground">groupe</strong>{" "}
+              (et éventuellement un <strong className="font-semibold text-foreground">module</strong>)
+              {" "}ci-dessus pour afficher les étudiants que vous enseignez.
+            </>
+          ) : (
+            <>
+              Sélectionnez une <strong className="font-semibold text-foreground">filière</strong>,
+              un <strong className="font-semibold text-foreground">semestre</strong> et un{" "}
+              <strong className="font-semibold text-foreground">groupe</strong> ci-dessus pour
+              afficher la liste des étudiants concernés.
+            </>
+          )}
         </p>
       </div>
     </motion.div>

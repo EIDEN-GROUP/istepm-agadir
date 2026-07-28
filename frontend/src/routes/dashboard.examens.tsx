@@ -15,9 +15,9 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth";
+import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
 import { deleteNote } from "@/lib/istpm-api";
-import { useIstpm, moyennePonderee } from "@/lib/istpm-store";
+import { useIstpm, useCurrentFormateur, moyennePonderee } from "@/lib/istpm-store";
 import {
   FILIERES,
   NIVEAUX,
@@ -370,10 +370,10 @@ function EspaceFormateur() {
     removeDocument,
   } = useIstpm();
 
-  // Le formateur connecté : ses examens seulement.
-  const { selectedFormateurId } = useAuth();
-  const moiId = selectedFormateurId ?? "";
-  const moi = formateurs.find((f) => f.id === moiId);
+  // Le formateur connecté : ses examens seulement. Résolu depuis le profil
+  // sélectionné (référentiel hydraté), avec repli sur le formateur de démo.
+  const moi = useCurrentFormateur();
+  const moiId = moi?.id ?? DEMO_FORMATEUR_ID;
 
   const [search, setSearch] = useState("");
   const [type, setType] = useState<string>(ALL);

@@ -12,6 +12,7 @@ import { bulletins } from "@/db/schema/bulletins";
 import { stages } from "@/db/schema/stages";
 import { historiquePaiements } from "@/db/schema/historique-paiements";
 import { notesEtudiant } from "@/db/schema/notes-etudiant";
+import { groupConfigs } from "@/db/schema/groupConfigs";
 import { eq, desc, asc } from "drizzle-orm";
 
 const settingSchema = z.object({
@@ -107,6 +108,55 @@ export async function settingsRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(levels).where(eq(levels.id, id));
+    return { ok: true };
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Group Configs                                                        */
+  /* ------------------------------------------------------------------ */
+  const groupConfigSchema = z.object({
+    name: z.string().min(1, "Nom du groupe requis"),
+    semester: z.string().min(1, "Semestre requis"),
+    studentCount: z.number().int().min(0).optional().default(0),
+  });
+
+  app.get("/groups", { preHandler: [authenticate] }, async () => {
+    const db = getDb();
+    return db.select().from(groupConfigs).orderBy(asc(groupConfigs.semester), asc(groupConfigs.name));
+  });
+
+  app.post("/groups", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const input = groupConfigSchema.parse(request.body);
+    const db = getDb();
+    try {
+      const [config] = await db.insert(groupConfigs).values(input).returning();
+      return config;
+    } catch {
+      return reply.status(409).send({ error: "Ce groupe existe déjà" });
+    }
+  });
+
+  app.put("/groups/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = groupConfigSchema.partial().parse(request.body);
+    const db = getDb();
+    const values: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(input)) {
+      if (val !== undefined) values[key] = val;
+    }
+    const [updated] = await db
+      .update(groupConfigs)
+      .set(values)
+      .where(eq(groupConfigs.id, id))
+      .returning();
+    if (!updated) return reply.status(404).send({ error: "Groupe introuvable" });
+    return updated;
+  });
+
+  app.delete("/groups/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+    const { id } = request.params as { id: string };
+    const db = getDb();
+    await db.delete(groupConfigs).where(eq(groupConfigs.id, id));
     return { ok: true };
   });
 

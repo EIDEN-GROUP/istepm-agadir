@@ -1,4 +1,10 @@
-import type { ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  type ReactNode,
+  type ReactElement,
+} from "react";
 import { Search, X, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
@@ -273,6 +279,49 @@ function FilterChip({
   );
 }
 
+/** Texte brut d'un nœud React (pour dériver l'intitulé d'une colonne). */
+function nodeText(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join("");
+  if (isValidElement(node))
+    return nodeText((node.props as { children?: ReactNode }).children);
+  return "";
+}
+
+/** Intitulés de colonnes, extraits des `<th>` de l'en-tête (dans l'ordre). */
+function headerLabels(head: ReactNode): string[] {
+  const ths = isValidElement(head)
+    ? Children.toArray((head.props as { children?: ReactNode }).children)
+    : Children.toArray(head);
+  return ths.map((th) =>
+    isValidElement(th) ? nodeText(th).replace(/\s+/g, " ").trim() : "",
+  );
+}
+
+/**
+ * Recopie l'intitulé de chaque colonne sur la cellule correspondante en
+ * `data-label`, ce qui alimente l'affichage « cartes » sur téléphone (voir
+ * styles.css). Purement additif : aucune cellule n'est modifiée autrement, et
+ * un `data-label` déjà présent est respecté.
+ */
+function withCellLabels(children: ReactNode, labels: string[]): ReactNode {
+  if (!labels.length) return children;
+  return Children.map(children, (row) => {
+    if (!isValidElement(row)) return row;
+    const rowEl = row as ReactElement<{ children?: ReactNode }>;
+    const cells = Children.toArray(rowEl.props.children);
+    const labelled = cells.map((cell, i) => {
+      if (!isValidElement(cell)) return cell;
+      const cellEl = cell as ReactElement<Record<string, unknown>>;
+      const label = labels[i];
+      if (!label || cellEl.props["data-label"] != null) return cell;
+      return cloneElement(cellEl, { "data-label": label });
+    });
+    return cloneElement(rowEl, undefined, labelled);
+  });
+}
+
 export function DataTable({
   head,
   children,
@@ -289,6 +338,7 @@ export function DataTable({
   /** Pied de tableau optionnel (ex. pagination), rendu à l'intérieur de la carte. */
   footer?: ReactNode;
 }) {
+  const labelled = withCellLabels(children, headerLabels(head));
   return (
     <motion.section
       initial={{ opacity: 0, y: 20 }}
@@ -297,13 +347,15 @@ export function DataTable({
       className={cn(softCard, "overflow-hidden")}
     >
       <div className={tableWrap}>
-        <table className={cn(tableEl, minWidth)}>
+        <table className={cn(tableEl, "dash-table", minWidth)}>
           <thead>
             <tr className={tableHead}>{head}</tr>
           </thead>
           {/* L'entrée des lignes est gérée par `motion.tr` dans chaque page :
-              pas d'animation CSS ici, sinon les deux se superposeraient. */}
-          <tbody className={tableBody}>{children}</tbody>
+              pas d'animation CSS ici, sinon les deux se superposeraient.
+              `labelled` = mêmes lignes, avec un `data-label` par cellule pour
+              l'affichage en cartes sur téléphone. */}
+          <tbody className={tableBody}>{labelled}</tbody>
         </table>
         <AnimatePresence>
           {isEmpty ? (

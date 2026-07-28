@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, BellRing, Eye, Receipt, ListChecks, CalendarDays, Search } from "lucide-react";
+import { Plus, BellRing, Eye, Receipt, ListChecks, CalendarDays, Search, Check, Clock, AlertTriangle, Ban } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -78,6 +78,13 @@ const MODES: LignePaiement["mode"][] = [
   "Chèque",
 ];
 const STATUTS: StatutPaiement[] = ["paye", "en_attente", "retard", "impaye"];
+
+const ICON_BY_STATUT: Record<StatutPaiement, typeof Check> = {
+  paye: Check,
+  en_attente: Clock,
+  retard: AlertTriangle,
+  impaye: Ban,
+};
 
 function PaiementsPage() {
   const { role } = useAuth();
@@ -465,55 +472,69 @@ function MonthlyTracker({
     : 0;
 
   return (
-    <section className={cn(softCard, "p-4 sm:p-5")}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <p className="max-w-xs text-sm text-muted-foreground">
-          Statut de règlement, mois par mois, pour un étudiant donné.
-        </p>
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="w-full sm:w-44">
-            <SelectField
-              label="Année universitaire"
-              value={academicYear}
-              onChange={onAcademicYearChange}
-              options={ANNEES_UNIVERSITAIRES.map((y) => ({
-                value: y,
-                label: `${y.replace("/", "–")}`,
+    <section className={cn(softCard, "overflow-hidden p-0")}>
+      {/* Gradient header */}
+      <div className="bg-gradient-to-r from-brand/10 via-brand/5 to-transparent px-5 pb-4 pt-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+          <div>
+            <h3 className="font-display text-base font-bold tracking-tight text-foreground">
+              Suivi mensuel
+            </h3>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Statut de règlement, mois par mois, pour un étudiant donné.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="w-full sm:w-44">
+              <SelectField
+                label="Année universitaire"
+                value={academicYear}
+                onChange={onAcademicYearChange}
+                options={ANNEES_UNIVERSITAIRES.map((y) => ({
+                  value: y,
+                  label: `${y.replace("/", "–")}`,
+                }))}
+              />
+            </div>
+            <div className="w-full max-w-xs">
+              <ComboBoxField
+              label="Étudiant"
+              value={etudiantId}
+              onChange={setEtudiantId}
+              options={etudiants.map((e) => ({
+                value: e.id,
+                label: `${e.prenom} ${e.nom}   ${e.cne}`,
               }))}
+              placeholder="Choisir un étudiant…"
+              searchPlaceholder="Nom, prénom ou CNE…"
+              emptyText="Aucun étudiant trouvé."
             />
           </div>
-          <div className="w-full max-w-xs">
-            <ComboBoxField
-            label="Étudiant"
-            value={etudiantId}
-            onChange={setEtudiantId}
-            options={etudiants.map((e) => ({
-              value: e.id,
-              label: `${e.prenom} ${e.nom}   ${e.cne}`,
-            }))}
-            placeholder="Choisir un étudiant…"
-            searchPlaceholder="Nom, prénom ou CNE…"
-            emptyText="Aucun étudiant trouvé."
-          />
         </div>
       </div>
-    </div>
+      </div>
 
       {etudiant ? (
         <>
-          <p className="mt-3 text-xs text-muted-foreground">
-            <strong className="font-semibold text-foreground">{nbRegles}</strong>{" "}
-            mois payé(s) sur {months.length} · <strong className="font-semibold text-foreground">{fmtMAD(etudiant.fraisMensuels)}</strong>/mois
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {months.map((m) => {
+          <div className="px-5 pt-4">
+            <p className="text-xs text-muted-foreground">
+              <strong className="font-semibold text-foreground">{nbRegles}</strong>{" "}
+              mois payé(s) sur {months.length} · <strong className="font-semibold text-foreground">{fmtMAD(etudiant.fraisMensuels)}</strong>/mois
+            </p>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2.5 px-5 pb-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            {months.map((m, i) => {
               const st = statutMois(m);
               const montant = montantMois(m);
+              const StatutIcon = ICON_BY_STATUT[st];
               return (
-                <div
+                <motion.div
                   key={m}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
                   className={cn(
-                    "rounded-2xl border px-3 py-2.5",
+                    "rounded-2xl border px-3 py-3",
                     st === "paye"
                       ? "border-brand/25 bg-brand/5"
                       : "border-brand/12 bg-muted/40",
@@ -523,9 +544,9 @@ function MonthlyTracker({
                     <p className="text-xs font-semibold capitalize text-foreground">
                       {m}
                     </p>
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: TONE_COLORS[STATUT_PAIEMENT_TONE[st]] }}
+                    <StatutIcon
+                      className="h-4 w-4 shrink-0"
+                      style={{ color: TONE_COLORS[STATUT_PAIEMENT_TONE[st]] }}
                     />
                   </div>
                   {canEdit ? (
@@ -544,7 +565,13 @@ function MonthlyTracker({
                       <SelectContent className={softSelectContent}>
                         {STATUTS.map((s) => (
                           <SelectItem key={s} value={s} className="text-xs">
-                            {STATUT_PAIEMENT_LABEL[s]}
+                            <span className="flex items-center gap-1.5">
+                              {(() => {
+                                const Icn = ICON_BY_STATUT[s];
+                                return <Icn className="h-3.5 w-3.5" />;
+                              })()}
+                              {STATUT_PAIEMENT_LABEL[s]}
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -561,13 +588,13 @@ function MonthlyTracker({
                       {fmtMAD(montant)}
                     </p>
                   ) : null}
-                </div>
+                </motion.div>
               );
             })}
           </div>
         </>
       ) : (
-        <p className="mt-4 text-sm text-muted-foreground">
+        <p className="px-5 pb-5 pt-4 text-sm text-muted-foreground">
           Sélectionner un étudiant pour afficher son suivi mensuel.
         </p>
       )}
@@ -708,9 +735,9 @@ function PaiementForm({
     etudiantId: "",
     montant: "" as number | "",
     mode: "Espèces" as LignePaiement["mode"],
+    statut: "paye" as StatutPaiement,
     mois: getDefaultMois(academicYear),
     date: new Date().toISOString().slice(0, 10),
-    statut: "paye" as StatutPaiement,
   });
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
@@ -788,6 +815,15 @@ function PaiementForm({
         value={f.mode}
         onChange={(v) => set("mode", v)}
         options={MODES}
+      />
+      <SelectField
+        label="Statut"
+        value={f.statut}
+        onChange={(v) => set("statut", v)}
+        options={STATUTS.map((s) => ({
+          value: s,
+          label: STATUT_PAIEMENT_LABEL[s],
+        }))}
       />
       <SelectField
         label="Mois réglé"
