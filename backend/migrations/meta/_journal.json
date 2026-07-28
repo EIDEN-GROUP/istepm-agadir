@@ -64,6 +64,13 @@
       "when": 1785157416990,
       "tag": "0008_jazzy_masked_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785200000000,
+      "tag": "0009_add_document_columns",
+      "breakpoints": true
     }
   ]
 }

@@ -121,7 +121,7 @@ function useTabs(initial = 0) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Header — solid brand band                                          */
+/*  Header   solid brand band                                          */
 /* ------------------------------------------------------------------ */
 
 function DashHero({ chips }: { chips: { label: string; value: string | number }[] }) {
@@ -748,7 +748,7 @@ function ExamensRecentsTable({ examens }: { examens: Examen[] }) {
         <TableCard>
           <table className="w-full min-w-[560px] text-left text-sm">
             <thead className={TH}>
-              <tr><th className="px-4 py-3">Titre</th><th className="px-4 py-3">Module</th><th className="px-4 py-3">Classe</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Statut</th></tr>
+              <tr><th className="px-4 py-3">Titre</th><th className="px-4 py-3">Module</th><th className="px-4 py-3">Groupe</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Statut</th></tr>
             </thead>
             <tbody className="divide-y divide-brand/8">
               {rows.map((ex) => (
@@ -954,7 +954,16 @@ function DashboardEnseignant() {
   const mesExamens = useMemo(() => (moi ? examens.filter((x) => moi.modules.includes(x.module)) : []), [examens, moi]);
   const seancesAujourdhui = useMemo(() => seances.filter((s) => s.date === today && s.professeurId === moi?.id), [seances, moi?.id]);
   const mesSeances = useMemo(() => seances.filter((s) => s.professeurId === moi?.id).slice().sort((a, b) => (a.date < b.date ? -1 : 1)), [seances, moi?.id]);
-  const mesEtudiants = useMemo(() => (moi ? etudiants.filter((e) => moi.groupes.includes(`${e.niveau}-${e.groupe}`)) : []), [etudiants, moi]);
+  // Tous les étudiants de la filière du formateur dans les semestres qu'il
+  // enseigne (préfixe de ses groupes : « S5-G1 » → « S5 »), sans restriction de
+  // sous-groupe — le professeur voit ainsi l'intégralité de ses promotions.
+  const mesEtudiants = useMemo(() => {
+    if (!moi) return [];
+    const niveaux = new Set(moi.groupes.map((g) => g.split("-")[0]));
+    return etudiants.filter(
+      (e) => e.filiere === moi.departement && niveaux.has(e.niveau),
+    );
+  }, [etudiants, moi]);
   const mesBulletins = useMemo(() => (moi ? bulletins.filter((b) => moi.modules.some((m) => b.notes?.some((n) => n.module === m))) : []), [bulletins, moi]);
   const calendrierProche = useMemo(() => mesSeances.filter((s) => s.date >= today).slice(0, 8), [mesSeances]);
   if (!moi) return <EmptyState icon={GraduationCap}>Aucun formateur enregistré.</EmptyState>;

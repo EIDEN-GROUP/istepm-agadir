@@ -178,10 +178,34 @@ type SeedExam = {
 };
 
 /**
+ * Récupère le sujet réel livré dans `public/exam-sujets/`.
+ *
+ * L'`id` du document encode le nom de fichier : `doc-ex-<slug>` → le PDF vit à
+ * `/exam-sujets/<slug>.pdf`. Renvoie `null` si le fichier est absent (l'appelant
+ * se rabat alors sur un PDF de remplacement généré localement).
+ */
+async function fetchSeedSujet(docId: string): Promise<Blob | null> {
+  const slug = docId.replace(/^doc-ex-/, "");
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}exam-sujets/${slug}.pdf`);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    // Un 404 renvoyé en HTML (dev server) ne doit pas être stocké comme PDF.
+    if (blob.type.includes("html") || blob.size === 0) return null;
+    return blob;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Crée les fichiers manquants des sujets livrés avec le jeu de démonstration,
  * pour que « Voir » et « Télécharger » fonctionnent dès la première ouverture.
- * Les fichiers déjà présents (y compris ceux déposés par l'utilisateur) ne sont
- * jamais écrasés.
+ *
+ * Le sujet réel (fourni dans `public/exam-sujets/`) est chargé en priorité ;
+ * s'il est introuvable, un PDF de remplacement lisible est généré. Les fichiers
+ * déjà présents (y compris ceux déposés par l'utilisateur) ne sont jamais
+ * écrasés.
  */
 export async function ensureSeedDocuments(
   exams: SeedExam[],
@@ -199,19 +223,21 @@ export async function ensureSeedDocuments(
         sizes[doc.id] = existing.size;
         continue;
       }
-      const blob = makePlaceholderPdf([
-        "ISTEPM Agadir  - Institut specialise des techniques paramedicales",
-        "",
-        exam.titre,
-        "",
-        `Module : ${exam.module}`,
-        `Filiere : ${exam.filiere}`,
-        `Classe : ${exam.classe} (${exam.niveau})`,
-        `Date : ${exam.date}`,
-        `Salle : ${exam.salle}`,
-        "",
-        "Document de demonstration genere localement.",
-      ]);
+      const blob =
+        (await fetchSeedSujet(doc.id)) ??
+        makePlaceholderPdf([
+          "ISTEPM Agadir  - Institut specialise des techniques paramedicales",
+          "",
+          exam.titre,
+          "",
+          `Module : ${exam.module}`,
+          `Filiere : ${exam.filiere}`,
+          `Classe : ${exam.classe} (${exam.niveau})`,
+          `Date : ${exam.date}`,
+          `Salle : ${exam.salle}`,
+          "",
+          "Document de demonstration genere localement.",
+        ]);
       await putDoc(doc.id, blob);
       sizes[doc.id] = blob.size;
     } catch {

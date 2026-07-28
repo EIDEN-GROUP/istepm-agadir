@@ -349,7 +349,7 @@ export function AiChatFloating() {
               {pendingActions.length > 0 && (
                 <div className="space-y-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Actions proposées — veuillez confirmer
+                    Actions proposées   veuillez confirmer
                   </p>
                   {pendingActions.map((a, i) => (
                     <ActionCard

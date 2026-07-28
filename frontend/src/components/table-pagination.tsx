@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Nombre de lignes affichées par page dans les tableaux du dashboard. */
-export const TABLE_PAGE_SIZE = 5;
+export const TABLE_PAGE_SIZE = 6;
 
 /**
  * Découpe une liste déjà filtrée en pages.

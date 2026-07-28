@@ -42,12 +42,14 @@ import {
   DetailShell,
   ALL,
 } from "@/components/dash-page";
+import { usePagination, TablePagination } from "@/components/table-pagination";
 import {
   FormDialog,
   ConfirmDialog,
   TextField,
   SelectField,
   ListField,
+  MultiSelectField,
   FullWidth,
   parseList,
 } from "@/components/dash-form";
@@ -64,9 +66,23 @@ const STATUTS: StatutFormateur[] = ["permanent", "vacataire", "en_conge"];
 
 function FormateursPage() {
   const { role } = useAuth();
-  const { formateurs, addFormateur, updateFormateur, deleteFormateur } =
+  const { formateurs, modules, addFormateur, updateFormateur, deleteFormateur } =
     useIstpm();
   const canEdit = role === "directeur" || role === "responsable";
+
+  /** Options du sélecteur : registre des modules (Paramètres › Modules),
+   *  complété par les modules déjà affectés à un formateur pour ne perdre
+   *  aucune valeur existante. */
+  const modulesDisponibles = useMemo(
+    () =>
+      [
+        ...new Set([
+          ...modules.map((m) => m.nom),
+          ...formateurs.flatMap((f) => f.modules),
+        ]),
+      ].sort(),
+    [modules, formateurs],
+  );
 
   const [search, setSearch] = useState("");
   const [departement, setDepartement] = useState<string>(ALL);
@@ -89,6 +105,8 @@ function FormateursPage() {
         .includes(q);
     });
   }, [formateurs, search, departement, grade]);
+
+  const pager = usePagination(filtered, `${search}|${departement}|${grade}`);
 
   const colonnesImportFormateurs: ImportColumn[] = [
     { key: "matricule", label: "Matricule", required: true },
@@ -214,6 +232,16 @@ function FormateursPage() {
       <DataTable
         isEmpty={filtered.length === 0}
         empty="Aucun formateur ne correspond à ces critères."
+        footer={
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            pageSize={pager.pageSize}
+            onPage={pager.setPage}
+            label="formateurs"
+          />
+        }
         head={
           <>
             <th>Matricule</th>
@@ -226,7 +254,7 @@ function FormateursPage() {
           </>
         }
       >
-        {filtered.map((f, i) => (
+        {pager.pageItems.map((f, i) => (
           <motion.tr
             key={f.id}
             initial={{ opacity: 0, x: -8 }}
@@ -395,6 +423,7 @@ function FormateursPage() {
         <FormateurForm
           key={editing?.id ?? "new"}
           initial={editing}
+          modulesDisponibles={modulesDisponibles}
           onCancel={() => setFormOpen(false)}
     onSubmit={(data) => {
       if (editing) {
@@ -455,6 +484,7 @@ function FormateurForm({
   initial,
   onSubmit,
   onCancel,
+  modulesDisponibles,
 }: {
   initial: Formateur | null;
   onSubmit: (data: {
@@ -472,6 +502,7 @@ function FormateurForm({
     password?: string;
   }) => void;
   onCancel: () => void;
+  modulesDisponibles: string[];
 }) {
   const [f, setF] = useState(() => ({
     matricule:
@@ -584,12 +615,14 @@ function FormateurForm({
         />
       </FullWidth>
       <FullWidth>
-        <ListField
+        <MultiSelectField
           label="Modules enseignés"
           value={f.modules}
           onChange={(v) => set("modules", v)}
-          placeholder="Soins infirmiers en médecine, Hygiène hospitalière"
+          options={modulesDisponibles.map((m) => ({ value: m, label: m }))}
+          placeholder="Sélectionner les modules…"
           error={errors.modules}
+          required
         />
       </FullWidth>
       <FullWidth>

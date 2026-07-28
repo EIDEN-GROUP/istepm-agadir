@@ -57,6 +57,7 @@ import {
   DetailShell,
   ALL,
 } from "@/components/dash-page";
+import { usePagination, TablePagination } from "@/components/table-pagination";
 import {
   FormDialog,
   ConfirmDialog,
@@ -301,6 +302,8 @@ function StagesPage() {
     });
   }, [stages, search, filiere, structure, statut]);
 
+  const pager = usePagination(filtered, `${search}|${filiere}|${structure}|${statut}`);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -359,6 +362,16 @@ function StagesPage() {
         minWidth="min-w-[1150px]"
         isEmpty={filtered.length === 0}
         empty="Aucun stage ne correspond à ces critères."
+        footer={
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            pageSize={pager.pageSize}
+            onPage={pager.setPage}
+            label="stages"
+          />
+        }
         head={
           <>
             <th>Étudiant</th>
@@ -370,7 +383,7 @@ function StagesPage() {
           </>
         }
       >
-        {filtered.map((s, i) => (
+        {pager.pageItems.map((s, i) => (
           <motion.tr
             key={s.id}
             initial={{ opacity: 0, x: -8 }}

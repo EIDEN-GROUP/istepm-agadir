@@ -68,6 +68,7 @@ import {
   DetailShell,
   ALL,
 } from "@/components/dash-page";
+import { usePagination, TablePagination } from "@/components/table-pagination";
 import {
   FormDialog,
   ConfirmDialog,
@@ -283,7 +284,7 @@ function InfosExamen({
         <DetailGrid>
           <DetailField label="Module" value={examen.module} full />
           <DetailField label="Filière" value={examen.filiere} full />
-          <DetailField label="Classe / groupe" value={examen.classe} />
+          <DetailField label="Groupe" value={examen.classe} />
           <DetailField label="Semestre" value={examen.niveau} />
           <DetailField
             label="Année universitaire"
@@ -410,6 +411,8 @@ function EspaceFormateur() {
     });
   }, [mesExamens, search, type, niveau, sujet]);
 
+  const pager = usePagination(filtered, `${search}|${type}|${niveau}|${sujet}`);
+
   const sansSujet = mesExamens.filter((x) => !x.document).length;
 
   return (
@@ -462,7 +465,7 @@ function EspaceFormateur() {
       <FilterPanel
         search={search}
         onSearch={setSearch}
-        placeholder="Rechercher par titre, module, classe, salle…"
+        placeholder="Rechercher par titre, module, groupe, salle…"
         filters={[
           {
             id: "type",
@@ -507,19 +510,29 @@ function EspaceFormateur() {
             ? "Vous n'avez pas encore créé d'examen."
             : "Aucun examen ne correspond à ces critères."
         }
+        footer={
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            pageSize={pager.pageSize}
+            onPage={pager.setPage}
+            label="examens"
+          />
+        }
         head={
           <>
             <th>Examen</th>
-            <th>Classe</th>
+            <th>Groupe</th>
             <th>Type</th>
             <th>Date</th>
-            <th>Sujet</th>
+            <th>Année scolaire</th>
             <th>Statut</th>
             <th className="w-32 text-center">Actions</th>
           </>
         }
       >
-        {filtered.map((x, i) => (
+        {pager.pageItems.map((x, i) => (
           <motion.tr
             key={x.id}
             initial={{ opacity: 0, x: -8 }}
@@ -534,9 +547,7 @@ function EspaceFormateur() {
               {TYPE_EXAMEN_LABEL[x.type]}
             </td>
             <td>{fmtDate(x.date)}</td>
-            <td>
-              <DocumentBadge examen={x} />
-            </td>
+            <td>{x.anneeUniversitaire}</td>
             <td>
               <span className={toneBadge(STATUT_EXAMEN_TONE[x.statut])}>
                 {STATUT_EXAMEN_LABEL[x.statut]}
@@ -714,6 +725,11 @@ function EspaceDirecteur() {
     });
   }, [examens, formateurs, search, prof, module, classe, semestre, annee]);
 
+  const pager = usePagination(
+    filtered,
+    `${search}|${prof}|${module}|${classe}|${semestre}|${annee}`,
+  );
+
   const avecSujet = filtered.filter((x) => x.document).length;
 
   return (
@@ -731,7 +747,7 @@ function EspaceDirecteur() {
       <FilterPanel
         search={search}
         onSearch={setSearch}
-        placeholder="Rechercher par titre, module, classe, formateur, fichier…"
+        placeholder="Rechercher par titre, module, groupe, formateur, fichier…"
         filters={[
           {
             id: "prof",
@@ -750,12 +766,12 @@ function EspaceDirecteur() {
             allLabel: "Tous les modules",
           },
           {
-            id: "classe",
-            label: "Classe",
+            id: "groupe",
+            label: "Groupe",
             value: classe,
             onChange: setClasse,
             options: classes,
-            allLabel: "Toutes les classes",
+            allLabel: "Tous les groupes",
           },
           {
             id: "semestre",
@@ -788,20 +804,31 @@ function EspaceDirecteur() {
         minWidth="min-w-[1250px]"
         isEmpty={filtered.length === 0}
         empty="Aucun examen ne correspond à ces critères."
+        footer={
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            pageSize={pager.pageSize}
+            onPage={pager.setPage}
+            label="examens"
+          />
+        }
         head={
           <>
             <th>Examen</th>
             <th>Module</th>
-            <th>Classe</th>
+            <th>Groupe</th>
             <th>Type</th>
             <th>Date</th>
+            <th>Année scolaire</th>
             <th>Formateur</th>
-            <th>Sujet</th>
+            <th>Statut</th>
             <th className="w-24 text-center">Actions</th>
           </>
         }
       >
-        {filtered.map((x, i) => (
+        {pager.pageItems.map((x, i) => (
           <motion.tr
             key={x.id}
             initial={{ opacity: 0, x: -8 }}
@@ -819,11 +846,14 @@ function EspaceDirecteur() {
               {TYPE_EXAMEN_LABEL[x.type]}
             </td>
             <td>{fmtDate(x.date)}</td>
+            <td>{x.anneeUniversitaire}</td>
             <td className={cellTruncate}>
               {nomFormateur(formateurs, x.createdBy)}
             </td>
             <td>
-              <DocumentBadge examen={x} />
+              <span className={toneBadge(STATUT_EXAMEN_TONE[x.statut])}>
+                {STATUT_EXAMEN_LABEL[x.statut]}
+              </span>
             </td>
             <td
               className="text-center"
@@ -953,9 +983,33 @@ function ExamenForm({
   const [removeExisting, setRemoveExisting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
+  /* Référentiel des modules (Paramètres › Modules) : chaque module connaît sa
+     filière, ce qui permet de la pré-remplir à la sélection. */
+  const { modules: modulesReg } = useIstpm();
+
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => {
     setF((prev) => ({ ...prev, [k]: v }));
     setErrors((prev) => ({ ...prev, [k]: undefined }));
+  };
+
+  /** Options du sélecteur de module : le référentiel, complété par la valeur
+   *  déjà saisie sur un examen existant pour ne rien perdre à l'édition. */
+  const moduleOptions = useMemo(() => {
+    const noms = new Set(modulesReg.map((m) => m.nom));
+    if (f.module.trim() && !noms.has(f.module)) noms.add(f.module);
+    return [...noms].sort().map((nom) => ({ value: nom, label: nom }));
+  }, [modulesReg, f.module]);
+
+  /** Sélection d'un module : renseigne le module et, si le référentiel connaît
+   *  sa filière, l'associe automatiquement à l'examen. */
+  const onModuleChange = (nom: string) => {
+    const found = modulesReg.find((m) => m.nom === nom);
+    setF((prev) => ({
+      ...prev,
+      module: nom,
+      filiere: (found ? (found.filiere as Filiere) : prev.filiere),
+    }));
+    setErrors((prev) => ({ ...prev, module: undefined, filiere: undefined }));
   };
 
   const submit = () => {
@@ -964,7 +1018,7 @@ function ExamenForm({
     if (!f.module.trim()) next.module = "Module obligatoire";
     if (!f.filiere) next.filiere = "Filière obligatoire";
     if (!f.niveau) next.niveau = "Semestre obligatoire";
-    if (!f.classe.trim()) next.classe = "Classe obligatoire";
+    if (!f.classe.trim()) next.classe = "Groupe obligatoire";
     if (!f.date) next.date = "Date obligatoire";
     if (!f.salle.trim()) next.salle = "Salle obligatoire";
     if (!/^\d{2}:\d{2}$/.test(f.heure)) next.heure = "Format attendu HH:MM";
@@ -1025,12 +1079,15 @@ function ExamenForm({
         />
       </FullWidth>
       <FullWidth>
-        <TextField
+        <ComboBoxField
           label="Module"
           required
           value={f.module}
-          onChange={(v) => set("module", v)}
-          placeholder="Soins infirmiers en médecine"
+          onChange={onModuleChange}
+          options={moduleOptions}
+          placeholder="Sélectionner le module…"
+          searchPlaceholder="Rechercher un module…"
+          emptyText="Aucun module. Ajoutez-en dans Paramètres › Modules."
           error={errors.module}
         />
       </FullWidth>
@@ -1053,7 +1110,7 @@ function ExamenForm({
         error={errors.niveau}
       />
       <TextField
-        label="Classe / groupe"
+        label="Groupe"
         required
         value={f.classe}
         onChange={(v) => set("classe", v)}
@@ -1278,6 +1335,8 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
     return rows.reverse();
   }, [etudiants]);
 
+  const notesPager = usePagination(notesSaisies, notesSaisies.length);
+
   const removeNote = (etudiantId: string, module: string) => {
     const e = etudiants.find((x) => x.id === etudiantId);
     if (!e) return;
@@ -1384,6 +1443,16 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
         minWidth="min-w-[820px]"
         isEmpty={notesSaisies.length === 0}
         empty="Aucune note enregistrée pour le moment."
+        footer={
+          <TablePagination
+            page={notesPager.page}
+            pageCount={notesPager.pageCount}
+            total={notesPager.total}
+            pageSize={notesPager.pageSize}
+            onPage={notesPager.setPage}
+            label="notes"
+          />
+        }
         head={
           <>
             <th>Étudiant</th>
@@ -1395,7 +1464,7 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
           </>
         }
       >
-        {notesSaisies.map((r, i) => (
+        {notesPager.pageItems.map((r, i) => (
           <motion.tr
             key={r.key}
             initial={{ opacity: 0, x: -8 }}

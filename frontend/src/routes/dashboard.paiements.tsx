@@ -43,6 +43,7 @@ import {
   DetailField,
   ALL,
 } from "@/components/dash-page";
+import { usePagination, TablePagination } from "@/components/table-pagination";
 import {
   FormDialog,
   TextField,
@@ -106,6 +107,8 @@ function PaiementsPage() {
         .includes(q);
     });
   }, [paiements, search, filiere, statut]);
+
+  const pager = usePagination(filtered, `${search}|${filiere}|${statut}`);
 
   const kpis = [
     { label: "Encaissé", value: fmtMAD(financier.encaisse), tone: "teal" },
@@ -210,6 +213,16 @@ function PaiementsPage() {
         minWidth="min-w-[950px]"
         isEmpty={filtered.length === 0}
         empty="Aucun paiement ne correspond à ces critères."
+        footer={
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            pageSize={pager.pageSize}
+            onPage={pager.setPage}
+            label="paiements"
+          />
+        }
         head={
           <>
             <th>Étudiant</th>
@@ -222,7 +235,7 @@ function PaiementsPage() {
           </>
         }
       >
-        {filtered.map((p, i) => (
+        {pager.pageItems.map((p, i) => (
           <motion.tr
             key={p.id}
             initial={{ opacity: 0, x: -8 }}
@@ -580,7 +593,7 @@ function StudentSearchField({
   error?: string;
 }) {
   const label = (s: { prenom: string; nom: string; cne: string }) =>
-    `${s.prenom} ${s.nom} — ${s.cne}`;
+    `${s.prenom} ${s.nom}   ${s.cne}`;
   const selected = students.find((s) => s.id === value);
   const [query, setQuery] = useState(selected ? label(selected) : "");
   const [open, setOpen] = useState(false);

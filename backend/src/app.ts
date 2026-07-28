@@ -39,6 +39,7 @@ import { reminderRoutes } from "@/routes/reminders";
 import { reportRoutes } from "@/routes/reports";
 import { noteRoutes } from "@/routes/notes";
 import { agentRoutes } from "@/routes/agent";
+import { ensureBucket } from "@/lib/minio";
 
 export async function buildApp() {
   const env = getEnv();
@@ -65,6 +66,9 @@ export async function buildApp() {
     max: 100,
     timeWindow: "1 minute",
   });
+
+  // Ensure MinIO bucket exists (non-blocking; app works without it)
+  ensureBucket().catch(() => {});
 
   app.setErrorHandler(errorHandler);
 

@@ -1455,7 +1455,7 @@ function ImportCsvDialog({
                           mapping.get(col) ? "" : "border-alert/40 text-alert",
                         )}
                       >
-                        <option value="">— Non mappé —</option>
+                        <option value="">  Non mappé  </option>
                         {colonneDispo.map((h) => (
                           <option key={h} value={h}>
                             {h}

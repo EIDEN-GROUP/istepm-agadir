@@ -279,12 +279,15 @@ export function DataTable({
   empty,
   isEmpty,
   minWidth,
+  footer,
 }: {
   head: ReactNode;
   children: ReactNode;
   empty: string;
   isEmpty: boolean;
   minWidth?: string;
+  /** Pied de tableau optionnel (ex. pagination), rendu à l'intérieur de la carte. */
+  footer?: ReactNode;
 }) {
   return (
     <motion.section
@@ -293,7 +296,7 @@ export function DataTable({
       transition={{ duration: 0.35, delay: 0.1, ease: "easeOut" }}
       className={cn(softCard, "overflow-hidden")}
     >
-      <div className={cn(tableWrap, "scroll-touch max-h-[72vh] overflow-y-auto")}>
+      <div className={tableWrap}>
         <table className={cn(tableEl, minWidth)}>
           <thead>
             <tr className={tableHead}>{head}</tr>
@@ -315,6 +318,8 @@ export function DataTable({
           ) : null}
         </AnimatePresence>
       </div>
+      {/* Le pied (pagination) reste hors de la zone défilante, collé au bas de la carte. */}
+      {footer}
     </motion.section>
   );
 }

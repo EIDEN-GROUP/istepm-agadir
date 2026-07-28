@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import {
   Plus,
   Trash2,
@@ -34,6 +34,7 @@ import {
   ANNEES_UNIVERSITAIRES,
   TYPE_EXAMEN_LABEL,
   fmtMAD,
+  type ModuleRecord,
 } from "@/lib/istpm-data";
 import { useIstpm } from "@/lib/istpm-store";
 import {
@@ -53,7 +54,14 @@ import {
   type RoleRecord,
   type UserRecord,
 } from "@/lib/istpm-api";
-import { ConfirmDialog } from "@/components/dash-form";
+import {
+  ConfirmDialog,
+  FormDialog,
+  TextField,
+  NumberField,
+  ComboBoxField,
+  FullWidth,
+} from "@/components/dash-form";
 import {
   softCard,
   primaryPill,
@@ -356,6 +364,269 @@ function ChampReglage({
         ) : null}
       </span>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Modules   registre des modules rattachés à une filière             */
+/* ------------------------------------------------------------------ */
+
+type ModuleForm = {
+  nom: string;
+  filiere: string;
+  code: string;
+  volumeHoraire: number | "";
+  coefficient: number | "";
+  description: string;
+};
+
+const EMPTY_MODULE_FORM: ModuleForm = {
+  nom: "",
+  filiere: "",
+  code: "",
+  volumeHoraire: "",
+  coefficient: "",
+  description: "",
+};
+
+/**
+ * Registre des modules : chaque module appartient à une filière (obligatoire).
+ * La liste des filières provient du même référentiel que le reste de
+ * l'application ; un module ne peut être enregistré sans filière associée.
+ */
+function ModulesSection({ filieres }: { filieres: string[] }) {
+  const { modules, addModule, updateModule, deleteModule } = useIstpm();
+  const [filtre, setFiltre] = useState<string>("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<ModuleRecord | null>(null);
+  const [form, setForm] = useState<ModuleForm>(EMPTY_MODULE_FORM);
+  const [errors, setErrors] = useState<{ nom?: string; filiere?: string }>({});
+  const [toDelete, setToDelete] = useState<ModuleRecord | null>(null);
+
+  const filtres = filtre ? modules.filter((m) => m.filiere === filtre) : modules;
+  const set = <K extends keyof ModuleForm>(k: K, v: ModuleForm[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ ...EMPTY_MODULE_FORM, filiere: filtre });
+    setErrors({});
+    setDialogOpen(true);
+  };
+
+  const openEdit = (m: ModuleRecord) => {
+    setEditing(m);
+    setForm({
+      nom: m.nom,
+      filiere: m.filiere,
+      code: m.code ?? "",
+      volumeHoraire: m.volumeHoraire ?? "",
+      coefficient:
+        m.coefficient === null || m.coefficient === undefined
+          ? ""
+          : Number(m.coefficient),
+      description: m.description ?? "",
+    });
+    setErrors({});
+    setDialogOpen(true);
+  };
+
+  const submit = () => {
+    const next: typeof errors = {};
+    if (!form.nom.trim()) next.nom = "Nom du module obligatoire";
+    if (!form.filiere.trim()) next.filiere = "La filière est obligatoire";
+    setErrors(next);
+    if (Object.keys(next).length) return;
+
+    const payload = {
+      nom: form.nom.trim(),
+      filiere: form.filiere.trim(),
+      code: form.code.trim() || null,
+      description: form.description.trim() || null,
+      volumeHoraire: form.volumeHoraire === "" ? null : Number(form.volumeHoraire),
+      coefficient: form.coefficient === "" ? null : Number(form.coefficient),
+    };
+
+    if (editing) {
+      updateModule(editing.id, payload);
+      toast.success("Module mis à jour");
+    } else {
+      addModule(payload);
+      toast.success(`Module ajouté   ${payload.nom}`);
+    }
+    setDialogOpen(false);
+  };
+
+  const confirmDelete = () => {
+    if (!toDelete) return;
+    const t = toDelete;
+    setToDelete(null);
+    deleteModule(t.id);
+    toast.success(`Module supprimé   ${t.nom}`);
+  };
+
+  const noFilieres = filieres.length === 0;
+
+  return (
+    <Carte
+      id="modules"
+      action={
+        <div className="flex items-center gap-2">
+          <span className={toneBadge("neutral")}>{modules.length}</span>
+          <button
+            type="button"
+            onClick={openCreate}
+            disabled={noFilieres}
+            className={cn(ghostPill, "h-7 gap-1 px-2.5 text-[11px]", noFilieres && "cursor-not-allowed opacity-50")}
+          >
+            <Plus className="h-3 w-3" /> Ajouter
+          </button>
+        </div>
+      }
+    >
+      {noFilieres ? (
+        <p className="rounded-xl bg-brand/8 px-3 py-2.5 text-[11px] text-brand-dk">
+          Ajoutez d'abord au moins une filière pour créer des modules.
+        </p>
+      ) : (
+        <>
+          {filieres.length > 1 ? (
+            <select
+              value={filtre}
+              onChange={(e) => setFiltre(e.target.value)}
+              className={cn(
+                "mb-3 h-8 w-full rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none",
+                "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
+              )}
+            >
+              <option value="">Toutes les filières</option>
+              {filieres.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          ) : null}
+
+          <div className="max-h-80 space-y-1.5 overflow-y-auto">
+            {filtres.length === 0 ? (
+              <p className="py-3 text-center text-xs text-muted-foreground">
+                Aucun module.
+              </p>
+            ) : (
+              filtres.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-brand/12 px-3 py-2"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">
+                      {m.nom}
+                    </span>
+                    <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span className="inline-flex items-center rounded-md bg-brand/10 px-1.5 py-0.5 font-medium text-brand-dk">
+                        {m.filiere}
+                      </span>
+                      {m.code ? <span>· {m.code}</span> : null}
+                      {m.coefficient ? <span>· coef {m.coefficient}</span> : null}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      aria-label={`Modifier ${m.nom}`}
+                      onClick={() => openEdit(m)}
+                      className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk"
+                    >
+                      <PenLine className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Supprimer ${m.nom}`}
+                      onClick={() => setToDelete(m)}
+                      className={iconButtonDanger}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      <FormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title={editing ? "Modifier le module" : "Nouveau module"}
+        subtitle="Chaque module doit être rattaché à une filière."
+        submitLabel={editing ? "Enregistrer" : "Ajouter"}
+        onSubmit={submit}
+      >
+        <FullWidth>
+          <TextField
+            label="Nom du module"
+            value={form.nom}
+            onChange={(v) => set("nom", v)}
+            placeholder="Soins infirmiers en médecine"
+            error={errors.nom}
+            required
+          />
+        </FullWidth>
+        <FullWidth>
+          <ComboBoxField
+            label="Filière"
+            value={form.filiere}
+            onChange={(v) => set("filiere", v)}
+            options={filieres.map((f) => ({ value: f, label: f }))}
+            placeholder="Sélectionner la filière…"
+            searchPlaceholder="Rechercher une filière…"
+            error={errors.filiere}
+            required
+          />
+        </FullWidth>
+        <TextField
+          label="Code"
+          value={form.code}
+          onChange={(v) => set("code", v)}
+          placeholder="MOD-01"
+        />
+        <NumberField
+          label="Volume horaire"
+          value={form.volumeHoraire}
+          onChange={(v) => set("volumeHoraire", v)}
+          min={0}
+          suffix="h"
+        />
+        <NumberField
+          label="Coefficient"
+          value={form.coefficient}
+          onChange={(v) => set("coefficient", v)}
+          min={0}
+          step={0.5}
+        />
+        <FullWidth>
+          <TextField
+            label="Description"
+            value={form.description}
+            onChange={(v) => set("description", v)}
+            placeholder="Objectifs et contenu du module"
+          />
+        </FullWidth>
+      </FormDialog>
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        onOpenChange={(o) => {
+          if (!o) setToDelete(null);
+        }}
+        title={toDelete ? `Supprimer le module "${toDelete.nom}" ?` : ""}
+        message="Cette action est irréversible."
+        confirmLabel="Supprimer"
+        onConfirm={confirmDelete}
+      />
+    </Carte>
   );
 }
 
@@ -821,12 +1092,6 @@ function SettingsPage() {
     manage: <Settings className="h-3 w-3" />,
   };
 
-  /** Modules réellement enseignés, dérivés du corps enseignant. */
-  const modules = useMemo(
-    () => [...new Set(formateurs.flatMap((f) => f.modules))].sort(),
-    [formateurs],
-  );
-
   /* --------- Accès refusé --------- */
   if (!role || autorisees.length === 0) {
     return (
@@ -904,7 +1169,7 @@ function SettingsPage() {
       })()}
 
       {/* Données de démonstration   accessible aux deux rôles */}
-      <section className={cn(softCard, "p-5")}>
+      {/* <section className={cn(softCard, "p-5")}>
         <h3 className="font-display text-sm font-bold tracking-tight text-foreground">
           Données de démonstration
         </h3>
@@ -918,7 +1183,7 @@ function SettingsPage() {
         >
           <RotateCcw className="h-4 w-4" /> Réinitialiser les données
         </button>
-      </section>
+      </section> */}
 
       <ConfirmDialog
         open={resetOpen}
@@ -1017,26 +1282,7 @@ function SettingsPage() {
         );
 
       case "modules":
-        return (
-          <Carte
-            id="modules"
-            action={
-              <span className={toneBadge("neutral")}>{modules.length}</span>
-            }
-          >
-            {/* Les modules proviennent des affectations des formateurs :
-                ils se modifient depuis la fiche du formateur. */}
-            <ListeEditable
-              valeurs={modules}
-              onChange={() => {}}
-              placeholder=""
-              readOnly
-            />
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Modifiables depuis la fiche de chaque formateur.
-            </p>
-          </Carte>
-        );
+        return <ModulesSection filieres={listeFilieres} />;
 
       case "planning":
         return (

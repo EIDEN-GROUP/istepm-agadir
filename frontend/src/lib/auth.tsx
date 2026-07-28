@@ -130,6 +130,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (id) window.localStorage.setItem(FORMATEUR_STORAGE_KEY, id);
       else window.localStorage.removeItem(FORMATEUR_STORAGE_KEY);
     }
+    // Choosing a specific formateur switches the session to that teacher's
+    // identity, so the greeting, sidebar and avatar reflect who was picked —
+    // not the generic demo formateur.
+    if (id) {
+      const fo = FORMATEURS.find((f) => f.id === id);
+      if (fo) {
+        const authUser: AuthUser = {
+          id: fo.id,
+          role: "enseignant",
+          name: `${fo.prenom} ${fo.nom}`,
+          email: fo.email,
+        };
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(ROLE_STORAGE_KEY, "enseignant");
+          window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(authUser));
+        }
+        setRoleState("enseignant");
+        setUserState(authUser);
+      }
+    }
   }, []);
 
   useEffect(() => {

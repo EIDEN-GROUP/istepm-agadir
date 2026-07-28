@@ -34,3 +34,4 @@ export { teacherAvailability } from "./teacher-availability";
 export { userPreferences } from "./user-preferences";
 export { attendance, attendanceSession } from "./attendance";
 export { reminders } from "./reminders";
+export { modules } from "./modules";
