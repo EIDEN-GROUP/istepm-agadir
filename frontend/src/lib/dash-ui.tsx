@@ -128,6 +128,22 @@ export const CHART_COLORS = [
 ] as const;
 
 /**
+ * Multi-tone brand palette   teal + blue + amber + violet + sage + coral + red.
+ * Unlike the monochrome teal `CHART_COLORS` ramp, this spans the full ISTEPM
+ * brand family so a chart reads as colourful/categorical. Opt-in per chart via
+ * the `palette` prop   used on the director "Analyse" dashboard.
+ */
+export const BRAND_CHART_COLORS = [
+  "var(--istpm-teal)",
+  "var(--istpm-blue)",
+  "var(--istpm-amber)",
+  "var(--istpm-violet)",
+  "var(--istpm-sage)",
+  "var(--istpm-coral)",
+  "var(--istpm-red)",
+] as const;
+
+/**
  * Solid colours per semantic tone   for row accent bars, chart cells and dots
  * where a class name will not do.
  */

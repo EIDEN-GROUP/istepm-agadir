@@ -22,6 +22,8 @@ import {
   PenLine,
   Settings,
   Hospital,
+  Stamp,
+  Upload,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -39,6 +41,7 @@ import {
   type StructureAccueil,
 } from "@/lib/istpm-data";
 import { useIstpm } from "@/lib/istpm-store";
+import { useStamp, setStamp, prepareStampFromFile } from "@/lib/stamp";
 import {
   fetchSettings,
   updateSetting,
@@ -106,6 +109,7 @@ type SectionId =
   | "institut"
   | "systeme"
   | "securite"
+  | "cachet"
   | "structures";
 
 /**
@@ -141,6 +145,7 @@ const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
     "institut",
     "systeme",
     "securite",
+    "cachet",
     "structures",
   ],
   enseignant: [],
@@ -166,6 +171,7 @@ const META: Record<
   institut: { titre: "Informations de l'institut", desc: "Identité et coordonnées", icone: Building2, groupe: "Administration" },
   systeme: { titre: "Configuration système", desc: "Langue, devise et fuseau", icone: SlidersHorizontal, groupe: "Administration" },
   securite: { titre: "Sécurité", desc: "Mots de passe et sessions", icone: Lock, groupe: "Administration" },
+  cachet: { titre: "Cachet officiel", desc: "Tampon apposé sur tous les PDF (bulletins, conventions, rapports)", icone: Stamp, groupe: "Administration" },
   structures: { titre: "Structures d'accueil", desc: "CHU, hôpitaux et cliniques partenaires", icone: Hospital, groupe: "Organisation pédagogique" },
 };
 
@@ -202,6 +208,98 @@ function Carte({
       </div>
       {children}
     </section>
+  );
+}
+
+/**
+ * Cachet officiel : téléversement d'une image apposée sur tous les PDF générés.
+ * Réservé au directeur (la section n'est listée que pour ce rôle) et stockée
+ * localement via `@/lib/stamp`.
+ */
+function StampSection() {
+  const stamp = useStamp();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Veuillez choisir une image (PNG, JPG…)");
+      return;
+    }
+    setBusy(true);
+    try {
+      const dataUrl = await prepareStampFromFile(file);
+      setStamp(dataUrl);
+      toast.success("Cachet enregistré — il sera apposé sur tous les PDF");
+    } catch {
+      toast.error("Impossible de lire cette image");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Carte id="cachet">
+      <div className="space-y-4">
+        <p className="text-xs text-muted-foreground">
+          L'image est apposée automatiquement en bas des documents PDF générés
+          (bulletins, conventions et rapports de stage). Format conseillé : PNG
+          à fond transparent, environ 600&nbsp;px.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="grid h-28 w-28 shrink-0 place-items-center overflow-hidden rounded-xl border border-dashed border-brand/30 bg-muted/40">
+            {stamp ? (
+              <img
+                src={stamp}
+                alt="Cachet de l'établissement"
+                className="max-h-full max-w-full object-contain"
+              />
+            ) : (
+              <span className="flex flex-col items-center gap-1 text-[10px] text-muted-foreground">
+                <Stamp className="h-6 w-6" />
+                Aucun cachet
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                onFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              className={cn(primaryPill, "h-9 gap-1.5 px-4 text-sm")}
+              disabled={busy}
+              onClick={() => inputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4" />
+              {stamp ? "Remplacer le cachet" : "Téléverser un cachet"}
+            </button>
+            {stamp ? (
+              <button
+                type="button"
+                className={cn(ghostPill, "h-9 gap-1.5 px-4 text-sm text-alert")}
+                onClick={() => {
+                  setStamp(null);
+                  toast.success("Cachet supprimé");
+                }}
+              >
+                <Trash2 className="h-4 w-4" /> Supprimer
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </Carte>
   );
 }
 
@@ -1845,6 +1943,9 @@ function SettingsPage() {
             </p>
           </Carte>
         );
+
+      case "cachet":
+        return <StampSection />;
 
       case "structures":
         return (

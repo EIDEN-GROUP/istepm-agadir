@@ -239,7 +239,7 @@ function EtudiantsPage() {
         eyebrow="Scolarité"
         title="Étudiants"
         actions={
-          canEdit ? (
+          canEdit && (
             <>
               <button className={cn(ghostPill, "gap-1.5")} onClick={() => setImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" /> Importer
@@ -278,10 +278,6 @@ function EtudiantsPage() {
                 <Plus className="h-4 w-4" /> Nouvelle inscription
               </button>
             </>
-          ) : (
-            <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
-              Consultation seule
-            </span>
           )
         }
       />

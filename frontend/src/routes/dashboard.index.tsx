@@ -35,6 +35,8 @@ import {
   type Examen,
   type Bulletin,
   TYPE_SEANCE_LABEL,
+  STATUT_EXAMEN_LABEL,
+  TYPE_EXAMEN_LABEL,
   minutesDepuisMinuit,
   SALLES,
 } from "@/lib/istpm-data";
@@ -48,7 +50,11 @@ import {
   eyebrowClass,
   dashTooltip,
   dashCursor,
+  BRAND_CHART_COLORS,
+  dialogSurface,
 } from "@/lib/dash-ui";
+import { DetailShell, DetailSection } from "@/components/dash-page";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { DashTabs, DashTabPanel, type DashTab } from "@/components/dash-tabs";
 import { AreaTrend, LineTrend, BarSeries, HBarSeries, DonutChart, type ChartDatum } from "@/components/dash-charts";
 import {
@@ -70,7 +76,8 @@ import { cn } from "@/lib/utils";
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const MOIS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","AoÀ»","Sep","Oct","Nov","Déc"];
+// Mois dans l'ordre académique (septembre → juin), étiquettes courtes pour l'axe.
+const MOIS_ACAD = ["Sep","Oct","Nov","Déc","Jan","Fév","Mar","Avr","Mai","Jun"];
 const JOURS = ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 const today = new Date().toISOString().slice(0, 10);
 
@@ -641,11 +648,12 @@ function ActiviteFeed() {
   );
 }
 
-function MeterRow({ label, ratio, color, detail }: {
-  label: string; ratio: number; color: string; detail: ReactNode;
+function MeterRow({ label, ratio, color, detail, onClick }: {
+  label: string; ratio: number; color: string; detail: ReactNode; onClick?: () => void;
 }) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-brand/6 sm:px-5">
+  const cls = "flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-left transition-colors hover:bg-brand/6 sm:px-5";
+  const inner = (
+    <>
       <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{label}</span>
       <div className="order-3 h-2 w-full overflow-hidden rounded-full bg-brand/12 sm:order-none sm:w-24">
         <motion.div
@@ -657,8 +665,10 @@ function MeterRow({ label, ratio, color, detail }: {
         />
       </div>
       <span className="whitespace-nowrap text-xs text-muted-foreground">{detail}</span>
-    </div>
+    </>
   );
+  if (onClick) return <button type="button" onClick={onClick} className={cn(cls, "cursor-pointer")}>{inner}</button>;
+  return <div className={cls}>{inner}</div>;
 }
 
 const TH = "border-b border-brand/15 bg-muted text-[11px] font-semibold uppercase tracking-wider text-muted-foreground";
@@ -855,7 +865,7 @@ const DIRECTOR_TABS: DashTab[] = [
 
 function DashboardDirecteur() {
   const { tab, setTab, direction } = useTabs();
-  const { dashboard, financier, reussiteFiliere, formateurs, seances, examens, bulletins, etudiants, aTraiter, repartitionFiliere, repartitionNiveau } = useIstpm();
+  const { dashboard, financier, reussiteFiliere, formateurs, seances, examens, etudiants, aTraiter, repartitionFiliere, repartitionNiveau } = useIstpm();
 
   // Décomposition du « reste à recouvrer » par statut de paiement, pour le graphe.
   const recouvrementData = useMemo<ChartDatum[]>(() => [
@@ -868,12 +878,19 @@ function DashboardDirecteur() {
   // « Étudiants actifs » = ceux dont la scolarité est en cours (statut inscrit),
   // hors diplômés, abandons et dossiers en attente.
   const etudiantsActifs = useMemo(() => etudiants.filter((e) => e.statut === "inscrit").length, [etudiants]);
-  const examensParMois = useMemo(() => { const c = new Array(12).fill(0); examens.forEach((ex) => c[new Date(ex.date).getMonth()]++); return MOIS.map((n, i) => ({ name: n, value: c[i] })); }, [examens]);
+  // « Examens par mois » suit l'année scolaire : septembre (index 0) → juin.
+  const examensParMois = useMemo(() => { const c = new Array(MOIS_ACAD.length).fill(0); examens.forEach((ex) => { const idx = (new Date(ex.date).getMonth() - 8 + 12) % 12; if (idx < MOIS_ACAD.length) c[idx]++; }); return MOIS_ACAD.map((n, i) => ({ name: n, value: c[i] })); }, [examens]);
   const sessionsParJour = useMemo(() => { const c = new Array(7).fill(0); seances.forEach((s) => c[new Date(s.date).getDay()]++); return JOURS.map((n, i) => ({ name: n, value: c[i] })); }, [seances]);
   const chargeFormateurs = useMemo(() => formateurs.filter((f) => f.statut !== "en_conge").map((f) => ({ id: f.id, nom: `${f.prenom} ${f.nom}`, seances: seances.filter((s) => s.professeurId === f.id).length, groupes: f.groupes.length, modules: f.modules.length })).sort((a, b) => b.seances - a.seances), [formateurs, seances]);
   const derniersEtudiants = useMemo(() => etudiants.slice().reverse().slice(0, 6), [etudiants]);
-  const bulletinsRecents = useMemo(() => bulletins.slice().reverse().slice(0, 6), [bulletins]);
   const examensRecents = useMemo(() => examens.slice().reverse().slice(0, 6), [examens]);
+  // Synthèse des examens : répartition par statut et par type (onglet Académique).
+  const examensParStatut = useMemo<ChartDatum[]>(() => Object.entries(STATUT_EXAMEN_LABEL).map(([k, label]) => ({ name: label, value: examens.filter((e) => e.statut === k).length })), [examens]);
+  const examensParType = useMemo<ChartDatum[]>(() => Object.entries(TYPE_EXAMEN_LABEL).map(([k, label]) => ({ name: label, value: examens.filter((e) => e.type === k).length })), [examens]);
+
+  // « Charge des formateurs » : ligne cliquable → modale des séances du formateur.
+  const [chargeSel, setChargeSel] = useState<{ id: string; nom: string } | null>(null);
+  const seancesFormateur = useMemo(() => chargeSel ? seances.filter((s) => s.professeurId === chargeSel.id).slice().sort((a, b) => (a.date === b.date ? (a.debut < b.debut ? -1 : 1) : a.date < b.date ? -1 : 1)) : [], [chargeSel, seances]);
 
   return (
     <>
@@ -919,28 +936,79 @@ function DashboardDirecteur() {
                 </Section>
               </div>
             </div>
-            <Section title="Bulletins récents" action={<SectionLink to="/dashboard/bulletins">Tous les bulletins</SectionLink>}>
-              <BulletinsRecentsTable bulletins={bulletinsRecents} />
+            <Section title="Synthèse des examens" action={<SectionLink to="/dashboard/examens">Tous les examens</SectionLink>}>
+              <div className="grid gap-4 xl:grid-cols-2">
+                <DonutChart title="Examens par statut" data={examensParStatut} palette={BRAND_CHART_COLORS} />
+                <BarSeries title="Examens par type" data={examensParType} colorful palette={BRAND_CHART_COLORS} />
+              </div>
             </Section>
           </div>
         ) : (
           <div className="space-y-6">
             <Section title="Analyse">
               <div className="grid gap-4 xl:grid-cols-2">
-                <DonutChart title="Répartition par filière" data={repartitionFiliere} />
-                <BarSeries title="Répartition par niveau" data={repartitionNiveau} colorful />
-                <AreaTrend title="Examens par mois" data={examensParMois} color="var(--chart-1)" />
-                <LineTrend title="Séances par jour de la semaine" data={sessionsParJour} color="var(--chart-5)" />
+                <DonutChart title="Répartition par filière" data={repartitionFiliere} palette={BRAND_CHART_COLORS} />
+                <BarSeries title="Répartition par niveau" data={repartitionNiveau} colorful palette={BRAND_CHART_COLORS} />
+                <AreaTrend title="Examens par mois" data={examensParMois} color="var(--istpm-blue)" />
+                <LineTrend title="Séances par jour de la semaine" data={sessionsParJour} color="var(--istpm-amber)" />
               </div>
             </Section>
             <Section title="Charge des formateurs">
               <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
-                {chargeFormateurs.map((f) => { const r = Math.min(f.seances / 8, 1); return <MeterRow key={f.id} label={f.nom} ratio={r} color={r > 0.75 ? TONE_COLORS.red : r > 0.5 ? TONE_COLORS.amber : TONE_COLORS.teal} detail={`${f.seances} séances Â· ${f.groupes} grp Â· ${f.modules} mod`} />; })}
+                {chargeFormateurs.map((f) => { const r = Math.min(f.seances / 8, 1); return <MeterRow key={f.id} label={f.nom} ratio={r} color={r > 0.75 ? TONE_COLORS.red : r > 0.5 ? TONE_COLORS.amber : TONE_COLORS.teal} detail={`${f.seances} séances Â· ${f.groupes} grp Â· ${f.modules} mod`} onClick={() => setChargeSel({ id: f.id, nom: f.nom })} />; })}
               </div>
             </Section>
           </div>
         )}
       </DashWorkspace>
+
+      {/* Séances d'un formateur (depuis « Charge des formateurs ») */}
+      <Dialog open={!!chargeSel} onOpenChange={(o) => !o && setChargeSel(null)}>
+        <DialogContent className={dialogSurface}>
+          <DialogTitle className="sr-only">Séances du formateur</DialogTitle>
+          <DialogDescription className="sr-only">Liste des séances programmées</DialogDescription>
+          {chargeSel ? (
+            <DetailShell
+              icon={<Users className="h-5 w-5" />}
+              title={chargeSel.nom}
+              subtitle={`${seancesFormateur.length} séance${seancesFormateur.length > 1 ? "s" : ""}`}
+            >
+              <DetailSection title="Séances programmées">
+                {seancesFormateur.length ? (
+                  <div className="overflow-x-auto rounded-xl border border-brand/12">
+                    <table className="w-full min-w-[560px] text-left text-sm">
+                      <thead className={TH}>
+                        <tr>
+                          <th className="px-4 py-3">Date</th>
+                          <th className="px-4 py-3">Horaire</th>
+                          <th className="px-4 py-3">Module</th>
+                          <th className="px-4 py-3">Groupe</th>
+                          <th className="px-4 py-3">Salle</th>
+                          <th className="px-4 py-3">Type</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-brand/8">
+                        {seancesFormateur.map((s) => (
+                          <tr key={s.id} className="transition-colors hover:bg-brand/6">
+                            <td className="whitespace-nowrap px-4 py-3 font-medium text-foreground">{fmtDate(s.date)}</td>
+                            <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{s.debut}&ndash;{s.fin}</td>
+                            <td className="px-4 py-3">{s.module}</td>
+                            <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{s.groupe}</td>
+                            <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{s.salle}</td>
+                            <td className="whitespace-nowrap px-4 py-3"><span className={toneBadge("blue")}>{TYPE_SEANCE_LABEL[s.type]}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Aucune séance programmée.</p>
+                )}
+              </DetailSection>
+            </DetailShell>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -91,7 +91,6 @@ function FormateursPage() {
 
   const [search, setSearch] = useState("");
   const [departement, setDepartement] = useState<string>(ALL);
-  const [grade, setGrade] = useState<string>(ALL);
 
   const [detail, setDetail] = useState<Formateur | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -103,15 +102,14 @@ function FormateursPage() {
     const q = search.trim().toLowerCase();
     return formateurs.filter((f) => {
       if (departement !== ALL && f.departement !== departement) return false;
-      if (grade !== ALL && GRADE_LABEL[f.grade] !== grade) return false;
       if (!q) return true;
       return `${f.matricule} ${f.cin} ${f.prenom} ${f.nom} ${f.modules.join(" ")} ${f.groupes.join(" ")}`
         .toLowerCase()
         .includes(q);
     });
-  }, [formateurs, search, departement, grade]);
+  }, [formateurs, search, departement]);
 
-  const pager = usePagination(filtered, `${search}|${departement}|${grade}`);
+  const pager = usePagination(filtered, `${search}|${departement}`);
 
   const colonnesImportFormateurs: ImportColumn[] = [
     { key: "matricule", label: "Matricule", required: true },
@@ -223,14 +221,6 @@ function FormateursPage() {
             options: FILIERES,
             allLabel: "Tous les départements",
           },
-          {
-            id: "grade",
-            label: "Grade",
-            value: grade,
-            onChange: setGrade,
-            options: GRADES.map((g) => GRADE_LABEL[g]),
-            allLabel: "Tous les grades",
-          },
         ]}
       />
 
@@ -251,7 +241,6 @@ function FormateursPage() {
           <>
             <th>Matricule</th>
             <th>Nom &amp; prénom</th>
-            <th>Grade</th>
             <th>Département</th>
             <th className="text-center">Modules</th>
             <th>Statut</th>
@@ -279,7 +268,6 @@ function FormateursPage() {
                 </span>
               </span>
             </td>
-            <td className="text-muted-foreground">{GRADE_LABEL[f.grade]}</td>
             <td className={cn("text-muted-foreground", cellTruncate)}>
               {f.departement}
             </td>

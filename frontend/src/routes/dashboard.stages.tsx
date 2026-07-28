@@ -3,9 +3,6 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Eye, FileDown, FileText, Plus, Pencil, Trash2, Mail } from "lucide-react";
 import { motion } from "framer-motion";
 import {
-  PieChart,
-  Pie,
-  Cell,
   BarChart,
   Bar,
   XAxis,
@@ -49,9 +46,7 @@ import {
   rowActions,
   initials,
   TONE_COLORS,
-  CHART_COLORS,
   dashTooltip,
-  renderPieLabel,
 } from "@/lib/dash-ui";
 import {
   PageHeader,
@@ -138,10 +133,10 @@ function ChartCard({
 /**
  * Tableau de bord analytique des stages cliniques.
  *
- * Trois angles de lecture, tous dérivés en direct de l'état des stages :
+ * Plusieurs angles de lecture, tous dérivés en direct de l'état des stages :
  *  · statistiques par statut d'avancement ;
- *  · répartition par service / département d'accueil ;
- *  · volume par structure hospitalière.
+ *  · volume par structure hospitalière ;
+ *  · étudiants éligibles au stage.
  */
 function StagesAnalytics({
   stages,
@@ -185,14 +180,6 @@ function StagesAnalytics({
     [stages],
   );
 
-  const parService = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const s of stages) map.set(s.service, (map.get(s.service) ?? 0) + 1);
-    return [...map.entries()]
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-  }, [stages]);
-
   const parStructure = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of stages)
@@ -206,7 +193,7 @@ function StagesAnalytics({
 
   return (
     <>
-    <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+    <section className="grid gap-4 md:grid-cols-1 2xl:grid-cols-3">
       <ChartCard title="Statistiques des stages (par statut)">
         <BarChart data={parStatut}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
@@ -228,26 +215,6 @@ function StagesAnalytics({
           <Tooltip contentStyle={dashTooltip} cursor={false} />
           <Bar dataKey="value" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
         </BarChart>
-      </ChartCard>
-
-      <ChartCard title="Répartition par service / département">
-        <PieChart>
-          <Pie
-            data={parService}
-            dataKey="value"
-            nameKey="name"
-            innerRadius="45%"
-            outerRadius="78%"
-            paddingAngle={2}
-            label={renderPieLabel}
-            labelLine={false}
-          >
-            {parService.map((_, i) => (
-              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip contentStyle={dashTooltip} />
-        </PieChart>
       </ChartCard>
 
       <ChartCard title="Stages par structure hospitalière" height={260}>

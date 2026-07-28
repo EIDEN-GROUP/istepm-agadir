@@ -36,6 +36,8 @@ import {
   FILIERES,
   CRENEAUX,
   ANNEES_UNIVERSITAIRES,
+  ANNEES_ETUDE,
+  anneeEtude,
   TYPE_SEANCE_LABEL,
   couleurSeance,
   lundiDeLaSemaine,
@@ -144,6 +146,7 @@ function PlanningPage() {
   const [groupe, setGroupe] = useState<string>(ALL);
   const [salle, setSalle] = useState<string>(ALL);
   const [module, setModule] = useState<string>(ALL);
+  const [annee, setAnnee] = useState<string>(ALL);
 
   const [detail, setDetail] = useState<Seance | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -190,12 +193,13 @@ const [importOpen, setImportOpen] = useState(false);
       if (groupe !== ALL && s.groupe !== groupe) return false;
       if (salle !== ALL && s.salle !== salle) return false;
       if (module !== ALL && s.module !== module) return false;
+      if (annee !== ALL && anneeEtude(s.semestre) !== annee) return false;
       if (!q) return true;
       return `${s.module} ${s.groupe} ${s.salle} ${nomProf(s.professeurId)} ${s.notes ?? ""}`
         .toLowerCase()
         .includes(q);
     });
-  }, [visibles, search, prof, groupe, salle, module, nomProf]);
+  }, [visibles, search, prof, groupe, salle, module, annee, nomProf]);
 
   /* --------------- Navigation temporelle --------------- */
 
@@ -331,6 +335,28 @@ const [importOpen, setImportOpen] = useState(false);
     toast.success(`${filtrees.length} séance(s) exportée(s)`);
   };
 
+  /** Télécharge un modèle CSV d'exemple (entêtes + lignes types) pour l'import. */
+  const exportExempleCsv = () => {
+    const entetes = [...COLONNES_IMPORT];
+    const exemples = [
+      ["2025-10-06", "08:30", "10:00", "Soins infirmiers en médecine", "Infirmier polyvalent", "Cours", "S5-G1", "Amphi A", "Yassine El Amrani", "S5", "2025/2026", "Séance d'ouverture"],
+      ["2025-10-06", "10:15", "11:45", "Réanimation et soins intensifs", "Infirmier polyvalent", "TP", "S5-G2", "Labo simulation 2", "Salma Benali", "S5", "2025/2026", ""],
+    ];
+    const csv = [
+      entetes.join(","),
+      ...exemples.map((r) =>
+        r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","),
+      ),
+    ].join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "modele-emploi-du-temps-istpm.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast.success("Modèle CSV d'exemple téléchargé");
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -346,6 +372,14 @@ const [importOpen, setImportOpen] = useState(false);
                 <Upload className="h-3.5 w-3.5" /> Importer CSV
               </button>
             ) : null}
+            {canEdit ? (
+              <button
+                className={cn(ghostPill, "gap-1.5")}
+                onClick={exportExempleCsv}
+              >
+                <FileUp className="h-3.5 w-3.5" /> Exemple CSV
+              </button>
+            ) : null}
             <button className={cn(ghostPill, "gap-1.5")} onClick={exportCsv}>
               <Download className="h-3.5 w-3.5" /> Exporter CSV
             </button>
@@ -356,7 +390,7 @@ const [importOpen, setImportOpen] = useState(false);
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
                 <Lock className="h-3.5 w-3.5" />
-                {estEnseignant ? "Mon planning" : "Consultation seule"}
+                {estEnseignant ? "Mon planning" : ""}
               </span>
             )}
           </>
@@ -405,6 +439,14 @@ const [importOpen, setImportOpen] = useState(false);
             onChange: setModule,
             options: modules,
             allLabel: "Tous les modules",
+          },
+          {
+            id: "annee",
+            label: "Année",
+            value: annee,
+            onChange: setAnnee,
+            options: ANNEES_ETUDE,
+            allLabel: "Toutes les années",
           },
         ]}
         summary={
@@ -643,7 +685,7 @@ function SeanceDetail({
         </>
       }
       footer={
-        canEdit ? (
+        canEdit && (
           <div className="flex items-center justify-end gap-2">
             <button
               className={cn(ghostPill, "gap-1.5")}
@@ -658,10 +700,6 @@ function SeanceDetail({
               <Trash2 className="h-4 w-4" /> Supprimer
             </button>
           </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Planning en consultation seule.
-          </p>
         )
       }
     >

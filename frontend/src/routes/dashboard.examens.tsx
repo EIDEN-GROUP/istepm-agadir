@@ -22,6 +22,8 @@ import {
   FILIERES,
   NIVEAUX,
   ANNEES_UNIVERSITAIRES,
+  ANNEES_ETUDE,
+  anneeEtude,
   DUREES_EXAMEN,
   TYPE_EXAMEN_LABEL,
   STATUT_EXAMEN_LABEL,
@@ -526,7 +528,7 @@ function EspaceFormateur() {
             <th>Groupe</th>
             <th>Type</th>
             <th>Date</th>
-            <th>Année scolaire</th>
+            <th>Année</th>
             <th>Statut</th>
             <th className="w-32 text-center">Actions</th>
           </>
@@ -547,7 +549,7 @@ function EspaceFormateur() {
               {TYPE_EXAMEN_LABEL[x.type]}
             </td>
             <td>{fmtDate(x.date)}</td>
-            <td>{x.anneeUniversitaire}</td>
+            <td>{anneeEtude(x.niveau)}</td>
             <td>
               <span className={toneBadge(STATUT_EXAMEN_TONE[x.statut])}>
                 {STATUT_EXAMEN_LABEL[x.statut]}
@@ -696,10 +698,6 @@ function EspaceDirecteur() {
     () => [...new Set(examens.map((x) => x.classe))].sort(),
     [examens],
   );
-  const annees = useMemo(
-    () => [...new Set(examens.map((x) => x.anneeUniversitaire))].sort().reverse(),
-    [examens],
-  );
   const profs = useMemo(() => {
     const ids = new Set(examens.map((x) => x.createdBy));
     return formateurs
@@ -716,7 +714,7 @@ function EspaceDirecteur() {
       if (module !== ALL && x.module !== module) return false;
       if (classe !== ALL && x.classe !== classe) return false;
       if (semestre !== ALL && x.niveau !== semestre) return false;
-      if (annee !== ALL && x.anneeUniversitaire !== annee) return false;
+      if (annee !== ALL && anneeEtude(x.niveau) !== annee) return false;
       if (!q) return true;
       const auteur = nomFormateur(formateurs, x.createdBy);
       return `${x.titre} ${x.module} ${x.classe} ${x.salle} ${auteur} ${x.document?.nom ?? ""}`
@@ -737,11 +735,11 @@ function EspaceDirecteur() {
       <PageHeader
         eyebrow="Direction"
         title="Examens"
-        actions={
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
-            <Lock className="h-3.5 w-3.5" /> Consultation seule
-          </span>
-        }
+        // actions={
+        //   <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+        //     <Lock className="h-3.5 w-3.5" /> Consultation seule
+        //   </span>
+        // }
       />
 
       <FilterPanel
@@ -783,10 +781,10 @@ function EspaceDirecteur() {
           },
           {
             id: "annee",
-            label: "Année universitaire",
+            label: "Année",
             value: annee,
             onChange: setAnnee,
-            options: annees,
+            options: ANNEES_ETUDE,
             allLabel: "Toutes les années",
           },
         ]}
@@ -821,7 +819,7 @@ function EspaceDirecteur() {
             <th>Groupe</th>
             <th>Type</th>
             <th>Date</th>
-            <th>Année scolaire</th>
+            <th>Année</th>
             <th>Formateur</th>
             <th>Statut</th>
             <th className="w-24 text-center">Actions</th>
@@ -846,7 +844,7 @@ function EspaceDirecteur() {
               {TYPE_EXAMEN_LABEL[x.type]}
             </td>
             <td>{fmtDate(x.date)}</td>
-            <td>{x.anneeUniversitaire}</td>
+            <td>{anneeEtude(x.niveau)}</td>
             <td className={cellTruncate}>
               {nomFormateur(formateurs, x.createdBy)}
             </td>

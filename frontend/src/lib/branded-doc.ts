@@ -11,6 +11,7 @@
  */
 
 import { fmtDate, type Stage } from "@/lib/istpm-data";
+import { getStamp } from "@/lib/stamp";
 
 /* ------------------------------------------------------------------ */
 /*  Palette de marque (miroir de styles.css)                           */
@@ -99,6 +100,35 @@ async function loadLogo(): Promise<LogoRaster | null> {
 
 export async function loadLogoDataUrl(): Promise<string | null> {
   return (await loadLogo())?.dataUrl ?? null;
+}
+
+/**
+ * Rasterise une data URL image quelconque (cachet téléversé) en JPEG, pour
+ * l'embarquer dans le PDF comme le logo. La transparence est aplatie sur blanc.
+ */
+async function rasterizeDataUrl(
+  dataUrl: string,
+  wPx: number,
+): Promise<LogoRaster | null> {
+  try {
+    const img = await loadImage(dataUrl);
+    const aspect = img.width && img.height ? img.width / img.height : 1;
+    const hPx = Math.max(1, Math.round(wPx / aspect));
+    const scale = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = wPx * scale;
+    canvas.height = hPx * scale;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const url = canvas.toDataURL("image/jpeg", 0.92);
+    const jpeg = base64ToBytes(url.split(",")[1]);
+    return { dataUrl: url, jpeg, w: canvas.width, h: canvas.height };
+  } catch {
+    return null;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -210,6 +240,8 @@ function buildContentStream(
   sections: Section[],
   hasLogo: boolean,
   logoAspect: number,
+  hasStamp: boolean,
+  stampAspect: number,
 ): string {
   const ops: string[] = [];
   const PAGE_W = 595;
@@ -280,6 +312,27 @@ function buildContentStream(
     y -= 16;
   }
 
+  // Cachet officiel de l'établissement, apposé en bas à droite au-dessus du pied.
+  if (hasStamp) {
+    const BOX = 92;
+    let dw = BOX;
+    let dh = BOX;
+    if (stampAspect > 1) dh = BOX / stampAspect;
+    else dw = BOX * stampAspect;
+    const sx = RIGHT - dw;
+    const sy = 112;
+    ops.push(
+      `q ${dw.toFixed(2)} 0 0 ${dh.toFixed(2)} ${sx.toFixed(2)} ${sy.toFixed(
+        2,
+      )} cm /Im1 Do Q`,
+    );
+    ops.push(
+      `${PDF.muted} rg BT /F1 8 Tf ${sx.toFixed(2)} ${(sy - 12).toFixed(
+        2,
+      )} Td (${pdfText("Cachet de l'etablissement")}) Tj ET`,
+    );
+  }
+
   ops.push(`${PDF.teal} rg ${LEFT} 96 ${RIGHT - LEFT} 2 re f`);
   ops.push(
     `${PDF.muted} rg BT /F1 8 Tf ${LEFT} 80 Td (${pdfText(
@@ -297,14 +350,29 @@ function buildContentStream(
 
 export async function makeStageDocPdf(s: Stage, kind: Kind): Promise<Blob> {
   const logo = await loadLogo();
+  const stampRaw = getStamp();
+  const stamp = stampRaw ? await rasterizeDataUrl(stampRaw, 220) : null;
+
   const sections = stageSections(s, kind);
   const content = buildContentStream(
     KIND_TITLE[kind],
     sections,
     !!logo,
     logo ? logo.w / logo.h : 1,
+    !!stamp,
+    stamp ? stamp.w / stamp.h : 1,
   );
   const contentBytes = enc.encode(content);
+
+  // Images embarquées : logo (/Im0) puis cachet (/Im1). Les numéros d'objet
+  // commencent à 7 (après le catalogue, les pages, le contenu et les 2 polices).
+  const images: { name: string; raster: LogoRaster }[] = [];
+  if (logo) images.push({ name: "Im0", raster: logo });
+  if (stamp) images.push({ name: "Im1", raster: stamp });
+  const imgObjNum: Record<string, number> = {};
+  images.forEach((im, i) => {
+    imgObjNum[im.name] = 7 + i;
+  });
 
   const parts: Uint8Array[] = [];
   let len = 0;
@@ -326,8 +394,11 @@ export async function makeStageDocPdf(s: Stage, kind: Kind): Promise<Blob> {
   startObject(2);
   push("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
 
-  const resources = logo
-    ? "/Font << /F1 5 0 R /F2 6 0 R >> /XObject << /Im0 7 0 R >>"
+  const xobjs = images
+    .map((im) => `/${im.name} ${imgObjNum[im.name]} 0 R`)
+    .join(" ");
+  const resources = images.length
+    ? `/Font << /F1 5 0 R /F2 6 0 R >> /XObject << ${xobjs} >>`
     : "/Font << /F1 5 0 R /F2 6 0 R >>";
   startObject(3);
   push(
@@ -350,18 +421,19 @@ export async function makeStageDocPdf(s: Stage, kind: Kind): Promise<Blob> {
     "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n",
   );
 
-  if (logo) {
-    startObject(7);
+  for (const im of images) {
+    const n = imgObjNum[im.name];
+    startObject(n);
     push(
-      `7 0 obj\n<< /Type /XObject /Subtype /Image /Width ${logo.w} ` +
-        `/Height ${logo.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 ` +
-        `/Filter /DCTDecode /Length ${logo.jpeg.length} >>\nstream\n`,
+      `${n} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${im.raster.w} ` +
+        `/Height ${im.raster.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 ` +
+        `/Filter /DCTDecode /Length ${im.raster.jpeg.length} >>\nstream\n`,
     );
-    push(logo.jpeg);
+    push(im.raster.jpeg);
     push("\nendstream\nendobj\n");
   }
 
-  const count = logo ? 7 : 6;
+  const count = 6 + images.length;
   const xrefStart = len;
   let xref = `xref\n0 ${count + 1}\n0000000000 65535 f \n`;
   for (let i = 1; i <= count; i++) {

@@ -4,10 +4,13 @@ import { Eye, FileDown, Send, Pencil, SendHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { getStamp } from "@/lib/stamp";
 import { useIstpm, mentionFor, decisionFor } from "@/lib/istpm-store";
 import {
   FILIERES,
   NIVEAUX,
+  ANNEES_ETUDE,
+  anneeEtude,
   DECISION_TONE,
   MENTION_TONE,
   STATUT_BULLETIN_LABEL,
@@ -71,13 +74,35 @@ const STATUTS: StatutBulletin[] = ["genere", "valide", "publie"];
  * dialog   "Enregistrer au format PDF" there produces the real document.
  * An iframe avoids the popup blocker that `window.open` would trip.
  */
-function printBulletin(b: Bulletin) {
+function printBulletin(b: Bulletin, groupe?: string) {
   const rows = b.notes
     .map(
       (n) =>
         `<tr><td>${n.module}</td><td class="r">${n.note.toFixed(2)}</td><td class="r">${n.coef}</td><td class="r">${n.credits}</td></tr>`,
     )
     .join("");
+
+  // Méthode de calcul : moyenne pondérée par les coefficients, sur les modules
+  // et l'évaluation clinique (coef 2), telle qu'affichée dans le tableau ci-dessus.
+  const calcRows = [
+    ...b.notes.map((n) => ({ label: n.module, note: n.note, coef: n.coef })),
+    { label: "Évaluation clinique / pratique", note: b.evaluationClinique, coef: 2 },
+  ];
+  const totalCoef = calcRows.reduce((s, r) => s + r.coef, 0);
+  const sommePond = calcRows.reduce((s, r) => s + r.note * r.coef, 0);
+  const moyCalc = totalCoef ? sommePond / totalCoef : 0;
+  const calcTableRows = calcRows
+    .map(
+      (r) =>
+        `<tr><td>${r.label}</td><td class="r">${r.note.toFixed(2)}</td><td class="r">${r.coef}</td><td class="r">${(r.note * r.coef).toFixed(2)}</td></tr>`,
+    )
+    .join("");
+
+  // Cachet officiel (téléversé dans les Paramètres par le directeur).
+  const stamp = getStamp();
+  const cachet = stamp
+    ? `<div class="cachet"><img src="${stamp}" alt="Cachet de l'établissement"><div class="lbl">Cachet de l'établissement</div></div>`
+    : "";
 
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <title>Bulletin   ${b.prenom} ${b.nom}</title>
@@ -94,6 +119,15 @@ function printBulletin(b: Bulletin) {
   .sum div{display:flex;justify-content:space-between;
            border-bottom:1px solid #d6efee;padding:6px 0;}
   .clin{background:#f1f9f9;font-weight:600;}
+  .calc{margin-top:28px;page-break-inside:avoid;}
+  .calc h2{color:#017a76;font-size:14px;margin:0 0 6px;}
+  .formula{background:#eef7f6;border:1px solid #d6efee;border-radius:8px;
+           padding:10px 12px;font-size:13px;color:#123b3a;margin:0 0 4px;}
+  .note{color:#556;font-size:11px;margin-top:6px;}
+  .cachet{margin-top:36px;text-align:right;page-break-inside:avoid;}
+  .cachet img{max-width:150px;max-height:120px;}
+  .cachet .lbl{color:#556;font-size:10px;margin-top:2px;
+               text-transform:uppercase;letter-spacing:.06em;}
 </style></head><body>
 <h1>ISTEPM Agadir    Bulletin de notes</h1>
 <div class="sub">Institut spécialisé des techniques paramédicales</div>
@@ -101,6 +135,7 @@ function printBulletin(b: Bulletin) {
   <div><span>Étudiant</span><strong>${b.prenom} ${b.nom}</strong></div>
   <div><span>CNE</span><strong>${b.cne}</strong></div>
   <div><span>Filière</span><strong>${b.filiere}</strong></div>
+  ${groupe ? `<div><span>Groupe</span><strong>${groupe}</strong></div>` : ""}
   <div><span>Niveau / session</span><strong>${b.niveau}   session ${b.session}</strong></div>
 </div>
 <table><thead><tr><th>Module</th><th class="r">Note</th><th class="r">Coef.</th><th class="r">Crédits</th></tr></thead>
@@ -112,6 +147,21 @@ function printBulletin(b: Bulletin) {
   <div><span>Mention</span><strong>${b.mention}</strong></div>
   <div><span>Décision</span><strong>${b.decision}</strong></div>
 </div>
+<div class="calc">
+  <h2>Méthode de calcul de la moyenne</h2>
+  <p class="formula">Moyenne générale = Σ (note × coefficient) ÷ Σ (coefficients)</p>
+  <table>
+    <thead><tr><th>Module</th><th class="r">Note</th><th class="r">Coef.</th><th class="r">Note × Coef.</th></tr></thead>
+    <tbody>${calcTableRows}
+    <tr class="clin"><td>Total</td><td class="r">—</td><td class="r">${totalCoef}</td><td class="r">${sommePond.toFixed(2)}</td></tr>
+    </tbody>
+  </table>
+  <div class="sum">
+    <div><span>Moyenne pondérée = ${sommePond.toFixed(2)} ÷ ${totalCoef}</span><strong>${moyCalc.toFixed(2)} / 20</strong></div>
+  </div>
+  <p class="note">Chaque note est pondérée par son coefficient ; la moyenne est la somme des notes pondérées divisée par la somme des coefficients.</p>
+</div>
+${cachet}
 </body></html>`;
 
   const frame = document.createElement("iframe");
@@ -128,7 +178,7 @@ function printBulletin(b: Bulletin) {
 
 function BulletinsPage() {
   const { role } = useAuth();
-  const { bulletins, updateBulletin, publierBulletin, publierTousBulletins } =
+  const { bulletins, etudiants, formateurs, updateBulletin, publierBulletin, publierTousBulletins } =
     useIstpm();
   // Publishing transcripts is a student-administration act.
   const canPublish = role === "directeur" || role === "responsable";
@@ -137,10 +187,23 @@ function BulletinsPage() {
   const [filiere, setFiliere] = useState<string>(ALL);
   const [niveau, setNiveau] = useState<string>(ALL);
   const [session, setSession] = useState<string>(ALL);
+  const [annee, setAnnee] = useState<string>(ALL);
+  const [groupe, setGroupe] = useState<string>(ALL);
+  const [formateur, setFormateur] = useState<string>(ALL);
+  const [statut, setStatut] = useState<string>(ALL);
 
   const [detail, setDetail] = useState<Bulletin | null>(null);
   const [editing, setEditing] = useState<Bulletin | null>(null);
   const [publishAllOpen, setPublishAllOpen] = useState(false);
+
+  // Le bulletin ne porte ni groupe ni formateur : on les rattache via l'étudiant
+  // (groupe) et via les modules enseignés (formateur → notes du bulletin).
+  const etuById = useMemo(() => new Map(etudiants.map((e) => [e.id, e])), [etudiants]);
+  const groupeOptions = useMemo(() => [...new Set(etudiants.map((e) => e.groupe))].sort(), [etudiants]);
+  const formateursActifs = useMemo(() => formateurs.filter((f) => !f.archived), [formateurs]);
+  const formateurOptions = useMemo(() => formateursActifs.map((f) => `${f.prenom} ${f.nom}`), [formateursActifs]);
+  const modulesParFormateur = useMemo(() => new Map(formateursActifs.map((f) => [`${f.prenom} ${f.nom}`, new Set(f.modules)])), [formateursActifs]);
+  const statutOptions = useMemo(() => STATUTS.map((s) => STATUT_BULLETIN_LABEL[s]), []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -148,12 +211,19 @@ function BulletinsPage() {
       if (filiere !== ALL && b.filiere !== filiere) return false;
       if (niveau !== ALL && b.niveau !== niveau) return false;
       if (session !== ALL && b.session !== session) return false;
+      if (annee !== ALL && anneeEtude(b.niveau) !== annee) return false;
+      if (groupe !== ALL && etuById.get(b.etudiantId)?.groupe !== groupe) return false;
+      if (statut !== ALL && STATUT_BULLETIN_LABEL[b.statut] !== statut) return false;
+      if (formateur !== ALL) {
+        const mods = modulesParFormateur.get(formateur);
+        if (!mods || !b.notes.some((n) => mods.has(n.module))) return false;
+      }
       if (!q) return true;
       return `${b.cne} ${b.prenom} ${b.nom}`.toLowerCase().includes(q);
     });
-  }, [bulletins, search, filiere, niveau, session]);
+  }, [bulletins, search, filiere, niveau, session, annee, groupe, statut, formateur, etuById, modulesParFormateur]);
 
-  const pager = usePagination(filtered, `${search}|${filiere}|${niveau}|${session}`);
+  const pager = usePagination(filtered, `${search}|${filiere}|${niveau}|${session}|${annee}|${groupe}|${statut}|${formateur}`);
 
   const aPublier = bulletins.filter((b) => b.statut !== "publie").length;
 
@@ -163,7 +233,7 @@ function BulletinsPage() {
         eyebrow="Résultats"
         title="Bulletins"
         actions={
-          canPublish ? (
+          canPublish && (
             <>
               <span className="rounded-full bg-brand/12 px-3 py-1.5 text-xs font-medium text-brand-dk">
                 {aPublier} à publier
@@ -176,10 +246,6 @@ function BulletinsPage() {
                 <SendHorizontal className="h-3.5 w-3.5" /> Tout publier
               </button>
             </>
-          ) : (
-            <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
-              Consultation seule
-            </span>
           )
         }
       />
@@ -212,6 +278,38 @@ function BulletinsPage() {
             onChange: setSession,
             options: SESSIONS,
             allLabel: "Toutes les sessions",
+          },
+          {
+            id: "annee",
+            label: "Année",
+            value: annee,
+            onChange: setAnnee,
+            options: ANNEES_ETUDE,
+            allLabel: "Toutes les années",
+          },
+          {
+            id: "groupe",
+            label: "Groupe",
+            value: groupe,
+            onChange: setGroupe,
+            options: groupeOptions,
+            allLabel: "Tous les groupes",
+          },
+          {
+            id: "formateur",
+            label: "Formateur",
+            value: formateur,
+            onChange: setFormateur,
+            options: formateurOptions,
+            allLabel: "Tous les formateurs",
+          },
+          {
+            id: "statut",
+            label: "Statut",
+            value: statut,
+            onChange: setStatut,
+            options: statutOptions,
+            allLabel: "Tous les statuts",
           },
         ]}
       />
@@ -298,7 +396,7 @@ function BulletinsPage() {
                 <button
                   className={iconButton}
                   aria-label="Imprimer / PDF"
-                  onClick={() => printBulletin(b)}
+                  onClick={() => printBulletin(b, etuById.get(b.etudiantId)?.groupe)}
                 >
                   <FileDown className="h-3.5 w-3.5" />
                 </button>
@@ -341,6 +439,7 @@ function BulletinsPage() {
           {detail ? (
             <BulletinDetail
               b={bulletins.find((x) => x.id === detail.id) ?? detail}
+              groupe={etuById.get(detail.etudiantId)?.groupe}
               canPublish={canPublish}
               onPublish={(b) => {
                 publierBulletin(b.id);
@@ -485,10 +584,12 @@ function BulletinForm({
 
 function BulletinDetail({
   b,
+  groupe,
   canPublish,
   onPublish,
 }: {
   b: Bulletin;
+  groupe?: string;
   canPublish: boolean;
   onPublish: (b: Bulletin) => void;
 }) {
@@ -519,7 +620,7 @@ function BulletinDetail({
         <div className="flex items-center justify-end gap-2">
           <button
             className={cn(ghostPill, "gap-1.5")}
-            onClick={() => printBulletin(b)}
+            onClick={() => printBulletin(b, groupe)}
           >
             <FileDown className="h-3.5 w-3.5" /> Imprimer / PDF
           </button>
@@ -535,6 +636,7 @@ function BulletinDetail({
         <DetailGrid>
           <DetailField label="CNE" value={b.cne} />
           <DetailField label="Filière" value={b.filiere} />
+          {groupe ? <DetailField label="Groupe" value={groupe} /> : null}
           <DetailField label="Niveau" value={b.niveau} />
           <DetailField
             label="Session"

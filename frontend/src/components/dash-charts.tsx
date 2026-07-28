@@ -204,6 +204,7 @@ export function BarSeries({
   data,
   color = "var(--chart-3)",
   colorful = false,
+  palette = CHART_COLORS,
   height = 240,
 }: {
   title: string;
@@ -211,14 +212,17 @@ export function BarSeries({
   data: ChartDatum[];
   color?: string;
   colorful?: boolean;
+  /** Ramp used when `colorful` (defaults to the teal `CHART_COLORS`). */
+  palette?: readonly string[];
   height?: number;
 }) {
-  // Monochrome brand look: a single teal gradient, or per-bar teal-ramp
-  // gradients when `colorful` so shades still vary within the brand family.
-  const palette = colorful
-    ? data.map((_, i) => CHART_COLORS[i % CHART_COLORS.length])
+  // Monochrome brand look: a single teal gradient, or per-bar gradients drawn
+  // from `palette` when `colorful` (teal ramp by default, multi-tone brand
+  // palette on the Analyse dashboard).
+  const cells = colorful
+    ? data.map((_, i) => palette[i % palette.length])
     : [color];
-  const { ids, defs } = useGradients(palette);
+  const { ids, defs } = useGradients(cells);
   return (
     <ChartFrame title={title} subtitle={subtitle} height={height}>
       <BarChart data={data} margin={{ top: 6, right: 6, left: -14, bottom: 0 }}>
@@ -297,16 +301,19 @@ export function DonutChart({
   title,
   subtitle,
   data,
+  palette = CHART_COLORS,
   height = 240,
 }: {
   title: string;
   subtitle?: ReactNode;
   data: ChartDatum[];
+  /** Slice colour ramp (defaults to the teal `CHART_COLORS`). */
+  palette?: readonly string[];
   height?: number;
 }) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
   const { ids, defs } = useGradients(
-    data.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+    data.map((_, i) => palette[i % palette.length]),
   );
   return (
     <div className={cn(softCard, "p-4 sm:p-5")}>
@@ -354,7 +361,7 @@ export function DonutChart({
                 <span className="flex min-w-0 items-center gap-2">
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
+                    style={{ backgroundColor: palette[i % palette.length] }}
                   />
                   <span className="truncate text-muted-foreground">{d.name}</span>
                 </span>
