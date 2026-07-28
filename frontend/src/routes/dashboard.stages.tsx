@@ -386,6 +386,7 @@ function StagesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Stage | null>(null);
   const [preselectStudentId, setPreselectStudentId] = useState<string | null>(null);
+  const [preselectStructure, setPreselectStructure] = useState<string>("");
   const [toDelete, setToDelete] = useState<Stage | null>(null);
   const [emailTarget, setEmailTarget] = useState<Stage | null>(null);
   const [emailTo, setEmailTo] = useState("");
@@ -418,6 +419,7 @@ function StagesPage() {
               onClick={() => {
                 setEditing(null);
                 setPreselectStudentId(null);
+                setPreselectStructure("");
                 setFormOpen(true);
               }}
             >
@@ -431,7 +433,20 @@ function StagesPage() {
         stages={stages}
         etudiants={etudiants}
         onConvention={(etudiantId) => {
+          const counts = new Map<string, number>();
+          for (const s of stages) {
+            if (s.statut !== "valide")
+              counts.set(s.structure, (counts.get(s.structure) ?? 0) + 1);
+          }
+          const dispo = structuresAccueil.filter(
+            (st) => (counts.get(st.nom) ?? 0) < st.capacite,
+          );
+          const randomStructure =
+            dispo.length > 0
+              ? dispo[Math.floor(Math.random() * dispo.length)].nom
+              : "";
           setPreselectStudentId(etudiantId);
+          setPreselectStructure(randomStructure);
           setEditing(null);
           setFormOpen(true);
         }}
@@ -804,8 +819,9 @@ function StagesPage() {
           etudiants={etudiants}
           stages={stages}
           preselectEtudiantId={preselectStudentId}
+          preselectStructure={preselectStructure}
           structuresAccueil={structuresAccueil}
-          onCancel={() => { setFormOpen(false); setPreselectStudentId(null); }}
+          onCancel={() => { setFormOpen(false); setPreselectStudentId(null); setPreselectStructure(""); }}
           onSubmit={(data) => {
             if (editing) {
               updateStage(editing.id, data);
@@ -816,6 +832,7 @@ function StagesPage() {
             }
             setFormOpen(false);
             setPreselectStudentId(null);
+            setPreselectStructure("");
           }}
         />
       ) : null}
@@ -847,6 +864,7 @@ function StageForm({
   etudiants,
   stages: allStages,
   preselectEtudiantId,
+  preselectStructure,
   structuresAccueil: structures,
   onSubmit,
   onCancel,
@@ -855,13 +873,14 @@ function StageForm({
   etudiants: ReturnType<typeof useIstpm>["etudiants"];
   stages: Stage[];
   preselectEtudiantId?: string | null;
+  preselectStructure?: string;
   structuresAccueil: StructureAccueil[];
   onSubmit: (data: Omit<Stage, "id">) => void;
   onCancel: () => void;
 }) {
   const [f, setF] = useState(() => ({
     etudiantId: initial?.etudiantId ?? preselectEtudiantId ?? "",
-    structure: (initial?.structure ?? "") as string,
+    structure: (initial?.structure ?? preselectStructure ?? "") as string,
     service: initial?.service ?? "",
     encadrantClinique: initial?.encadrantClinique ?? "",
     tuteurAcademique: initial?.tuteurAcademique ?? "",

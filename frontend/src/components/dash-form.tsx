@@ -174,7 +174,7 @@ export function SelectField<T extends string>({
   );
   return (
     <FieldShell label={label} error={error} required={required}>
-      <Select value={value} onValueChange={(v) => onChange(v as T)}>
+      <Select value={value || undefined} onValueChange={(v) => onChange(v as T)}>
         <SelectTrigger
           className={cn(
             softSelectTrigger,

@@ -139,6 +139,9 @@ services:
       WHATSAPP_API_VERSION: v22.0
       N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL}
       N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_MODEL: ${AI_MODEL}
       LOG_LEVEL: info
     depends_on:
       - postgres
@@ -180,6 +183,9 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: school-crm
       JWT_SECRET: ${JWT_SECRET}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_MODEL: ${AI_MODEL}
       LOG_LEVEL: info
     depends_on:
       - postgres

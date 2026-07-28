@@ -4,6 +4,7 @@ import {
   Plus,
   Trash2,
   RotateCcw,
+  Save,
   Users,
   ShieldCheck,
   GraduationCap,
@@ -1865,7 +1866,6 @@ function SettingsPage() {
                             j === i ? { ...st, capacite: v } : st,
                           );
                           setListeStructures(next);
-                          updateStructureAccueil(s.nom, { capacite: v });
                         }
                       }}
                       className="h-7 w-16 rounded-lg border-brand/20 text-center text-xs tabular-nums"
@@ -1931,6 +1931,28 @@ function SettingsPage() {
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
+              {listeStructures.some((st) => {
+                const orig = structuresAccueil.find((x) => x.nom === st.nom);
+                return orig && orig.capacite !== st.capacite;
+              }) ? (
+                <div className="flex justify-end border-t border-brand/12 pt-3">
+                  <button
+                    type="button"
+                    className={cn(primaryPill, "h-9 gap-1.5 px-5 text-sm")}
+                    onClick={() => {
+                      for (const st of listeStructures) {
+                        const original = structuresAccueil.find((x) => x.nom === st.nom);
+                        if (original && original.capacite !== st.capacite) {
+                          updateStructureAccueil(st.nom, { capacite: st.capacite });
+                        }
+                      }
+                      toast.success("Capacités enregistrées");
+                    }}
+                  >
+                    <Save className="h-4 w-4" /> Enregistrer les capacités
+                  </button>
+                </div>
+              ) : null}
             </div>
           </Carte>
         );

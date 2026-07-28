@@ -1,5 +1,10 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "path";
 import { z } from "zod";
+
+// Load .env from backend/ (dev defaults), then .env.production from project root (prod overrides)
+dotenv.config({ path: path.resolve(__dirname, "..", "..", ".env") });
+dotenv.config({ path: path.resolve(__dirname, "..", "..", "..", ".env.production"), override: true });
 
 const envSchema = z.object({
   NODE_ENV: z
