@@ -672,3 +672,13 @@ export function fetchAgentActions() {
     { name: string; description: string; category: string; paramsCount: number }[]
   >("/agent/actions");
 }
+
+export function sendEmailApi(data: {
+  to: string;
+  subject: string;
+  html?: string;
+  text?: string;
+  attachments?: { filename: string; content: string; contentType: string }[];
+}) {
+  return api.post<{ ok: boolean; error?: string }>("/email/send", data);
+}

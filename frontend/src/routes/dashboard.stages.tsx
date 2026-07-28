@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { Eye, FileDown, FileText, Plus, Pencil, Trash2 } from "lucide-react";
+import { Eye, FileDown, FileText, Plus, Pencil, Trash2, Mail } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   PieChart,
@@ -33,6 +33,7 @@ import {
   softCard,
   eyebrowClass,
   primaryPill,
+  ghostPill,
   iconButton,
   iconButtonDanger,
   toneBadge,
@@ -72,6 +73,8 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const STATUTS: StatutStage[] = [
@@ -174,7 +177,39 @@ function ChartCard({
  *  · répartition par service / département d'accueil ;
  *  · volume par structure hospitalière.
  */
-function StagesAnalytics({ stages }: { stages: Stage[] }) {
+function StagesAnalytics({
+  stages,
+  etudiants,
+  onConvention,
+}: {
+  stages: Stage[];
+  etudiants: Etudiant[];
+  onConvention: (etudiantId: string) => void;
+}) {
+  const [eligibleOpen, setEligibleOpen] = useState(false);
+
+  const eligible = useMemo(() => {
+    const activeIds = new Set(
+      stages
+        .filter((s) => s.statut !== "valide")
+        .map((s) => s.etudiantId),
+    );
+    return etudiants.filter(
+      (e) =>
+        (e.niveau === "S2" || e.niveau === "S4" || e.niveau === "S6") &&
+        !activeIds.has(e.id),
+    );
+  }, [etudiants, stages]);
+
+  const eligibleParNiveau = useMemo(
+    () =>
+      (["S2", "S4", "S6"] as const).map((n) => ({
+        name: n,
+        value: eligible.filter((e) => e.niveau === n).length,
+      })),
+    [eligible],
+  );
+
   const parStatut = useMemo(
     () =>
       STATUTS.map((s) => ({
@@ -204,7 +239,8 @@ function StagesAnalytics({ stages }: { stages: Stage[] }) {
   if (!stages.length) return null;
 
   return (
-    <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+    <>
+    <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
       <ChartCard title="Statistiques des stages (par statut)">
         <BarChart data={parStatut}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
@@ -268,7 +304,54 @@ function StagesAnalytics({ stages }: { stages: Stage[] }) {
           <Bar dataKey="value" fill="var(--chart-2)" radius={[0, 6, 6, 0]} />
         </BarChart>
       </ChartCard>
+      {/* Carte des étudiants éligibles */}
+      <div
+        className={cn(
+          softCard,
+          "cursor-pointer p-4 transition hover:shadow-md sm:p-5",
+        )}
+        onClick={() => setEligibleOpen(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setEligibleOpen(true);
+          }
+        }}
+      >
+        <div className="flex items-baseline justify-between gap-2">
+          <p className={eyebrowClass}>Étudiants éligibles</p>
+          <span className="text-2xl font-bold tabular-nums leading-none text-brand-dk">
+            {eligible.length}
+          </span>
+        </div>
+        <div className="mt-3 w-full" style={{ height: 240 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={eligibleParNiveau}>
+              <CartesianGrid stroke="var(--border)" vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11 }}
+                stroke="var(--muted-foreground)"
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 11 }}
+                stroke="var(--muted-foreground)"
+                width={28}
+              />
+              <Tooltip contentStyle={dashTooltip} cursor={false} />
+              <Bar dataKey="value" fill="var(--chart-3)" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="mt-1 text-center text-xs text-muted-foreground">
+          S2, S4, S6 sans stage actif
+        </p>
+      </div>
     </section>
+    </>
   );
 }
 
@@ -287,6 +370,8 @@ function StagesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Stage | null>(null);
   const [toDelete, setToDelete] = useState<Stage | null>(null);
+  const [emailTarget, setEmailTarget] = useState<Stage | null>(null);
+  const [emailTo, setEmailTo] = useState("");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -324,7 +409,7 @@ function StagesPage() {
         }
       />
 
-      <StagesAnalytics stages={stages} />
+      <StagesAnalytics stages={stages} etudiants={etudiants} onConvention={() => {}} />
 
       <FilterPanel
         search={search}
@@ -484,7 +569,7 @@ function StagesPage() {
                     footer={
                       <div className="flex flex-wrap items-center gap-2">
                         <button
-                          className={iconButton + " w-auto gap-1.5 px-3 text-xs"}
+                          className={cn(ghostPill, "gap-1.5 px-3.5 py-2 text-xs")}
                           onClick={() =>
                             s.conventionSignee
                               ? (downloadStageDoc(s, "convention"),
@@ -495,7 +580,7 @@ function StagesPage() {
                           <FileDown className="h-3.5 w-3.5" /> Convention
                         </button>
                         <button
-                          className={iconButton + " w-auto gap-1.5 px-3 text-xs"}
+                          className={cn(ghostPill, "gap-1.5 px-3.5 py-2 text-xs")}
                           onClick={() =>
                             s.noteSoutenance !== undefined
                               ? (downloadStageDoc(s, "rapport"),
@@ -504,6 +589,15 @@ function StagesPage() {
                           }
                         >
                           <FileText className="h-3.5 w-3.5" /> Rapport
+                        </button>
+                        <button
+                          className={cn(ghostPill, "gap-1.5 px-3.5 py-2 text-xs")}
+                          onClick={() => {
+                            setEmailTarget(s);
+                            setEmailTo(s.cne ? `${s.prenom}.${s.nom}@example.com`.toLowerCase() : "");
+                          }}
+                        >
+                          <Mail className="h-3.5 w-3.5" /> Envoyer
                         </button>
                         {canManage && s.statut !== "valide" ? (
                           <button
@@ -571,6 +665,107 @@ function StagesPage() {
                 );
               })()
             : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Email convention dialog */}
+      <Dialog open={!!emailTarget} onOpenChange={(o) => { if (!o) setEmailTarget(null); }}>
+        <DialogContent className={dialogSurface}>
+          <DialogTitle className="sr-only">Envoyer la convention</DialogTitle>
+          <DialogDescription className="sr-only">
+            Envoyer la convention de stage par email
+          </DialogDescription>
+          {emailTarget ? (
+            <DetailShell
+              icon={<Mail className="h-5 w-5" />}
+              title="Envoyer la convention"
+              subtitle={`${emailTarget.prenom} ${emailTarget.nom} · ${emailTarget.structure}`}
+              footer={
+                <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className={cn(ghostPill, "h-9 px-4 text-sm")}
+                  onClick={() => setEmailTarget(null)}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className={cn(primaryPill, "h-9 px-4 text-sm")}
+                  disabled={!emailTo.trim()}
+                  onClick={async () => {
+                    const to = emailTo.trim();
+                    if (!to) return;
+                    const s = emailTarget!;
+                    try {
+                      const lignes = [
+                        "ISTEPM Agadir - Institut specialise des techniques paramedicales",
+                        "",
+                        "Convention de stage clinique",
+                        "",
+                        `Etudiant : ${s.prenom} ${s.nom}`,
+                        `CNE : ${s.cne}`,
+                        `Filiere : ${s.filiere} (${s.niveau})`,
+                        "",
+                        `Structure d'accueil : ${s.structure}`,
+                        `Service : ${s.service}`,
+                        `Periode : ${fmtDate(s.debut)} au ${fmtDate(s.fin)}`,
+                        "",
+                        `Tuteur clinique : ${s.encadrantClinique || "-"}`,
+                        `Tuteur academique : ${s.tuteurAcademique || "-"}`,
+                        "",
+                        `Convention : ${s.conventionSignee ? "signee" : "en attente de signature"}`,
+                        "",
+                        "Document de demonstration genere localement.",
+                      ];
+                      const blob = makePlaceholderPdf(lignes);
+                      const buf = await blob.arrayBuffer();
+                      const base64 = btoa(
+                        new Uint8Array(buf).reduce(
+                          (s, b) => s + String.fromCharCode(b),
+                          "",
+                        ),
+                      );
+                      const res = await sendEmailApi({
+                        to,
+                        subject: `Convention de stage — ${s.prenom} ${s.nom}`,
+                        html: `<p>Veuillez trouver ci-joint la convention de stage de <strong>${s.prenom} ${s.nom}</strong> (${s.cne}, ${s.filiere}, ${s.niveau}).</p><p>Structure d'accueil : ${s.structure}<br/>Service : ${s.service}<br/>Période : ${s.debut} → ${s.fin}</p>`,
+                        attachments: [
+                          {
+                            filename: `convention-${s.nom.toLowerCase()}-${s.cne}.pdf`,
+                            content: base64,
+                            contentType: "application/pdf",
+                          },
+                        ],
+                      });
+                      if (res.ok) {
+                        toast.success("Convention envoyée par email");
+                        setEmailTarget(null);
+                      } else {
+                        toast.error(res.error ?? "Échec de l'envoi");
+                      }
+                    } catch {
+                      toast.error("Erreur lors de l'envoi de l'email");
+                    }
+                  }}
+                >
+                  <Mail className="h-4 w-4" /> Envoyer
+                </button>
+                </div>
+              }
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="email-to">Adresse email</Label>
+                <Input
+                  id="email-to"
+                  type="email"
+                  value={emailTo}
+                  onChange={(e) => setEmailTo(e.target.value)}
+                  placeholder="email@example.com"
+                />
+              </div>
+            </DetailShell>
+          ) : null}
         </DialogContent>
       </Dialog>
 

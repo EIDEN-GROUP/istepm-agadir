@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Eye, Trash2, Upload } from "lucide-react";
+import { Plus, Pencil, Eye, Trash2, Upload, Archive } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -60,6 +60,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+
+
 
 const GRADES: GradeFormateur[] = ["PES", "vacataire", "formateur_clinique"];
 const STATUTS: StatutFormateur[] = ["permanent", "vacataire", "en_conge"];
@@ -671,6 +673,154 @@ function FormateurForm({
         error={errors.password}
       />
     </FormDialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Archive dialog  répartition des groupes + filière avant archivage  */
+/* ------------------------------------------------------------------ */
+
+function ArchiveFormateurDialog({
+  formateur,
+  formateurs,
+  groupConfigs,
+  onConfirm,
+  onCancel,
+}: {
+  formateur: Formateur;
+  formateurs: Formateur[];
+  groupConfigs: GroupConfig[];
+  onConfirm: (
+    groupReassignments: Array<{ groupName: string; targetFormateurId: string }>,
+    filiereReassignment?: { targetFormateurId: string },
+  ) => void;
+  onCancel: () => void;
+}) {
+  const [reassignments, setReassignments] = useState<Record<string, string>>(() => {
+    const r: Record<string, string> = {};
+    for (const g of formateur.groupes) r[g] = "";
+    return r;
+  });
+  const [filiereTarget, setFiliereTarget] = useState("");
+
+  const reassign = formateur.groupes.length > 0;
+
+  const allAssigned = () =>
+    formateur.groupes.every((g) => reassignments[g]?.trim());
+
+  const handleConfirm = () => {
+    const groupReassignments = formateur.groupes
+      .filter((g) => reassignments[g]?.trim())
+      .map((g) => ({
+        groupName: g,
+        targetFormateurId: reassignments[g],
+      }));
+    const filiereReassignment = filiereTarget.trim()
+      ? { targetFormateurId: filiereTarget }
+      : undefined;
+    onConfirm(groupReassignments, filiereReassignment);
+  };
+
+  const selectClass = cn(
+    "h-10 w-full rounded-xl border border-brand/12 bg-card px-3 text-sm text-foreground outline-none transition",
+    "focus:border-brand/30 focus:ring-2 focus:ring-brand/15",
+  );
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onCancel()}>
+      <DialogContent className={dialogSurface}>
+        <DialogTitle className="sr-only">
+          Archiver {formateur.prenom} {formateur.nom}
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          Répartir les groupes et la filière avant d'archiver le formateur.
+        </DialogDescription>
+
+        <DetailShell
+          icon={<Archive className="h-5 w-5" />}
+          title={`Archiver ${formateur.prenom} ${formateur.nom}`}
+          subtitle={
+            formateur.groupes.length > 0
+              ? `Ce formateur a ${formateur.groupes.length} groupe(s) et la filière « ${formateur.departement} ». Réaffectez chaque élément avant d'archiver.`
+              : `Ce formateur n'a aucun groupe. Vous pouvez aussi réaffecter sa filière « ${formateur.departement} ».`
+          }
+          footer={
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className={cn(ghostPill, "h-9 px-4 text-sm")}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={reassign && !allAssigned()}
+                className={cn(primaryPill, "h-9 px-4 text-sm")}
+              >
+                Archiver
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+          {formateur.groupes.map((g) => {
+            const config = groupConfigs.find((c) => c.name === g);
+            return (
+              <div key={g} className="space-y-1.5">
+                <label className="block text-xs font-medium text-foreground">
+                  Groupe <strong>{g}</strong>
+                  {config && config.studentCount > 0 ? (
+                    <span className="ml-1 text-muted-foreground">
+                      ({config.studentCount} étud.)
+                    </span>
+                  ) : null}
+                </label>
+                <select
+                  value={reassignments[g]}
+                  onChange={(e) =>
+                    setReassignments((prev) => ({
+                      ...prev,
+                      [g]: e.target.value,
+                    }))
+                  }
+                  className={selectClass}
+                >
+                  <option value="">
+                    {reassign ? "Choisir un formateur…" : "Aucun groupe à réaffecter"}
+                  </option>
+                  {formateurs.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.prenom} {f.nom}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-foreground">
+              Filière <strong>{formateur.departement}</strong>
+            </label>
+            <select
+              value={filiereTarget}
+              onChange={(e) => setFiliereTarget(e.target.value)}
+              className={selectClass}
+            >
+              <option value="">Ne pas réaffecter</option>
+              {formateurs.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.prenom} {f.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+          </div>
+        </DetailShell>
+      </DialogContent>
+    </Dialog>
   );
 }
 
