@@ -20,7 +20,7 @@ COPY package*.json ./
 COPY drizzle.config.ts ./
 COPY migrations ./migrations
 EXPOSE 3000
-CMD ["npx", "tsx", "dist/index.js"]
+CMD ["node", "--import", "tsx/esm", "dist/index.js"]
 
 FROM node:22-alpine AS development
 RUN apk add --no-cache curl

@@ -181,7 +181,7 @@ jobs:
               --restart-condition none \
               -e DATABASE_URL="postgres://postgres:${DB_PASSWORD}@postgres:5432/school_crm" \
               ghcr.io/eiden-group/istepm-agadir/school-crm-api:${{ github.sha }} \
-              npx tsx dist/db/migrate.js
+              node --import tsx/esm dist/db/migrate.js
 
             # Wait for migration task to complete
             sleep 5

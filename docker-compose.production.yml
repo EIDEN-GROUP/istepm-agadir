@@ -169,7 +169,7 @@ services:
   backend-worker:
     image: ghcr.io/eiden-group/istepm-agadir/school-crm-api:latest
     restart: unless-stopped
-    command: ["npx", "tsx", "dist/jobs/worker.js"]
+    command: ["node", "--import", "tsx/esm", "dist/jobs/worker.js"]
     environment:
       NODE_ENV: production
       DATABASE_URL: postgres://postgres:${DB_PASSWORD}@postgres:5432/school_crm
