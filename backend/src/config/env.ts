@@ -1,14 +1,36 @@
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import { existsSync } from "fs";
 import { z } from "zod";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load .env from backend/ (dev defaults), then .env.production from project root (prod overrides)
-dotenv.config({ path: path.resolve(__dirname, "..", "..", ".env") });
-dotenv.config({ path: path.resolve(__dirname, "..", "..", "..", ".env.production"), override: true });
+// Try common locations for .env / .env.production
+const candidates = [
+  path.resolve(__dirname, "..", "..", ".env"),
+  path.resolve(process.cwd(), ".env"),
+];
+for (const c of candidates) {
+  if (existsSync(c)) {
+    dotenv.config({ path: c });
+    break;
+  }
+}
+
+const prodCandidates = [
+  path.resolve(__dirname, "..", "..", ".env.production"),          // container: /app/
+  path.resolve(__dirname, "..", "..", "..", ".env.production"),    // dev: monorepo root
+  path.resolve(process.cwd(), ".env.production"),                  // cwd
+  path.resolve(process.cwd(), "..", ".env.production"),            // parent of cwd
+];
+for (const c of prodCandidates) {
+  if (existsSync(c)) {
+    dotenv.config({ path: c, override: true });
+    break;
+  }
+}
 
 const envSchema = z.object({
   NODE_ENV: z
