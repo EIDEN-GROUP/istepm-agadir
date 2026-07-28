@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { Eye, FileDown, FileText, Plus, Pencil, Trash2, Shuffle, Mail, GraduationCap } from "lucide-react";
+import { Eye, FileDown, FileText, Plus, Pencil, Trash2, Mail } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   PieChart,
@@ -17,8 +17,11 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
-import { makePlaceholderPdf } from "@/lib/doc-store";
-import { sendEmailApi } from "@/lib/istpm-api";
+import {
+  makeStageDocPdf,
+  buildStageEmailHtml,
+  loadLogoDataUrl,
+} from "@/lib/branded-doc";
 import {
   FILIERES,
   NIVEAUX,
@@ -26,12 +29,12 @@ import {
   STATUT_STAGE_TONE,
   fmtDate,
   type Stage,
+  type Etudiant,
   type Filiere,
   type Niveau,
   type StatutStage,
-  type StructureAccueil,
-  type Etudiant,
 } from "@/lib/istpm-data";
+import { sendEmailApi } from "@/lib/istpm-api";
 import {
   softCard,
   eyebrowClass,
@@ -76,9 +79,9 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 const STATUTS: StatutStage[] = [
   "recherche",
@@ -95,48 +98,8 @@ const STATUTS: StatutStage[] = [
  * livrer. Le document est maintenant généré localement, au même format que les
  * sujets d'examen.
  */
-function downloadStageDoc(s: Stage, kind: "convention" | "rapport") {
-  const titre =
-    kind === "convention"
-      ? "Convention de stage clinique"
-      : "Rapport de stage clinique";
-
-  const lignes = [
-    "ISTEPM Agadir - Institut specialise des techniques paramedicales",
-    "",
-    titre,
-    "",
-    `Etudiant : ${s.prenom} ${s.nom}`,
-    `CNE : ${s.cne}`,
-    `Filiere : ${s.filiere} (${s.niveau})`,
-    "",
-    `Structure d'accueil : ${s.structure}`,
-    `Service : ${s.service}`,
-    `Periode : ${fmtDate(s.debut)} au ${fmtDate(s.fin)}`,
-    "",
-    `Tuteur clinique : ${s.encadrantClinique || "-"}`,
-    `Tuteur academique : ${s.tuteurAcademique || "-"}`,
-  ];
-
-  if (kind === "rapport") {
-    lignes.push(
-      "",
-      `Note de soutenance : ${
-        s.noteSoutenance !== undefined
-          ? `${s.noteSoutenance.toFixed(2)} / 20`
-          : "non soutenu"
-      }`,
-    );
-  } else {
-    lignes.push(
-      "",
-      `Convention : ${s.conventionSignee ? "signee" : "en attente de signature"}`,
-    );
-  }
-
-  lignes.push("", "Document de demonstration genere localement.");
-
-  const blob = makePlaceholderPdf(lignes);
+async function downloadStageDoc(s: Stage, kind: "convention" | "rapport") {
+  const blob = await makeStageDocPdf(s, kind);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -204,6 +167,15 @@ function StagesAnalytics({
     );
   }, [etudiants, stages]);
 
+  const eligibleParNiveau = useMemo(
+    () =>
+      (["S2", "S4", "S6"] as const).map((n) => ({
+        name: n,
+        value: eligible.filter((e) => e.niveau === n).length,
+      })),
+    [eligible],
+  );
+
   const parStatut = useMemo(
     () =>
       STATUTS.map((s) => ({
@@ -234,7 +206,7 @@ function StagesAnalytics({
 
   return (
     <>
-    <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+    <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
       <ChartCard title="Statistiques des stages (par statut)">
         <BarChart data={parStatut}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
@@ -298,75 +270,53 @@ function StagesAnalytics({
           <Bar dataKey="value" fill="var(--chart-2)" radius={[0, 6, 6, 0]} />
         </BarChart>
       </ChartCard>
-
       {/* Carte des étudiants éligibles */}
       <div
         className={cn(
           softCard,
-          "flex cursor-pointer flex-col items-center justify-center p-6 text-center transition hover:shadow-md",
+          "cursor-pointer p-4 transition hover:shadow-md sm:p-5",
         )}
         onClick={() => setEligibleOpen(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setEligibleOpen(true);
+          }
+        }}
       >
-        <span className="text-3xl font-bold tabular-nums text-brand-dk">
-          {eligible.length}
-        </span>
-        <p className="mt-1 text-sm font-medium text-foreground">
-          Étudiant{eligible.length > 1 ? "s" : ""} éligible{eligible.length > 1 ? "s" : ""}
+        <div className="flex items-baseline justify-between gap-2">
+          <p className={eyebrowClass}>Étudiants éligibles</p>
+          <span className="text-2xl font-bold tabular-nums leading-none text-brand-dk">
+            {eligible.length}
+          </span>
+        </div>
+        <div className="mt-3 w-full" style={{ height: 240 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={eligibleParNiveau}>
+              <CartesianGrid stroke="var(--border)" vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11 }}
+                stroke="var(--muted-foreground)"
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 11 }}
+                stroke="var(--muted-foreground)"
+                width={28}
+              />
+              <Tooltip contentStyle={dashTooltip} cursor={false} />
+              <Bar dataKey="value" fill="var(--chart-3)" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="mt-1 text-center text-xs text-muted-foreground">
+          S2, S4, S6 sans stage actif
         </p>
-        <p className="text-xs text-muted-foreground">(S2, S4, S6 sans stage actif)</p>
       </div>
     </section>
-
-    {/* Modal des étudiants éligibles */}
-    <Dialog open={eligibleOpen} onOpenChange={setEligibleOpen}>
-      <DialogContent className={cn(dialogSurface, "max-w-2xl")}>
-        <DialogTitle className="sr-only">Étudiants éligibles aux stages</DialogTitle>
-        <DialogDescription className="sr-only">
-          {eligible.length} étudiant{eligible.length > 1 ? "s" : ""} éligible{eligible.length > 1 ? "s" : ""}
-        </DialogDescription>
-        <DetailShell
-          icon={<GraduationCap className="h-5 w-5" />}
-          title={`${eligible.length} étudiant${eligible.length > 1 ? "s" : ""} éligible${eligible.length > 1 ? "s" : ""}`}
-          subtitle="S2, S4 ou S6 sans stage actif"
-        >
-          <div className="max-h-80 space-y-2 overflow-y-auto">
-            {eligible.map((e) => (
-              <div
-                key={e.id}
-                className="flex items-center gap-3 rounded-xl border border-brand/12 bg-card px-4 py-3"
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand-dk">
-                  {e.prenom[0]}{e.nom[0]}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    {e.prenom} {e.nom}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {e.cne} · {e.filiere} · {e.niveau}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className={cn(primaryPill, "h-8 gap-1.5 px-3 text-xs")}
-                  onClick={() => {
-                    setEligibleOpen(false);
-                    onConvention(e.id);
-                  }}
-                >
-                  <FileText className="h-3.5 w-3.5" /> Convention
-                </button>
-              </div>
-            ))}
-            {eligible.length === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                Aucun étudiant éligible pour le moment.
-              </p>
-            )}
-          </div>
-        </DetailShell>
-      </DialogContent>
-    </Dialog>
     </>
   );
 }
@@ -385,8 +335,6 @@ function StagesPage() {
   const [detail, setDetail] = useState<Stage | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Stage | null>(null);
-  const [preselectStudentId, setPreselectStudentId] = useState<string | null>(null);
-  const [preselectStructure, setPreselectStructure] = useState<string>("");
   const [toDelete, setToDelete] = useState<Stage | null>(null);
   const [emailTarget, setEmailTarget] = useState<Stage | null>(null);
   const [emailTo, setEmailTo] = useState("");
@@ -418,8 +366,6 @@ function StagesPage() {
               className={primaryPill}
               onClick={() => {
                 setEditing(null);
-                setPreselectStudentId(null);
-                setPreselectStructure("");
                 setFormOpen(true);
               }}
             >
@@ -429,28 +375,7 @@ function StagesPage() {
         }
       />
 
-      <StagesAnalytics
-        stages={stages}
-        etudiants={etudiants}
-        onConvention={(etudiantId) => {
-          const counts = new Map<string, number>();
-          for (const s of stages) {
-            if (s.statut !== "valide")
-              counts.set(s.structure, (counts.get(s.structure) ?? 0) + 1);
-          }
-          const dispo = structuresAccueil.filter(
-            (st) => (counts.get(st.nom) ?? 0) < st.capacite,
-          );
-          const randomStructure =
-            dispo.length > 0
-              ? dispo[Math.floor(Math.random() * dispo.length)].nom
-              : "";
-          setPreselectStudentId(etudiantId);
-          setPreselectStructure(randomStructure);
-          setEditing(null);
-          setFormOpen(true);
-        }}
-      />
+      <StagesAnalytics stages={stages} etudiants={etudiants} onConvention={() => {}} />
 
       <FilterPanel
         search={search}
@@ -610,7 +535,7 @@ function StagesPage() {
                     footer={
                       <div className="flex flex-wrap items-center gap-2">
                         <button
-                          className={iconButton + " w-auto gap-1.5 px-3 text-xs"}
+                          className={cn(ghostPill, "gap-1.5 px-3.5 py-2 text-xs")}
                           onClick={() =>
                             s.conventionSignee
                               ? (downloadStageDoc(s, "convention"),
@@ -621,7 +546,7 @@ function StagesPage() {
                           <FileDown className="h-3.5 w-3.5" /> Convention
                         </button>
                         <button
-                          className={iconButton + " w-auto gap-1.5 px-3 text-xs"}
+                          className={cn(ghostPill, "gap-1.5 px-3.5 py-2 text-xs")}
                           onClick={() =>
                             s.noteSoutenance !== undefined
                               ? (downloadStageDoc(s, "rapport"),
@@ -632,7 +557,7 @@ function StagesPage() {
                           <FileText className="h-3.5 w-3.5" /> Rapport
                         </button>
                         <button
-                          className={iconButton + " w-auto gap-1.5 px-3 text-xs"}
+                          className={cn(ghostPill, "gap-1.5 px-3.5 py-2 text-xs")}
                           onClick={() => {
                             setEmailTarget(s);
                             setEmailTo(s.cne ? `${s.prenom}.${s.nom}@example.com`.toLowerCase() : "");
@@ -717,26 +642,12 @@ function StagesPage() {
             Envoyer la convention de stage par email
           </DialogDescription>
           {emailTarget ? (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium text-foreground">
-                  Envoyer la convention à
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {emailTarget.prenom} {emailTarget.nom} · {emailTarget.structure}
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="email-to">Adresse email</Label>
-                <Input
-                  id="email-to"
-                  type="email"
-                  value={emailTo}
-                  onChange={(e) => setEmailTo(e.target.value)}
-                  placeholder="email@example.com"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
+            <DetailShell
+              icon={<Mail className="h-5 w-5" />}
+              title="Envoyer la convention"
+              subtitle={`${emailTarget.prenom} ${emailTarget.nom} · ${emailTarget.structure}`}
+              footer={
+                <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   className={cn(ghostPill, "h-9 px-4 text-sm")}
@@ -753,38 +664,27 @@ function StagesPage() {
                     if (!to) return;
                     const s = emailTarget!;
                     try {
-                      const lignes = [
-                        "ISTEPM Agadir - Institut specialise des techniques paramedicales",
-                        "",
-                        "Convention de stage clinique",
-                        "",
-                        `Etudiant : ${s.prenom} ${s.nom}`,
-                        `CNE : ${s.cne}`,
-                        `Filiere : ${s.filiere} (${s.niveau})`,
-                        "",
-                        `Structure d'accueil : ${s.structure}`,
-                        `Service : ${s.service}`,
-                        `Periode : ${fmtDate(s.debut)} au ${fmtDate(s.fin)}`,
-                        "",
-                        `Tuteur clinique : ${s.encadrantClinique || "-"}`,
-                        `Tuteur academique : ${s.tuteurAcademique || "-"}`,
-                        "",
-                        `Convention : ${s.conventionSignee ? "signee" : "en attente de signature"}`,
-                        "",
-                        "Document de demonstration genere localement.",
-                      ];
-                      const blob = makePlaceholderPdf(lignes);
+                      const [blob, logoDataUrl] = await Promise.all([
+                        makeStageDocPdf(s, "convention"),
+                        loadLogoDataUrl(),
+                      ]);
                       const buf = await blob.arrayBuffer();
                       const base64 = btoa(
                         new Uint8Array(buf).reduce(
-                          (s, b) => s + String.fromCharCode(b),
+                          (acc, b) => acc + String.fromCharCode(b),
                           "",
                         ),
+                      );
+                      const { html, text } = buildStageEmailHtml(
+                        s,
+                        "convention",
+                        logoDataUrl,
                       );
                       const res = await sendEmailApi({
                         to,
                         subject: `Convention de stage — ${s.prenom} ${s.nom}`,
-                        html: `<p>Veuillez trouver ci-joint la convention de stage de <strong>${s.prenom} ${s.nom}</strong> (${s.cne}, ${s.filiere}, ${s.niveau}).</p><p>Structure d'accueil : ${s.structure}<br/>Service : ${s.service}<br/>Période : ${s.debut} → ${s.fin}</p>`,
+                        html,
+                        text,
                         attachments: [
                           {
                             filename: `convention-${s.nom.toLowerCase()}-${s.cne}.pdf`,
@@ -806,22 +706,31 @@ function StagesPage() {
                 >
                   <Mail className="h-4 w-4" /> Envoyer
                 </button>
+                </div>
+              }
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="email-to">Adresse email</Label>
+                <Input
+                  id="email-to"
+                  type="email"
+                  value={emailTo}
+                  onChange={(e) => setEmailTo(e.target.value)}
+                  placeholder="email@example.com"
+                />
               </div>
-            </div>
+            </DetailShell>
           ) : null}
         </DialogContent>
       </Dialog>
 
       {formOpen ? (
         <StageForm
-          key={editing?.id ?? preselectStudentId ?? "new"}
+          key={editing?.id ?? "new"}
           initial={editing}
           etudiants={etudiants}
-          stages={stages}
-          preselectEtudiantId={preselectStudentId}
-          preselectStructure={preselectStructure}
-          structuresAccueil={structuresAccueil}
-          onCancel={() => { setFormOpen(false); setPreselectStudentId(null); setPreselectStructure(""); }}
+          structuresAccueil={structuresAccueil.map((s) => s.nom)}
+          onCancel={() => setFormOpen(false)}
           onSubmit={(data) => {
             if (editing) {
               updateStage(editing.id, data);
@@ -831,8 +740,6 @@ function StagesPage() {
               toast.success(`Convention créée   ${data.prenom} ${data.nom}`);
             }
             setFormOpen(false);
-            setPreselectStudentId(null);
-            setPreselectStructure("");
           }}
         />
       ) : null}
@@ -862,25 +769,19 @@ function StagesPage() {
 function StageForm({
   initial,
   etudiants,
-  stages: allStages,
-  preselectEtudiantId,
-  preselectStructure,
   structuresAccueil: structures,
   onSubmit,
   onCancel,
 }: {
   initial: Stage | null;
   etudiants: ReturnType<typeof useIstpm>["etudiants"];
-  stages: Stage[];
-  preselectEtudiantId?: string | null;
-  preselectStructure?: string;
-  structuresAccueil: StructureAccueil[];
+  structuresAccueil: string[];
   onSubmit: (data: Omit<Stage, "id">) => void;
   onCancel: () => void;
 }) {
   const [f, setF] = useState(() => ({
-    etudiantId: initial?.etudiantId ?? preselectEtudiantId ?? "",
-    structure: (initial?.structure ?? preselectStructure ?? "") as string,
+    etudiantId: initial?.etudiantId ?? "",
+    structure: (initial?.structure ?? "") as string,
     service: initial?.service ?? "",
     encadrantClinique: initial?.encadrantClinique ?? "",
     tuteurAcademique: initial?.tuteurAcademique ?? "",
@@ -970,42 +871,14 @@ function StageForm({
         />
       </FullWidth>
       <FullWidth>
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <SelectField
-              label="Structure d'accueil"
-              required
-              value={f.structure}
-              onChange={(v) => set("structure", v)}
-              options={structures.map((s) => s.nom)}
-              error={errors.structure}
-            />
-          </div>
-          <button
-            type="button"
-            className={cn(ghostPill, "mb-0.5 h-9 gap-1.5 px-3 text-xs")}
-            title="Choisir aléatoirement une structure avec des places disponibles"
-            onClick={() => {
-              const counts = new Map<string, number>();
-              for (const s of allStages) {
-                if (s.statut !== "valide")
-                  counts.set(s.structure, (counts.get(s.structure) ?? 0) + 1);
-              }
-              const dispo = structures.filter(
-                (st) => (counts.get(st.nom) ?? 0) < st.capacite,
-              );
-              if (dispo.length === 0) {
-                toast.error("Aucune structure avec des places disponibles");
-                return;
-              }
-              const pick = dispo[Math.floor(Math.random() * dispo.length)];
-              set("structure", pick.nom);
-              toast.success(`Structure choisie   ${pick.nom}`);
-            }}
-          >
-            <Shuffle className="h-3.5 w-3.5" /> Aléatoire
-          </button>
-        </div>
+        <SelectField
+          label="Structure d'accueil"
+          required
+          value={f.structure}
+          onChange={(v) => set("structure", v)}
+          options={structures}
+          error={errors.structure}
+        />
       </FullWidth>
       <TextField
         label="Service"

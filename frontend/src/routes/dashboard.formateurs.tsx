@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Eye, Trash2, Upload, Archive, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Eye, Trash2, Upload, Archive } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -13,7 +13,6 @@ import {
   STATUT_FORMATEUR_LABEL,
   STATUT_FORMATEUR_TONE,
   type Formateur,
-  type GroupConfig,
   type Filiere,
   type GradeFormateur,
   type StatutFormateur,
@@ -62,12 +61,17 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
+
+
+/** Configuration d'un groupe encadré par un formateur (effectif rattaché). */
+type GroupConfig = { name: string; studentCount: number };
+
 const GRADES: GradeFormateur[] = ["PES", "vacataire", "formateur_clinique"];
 const STATUTS: StatutFormateur[] = ["permanent", "vacataire", "en_conge"];
 
 function FormateursPage() {
   const { role } = useAuth();
-  const { formateurs, modules, groupConfigs, addFormateur, updateFormateur, deleteFormateur, archiveFormateur, restoreFormateur } =
+  const { formateurs, modules, addFormateur, updateFormateur, deleteFormateur } =
     useIstpm();
   const canEdit = role === "directeur" || role === "responsable";
 
@@ -88,19 +92,16 @@ function FormateursPage() {
   const [search, setSearch] = useState("");
   const [departement, setDepartement] = useState<string>(ALL);
   const [grade, setGrade] = useState<string>(ALL);
-  const [archivedFilter, setArchivedFilter] = useState<"active" | "all">("active");
 
   const [detail, setDetail] = useState<Formateur | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Formateur | null>(null);
   const [toDelete, setToDelete] = useState<Formateur | null>(null);
-  const [toArchive, setToArchive] = useState<Formateur | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return formateurs.filter((f) => {
-      if (archivedFilter === "active" && f.archived) return false;
       if (departement !== ALL && f.departement !== departement) return false;
       if (grade !== ALL && GRADE_LABEL[f.grade] !== grade) return false;
       if (!q) return true;
@@ -108,7 +109,7 @@ function FormateursPage() {
         .toLowerCase()
         .includes(q);
     });
-  }, [formateurs, search, departement, grade, archivedFilter]);
+  }, [formateurs, search, departement, grade]);
 
   const pager = usePagination(filtered, `${search}|${departement}|${grade}`);
 
@@ -231,21 +232,6 @@ function FormateursPage() {
             allLabel: "Tous les grades",
           },
         ]}
-        trailing={
-          <button
-            type="button"
-            onClick={() => setArchivedFilter((p) => (p === "active" ? "all" : "active"))}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition",
-              archivedFilter === "all"
-                ? "bg-amber/10 text-amber"
-                : "text-muted-foreground hover:bg-brand/10",
-            )}
-          >
-            <Archive className="h-3 w-3" />
-            {archivedFilter === "all" ? "Archivés inclus" : "Archivés masqués"}
-          </button>
-        }
       />
 
       <DataTable
@@ -329,26 +315,6 @@ function FormateursPage() {
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    {f.archived ? (
-                      <button
-                        className={iconButton}
-                        aria-label="Restaurer"
-                        onClick={() => {
-                          restoreFormateur(f.id);
-                          toast.success(`${f.prenom} ${f.nom} restauré`);
-                        }}
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      </button>
-                    ) : (
-                      <button
-                        className={iconButton}
-                        aria-label="Archiver"
-                        onClick={() => setToArchive(f)}
-                      >
-                        <Archive className="h-3.5 w-3.5" />
-                      </button>
-                    )}
                     <button
                       className={iconButtonDanger}
                       aria-label="Supprimer"
@@ -463,7 +429,6 @@ function FormateursPage() {
           key={editing?.id ?? "new"}
           initial={editing}
           modulesDisponibles={modulesDisponibles}
-          groupConfigs={groupConfigs}
           onCancel={() => setFormOpen(false)}
     onSubmit={(data) => {
       if (editing) {
@@ -505,20 +470,6 @@ function FormateursPage() {
         }}
       />
 
-      {toArchive ? (
-        <ArchiveFormateurDialog
-          formateur={toArchive}
-          formateurs={formateurs.filter((f) => f.id !== toArchive.id && !f.archived)}
-          groupConfigs={groupConfigs}
-          onConfirm={(groupReassignments, filiereReassignment) => {
-            archiveFormateur(toArchive.id, groupReassignments, filiereReassignment);
-            toast.success(`${toArchive.prenom} ${toArchive.nom} archivé`);
-            setToArchive(null);
-          }}
-          onCancel={() => setToArchive(null)}
-        />
-      ) : null}
-
       <ImportCsvDialog
         open={importOpen}
         onOpenChange={setImportOpen}
@@ -539,7 +490,6 @@ function FormateurForm({
   onSubmit,
   onCancel,
   modulesDisponibles,
-  groupConfigs,
 }: {
   initial: Formateur | null;
   onSubmit: (data: {
@@ -558,7 +508,6 @@ function FormateurForm({
   }) => void;
   onCancel: () => void;
   modulesDisponibles: string[];
-  groupConfigs: GroupConfig[];
 }) {
   const [f, setF] = useState(() => ({
     matricule:
@@ -682,15 +631,11 @@ function FormateurForm({
         />
       </FullWidth>
       <FullWidth>
-        <MultiSelectField
+        <ListField
           label="Groupes"
           value={f.groupes}
           onChange={(v) => set("groupes", v)}
-          options={groupConfigs.map((g) => ({
-            value: g.name,
-            label: `${g.name}${g.studentCount > 0 ? ` (${g.studentCount} étud.)` : ""}`,
-          }))}
-          placeholder="Sélectionner les groupes…"
+          placeholder="S5-G1, S1-B"
         />
       </FullWidth>
       <SelectField
@@ -779,27 +724,54 @@ function ArchiveFormateurDialog({
     onConfirm(groupReassignments, filiereReassignment);
   };
 
+  const selectClass = cn(
+    "h-10 w-full rounded-xl border border-brand/12 bg-card px-3 text-sm text-foreground outline-none transition",
+    "focus:border-brand/30 focus:ring-2 focus:ring-brand/15",
+  );
+
   return (
     <Dialog open onOpenChange={(o) => !o && onCancel()}>
       <DialogContent className={dialogSurface}>
-        <DialogTitle className="text-base font-bold text-foreground">
+        <DialogTitle className="sr-only">
           Archiver {formateur.prenom} {formateur.nom}
         </DialogTitle>
         <DialogDescription className="sr-only">
           Répartir les groupes et la filière avant d'archiver le formateur.
         </DialogDescription>
 
-        <div className="space-y-4 py-2">
-          <p className="text-sm text-muted-foreground">
-            {formateur.groupes.length > 0
-              ? `Ce formateur a ${formateur.groupes.length} groupe(s) et la filière "${formateur.departement}". Réaffectez chaque élément avant d'archiver.`
-              : `Ce formateur n'a aucun groupe. Vous pouvez aussi réaffecter sa filière "${formateur.departement}".`}
-          </p>
-
+        <DetailShell
+          icon={<Archive className="h-5 w-5" />}
+          title={`Archiver ${formateur.prenom} ${formateur.nom}`}
+          subtitle={
+            formateur.groupes.length > 0
+              ? `Ce formateur a ${formateur.groupes.length} groupe(s) et la filière « ${formateur.departement} ». Réaffectez chaque élément avant d'archiver.`
+              : `Ce formateur n'a aucun groupe. Vous pouvez aussi réaffecter sa filière « ${formateur.departement} ».`
+          }
+          footer={
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className={cn(ghostPill, "h-9 px-4 text-sm")}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={reassign && !allAssigned()}
+                className={cn(primaryPill, "h-9 px-4 text-sm")}
+              >
+                Archiver
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
           {formateur.groupes.map((g) => {
             const config = groupConfigs.find((c) => c.name === g);
             return (
-              <div key={g} className="space-y-1">
+              <div key={g} className="space-y-1.5">
                 <label className="block text-xs font-medium text-foreground">
                   Groupe <strong>{g}</strong>
                   {config && config.studentCount > 0 ? (
@@ -816,10 +788,7 @@ function ArchiveFormateurDialog({
                       [g]: e.target.value,
                     }))
                   }
-                  className={cn(
-                    "h-9 w-full rounded-lg border border-brand/12 bg-card px-2 text-sm outline-none",
-                    "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
-                  )}
+                  className={selectClass}
                 >
                   <option value="">
                     {reassign ? "Choisir un formateur…" : "Aucun groupe à réaffecter"}
@@ -834,17 +803,14 @@ function ArchiveFormateurDialog({
             );
           })}
 
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <label className="block text-xs font-medium text-foreground">
               Filière <strong>{formateur.departement}</strong>
             </label>
             <select
               value={filiereTarget}
               onChange={(e) => setFiliereTarget(e.target.value)}
-              className={cn(
-                "h-9 w-full rounded-lg border border-brand/12 bg-card px-2 text-sm outline-none",
-                "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
-              )}
+              className={selectClass}
             >
               <option value="">Ne pas réaffecter</option>
               {formateurs.map((f) => (
@@ -854,25 +820,8 @@ function ArchiveFormateurDialog({
               ))}
             </select>
           </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className={cn(ghostPill, "h-9 px-4 text-sm")}
-          >
-            Annuler
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={reassign && !allAssigned()}
-            className={cn(primaryPill, "h-9 px-4 text-sm")}
-          >
-            Archiver
-          </button>
-        </div>
+          </div>
+        </DetailShell>
       </DialogContent>
     </Dialog>
   );
