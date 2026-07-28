@@ -56,6 +56,7 @@ import {
   type Mention,
   type Decision,
   type ExamDocument,
+  type StructureAccueil,
 } from "@/lib/istpm-data";
 import {
   deleteDoc,
@@ -135,7 +136,7 @@ type Snapshot = {
   activite: ActiviteItem[];
   seances: Seance[];
   filieres: string[];
-  structuresAccueil: string[];
+  structuresAccueil: StructureAccueil[];
   modules: ModuleRecord[];
   groupConfigs: GroupConfig[];
 };
@@ -155,7 +156,7 @@ function seed(): Snapshot {
     activite: ACTIVITE_RECENTE,
     seances: SEANCES,
     filieres: [...FILIERES],
-    structuresAccueil: [...STRUCTURES_ACCUEIL],
+    structuresAccueil: structuredClone(STRUCTURES_ACCUEIL),
     modules: seedModules(),
     groupConfigs: structuredClone(DEFAULT_GROUP_CONFIGS),
   }) as Snapshot;
@@ -275,7 +276,7 @@ type IstpmCtx = {
   activite: ActiviteItem[];
   seances: Seance[];
   filieres: string[];
-  structuresAccueil: string[];
+  structuresAccueil: StructureAccueil[];
   modules: ModuleRecord[];
   groupConfigs: GroupConfig[];
 
@@ -355,8 +356,8 @@ type IstpmCtx = {
   addFiliere: (nom: string) => void;
   deleteFiliere: (nom: string) => void;
 
-  addStructureAccueil: (nom: string) => void;
-  updateStructureAccueil: (oldName: string, newName: string) => void;
+  addStructureAccueil: (nom: string, capacite?: number) => void;
+  updateStructureAccueil: (oldName: string, body: { nouveauNom?: string; capacite?: number }) => void;
   deleteStructureAccueil: (nom: string) => void;
 
   addModule: (data: Omit<ModuleRecord, "id">) => void;
@@ -470,8 +471,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           bulletins: prefer(s.bulletins, bulletins as Bulletin[]),
           stages: prefer(s.stages, stages as Stage[]),
           seances: prefer(s.seances, seances as Seance[]),
-          structuresAccueil: (structures as string[])?.length
-            ? (structures as string[])
+          structuresAccueil: (structures as StructureAccueil[])?.length
+            ? (structures as StructureAccueil[])
             : s.structuresAccueil,
         }));
       } catch {
@@ -1069,25 +1070,27 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   /* ---------------- Structures d'accueil ---------------- */
 
   const addStructureAccueil = useCallback(
-    (nom: string) => {
-      createStructureApi(nom).catch(() => {});
+    (nom: string, capacite = 5) => {
+      createStructureApi(nom, capacite).catch(() => {});
       setSnap((s) => ({
         ...s,
-        structuresAccueil: s.structuresAccueil.includes(nom)
+        structuresAccueil: s.structuresAccueil.some((st) => st.nom === nom)
           ? s.structuresAccueil
-          : [...s.structuresAccueil, nom],
+          : [...s.structuresAccueil, { nom, capacite }],
       }));
     },
     [],
   );
 
   const updateStructureAccueil = useCallback(
-    (oldName: string, newName: string) => {
-      updateStructureApi(oldName, newName).catch(() => {});
+    (oldName: string, body: { nouveauNom?: string; capacite?: number }) => {
+      updateStructureApi(oldName, body).catch(() => {});
       setSnap((s) => ({
         ...s,
         structuresAccueil: s.structuresAccueil.map((st) =>
-          st === oldName ? newName : st,
+          st.nom === oldName
+            ? { nom: body.nouveauNom ?? st.nom, capacite: body.capacite ?? st.capacite }
+            : st,
         ),
       }));
     },
@@ -1099,7 +1102,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
       deleteStructureApi(nom).catch(() => {});
       setSnap((s) => ({
         ...s,
-        structuresAccueil: s.structuresAccueil.filter((st) => st !== nom),
+        structuresAccueil: s.structuresAccueil.filter((st) => st.nom !== nom),
       }));
     },
     [],

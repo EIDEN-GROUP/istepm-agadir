@@ -441,20 +441,22 @@ export function deleteFiliereApi(nom: string) {
   return api.delete<{ filieres: string[] }>(`/settings/filieres/${nom}`);
 }
 
+import type { StructureAccueil } from "@/lib/istpm-data";
+
 export function fetchStructuresApi() {
-  return api.get<string[]>("/settings/structures");
+  return api.get<StructureAccueil[]>("/settings/structures");
 }
 
-export function createStructureApi(nom: string) {
-  return api.post<{ structures: string[] }>("/settings/structures", { nom });
+export function createStructureApi(nom: string, capacite = 5) {
+  return api.post<{ structures: StructureAccueil[] }>("/settings/structures", { nom, capacite });
 }
 
-export function updateStructureApi(nom: string, nouveauNom: string) {
-  return api.put<{ structures: string[] }>(`/settings/structures/${encodeURIComponent(nom)}`, { nouveauNom });
+export function updateStructureApi(nom: string, body: { nouveauNom?: string; capacite?: number }) {
+  return api.put<{ structures: StructureAccueil[] }>(`/settings/structures/${encodeURIComponent(nom)}`, body);
 }
 
 export function deleteStructureApi(nom: string) {
-  return api.delete<{ structures: string[] }>(`/settings/structures/${encodeURIComponent(nom)}`);
+  return api.delete<{ structures: StructureAccueil[] }>(`/settings/structures/${encodeURIComponent(nom)}`);
 }
 
 /* ------------------------------------------------------------------ */
@@ -700,4 +702,14 @@ export function fetchAgentActions() {
   return api.get<
     { name: string; description: string; category: string; paramsCount: number }[]
   >("/agent/actions");
+}
+
+export function sendEmailApi(payload: {
+  to: string;
+  subject: string;
+  html?: string;
+  text?: string;
+  attachments?: { filename: string; content: string; contentType?: string }[];
+}) {
+  return api.post<{ ok: boolean; error?: string }>("/email/send", payload);
 }

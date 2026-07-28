@@ -13,6 +13,15 @@ const sendSchema = z.object({
   text: z.string().optional(),
   message: z.string().optional(),
   parentName: z.string().optional(),
+  attachments: z
+    .array(
+      z.object({
+        filename: z.string(),
+        content: z.string(), // base64-encoded
+        contentType: z.string().optional(),
+      }),
+    )
+    .optional(),
 });
 
 const receiptSchema = z.object({
@@ -59,14 +68,24 @@ export async function emailRoutes(app: FastifyInstance) {
     const html = input.html ?? input.message ?? input.text ?? "";
     const text = input.text ?? input.message ?? "";
 
+    const mailOptions: nodemailer.SendMailOptions = {
+      from: env.FROM_EMAIL,
+      to: input.to,
+      subject: input.subject,
+      html,
+      text,
+    };
+
+    if (input.attachments?.length) {
+      mailOptions.attachments = input.attachments.map((a) => ({
+        filename: a.filename,
+        content: Buffer.from(a.content, "base64"),
+        contentType: a.contentType ?? "application/pdf",
+      }));
+    }
+
     try {
-      await transporter.sendMail({
-        from: env.FROM_EMAIL,
-        to: input.to,
-        subject: input.subject,
-        html,
-        text,
-      });
+      await transporter.sendMail(mailOptions);
 
       await logEmail(input.to, input.subject, "custom", "sent");
 

@@ -36,15 +36,20 @@ export const NIVEAUX = ["S1", "S2", "S3", "S4", "S5", "S6"] as const;
 export type Niveau = (typeof NIVEAUX)[number];
 
 /** CHU / hôpitaux / cliniques d'accueil (structures de stage réelles au Maroc). */
-export const STRUCTURES_ACCUEIL = [
-  "CHR Hassan II   Agadir",
-  "CHU Ibn Rochd   Casablanca",
-  "CHU Mohammed VI   Marrakech",
-  "Hôpital Hassan II   Agadir",
-  "Clinique Al Massira   Agadir",
-  "Hôpital préfectoral Inezgane",
-  "Clinique Ennakhil   Agadir",
-] as const;
+export type StructureAccueil = {
+  nom: string;
+  capacite: number;
+};
+
+export const STRUCTURES_ACCUEIL: StructureAccueil[] = [
+  { nom: "CHR Hassan II   Agadir", capacite: 5 },
+  { nom: "CHU Ibn Rochd   Casablanca", capacite: 5 },
+  { nom: "CHU Mohammed VI   Marrakech", capacite: 5 },
+  { nom: "Hôpital Hassan II   Agadir", capacite: 5 },
+  { nom: "Clinique Al Massira   Agadir", capacite: 5 },
+  { nom: "Hôpital préfectoral Inezgane", capacite: 5 },
+  { nom: "Clinique Ennakhil   Agadir", capacite: 5 },
+];
 
 /* ------------------------------------------------------------------ */
 /*  Modules   chaque module est rattaché à une filière                 */

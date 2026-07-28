@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { Eye, FileDown, FileText, Plus, Pencil, Trash2 } from "lucide-react";
+import { Eye, FileDown, FileText, Plus, Pencil, Trash2, Shuffle, Mail, GraduationCap } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   PieChart,
@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
 import { makePlaceholderPdf } from "@/lib/doc-store";
+import { sendEmailApi } from "@/lib/istpm-api";
 import {
   FILIERES,
   NIVEAUX,
@@ -28,11 +29,14 @@ import {
   type Filiere,
   type Niveau,
   type StatutStage,
+  type StructureAccueil,
+  type Etudiant,
 } from "@/lib/istpm-data";
 import {
   softCard,
   eyebrowClass,
   primaryPill,
+  ghostPill,
   iconButton,
   iconButtonDanger,
   toneBadge,
@@ -73,6 +77,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const STATUTS: StatutStage[] = [
   "recherche",
@@ -174,7 +180,30 @@ function ChartCard({
  *  · répartition par service / département d'accueil ;
  *  · volume par structure hospitalière.
  */
-function StagesAnalytics({ stages }: { stages: Stage[] }) {
+function StagesAnalytics({
+  stages,
+  etudiants,
+  onConvention,
+}: {
+  stages: Stage[];
+  etudiants: Etudiant[];
+  onConvention: (etudiantId: string) => void;
+}) {
+  const [eligibleOpen, setEligibleOpen] = useState(false);
+
+  const eligible = useMemo(() => {
+    const activeIds = new Set(
+      stages
+        .filter((s) => s.statut !== "valide")
+        .map((s) => s.etudiantId),
+    );
+    return etudiants.filter(
+      (e) =>
+        (e.niveau === "S2" || e.niveau === "S4" || e.niveau === "S6") &&
+        !activeIds.has(e.id),
+    );
+  }, [etudiants, stages]);
+
   const parStatut = useMemo(
     () =>
       STATUTS.map((s) => ({
@@ -204,6 +233,7 @@ function StagesAnalytics({ stages }: { stages: Stage[] }) {
   if (!stages.length) return null;
 
   return (
+    <>
     <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
       <ChartCard title="Statistiques des stages (par statut)">
         <BarChart data={parStatut}>
@@ -268,7 +298,76 @@ function StagesAnalytics({ stages }: { stages: Stage[] }) {
           <Bar dataKey="value" fill="var(--chart-2)" radius={[0, 6, 6, 0]} />
         </BarChart>
       </ChartCard>
+
+      {/* Carte des étudiants éligibles */}
+      <div
+        className={cn(
+          softCard,
+          "flex cursor-pointer flex-col items-center justify-center p-6 text-center transition hover:shadow-md",
+        )}
+        onClick={() => setEligibleOpen(true)}
+      >
+        <span className="text-3xl font-bold tabular-nums text-brand-dk">
+          {eligible.length}
+        </span>
+        <p className="mt-1 text-sm font-medium text-foreground">
+          Étudiant{eligible.length > 1 ? "s" : ""} éligible{eligible.length > 1 ? "s" : ""}
+        </p>
+        <p className="text-xs text-muted-foreground">(S2, S4, S6 sans stage actif)</p>
+      </div>
     </section>
+
+    {/* Modal des étudiants éligibles */}
+    <Dialog open={eligibleOpen} onOpenChange={setEligibleOpen}>
+      <DialogContent className={cn(dialogSurface, "max-w-2xl")}>
+        <DialogTitle className="sr-only">Étudiants éligibles aux stages</DialogTitle>
+        <DialogDescription className="sr-only">
+          {eligible.length} étudiant{eligible.length > 1 ? "s" : ""} éligible{eligible.length > 1 ? "s" : ""}
+        </DialogDescription>
+        <DetailShell
+          icon={<GraduationCap className="h-5 w-5" />}
+          title={`${eligible.length} étudiant${eligible.length > 1 ? "s" : ""} éligible${eligible.length > 1 ? "s" : ""}`}
+          subtitle="S2, S4 ou S6 sans stage actif"
+        >
+          <div className="max-h-80 space-y-2 overflow-y-auto">
+            {eligible.map((e) => (
+              <div
+                key={e.id}
+                className="flex items-center gap-3 rounded-xl border border-brand/12 bg-card px-4 py-3"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand-dk">
+                  {e.prenom[0]}{e.nom[0]}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    {e.prenom} {e.nom}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {e.cne} · {e.filiere} · {e.niveau}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={cn(primaryPill, "h-8 gap-1.5 px-3 text-xs")}
+                  onClick={() => {
+                    setEligibleOpen(false);
+                    onConvention(e.id);
+                  }}
+                >
+                  <FileText className="h-3.5 w-3.5" /> Convention
+                </button>
+              </div>
+            ))}
+            {eligible.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Aucun étudiant éligible pour le moment.
+              </p>
+            )}
+          </div>
+        </DetailShell>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
@@ -286,7 +385,10 @@ function StagesPage() {
   const [detail, setDetail] = useState<Stage | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Stage | null>(null);
+  const [preselectStudentId, setPreselectStudentId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<Stage | null>(null);
+  const [emailTarget, setEmailTarget] = useState<Stage | null>(null);
+  const [emailTo, setEmailTo] = useState("");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -315,6 +417,7 @@ function StagesPage() {
               className={primaryPill}
               onClick={() => {
                 setEditing(null);
+                setPreselectStudentId(null);
                 setFormOpen(true);
               }}
             >
@@ -324,7 +427,15 @@ function StagesPage() {
         }
       />
 
-      <StagesAnalytics stages={stages} />
+      <StagesAnalytics
+        stages={stages}
+        etudiants={etudiants}
+        onConvention={(etudiantId) => {
+          setPreselectStudentId(etudiantId);
+          setEditing(null);
+          setFormOpen(true);
+        }}
+      />
 
       <FilterPanel
         search={search}
@@ -344,7 +455,7 @@ function StagesPage() {
             label: "Structure",
             value: structure,
             onChange: setStructure,
-            options: structuresAccueil,
+            options: structuresAccueil.map((s) => s.nom),
             allLabel: "Toutes les structures",
           },
           {
@@ -505,6 +616,15 @@ function StagesPage() {
                         >
                           <FileText className="h-3.5 w-3.5" /> Rapport
                         </button>
+                        <button
+                          className={iconButton + " w-auto gap-1.5 px-3 text-xs"}
+                          onClick={() => {
+                            setEmailTarget(s);
+                            setEmailTo(s.cne ? `${s.prenom}.${s.nom}@example.com`.toLowerCase() : "");
+                          }}
+                        >
+                          <Mail className="h-3.5 w-3.5" /> Envoyer
+                        </button>
                         {canManage && s.statut !== "valide" ? (
                           <button
                             className={primaryPill + " ms-auto"}
@@ -574,13 +694,118 @@ function StagesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Email convention dialog */}
+      <Dialog open={!!emailTarget} onOpenChange={(o) => { if (!o) setEmailTarget(null); }}>
+        <DialogContent className={dialogSurface}>
+          <DialogTitle className="sr-only">Envoyer la convention</DialogTitle>
+          <DialogDescription className="sr-only">
+            Envoyer la convention de stage par email
+          </DialogDescription>
+          {emailTarget ? (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-foreground">
+                  Envoyer la convention à
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {emailTarget.prenom} {emailTarget.nom} · {emailTarget.structure}
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="email-to">Adresse email</Label>
+                <Input
+                  id="email-to"
+                  type="email"
+                  value={emailTo}
+                  onChange={(e) => setEmailTo(e.target.value)}
+                  placeholder="email@example.com"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className={cn(ghostPill, "h-9 px-4 text-sm")}
+                  onClick={() => setEmailTarget(null)}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className={cn(primaryPill, "h-9 px-4 text-sm")}
+                  disabled={!emailTo.trim()}
+                  onClick={async () => {
+                    const to = emailTo.trim();
+                    if (!to) return;
+                    const s = emailTarget!;
+                    try {
+                      const lignes = [
+                        "ISTEPM Agadir - Institut specialise des techniques paramedicales",
+                        "",
+                        "Convention de stage clinique",
+                        "",
+                        `Etudiant : ${s.prenom} ${s.nom}`,
+                        `CNE : ${s.cne}`,
+                        `Filiere : ${s.filiere} (${s.niveau})`,
+                        "",
+                        `Structure d'accueil : ${s.structure}`,
+                        `Service : ${s.service}`,
+                        `Periode : ${fmtDate(s.debut)} au ${fmtDate(s.fin)}`,
+                        "",
+                        `Tuteur clinique : ${s.encadrantClinique || "-"}`,
+                        `Tuteur academique : ${s.tuteurAcademique || "-"}`,
+                        "",
+                        `Convention : ${s.conventionSignee ? "signee" : "en attente de signature"}`,
+                        "",
+                        "Document de demonstration genere localement.",
+                      ];
+                      const blob = makePlaceholderPdf(lignes);
+                      const buf = await blob.arrayBuffer();
+                      const base64 = btoa(
+                        new Uint8Array(buf).reduce(
+                          (s, b) => s + String.fromCharCode(b),
+                          "",
+                        ),
+                      );
+                      const res = await sendEmailApi({
+                        to,
+                        subject: `Convention de stage — ${s.prenom} ${s.nom}`,
+                        html: `<p>Veuillez trouver ci-joint la convention de stage de <strong>${s.prenom} ${s.nom}</strong> (${s.cne}, ${s.filiere}, ${s.niveau}).</p><p>Structure d'accueil : ${s.structure}<br/>Service : ${s.service}<br/>Période : ${s.debut} → ${s.fin}</p>`,
+                        attachments: [
+                          {
+                            filename: `convention-${s.nom.toLowerCase()}-${s.cne}.pdf`,
+                            content: base64,
+                            contentType: "application/pdf",
+                          },
+                        ],
+                      });
+                      if (res.ok) {
+                        toast.success("Convention envoyée par email");
+                        setEmailTarget(null);
+                      } else {
+                        toast.error(res.error ?? "Échec de l'envoi");
+                      }
+                    } catch {
+                      toast.error("Erreur lors de l'envoi de l'email");
+                    }
+                  }}
+                >
+                  <Mail className="h-4 w-4" /> Envoyer
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       {formOpen ? (
         <StageForm
-          key={editing?.id ?? "new"}
+          key={editing?.id ?? preselectStudentId ?? "new"}
           initial={editing}
           etudiants={etudiants}
+          stages={stages}
+          preselectEtudiantId={preselectStudentId}
           structuresAccueil={structuresAccueil}
-          onCancel={() => setFormOpen(false)}
+          onCancel={() => { setFormOpen(false); setPreselectStudentId(null); }}
           onSubmit={(data) => {
             if (editing) {
               updateStage(editing.id, data);
@@ -590,6 +815,7 @@ function StagesPage() {
               toast.success(`Convention créée   ${data.prenom} ${data.nom}`);
             }
             setFormOpen(false);
+            setPreselectStudentId(null);
           }}
         />
       ) : null}
@@ -619,18 +845,22 @@ function StagesPage() {
 function StageForm({
   initial,
   etudiants,
+  stages: allStages,
+  preselectEtudiantId,
   structuresAccueil: structures,
   onSubmit,
   onCancel,
 }: {
   initial: Stage | null;
   etudiants: ReturnType<typeof useIstpm>["etudiants"];
-  structuresAccueil: string[];
+  stages: Stage[];
+  preselectEtudiantId?: string | null;
+  structuresAccueil: StructureAccueil[];
   onSubmit: (data: Omit<Stage, "id">) => void;
   onCancel: () => void;
 }) {
   const [f, setF] = useState(() => ({
-    etudiantId: initial?.etudiantId ?? "",
+    etudiantId: initial?.etudiantId ?? preselectEtudiantId ?? "",
     structure: (initial?.structure ?? "") as string,
     service: initial?.service ?? "",
     encadrantClinique: initial?.encadrantClinique ?? "",
@@ -721,14 +951,42 @@ function StageForm({
         />
       </FullWidth>
       <FullWidth>
-        <SelectField
-          label="Structure d'accueil"
-          required
-          value={f.structure}
-          onChange={(v) => set("structure", v)}
-          options={structures}
-          error={errors.structure}
-        />
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <SelectField
+              label="Structure d'accueil"
+              required
+              value={f.structure}
+              onChange={(v) => set("structure", v)}
+              options={structures.map((s) => s.nom)}
+              error={errors.structure}
+            />
+          </div>
+          <button
+            type="button"
+            className={cn(ghostPill, "mb-0.5 h-9 gap-1.5 px-3 text-xs")}
+            title="Choisir aléatoirement une structure avec des places disponibles"
+            onClick={() => {
+              const counts = new Map<string, number>();
+              for (const s of allStages) {
+                if (s.statut !== "valide")
+                  counts.set(s.structure, (counts.get(s.structure) ?? 0) + 1);
+              }
+              const dispo = structures.filter(
+                (st) => (counts.get(st.nom) ?? 0) < st.capacite,
+              );
+              if (dispo.length === 0) {
+                toast.error("Aucune structure avec des places disponibles");
+                return;
+              }
+              const pick = dispo[Math.floor(Math.random() * dispo.length)];
+              set("structure", pick.nom);
+              toast.success(`Structure choisie   ${pick.nom}`);
+            }}
+          >
+            <Shuffle className="h-3.5 w-3.5" /> Aléatoire
+          </button>
+        </div>
       </FullWidth>
       <TextField
         label="Service"

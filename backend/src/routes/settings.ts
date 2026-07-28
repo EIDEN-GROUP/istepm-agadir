@@ -219,6 +219,22 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { filieres: list };
   });
 
+  const structSchema = z.object({
+    nom: z.string().min(1),
+    capacite: z.number().int().min(1).optional().default(5),
+  });
+
+  /** Normalise structures data: legacy string[] → { nom, capacite }[]. */
+  function asStructs(v: unknown): { nom: string; capacite: number }[] {
+    if (!Array.isArray(v)) return [];
+    return v.map((s: unknown) => {
+      if (typeof s === "string") return { nom: s, capacite: 5 };
+      if (typeof s === "object" && s && "nom" in (s as Record<string, unknown>))
+        return { nom: (s as Record<string, string>).nom, capacite: Number((s as Record<string, number>).capacite) || 5 };
+      return { nom: "?", capacite: 5 };
+    });
+  }
+
   app.get("/structures", { preHandler: [authenticate] }, async () => {
     const db = getDb();
     const [row] = await db
@@ -226,11 +242,11 @@ export async function settingsRoutes(app: FastifyInstance) {
       .from(settings)
       .where(eq(settings.key, "structures_accueil"))
       .limit(1);
-    return row?.value ?? [];
+    return asStructs(row?.value);
   });
 
   app.post("/structures", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
-    const { nom } = z.object({ nom: z.string().min(1) }).parse(request.body);
+    const { nom, capacite } = structSchema.parse(request.body);
     const db = getDb();
     const [row] = await db
       .select()
@@ -238,12 +254,12 @@ export async function settingsRoutes(app: FastifyInstance) {
       .where(eq(settings.key, "structures_accueil"))
       .limit(1);
 
-    const list: string[] = (row?.value as string[]) ?? [];
-    if (list.includes(nom)) {
+    const list = asStructs(row?.value);
+    if (list.some((s) => s.nom === nom)) {
       return reply.status(409).send({ error: "Cette structure existe déjà" });
     }
-    list.push(nom);
-    list.sort();
+    list.push({ nom, capacite });
+    list.sort((a, b) => a.nom.localeCompare(b.nom));
 
     if (row) {
       await db
@@ -256,9 +272,12 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { structures: list };
   });
 
+  // Update: change name and/or capacity
   app.put("/structures/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { nom } = request.params as { nom: string };
-    const { nouveauNom } = z.object({ nouveauNom: z.string().min(1) }).parse(request.body);
+    const body = z
+      .object({ nouveauNom: z.string().min(1).optional(), capacite: z.number().int().min(1).optional() })
+      .parse(request.body);
     const db = getDb();
     const [row] = await db
       .select()
@@ -267,13 +286,16 @@ export async function settingsRoutes(app: FastifyInstance) {
       .limit(1);
     if (!row) return reply.status(404).send({ error: "Aucune structure enregistrée" });
 
-    const list: string[] = (row.value as string[]) ?? [];
-    const idx = list.indexOf(nom);
+    const list = asStructs(row.value);
+    const idx = list.findIndex((s) => s.nom === nom);
     if (idx === -1) return reply.status(404).send({ error: "Structure introuvable" });
-    if (list.includes(nouveauNom))
+
+    const newName = body.nouveauNom ?? nom;
+    if (newName !== nom && list.some((s) => s.nom === newName))
       return reply.status(409).send({ error: "Ce nom existe déjà" });
-    list[idx] = nouveauNom;
-    list.sort();
+
+    list[idx] = { nom: newName, capacite: body.capacite ?? list[idx].capacite };
+    list.sort((a, b) => a.nom.localeCompare(b.nom));
 
     await db
       .update(settings)
@@ -292,8 +314,8 @@ export async function settingsRoutes(app: FastifyInstance) {
       .limit(1);
     if (!row) return reply.status(404).send({ error: "Aucune structure enregistrée" });
 
-    const list: string[] = (row.value as string[]) ?? [];
-    const idx = list.indexOf(nom);
+    const list = asStructs(row.value);
+    const idx = list.findIndex((s) => s.nom === nom);
     if (idx === -1) return reply.status(404).send({ error: "Structure introuvable" });
     list.splice(idx, 1);
 

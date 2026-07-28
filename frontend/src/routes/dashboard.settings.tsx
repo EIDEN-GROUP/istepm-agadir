@@ -35,6 +35,7 @@ import {
   fmtMAD,
   type ModuleRecord,
   type GroupConfig,
+  type StructureAccueil,
 } from "@/lib/istpm-data";
 import { useIstpm } from "@/lib/istpm-store";
 import {
@@ -1167,7 +1168,10 @@ function SettingsPage() {
     CRENEAUX.map((c) => `${c.debut} – ${c.fin}`),
   );
   const [listeFilieres, setListeFilieres] = useState<string[]>([...filieres]);
-  const [listeStructures, setListeStructures] = useState<string[]>([...structuresAccueil]);
+  const [listeStructures, setListeStructures] = useState<StructureAccueil[]>(
+    structuresAccueil.map((s) => (typeof s === "string" ? { nom: s, capacite: 5 } : s)),
+  );
+  const [nouvelleStructure, setNouvelleStructure] = useState("");
   const [typesExamen, setTypesExamen] = useState<string[]>(
     Object.values(TYPE_EXAMEN_LABEL),
   );
@@ -1203,8 +1207,6 @@ function SettingsPage() {
   /* --------- API sync --------- */
   const filieresRef = useRef(listeFilieres);
   filieresRef.current = listeFilieres;
-  const structuresRef = useRef(listeStructures);
-  structuresRef.current = listeStructures;
 
   useEffect(() => {
     fetchSettings()
@@ -1846,18 +1848,90 @@ function SettingsPage() {
       case "structures":
         return (
           <Carte id="structures">
-            <ListeEditable
-              valeurs={listeStructures}
-              onChange={(v) => {
-                const oldList = structuresRef.current;
-                const added = v.filter((x) => !oldList.includes(x));
-                const removed = oldList.filter((x) => !v.includes(x));
-                added.forEach((nom) => addStructureAccueil(nom));
-                removed.forEach((nom) => deleteStructureAccueil(nom));
-                setListeStructures(v);
-              }}
-              placeholder="CHU Mohammed VI   Marrakech"
-            />
+            <div className="space-y-3">
+              {listeStructures.map((s, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-xl border border-brand/12 bg-card px-3 py-2">
+                  <span className="min-w-0 flex-1 text-sm font-medium text-foreground">{s.nom}</span>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span>Cap.</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={s.capacite}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (v >= 1) {
+                          const next = listeStructures.map((st, j) =>
+                            j === i ? { ...st, capacite: v } : st,
+                          );
+                          setListeStructures(next);
+                          updateStructureAccueil(s.nom, { capacite: v });
+                        }
+                      }}
+                      className="h-7 w-16 rounded-lg border-brand/20 text-center text-xs tabular-nums"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className={ghostPill + " text-alert p-1.5"}
+                    aria-label={`Supprimer ${s.nom}`}
+                    onClick={() => {
+                      const next = listeStructures.filter((_, j) => j !== i);
+                      setListeStructures(next);
+                      deleteStructureAccueil(s.nom);
+                      toast.success(`Supprimée   ${s.nom}`);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Ajouter une structure…"
+                  value={nouvelleStructure}
+                  onChange={(e) => setNouvelleStructure(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const nom = nouvelleStructure.trim();
+                      if (nom && !listeStructures.some((s) => s.nom === nom)) {
+                        const next = [...listeStructures, { nom, capacite: 5 }].sort((a, b) =>
+                          a.nom.localeCompare(b.nom),
+                        );
+                        setListeStructures(next);
+                        addStructureAccueil(nom, 5);
+                        setNouvelleStructure("");
+                        toast.success(`Ajoutée   ${nom}`);
+                      } else if (nom) {
+                        toast.error("Cette structure existe déjà");
+                      }
+                    }
+                  }}
+                  className={cn(softInput, "h-9 flex-1 text-sm")}
+                />
+                <button
+                  type="button"
+                  className={cn(primaryPill, "h-9 px-4 text-sm")}
+                  onClick={() => {
+                    const nom = nouvelleStructure.trim();
+                    if (nom && !listeStructures.some((s) => s.nom === nom)) {
+                      const next = [...listeStructures, { nom, capacite: 5 }].sort((a, b) =>
+                        a.nom.localeCompare(b.nom),
+                      );
+                      setListeStructures(next);
+                      addStructureAccueil(nom, 5);
+                      setNouvelleStructure("");
+                      toast.success(`Ajoutée   ${nom}`);
+                    } else if (nom) {
+                      toast.error("Cette structure existe déjà");
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           </Carte>
         );
 
