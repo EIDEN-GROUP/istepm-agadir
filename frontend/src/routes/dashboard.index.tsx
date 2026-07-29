@@ -56,7 +56,7 @@ import {
 import { DetailShell, DetailSection } from "@/components/dash-page";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { DashTabs, DashTabPanel, type DashTab } from "@/components/dash-tabs";
-import { AreaTrend, LineTrend, BarSeries, HBarSeries, DonutChart, type ChartDatum } from "@/components/dash-charts";
+import { AreaTrend, LineTrend, BarSeries, HBarSeries, DonutChart, GroupedBarSeries, type ChartDatum, type GroupedDatum } from "@/components/dash-charts";
 import {
   Bar,
   BarChart,
@@ -671,6 +671,36 @@ function MeterRow({ label, ratio, color, detail, onClick }: {
   return <div className={cls}>{inner}</div>;
 }
 
+/**
+ * Sélecteur de période « du … à … ».
+ *
+ * Les bornes sont facultatives et inclusives : laisser un champ vide revient à
+ * ne pas borner ce côté. Les dates sont au format ISO (« AAAA-MM-JJ »), donc la
+ * comparaison lexicographique suffit pour filtrer.
+ */
+function DateRangeFilter({ du, a, onDu, onA }: {
+  du: string; a: string; onDu: (v: string) => void; onA: (v: string) => void;
+}) {
+  const champ = "h-9 rounded-xl border border-brand/20 bg-card px-2.5 text-xs text-foreground shadow-none transition-colors hover:border-brand/35 focus-visible:border-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15";
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Du
+        <input type="date" value={du} max={a || undefined} onChange={(e) => onDu(e.target.value)} className={champ} aria-label="Date de début" />
+      </label>
+      <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        À
+        <input type="date" value={a} min={du || undefined} onChange={(e) => onA(e.target.value)} className={champ} aria-label="Date de fin" />
+      </label>
+      {du || a ? (
+        <button type="button" onClick={() => { onDu(""); onA(""); }} className="rounded-lg px-2 py-1 text-[11px] font-semibold text-brand-dk transition-colors hover:bg-brand/10">
+          Réinitialiser
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 const TH = "border-b border-brand/15 bg-muted text-[11px] font-semibold uppercase tracking-wider text-muted-foreground";
 
 /* ------------------------------------------------------------------ */
@@ -881,16 +911,43 @@ function DashboardDirecteur() {
   // « Examens par mois » suit l'année scolaire : septembre (index 0) → juin.
   const examensParMois = useMemo(() => { const c = new Array(MOIS_ACAD.length).fill(0); examens.forEach((ex) => { const idx = (new Date(ex.date).getMonth() - 8 + 12) % 12; if (idx < MOIS_ACAD.length) c[idx]++; }); return MOIS_ACAD.map((n, i) => ({ name: n, value: c[i] })); }, [examens]);
   const sessionsParJour = useMemo(() => { const c = new Array(7).fill(0); seances.forEach((s) => c[new Date(s.date).getDay()]++); return JOURS.map((n, i) => ({ name: n, value: c[i] })); }, [seances]);
-  const chargeFormateurs = useMemo(() => formateurs.filter((f) => f.statut !== "en_conge").map((f) => ({ id: f.id, nom: `${f.prenom} ${f.nom}`, seances: seances.filter((s) => s.professeurId === f.id).length, groupes: f.groupes.length, modules: f.modules.length })).sort((a, b) => b.seances - a.seances), [formateurs, seances]);
+  // « Charge des formateurs » se lit sur une période choisie (bornes incluses,
+  // vides = pas de borne). Le compte des séances et la modale de détail
+  // s'appuient tous deux sur cette même sélection.
+  const [chargeDu, setChargeDu] = useState("");
+  const [chargeA, setChargeA] = useState("");
+  const seancesPeriode = useMemo(
+    () => seances.filter((s) => (!chargeDu || s.date >= chargeDu) && (!chargeA || s.date <= chargeA)),
+    [seances, chargeDu, chargeA],
+  );
+  const chargeFormateurs = useMemo(() => formateurs.filter((f) => f.statut !== "en_conge").map((f) => ({ id: f.id, nom: `${f.prenom} ${f.nom}`, seances: seancesPeriode.filter((s) => s.professeurId === f.id).length, groupes: f.groupes.length, modules: f.modules.length })).sort((a, b) => b.seances - a.seances), [formateurs, seancesPeriode]);
   const derniersEtudiants = useMemo(() => etudiants.slice().reverse().slice(0, 6), [etudiants]);
   const examensRecents = useMemo(() => examens.slice().reverse().slice(0, 6), [examens]);
   // Synthèse des examens : répartition par statut et par type (onglet Académique).
   const examensParStatut = useMemo<ChartDatum[]>(() => Object.entries(STATUT_EXAMEN_LABEL).map(([k, label]) => ({ name: label, value: examens.filter((e) => e.statut === k).length })), [examens]);
   const examensParType = useMemo<ChartDatum[]>(() => Object.entries(TYPE_EXAMEN_LABEL).map(([k, label]) => ({ name: label, value: examens.filter((e) => e.type === k).length })), [examens]);
+  // Examens par formateur : le rattachement se fait par module enseigné (comme
+  // sur le tableau de bord enseignant). « Planifiés » = encore à venir,
+  // « faits » = l'épreuve a eu lieu (en cours de correction ou notes saisies).
+  const examensParFormateur = useMemo<GroupedDatum[]>(
+    () =>
+      formateurs
+        .map((f) => {
+          const siens = examens.filter((x) => f.modules.includes(x.module));
+          return {
+            name: `${f.prenom.charAt(0)}. ${f.nom}`,
+            planifies: siens.filter((x) => x.statut === "planifie").length,
+            faits: siens.filter((x) => x.statut !== "planifie").length,
+          };
+        })
+        .filter((r) => r.planifies + r.faits > 0)
+        .sort((a, b) => b.planifies + b.faits - (a.planifies + a.faits)),
+    [formateurs, examens],
+  );
 
   // « Charge des formateurs » : ligne cliquable → modale des séances du formateur.
   const [chargeSel, setChargeSel] = useState<{ id: string; nom: string } | null>(null);
-  const seancesFormateur = useMemo(() => chargeSel ? seances.filter((s) => s.professeurId === chargeSel.id).slice().sort((a, b) => (a.date === b.date ? (a.debut < b.debut ? -1 : 1) : a.date < b.date ? -1 : 1)) : [], [chargeSel, seances]);
+  const seancesFormateur = useMemo(() => chargeSel ? seancesPeriode.filter((s) => s.professeurId === chargeSel.id).slice().sort((a, b) => (a.date === b.date ? (a.debut < b.debut ? -1 : 1) : a.date < b.date ? -1 : 1)) : [], [chargeSel, seancesPeriode]);
 
   return (
     <>
@@ -940,6 +997,19 @@ function DashboardDirecteur() {
               <div className="grid gap-4 xl:grid-cols-2">
                 <DonutChart title="Examens par statut" data={examensParStatut} palette={BRAND_CHART_COLORS} />
                 <BarSeries title="Examens par type" data={examensParType} colorful palette={BRAND_CHART_COLORS} />
+                <div className="xl:col-span-2">
+                  <GroupedBarSeries
+                    // Pas de sous-titre : la légende dit déjà « Planifiés / Faits ».
+                    title="Examens par formateur"
+                    height={300}
+                    data={examensParFormateur}
+                    series={[
+                      // Mêmes couleurs que les badges de statut : bleu « planifié », teal « notes saisies ».
+                      { key: "planifies", label: "Planifiés", color: BRAND_CHART_COLORS[1] },
+                      { key: "faits", label: "Faits", color: BRAND_CHART_COLORS[0] },
+                    ]}
+                  />
+                </div>
               </div>
             </Section>
           </div>
@@ -953,7 +1023,10 @@ function DashboardDirecteur() {
                 <LineTrend title="Séances par jour de la semaine" data={sessionsParJour} color="var(--istpm-amber)" />
               </div>
             </Section>
-            <Section title="Charge des formateurs">
+            <Section
+              title="Charge des formateurs"
+              action={<DateRangeFilter du={chargeDu} a={chargeA} onDu={setChargeDu} onA={setChargeA} />}
+            >
               <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
                 {chargeFormateurs.map((f) => { const r = Math.min(f.seances / 8, 1); return <MeterRow key={f.id} label={f.nom} ratio={r} color={r > 0.75 ? TONE_COLORS.red : r > 0.5 ? TONE_COLORS.amber : TONE_COLORS.teal} detail={`${f.seances} séances Â· ${f.groupes} grp Â· ${f.modules} mod`} onClick={() => setChargeSel({ id: f.id, nom: f.nom })} />; })}
               </div>
@@ -971,7 +1044,15 @@ function DashboardDirecteur() {
             <DetailShell
               icon={<Users className="h-5 w-5" />}
               title={chargeSel.nom}
-              subtitle={`${seancesFormateur.length} séance${seancesFormateur.length > 1 ? "s" : ""}`}
+              subtitle={`${seancesFormateur.length} séance${seancesFormateur.length > 1 ? "s" : ""}${
+                chargeDu && chargeA
+                  ? ` du ${fmtDate(chargeDu)} au ${fmtDate(chargeA)}`
+                  : chargeDu
+                    ? ` à partir du ${fmtDate(chargeDu)}`
+                    : chargeA
+                      ? ` jusqu'au ${fmtDate(chargeA)}`
+                      : ""
+              }`}
             >
               <DetailSection title="Séances programmées">
                 {seancesFormateur.length ? (
@@ -1002,7 +1083,11 @@ function DashboardDirecteur() {
                     </table>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Aucune séance programmée.</p>
+                  <p className="text-sm text-muted-foreground">
+                    {chargeDu || chargeA
+                      ? "Aucune séance sur la période sélectionnée."
+                      : "Aucune séance programmée."}
+                  </p>
                 )}
               </DetailSection>
             </DetailShell>

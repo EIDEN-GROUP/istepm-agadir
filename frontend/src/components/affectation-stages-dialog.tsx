@@ -224,7 +224,7 @@ export function AffectationStagesDialog({
         </DialogDescription>
         <DetailShell
           icon={<Users className="h-5 w-5" />}
-          title="Affecter les étudiants"
+          title="Affectation"
           subtitle={`Étape ${step + 1}/4 · ${titres[step]}`}
           badges={
             <>

@@ -528,7 +528,7 @@ function EspaceFormateur() {
             <th>Groupe</th>
             <th>Type</th>
             <th>Date</th>
-            <th>Année</th>
+            <th>Niveau</th>
             <th>Statut</th>
             <th className="w-32 text-center">Actions</th>
           </>
@@ -685,6 +685,7 @@ function EspaceDirecteur() {
   const [classe, setClasse] = useState<string>(ALL);
   const [semestre, setSemestre] = useState<string>(ALL);
   const [annee, setAnnee] = useState<string>(ALL);
+  const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
 
   const [detail, setDetail] = useState<Examen | null>(null);
   const [preview, setPreview] = useState<Examen | null>(null);
@@ -715,17 +716,19 @@ function EspaceDirecteur() {
       if (classe !== ALL && x.classe !== classe) return false;
       if (semestre !== ALL && x.niveau !== semestre) return false;
       if (annee !== ALL && anneeEtude(x.niveau) !== annee) return false;
+      if (anneeScolaire !== ALL && x.anneeUniversitaire !== anneeScolaire)
+        return false;
       if (!q) return true;
       const auteur = nomFormateur(formateurs, x.createdBy);
       return `${x.titre} ${x.module} ${x.classe} ${x.salle} ${auteur} ${x.document?.nom ?? ""}`
         .toLowerCase()
         .includes(q);
     });
-  }, [examens, formateurs, search, prof, module, classe, semestre, annee]);
+  }, [examens, formateurs, search, prof, module, classe, semestre, annee, anneeScolaire]);
 
   const pager = usePagination(
     filtered,
-    `${search}|${prof}|${module}|${classe}|${semestre}|${annee}`,
+    `${search}|${prof}|${module}|${classe}|${semestre}|${annee}|${anneeScolaire}`,
   );
 
   const avecSujet = filtered.filter((x) => x.document).length;
@@ -781,10 +784,18 @@ function EspaceDirecteur() {
           },
           {
             id: "annee",
-            label: "Année",
+            label: "Niveau",
             value: annee,
             onChange: setAnnee,
             options: ANNEES_ETUDE,
+            allLabel: "Tous les niveaux",
+          },
+          {
+            id: "anneeScolaire",
+            label: "Année scolaire",
+            value: anneeScolaire,
+            onChange: setAnneeScolaire,
+            options: ANNEES_UNIVERSITAIRES,
             allLabel: "Toutes les années",
           },
         ]}
@@ -819,7 +830,7 @@ function EspaceDirecteur() {
             <th>Groupe</th>
             <th>Type</th>
             <th>Date</th>
-            <th>Année</th>
+            <th>Niveau</th>
             <th>Formateur</th>
             <th>Statut</th>
             <th className="w-24 text-center">Actions</th>

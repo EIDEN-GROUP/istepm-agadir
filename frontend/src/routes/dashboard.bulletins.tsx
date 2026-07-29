@@ -10,6 +10,7 @@ import {
   FILIERES,
   NIVEAUX,
   ANNEES_ETUDE,
+  ANNEES_UNIVERSITAIRES,
   anneeEtude,
   DECISION_TONE,
   MENTION_TONE,
@@ -124,7 +125,7 @@ function printBulletin(b: Bulletin, groupe?: string) {
   .formula{background:#eef7f6;border:1px solid #d6efee;border-radius:8px;
            padding:10px 12px;font-size:13px;color:#123b3a;margin:0 0 4px;}
   .note{color:#556;font-size:11px;margin-top:6px;}
-  .cachet{margin-top:36px;text-align:left;page-break-inside:avoid;}
+  .cachet{margin-top:36px;text-align:right;page-break-inside:avoid;}
   .cachet img{max-width:150px;max-height:120px;}
   .cachet .lbl{color:#556;font-size:10px;margin-top:2px;
                text-transform:uppercase;letter-spacing:.06em;}
@@ -188,6 +189,7 @@ function BulletinsPage() {
   const [niveau, setNiveau] = useState<string>(ALL);
   const [session, setSession] = useState<string>(ALL);
   const [annee, setAnnee] = useState<string>(ALL);
+  const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
   const [groupe, setGroupe] = useState<string>(ALL);
   const [formateur, setFormateur] = useState<string>(ALL);
   const [statut, setStatut] = useState<string>(ALL);
@@ -212,6 +214,8 @@ function BulletinsPage() {
       if (niveau !== ALL && b.niveau !== niveau) return false;
       if (session !== ALL && b.session !== session) return false;
       if (annee !== ALL && anneeEtude(b.niveau) !== annee) return false;
+      // Le bulletin ne porte pas l'année scolaire : elle vient de l'étudiant.
+      if (anneeScolaire !== ALL && etuById.get(b.etudiantId)?.annee !== anneeScolaire) return false;
       if (groupe !== ALL && etuById.get(b.etudiantId)?.groupe !== groupe) return false;
       if (statut !== ALL && STATUT_BULLETIN_LABEL[b.statut] !== statut) return false;
       if (formateur !== ALL) {
@@ -221,9 +225,9 @@ function BulletinsPage() {
       if (!q) return true;
       return `${b.cne} ${b.prenom} ${b.nom}`.toLowerCase().includes(q);
     });
-  }, [bulletins, search, filiere, niveau, session, annee, groupe, statut, formateur, etuById, modulesParFormateur]);
+  }, [bulletins, search, filiere, niveau, session, annee, anneeScolaire, groupe, statut, formateur, etuById, modulesParFormateur]);
 
-  const pager = usePagination(filtered, `${search}|${filiere}|${niveau}|${session}|${annee}|${groupe}|${statut}|${formateur}`);
+  const pager = usePagination(filtered, `${search}|${filiere}|${niveau}|${session}|${annee}|${anneeScolaire}|${groupe}|${statut}|${formateur}`);
 
   const aPublier = bulletins.filter((b) => b.statut !== "publie").length;
 
@@ -281,10 +285,18 @@ function BulletinsPage() {
           },
           {
             id: "annee",
-            label: "Année",
+            label: "Niveau",
             value: annee,
             onChange: setAnnee,
             options: ANNEES_ETUDE,
+            allLabel: "Tous les niveaux",
+          },
+          {
+            id: "anneeScolaire",
+            label: "Année scolaire",
+            value: anneeScolaire,
+            onChange: setAnneeScolaire,
+            options: ANNEES_UNIVERSITAIRES,
             allLabel: "Toutes les années",
           },
           {

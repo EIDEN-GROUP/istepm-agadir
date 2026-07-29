@@ -15,8 +15,8 @@ import { notesEtudiant } from "@/db/schema/notes-etudiant";
 import { groupConfigs } from "@/db/schema/groupConfigs";
 import { eq, desc, asc } from "drizzle-orm";
 
+// La clé vient de l'URL (`PUT /settings/:key`) : le corps ne porte que la valeur.
 const settingSchema = z.object({
-  key: z.string().min(1),
   value: z.any(),
 });
 

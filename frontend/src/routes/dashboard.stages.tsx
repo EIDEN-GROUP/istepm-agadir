@@ -6,6 +6,8 @@ import {
   BarChart,
   Bar,
   Cell,
+  Pie,
+  PieChart,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -23,6 +25,7 @@ import {
 import {
   FILIERES,
   NIVEAUX,
+  anneeEtude,
   STATUT_STAGE_LABEL,
   STATUT_STAGE_TONE,
   fmtDate,
@@ -49,6 +52,7 @@ import {
   TONE_COLORS,
   BRAND_CHART_COLORS,
   dashTooltip,
+  renderPieLabel,
 } from "@/lib/dash-ui";
 import {
   PageHeader,
@@ -117,19 +121,70 @@ function ChartCard({
   title,
   children,
   height = 240,
+  action,
 }: {
   title: string;
   children: ReactNode;
   height?: number;
+  /** Contrôle optionnel aligné à droite du titre (bascule de vue, filtre…). */
+  action?: ReactNode;
 }) {
   return (
     <div className={cn(softCard, "p-4 sm:p-5")}>
-      <p className={eyebrowClass}>{title}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className={eyebrowClass}>{title}</p>
+        {action}
+      </div>
       <div className="mt-3 w-full" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           {children as React.ReactElement}
         </ResponsiveContainer>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Bascule segmentée entre deux angles d'analyse, sur le modèle du sélecteur
+ * « Réussite / Recouvrement » du tableau de bord.
+ */
+function ChartSwitch<T extends string>({
+  value,
+  onChange,
+  options,
+  label,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: readonly (readonly [T, string])[];
+  label: string;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      className="flex shrink-0 items-center gap-1 rounded-full border border-brand/12 bg-muted/60 p-1"
+    >
+      {options.map(([key, tabLabel]) => {
+        const active = value === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(key)}
+            className={cn(
+              "rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors",
+              active
+                ? "bg-brand text-white shadow-[0_2px_8px_-3px_rgb(var(--istpm-shadow)/0.5)]"
+                : "text-muted-foreground hover:text-brand-dk",
+            )}
+          >
+            {tabLabel}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -152,6 +207,12 @@ function StagesAnalytics({
   onConvention: (etudiantId: string) => void;
 }) {
   const [eligibleOpen, setEligibleOpen] = useState(false);
+  // Les deux angles de lecture des stages partagent une carte : on bascule de
+  // « par structure » à « par statut » sans consommer deux emplacements. La
+  // répartition par structure est affichée en premier.
+  const [vueStages, setVueStages] = useState<"statut" | "structure">(
+    "structure",
+  );
 
   const eligible = useMemo(() => {
     const activeIds = new Set(
@@ -166,10 +227,12 @@ function StagesAnalytics({
     );
   }, [etudiants, stages]);
 
+  // Les semestres éligibles (S2, S4, S6) sont les fins d'année d'étude : on les
+  // libelle par année (« 1ère année »…) plutôt que par code de semestre.
   const eligibleParNiveau = useMemo(
     () =>
       (["S2", "S4", "S6"] as const).map((n) => ({
-        name: n,
+        name: anneeEtude(n),
         value: eligible.filter((e) => e.niveau === n).length,
       })),
     [eligible],
@@ -197,64 +260,83 @@ function StagesAnalytics({
 
   return (
     <>
-    <section className="grid gap-4 md:grid-cols-1 2xl:grid-cols-3">
-      <ChartCard title="Statistiques des stages (par statut)">
-        <BarChart data={parStatut}>
-          <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis
-            dataKey="name"
-            tick={{ fontSize: 10 }}
-            stroke="var(--muted-foreground)"
-            interval={0}
-            angle={-15}
-            textAnchor="end"
-            height={54}
+    <section className="grid gap-4 md:grid-cols-1 2xl:grid-cols-[2fr_1fr]">
+      <ChartCard
+        title={
+          vueStages === "statut"
+            ? "Statistiques des stages (par statut)"
+            : "Stages par structure hospitalière"
+        }
+        height={260}
+        action={
+          <ChartSwitch
+            label="Choisir l'angle d'analyse des stages"
+            value={vueStages}
+            onChange={setVueStages}
+            options={[
+              ["structure", "Structure"],
+              ["statut", "Statut"],
+            ] as const}
           />
-          <YAxis
-            allowDecimals={false}
-            tick={{ fontSize: 11 }}
-            stroke="var(--muted-foreground)"
-            width={28}
-          />
-          <Tooltip contentStyle={dashTooltip} cursor={false} />
-          <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-            {parStatut.map((_, i) => (
-              <Cell
-                key={i}
-                fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
-              />
-            ))}
-          </Bar>
-        </BarChart>
+        }
+      >
+        {vueStages === "statut" ? (
+          <BarChart data={parStatut}>
+            <CartesianGrid stroke="var(--border)" vertical={false} />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 10 }}
+              stroke="var(--muted-foreground)"
+              interval={0}
+              angle={-15}
+              textAnchor="end"
+              height={54}
+            />
+            <YAxis
+              allowDecimals={false}
+              tick={{ fontSize: 11 }}
+              stroke="var(--muted-foreground)"
+              width={28}
+            />
+            <Tooltip contentStyle={dashTooltip} cursor={false} />
+            <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+              {parStatut.map((_, i) => (
+                <Cell
+                  key={i}
+                  fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        ) : (
+          <BarChart data={parStructure} layout="vertical">
+            <CartesianGrid stroke="var(--border)" horizontal={false} />
+            <XAxis
+              type="number"
+              allowDecimals={false}
+              tick={{ fontSize: 11 }}
+              stroke="var(--muted-foreground)"
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              tick={{ fontSize: 10 }}
+              stroke="var(--muted-foreground)"
+              width={130}
+            />
+            <Tooltip contentStyle={dashTooltip} cursor={false} />
+            <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+              {parStructure.map((_, i) => (
+                <Cell
+                  key={i}
+                  fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        )}
       </ChartCard>
 
-      <ChartCard title="Stages par structure hospitalière" height={260}>
-        <BarChart data={parStructure} layout="vertical">
-          <CartesianGrid stroke="var(--border)" horizontal={false} />
-          <XAxis
-            type="number"
-            allowDecimals={false}
-            tick={{ fontSize: 11 }}
-            stroke="var(--muted-foreground)"
-          />
-          <YAxis
-            type="category"
-            dataKey="name"
-            tick={{ fontSize: 10 }}
-            stroke="var(--muted-foreground)"
-            width={130}
-          />
-          <Tooltip contentStyle={dashTooltip} cursor={false} />
-          <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-            {parStructure.map((_, i) => (
-              <Cell
-                key={i}
-                fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ChartCard>
       {/* Carte des étudiants éligibles */}
       <div
         className={cn(
@@ -277,35 +359,62 @@ function StagesAnalytics({
             {eligible.length}
           </span>
         </div>
-        <div className="mt-3 w-full" style={{ height: 240 }}>
+        {/* Camembert plein (pas d'anneau) : la part de chaque année d'étude
+            dans le vivier d'étudiants encore à placer en stage. */}
+        <div className="mt-3 w-full" style={{ height: 200 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={eligibleParNiveau}>
-              <CartesianGrid stroke="var(--border)" vertical={false} />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 11 }}
-                stroke="var(--muted-foreground)"
-              />
-              <YAxis
-                allowDecimals={false}
-                tick={{ fontSize: 11 }}
-                stroke="var(--muted-foreground)"
-                width={28}
-              />
-              <Tooltip contentStyle={dashTooltip} cursor={false} />
-              <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+            <PieChart>
+              <Pie
+                data={eligibleParNiveau}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={0}
+                outerRadius="92%"
+                paddingAngle={0}
+                startAngle={90}
+                endAngle={-270}
+                stroke="var(--card)"
+                strokeWidth={2}
+                labelLine={false}
+                label={renderPieLabel}
+              >
                 {eligibleParNiveau.map((_, i) => (
                   <Cell
                     key={i}
                     fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
                   />
                 ))}
-              </Bar>
-            </BarChart>
+              </Pie>
+              <Tooltip contentStyle={dashTooltip} />
+            </PieChart>
           </ResponsiveContainer>
         </div>
+        <ul className="mt-3 space-y-2">
+          {eligibleParNiveau.map((d, i) => (
+            <li
+              key={d.name}
+              className="flex items-center justify-between gap-2 text-sm"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor:
+                      BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length],
+                  }}
+                />
+                <span className="truncate text-muted-foreground">{d.name}</span>
+              </span>
+              <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                {d.value}
+              </span>
+            </li>
+          ))}
+        </ul>
         <p className="mt-1 text-center text-xs text-muted-foreground">
-          S2, S4, S6 sans stage actif
+          Fin d&rsquo;année d&rsquo;étude (S2, S4, S6) sans stage actif
         </p>
       </div>
     </section>
@@ -364,7 +473,7 @@ function StagesPage() {
                 <Building2 className="h-3.5 w-3.5" /> Structures d'accueil
               </button>
               <button className={primaryPill} onClick={() => setAffectOpen(true)}>
-                <Users className="h-4 w-4" /> Affecter les étudiants
+                <Users className="h-4 w-4" /> Affectation
               </button>
             </>
           ) : undefined

@@ -228,13 +228,24 @@ function StampSection() {
       return;
     }
     setBusy(true);
+    let dataUrl: string;
     try {
-      const dataUrl = await prepareStampFromFile(file);
-      setStamp(dataUrl);
-      updateSetting("stamp_image", dataUrl).catch(() => {});
-      toast.success("Cachet enregistré — il sera apposé sur tous les PDF");
+      dataUrl = await prepareStampFromFile(file);
     } catch {
       toast.error("Impossible de lire cette image");
+      setBusy(false);
+      return;
+    }
+    setStamp(dataUrl);
+    // La persistance serveur est explicite : un échec doit être visible, sinon
+    // le cachet ne survit pas à un changement de poste ou de navigateur.
+    try {
+      await updateSetting("stamp_image", dataUrl);
+      toast.success("Cachet enregistré — il sera apposé sur tous les PDF");
+    } catch {
+      toast.error(
+        "Cachet appliqué localement, mais la sauvegarde sur le serveur a échoué",
+      );
     } finally {
       setBusy(false);
     }
@@ -291,8 +302,15 @@ function StampSection() {
                 className={cn(ghostPill, "h-9 gap-1.5 px-4 text-sm text-alert")}
                 onClick={() => {
                   setStamp(null);
-                  updateSetting("stamp_image", null).catch(() => {});
-                  toast.success("Cachet supprimé");
+                  // `settings.value` est `jsonb NOT NULL` : on efface avec une
+                  // chaîne vide plutôt qu'un `null` que la colonne refuserait.
+                  updateSetting("stamp_image", "")
+                    .then(() => toast.success("Cachet supprimé"))
+                    .catch(() =>
+                      toast.error(
+                        "Cachet retiré localement, mais la suppression sur le serveur a échoué",
+                      ),
+                    );
                 }}
               >
                 <Trash2 className="h-4 w-4" /> Supprimer
@@ -1352,6 +1370,10 @@ function SettingsPage() {
           setBulletin((p) => ({ ...p, seuilAdmission: data.bulletin_seuilAdmission as string }));
         if (typeof data.bulletin_creditsSemestre === "string")
           setBulletin((p) => ({ ...p, creditsSemestre: data.bulletin_creditsSemestre as string }));
+        // Le cachet est stocké en base : on réhydrate le cache local afin qu'il
+        // suive l'utilisateur d'un poste ou d'un navigateur à l'autre.
+        if (typeof data.stamp_image === "string" && data.stamp_image)
+          setStamp(data.stamp_image);
       })
       .catch(() => {});
   }, []);

@@ -104,6 +104,7 @@ function PaiementsPage() {
   const [filiere, setFiliere] = useState<string>(ALL);
   const [semestre, setSemestre] = useState<string>(ALL);
   const [annee, setAnnee] = useState<string>(ALL);
+  const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
   const [statut, setStatut] = useState<string>(ALL);
   const [mois, setMois] = useState<string>(ALL);
 
@@ -123,6 +124,7 @@ function PaiementsPage() {
         if (filiere !== ALL && e.filiere !== filiere) return false;
         if (semestre !== ALL && e.niveau !== semestre) return false;
         if (annee !== ALL && anneeEtude(e.niveau) !== annee) return false;
+        if (anneeScolaire !== ALL && e.annee !== anneeScolaire) return false;
         const statutE = deriveStatutPaiement(e.paiementsMensuelsRecords);
         if (statut !== ALL && STATUT_PAIEMENT_LABEL[statutE] !== statut) return false;
         if (mois !== ALL) {
@@ -144,11 +146,11 @@ function PaiementsPage() {
         const moisRetard = records.filter((r) => r.statut === "retard").length;
         return { etudiant: e, statut: statutE, totalPaye: total, resteDu: reste, moisNonPayes, moisRetard };
       });
-  }, [etudiants, search, filiere, semestre, annee, statut, mois]);
+  }, [etudiants, search, filiere, semestre, annee, anneeScolaire, statut, mois]);
 
   const pager = usePagination(
     parEtudiant,
-    `${search}|${filiere}|${semestre}|${annee}|${statut}|${mois}`,
+    `${search}|${filiere}|${semestre}|${annee}|${anneeScolaire}|${statut}|${mois}`,
   );
 
   const kpis = [
@@ -220,8 +222,14 @@ function PaiementsPage() {
             options: NIVEAUX, allLabel: "Tous les semestres",
           },
           {
-            id: "annee", label: "Année", value: annee, onChange: setAnnee,
-            options: ANNEES_ETUDE, allLabel: "Toutes les années",
+            // Libellé « Niveau » comme sur les autres pages : c'est l'année
+            // d'étude (1ère/2ème/3ème), à ne pas confondre avec l'année scolaire.
+            id: "annee", label: "Niveau", value: annee, onChange: setAnnee,
+            options: ANNEES_ETUDE, allLabel: "Tous les niveaux",
+          },
+          {
+            id: "anneeScolaire", label: "Année scolaire", value: anneeScolaire, onChange: setAnneeScolaire,
+            options: ANNEES_UNIVERSITAIRES, allLabel: "Toutes les années",
           },
           {
             id: "statut", label: "Statut", value: statut, onChange: setStatut,

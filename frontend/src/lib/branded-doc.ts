@@ -317,14 +317,21 @@ function buildContentStream(
     y -= 16;
   }
 
-  // Cachet officiel de l'établissement, apposé en bas à gauche au-dessus du pied.
+  // Cachet officiel de l'établissement, apposé en bas à droite au-dessus du
+  // pied de page — l'emplacement usuel d'une signature sur un document officiel.
   if (hasStamp) {
     const BOX = 92;
     let dw = BOX;
     let dh = BOX;
     if (stampAspect > 1) dh = BOX / stampAspect;
     else dw = BOX * stampAspect;
-    const sx = LEFT;
+    // Le bloc est calé sur la marge droite : l'image est centrée sur la
+    // largeur de la légende, elle-même alignée à droite.
+    const CAPTION = "Cachet de l'etablissement";
+    const captionW = CAPTION.length * 8 * 0.5; // largeur approx. en Helvetica 8 pt
+    const blockW = Math.max(dw, captionW);
+    const blockX = RIGHT - blockW;
+    const sx = blockX + (blockW - dw) / 2;
     const sy = 112;
     ops.push(
       `q ${dw.toFixed(2)} 0 0 ${dh.toFixed(2)} ${sx.toFixed(2)} ${sy.toFixed(
@@ -332,9 +339,9 @@ function buildContentStream(
       )} cm /Im1 Do Q`,
     );
     ops.push(
-      `${PDF.muted} rg BT /F1 8 Tf ${sx.toFixed(2)} ${(sy - 12).toFixed(
-        2,
-      )} Td (${pdfText("Cachet de l'etablissement")}) Tj ET`,
+      `${PDF.muted} rg BT /F1 8 Tf ${(RIGHT - captionW).toFixed(2)} ${(
+        sy - 12
+      ).toFixed(2)} Td (${pdfText(CAPTION)}) Tj ET`,
     );
   }
 

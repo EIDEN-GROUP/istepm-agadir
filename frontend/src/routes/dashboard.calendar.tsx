@@ -147,6 +147,7 @@ function PlanningPage() {
   const [salle, setSalle] = useState<string>(ALL);
   const [module, setModule] = useState<string>(ALL);
   const [annee, setAnnee] = useState<string>(ALL);
+  const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
 
   const [detail, setDetail] = useState<Seance | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -194,12 +195,14 @@ const [importOpen, setImportOpen] = useState(false);
       if (salle !== ALL && s.salle !== salle) return false;
       if (module !== ALL && s.module !== module) return false;
       if (annee !== ALL && anneeEtude(s.semestre) !== annee) return false;
+      if (anneeScolaire !== ALL && s.anneeUniversitaire !== anneeScolaire)
+        return false;
       if (!q) return true;
       return `${s.module} ${s.groupe} ${s.salle} ${nomProf(s.professeurId)} ${s.notes ?? ""}`
         .toLowerCase()
         .includes(q);
     });
-  }, [visibles, search, prof, groupe, salle, module, annee, nomProf]);
+  }, [visibles, search, prof, groupe, salle, module, annee, anneeScolaire, nomProf]);
 
   /* --------------- Navigation temporelle --------------- */
 
@@ -279,10 +282,26 @@ const [importOpen, setImportOpen] = useState(false);
     }
   };
 
-  const nbConflits = useMemo(
-    () => filtrees.filter((s) => conflitsSeance(s, s.id).length).length,
+  // Séances en conflit parmi celles affichées, avec le détail de chaque
+  // chevauchement — le compteur du bandeau et la modale s'appuient dessus.
+  const seancesEnConflit = useMemo(
+    () =>
+      filtrees
+        .map((s) => ({ seance: s, conflits: conflitsSeance(s, s.id) }))
+        .filter((x) => x.conflits.length)
+        .sort((a, b) =>
+          a.seance.date === b.seance.date
+            ? a.seance.debut < b.seance.debut
+              ? -1
+              : 1
+            : a.seance.date < b.seance.date
+              ? -1
+              : 1,
+        ),
     [filtrees, conflitsSeance],
   );
+  const nbConflits = seancesEnConflit.length;
+  const [conflitsOpen, setConflitsOpen] = useState(false);
 
   /** Exporte l'emploi du temps affiché (séances filtrées) au format CSV. */
   const exportCsv = () => {
@@ -442,10 +461,18 @@ const [importOpen, setImportOpen] = useState(false);
           },
           {
             id: "annee",
-            label: "Année",
+            label: "Niveau",
             value: annee,
             onChange: setAnnee,
             options: ANNEES_ETUDE,
+            allLabel: "Tous les niveaux",
+          },
+          {
+            id: "anneeScolaire",
+            label: "Année scolaire",
+            value: anneeScolaire,
+            onChange: setAnneeScolaire,
+            options: ANNEES_UNIVERSITAIRES,
             allLabel: "Toutes les années",
           },
         ]}
@@ -456,10 +483,15 @@ const [importOpen, setImportOpen] = useState(false);
             </strong>{" "}
             séance(s) affichée(s)
             {nbConflits ? (
-              <span className="ms-2 inline-flex items-center gap-1 font-semibold text-alert">
+              <button
+                type="button"
+                onClick={() => setConflitsOpen(true)}
+                title="Voir le détail des conflits"
+                className="ms-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold text-alert underline decoration-dotted underline-offset-2 transition-colors hover:bg-alert/10 hover:decoration-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alert/40"
+              >
                 <AlertTriangle className="h-3 w-3" />
                 {nbConflits} en conflit
-              </span>
+              </button>
             ) : null}
           </>
         }
@@ -563,6 +595,66 @@ const [importOpen, setImportOpen] = useState(false);
           )}
         </div>
       </section>
+
+      {/* Détail des conflits (depuis le compteur « N en conflit ») */}
+      <Dialog open={conflitsOpen} onOpenChange={setConflitsOpen}>
+        <DialogContent className={dialogSurface}>
+          <DialogTitle className="sr-only">Détail des conflits</DialogTitle>
+          <DialogDescription className="sr-only">
+            Liste des séances en conflit parmi celles affichées
+          </DialogDescription>
+          <DetailShell
+            icon={<AlertTriangle className="h-5 w-5" />}
+            title="Séances en conflit"
+            subtitle={`${nbConflits} séance(s) sur ${filtrees.length} affichée(s)`}
+          >
+            <DetailSection title="Chevauchements détectés">
+              {nbConflits ? (
+                <ul className="space-y-2">
+                  {seancesEnConflit.map(({ seance: s, conflits }) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // On bascule directement sur la fiche de la séance
+                          // fautive : c'est de là qu'on la corrige.
+                          setConflitsOpen(false);
+                          setDetail(s);
+                        }}
+                        className="w-full rounded-2xl bg-alert/8 px-4 py-3 text-left transition-colors hover:bg-alert/15"
+                      >
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="text-sm font-semibold text-foreground">
+                            {s.module}
+                          </span>
+                          <span className={toneBadge("red")}>
+                            {conflits.length} conflit(s)
+                          </span>
+                        </span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {fmtDate(s.date)} · {s.debut}–{s.fin} · {s.salle} ·{" "}
+                          {s.groupe} · {nomProf(s.professeurId)}
+                        </span>
+                        <ul className="mt-1.5 space-y-0.5 text-xs text-alert-dk">
+                          {conflits.map((cf, i) => (
+                            <li key={i}>
+                              {LIBELLE_CONFLIT[cf.type]} — {cf.seance.module} (
+                              {cf.seance.debut}–{cf.seance.fin},{" "}
+                              {cf.seance.salle})
+                            </li>
+                          ))}
+                        </ul>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <DetailEmpty>Aucun conflit détecté.</DetailEmpty>
+              )}
+            </DetailSection>
+          </DetailShell>
+        </DialogContent>
+      </Dialog>
 
       {/* Fiche d'une séance */}
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>

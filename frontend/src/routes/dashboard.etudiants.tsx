@@ -10,6 +10,7 @@ import { fetchStudentSemestres, exportEtudiantsCsv } from "@/lib/istpm-api";
 import {
   FILIERES,
   NIVEAUX,
+  ANNEES_UNIVERSITAIRES,
   STATUT_ETUDIANT_LABEL,
   STATUT_ETUDIANT_TONE,
   STATUT_PAIEMENT_LABEL,
@@ -113,6 +114,7 @@ function EtudiantsPage() {
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
   const [niveau, setNiveau] = useState<string>(ALL);
+  const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
   const [groupe, setGroupe] = useState<string>(ALL);
   const [statut, setStatut] = useState<string>(ALL);
   const [moduleFilter, setModuleFilter] = useState<string>(ALL);
@@ -189,6 +191,7 @@ function EtudiantsPage() {
       }
       if (filiere !== ALL && e.filiere !== filiere) return false;
       if (niveau !== ALL && e.niveau !== niveau) return false;
+      if (anneeScolaire !== ALL && e.annee !== anneeScolaire) return false;
       if (groupe !== ALL && e.groupe !== groupe) return false;
       if (statut !== ALL && STATUT_ETUDIANT_LABEL[e.statut] !== statut)
         return false;
@@ -197,11 +200,11 @@ function EtudiantsPage() {
         .toLowerCase()
         .includes(q);
     });
-  }, [etudiants, search, showArchived, enseignantScope, filiere, niveau, groupe, statut]);
+  }, [etudiants, search, showArchived, enseignantScope, filiere, niveau, anneeScolaire, groupe, statut]);
 
   const pager = usePagination(
     filtered,
-    `${search}|${showArchived}|${filiere}|${niveau}|${groupe}|${statut}`,
+    `${search}|${showArchived}|${filiere}|${niveau}|${anneeScolaire}|${groupe}|${statut}`,
   );
 
   const openCreate = () => {
@@ -307,6 +310,14 @@ function EtudiantsPage() {
                   allLabel: "Tous les semestres",
                 },
                 {
+                  id: "anneeScolaire",
+                  label: "Année scolaire",
+                  value: anneeScolaire,
+                  onChange: setAnneeScolaire,
+                  options: ANNEES_UNIVERSITAIRES,
+                  allLabel: "Toutes les années",
+                },
+                {
                   id: "groupe",
                   label: "Groupe",
                   value: groupe,
@@ -339,6 +350,14 @@ function EtudiantsPage() {
                   onChange: setNiveau,
                   options: NIVEAUX,
                   allLabel: isTeacher ? "Choisir un semestre" : "Tous les semestres",
+                },
+                {
+                  id: "anneeScolaire",
+                  label: "Année scolaire",
+                  value: anneeScolaire,
+                  onChange: setAnneeScolaire,
+                  options: ANNEES_UNIVERSITAIRES,
+                  allLabel: "Toutes les années",
                 },
                 {
                   id: "groupe",
