@@ -231,6 +231,7 @@ function StampSection() {
     try {
       const dataUrl = await prepareStampFromFile(file);
       setStamp(dataUrl);
+      updateSetting("stamp_image", dataUrl).catch(() => {});
       toast.success("Cachet enregistré — il sera apposé sur tous les PDF");
     } catch {
       toast.error("Impossible de lire cette image");
@@ -290,6 +291,7 @@ function StampSection() {
                 className={cn(ghostPill, "h-9 gap-1.5 px-4 text-sm text-alert")}
                 onClick={() => {
                   setStamp(null);
+                  updateSetting("stamp_image", null).catch(() => {});
                   toast.success("Cachet supprimé");
                 }}
               >

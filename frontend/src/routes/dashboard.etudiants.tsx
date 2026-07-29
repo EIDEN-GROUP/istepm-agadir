@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useRef } from "react";
-import { Plus, Pencil, Eye, Download, Archive, RotateCcw, Upload, ListFilter, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Eye, Download, Archive, RotateCcw, Upload, ListFilter, ChevronDown, FileUp } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm, useCurrentFormateur, type NouvelEtudiant } from "@/lib/istpm-store";
-import { ImportEtudiantsDialog } from "@/components/import-etudiants-dialog";
+import { ImportEtudiantsDialog, downloadExempleEtudiantsCsv } from "@/components/import-etudiants-dialog";
 import { fetchStudentSemestres, exportEtudiantsCsv } from "@/lib/istpm-api";
 import {
   FILIERES,
@@ -243,6 +243,15 @@ function EtudiantsPage() {
             <>
               <button className={cn(ghostPill, "gap-1.5")} onClick={() => setImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" /> Importer
+              </button>
+              <button
+                className={cn(ghostPill, "gap-1.5")}
+                onClick={() => {
+                  downloadExempleEtudiantsCsv();
+                  toast.success("Modèle CSV d'exemple téléchargé");
+                }}
+              >
+                <FileUp className="h-3.5 w-3.5" /> Exemple CSV
               </button>
               <div ref={exportRef} className="relative">
                 <button
@@ -952,9 +961,8 @@ const RESULTAT_TONE = {
 };
 
 function EtudiantDetail({ e }: { e: Etudiant }) {
-  const moisValues = Object.values(e.paiementsMensuels ?? {});
-  const moisPayes = moisValues.filter((v) => v === "paye").length;
-  const moisTotal = moisValues.length || 10;
+  const moisPayes = e.paiementsMensuelsRecords.filter((r) => r.statut === "paye").length;
+  const moisTotal = e.paiementsMensuelsRecords.length || 10;
   const [semestres, setSemestres] = useState<SemestreResume[]>(() => historiqueSemestres(e));
   useEffect(() => {
     fetchStudentSemestres(e.id)
@@ -1126,32 +1134,38 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
           />
         </div>
 
-        {e.historique.length ? (
+        {e.paiementsMensuelsRecords.length ? (
           <DetailTable
             head={
               <>
-                <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2">Période</th>
-                <th className="px-3 py-2">Mode</th>
+                <th className="px-3 py-2">Mois</th>
                 <th className="px-3 py-2 text-right">Montant</th>
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2">Mode</th>
                 <th className="px-3 py-2">Statut</th>
+                <th className="px-3 py-2">Reçu</th>
               </>
             }
           >
-            {e.historique.map((h) => (
-              <tr key={h.recu}>
-                <td className="whitespace-nowrap px-3 py-2">
-                  {fmtDate(h.date)}
+            {e.paiementsMensuelsRecords.map((r) => (
+              <tr key={r.id}>
+                <td className="whitespace-nowrap px-3 py-2 font-medium capitalize">
+                  {r.mois}
                 </td>
-                <td className="px-3 py-2 text-muted-foreground">{h.periode}</td>
-                <td className="px-3 py-2 text-muted-foreground">{h.mode}</td>
                 <td className="px-3 py-2 text-right font-medium tabular-nums">
-                  {fmtMAD(h.montant)}
+                  {fmtMAD(r.montantPaye)} / {fmtMAD(r.montantDu)}
                 </td>
+                <td className="whitespace-nowrap px-3 py-2">
+                  {r.datePaiement ? fmtDate(r.datePaiement) : "—"}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">{r.mode}</td>
                 <td className="px-3 py-2">
-                  <span className={toneBadge(STATUT_PAIEMENT_TONE[h.statut])}>
-                    {STATUT_PAIEMENT_LABEL[h.statut]}
+                  <span className={toneBadge(STATUT_PAIEMENT_TONE[r.statut])}>
+                    {STATUT_PAIEMENT_LABEL[r.statut]}
                   </span>
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted-foreground">
+                  {r.recu || "—"}
                 </td>
               </tr>
             ))}

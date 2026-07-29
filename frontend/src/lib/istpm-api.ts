@@ -305,30 +305,56 @@ export function validerStageApi(id: string) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Paiements                                                          */
+/*  Paiements mensuels                                                 */
 /* ------------------------------------------------------------------ */
 
-export function fetchPaiements(params?: { etudiantId?: string }) {
-  return api.get<PaiementLigne[]>("/paiements-istpm", params);
+export type PaiementMensuelApi = {
+  id: string;
+  etudiantId: string;
+  mois: string;
+  montantDu: string;
+  montantPaye: string;
+  datePaiement: string | null;
+  mode: string;
+  recu: string;
+  statut: string;
+  notes: string;
+  etudiantPrenom: string;
+  etudiantNom: string;
+  etudiantCne: string;
+  etudiantFiliere: string;
+  etudiantNiveau: string;
+  etudiantFraisAnnuels: string;
+};
+
+export function fetchPaiementsMensuels(params?: { etudiantId?: string }) {
+  return api.get<PaiementMensuelApi[]>("/paiements-istpm", params);
 }
 
-export function createPaiement(data: {
+export function createPaiementsMensuels(data: {
   etudiantId: string;
+  mois: string[];
   montant: number;
   mode: string;
-  periode: string;
   date?: string;
-  /** Mois de scolarité réglé (suivi mensuel). Ignoré tant que l'API ne le gère pas. */
-  mois?: string;
+  recu?: string;
+  notes?: string;
 }) {
-  return api.post<{ ok: boolean; recu: string; nouveauReste: number; statut: string }>(
+  return api.post<{ ok: boolean; recu: string; result: Array<{ mois: string; statut: string }>; reste: number }>(
     "/paiements-istpm",
     data,
   );
 }
 
-export function updateMoisPaiementStatut(etudiantId: string, mois: string, statut: string) {
-  return api.put<{ ok: boolean }>(`/paiements-istpm/${etudiantId}/mois/${encodeURIComponent(mois)}`, { statut });
+export function updatePaiementMensuel(id: string, data: {
+  montantPaye?: number;
+  datePaiement?: string;
+  mode?: string;
+  recu?: string;
+  statut?: string;
+  notes?: string;
+}) {
+  return api.put<{ ok: boolean }>(`/paiements-istpm/${id}`, data);
 }
 
 export function fetchPaiementStats() {

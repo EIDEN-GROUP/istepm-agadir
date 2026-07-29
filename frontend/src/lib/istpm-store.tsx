@@ -53,6 +53,9 @@ import {
   type NoteModule,
   type PaiementLigne,
   type StatutPaiement,
+  type PaiementMensuel,
+  getAcademicYearMonths,
+  getCurrentAcademicYear,
   type Mention,
   type Decision,
   type ExamDocument,
@@ -98,8 +101,8 @@ import {
   updateStage as apiUpdateStage,
   deleteStage as apiDeleteStage,
   validerStageApi,
-  createPaiement as apiCreatePaiement,
-  updateMoisPaiementStatut as apiUpdateMoisPaiementStatut,
+  createPaiementsMensuels as apiCreatePaiementsMensuels,
+  updatePaiementMensuel as apiUpdatePaiementMensuel,
   createNote as apiCreateNote,
   deleteNote as apiDeleteNote,
   createFiliereApi,
@@ -145,10 +148,65 @@ function seedModules(): ModuleRecord[] {
   return DEFAULT_MODULES.map((m, i) => ({ id: `mod-seed-${i}`, ...m }));
 }
 
+/**
+ * Génère un suivi mensuel de démonstration pour un étudiant dont aucun paiement
+ * n'a encore été saisi, afin que la liste montre tous les statuts possibles
+ * (payé / en attente / en retard / impayé). Le profil de chaque étudiant découle
+ * de son statut de paiement d'origine (`e.paiement`), ce qui répartit
+ * naturellement les statuts sur toute la promotion.
+ */
+function genererRecordsDemo(e: Etudiant): PaiementMensuel[] {
+  const mois = getAcademicYearMonths(getCurrentAcademicYear());
+  const du = e.fraisMensuels;
+
+  // Statut de chaque mois selon le profil de l'étudiant (indice 0 = septembre).
+  const statutParMois = (i: number): StatutPaiement => {
+    switch (e.paiement) {
+      case "paye":
+        return "paye";
+      case "en_attente":
+        return i < 6 ? "paye" : "en_attente";
+      case "retard":
+        return i < 4 ? "paye" : i < 6 ? "retard" : "impaye";
+      case "impaye":
+      default:
+        return i < 2 ? "paye" : "impaye";
+    }
+  };
+
+  return mois.map((m, i) => {
+    const statut = statutParMois(i);
+    // Mois calendaire pour une date de règlement plausible (sept→déc = année de
+    // début, jan→juin = année suivante).
+    const [, annee = ""] = m.split(" ");
+    const moisCal = i < 4 ? i + 9 : i - 3;
+    return {
+      id: `pm-${e.id}-${i}`,
+      etudiantId: e.id,
+      mois: m,
+      montantDu: du,
+      montantPaye: statut === "paye" ? du : 0,
+      datePaiement:
+        statut === "paye"
+          ? `${annee}-${String(moisCal).padStart(2, "0")}-05`
+          : "",
+      mode: "Espèces" as const,
+      recu: statut === "paye" ? `R-${e.id}-${i}` : "",
+      statut,
+      notes: "",
+    };
+  });
+}
+
 function seed(): Snapshot {
   // Deep clone so edits never mutate the imported seed arrays.
   return structuredClone({
-    etudiants: ETUDIANTS,
+    etudiants: ETUDIANTS.map((e) => ({
+      ...e,
+      paiementsMensuelsRecords: (e as any).paiementsMensuelsRecords?.length
+        ? (e as any).paiementsMensuelsRecords
+        : genererRecordsDemo(e),
+    })),
     formateurs: FORMATEURS,
     examens: EXAMENS,
     bulletins: BULLETINS,
@@ -174,6 +232,16 @@ function load(): Snapshot {
     // Backfill fields added after this snapshot was persisted.
     if (!Array.isArray(parsed.modules)) parsed.modules = seedModules();
     if (!Array.isArray(parsed.groupConfigs)) parsed.groupConfigs = structuredClone(DEFAULT_GROUP_CONFIGS);
+    for (const e of parsed.etudiants) {
+      // Suivi mensuel de démonstration si aucun paiement n'a encore été saisi,
+      // pour que tous les statuts soient visibles dans la liste.
+      if (
+        !Array.isArray(e.paiementsMensuelsRecords) ||
+        e.paiementsMensuelsRecords.length === 0
+      ) {
+        e.paiementsMensuelsRecords = genererRecordsDemo(e);
+      }
+    }
 
     // Rebase seance dates to the current week.
     // Seed‑pattern seances ("se-0-…", "se-1-…") have dates frozen at save
@@ -204,6 +272,10 @@ let counter = 0;
 function uid(prefix: string) {
   counter += 1;
   return `${prefix}-${Date.now().toString(36)}${counter}`;
+}
+
+function isUUID(s: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 }
 
 function today() {
@@ -238,7 +310,7 @@ export function decisionFor(moy: number, notes: NoteModule[]): Decision {
 
 export type NouvelEtudiant = Omit<
   Etudiant,
-  "id" | "moyenne" | "notes" | "historique" | "paiementsMensuels" | "archived"
+  "id" | "moyenne" | "notes" | "historique" | "paiementsMensuels" | "paiementsMensuelsRecords" | "archived"
 >;
 export type NouveauFormateur = Omit<Formateur, "id" | "notesSaisies">;
 /** `createdBy` et `document` sont posés par le store, pas par le formulaire. */
@@ -341,13 +413,29 @@ type IstpmCtx = {
   updateStage: (id: string, patch: Partial<Stage>) => void;
   deleteStage: (id: string) => void;
 
-  addPaiement: (etudiantId: string, ligne: Omit<LignePaiement, "recu">) => void;
-
-  /** Fixe le statut de règlement d'un mois donné pour un étudiant (suivi mensuel). */
-  setMoisPaiementStatut: (
+  payerMois: (
     etudiantId: string,
-    mois: string,
-    statut: StatutPaiement,
+    mois: string[],
+    details: {
+      montant: number;
+      mode: "Espèces" | "Virement" | "Carte" | "Chèque";
+      date: string;
+      recu?: string;
+      notes?: string;
+    },
+  ) => void;
+
+  updatePaiementMensuel: (
+    id: string,
+    etudiantId: string,
+    patch: Partial<{
+      montantPaye: number;
+      datePaiement: string;
+      mode: "Espèces" | "Virement" | "Carte" | "Chèque";
+      recu: string;
+      statut: StatutPaiement;
+      notes: string;
+    }>,
   ) => void;
 
   /** Enregistre une note (module + examen) pour un étudiant et recalcule sa moyenne. */
@@ -519,6 +607,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         notes: [],
         historique: [],
         paiementsMensuels: {},
+        paiementsMensuelsRecords: [],
         archived: false,
       };
       apiCreateEtudiant(data as unknown as Record<string, unknown>).catch(() => {});
@@ -911,26 +1000,71 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  /* ---------------- Paiements ---------------- */
+  /* ---------------- Paiements mensuels ---------------- */
 
-  /**
-   * Record a payment against a student: appends to their history, reduces the
-   * outstanding balance and re-derives their payment status.
-   */
-  const addPaiement = useCallback(
-    (etudiantId: string, ligne: Omit<LignePaiement, "recu">) => {
-      apiCreatePaiement({
-        etudiantId,
-        montant: ligne.montant,
-        mode: ligne.mode,
-        periode: ligne.periode,
-        date: ligne.date,
-        mois: ligne.mois,
-      })
-        .then((res) => {
+  const payerMois = useCallback(
+    (
+      etudiantId: string,
+      mois: string[],
+      details: {
+        montant: number;
+        mode: "Espèces" | "Virement" | "Carte" | "Chèque";
+        date: string;
+        recu?: string;
+        notes?: string;
+      },
+    ) => {
+      const applyLocalUpdate = () => {
           setSnap((s) => {
             const etudiant = s.etudiants.find((e) => e.id === etudiantId);
             if (!etudiant) return s;
+
+            const montantParMois = Math.round(details.montant / mois.length);
+            const newRecords = [...etudiant.paiementsMensuelsRecords];
+
+            for (const m of mois) {
+              const existing = newRecords.find((r) => r.mois === m);
+              if (existing) {
+                const nouveauPaye = existing.montantPaye + montantParMois;
+                const nouveauStatut: StatutPaiement =
+                  nouveauPaye >= etudiant.fraisMensuels ? "paye" : "en_attente";
+                Object.assign(existing, {
+                  montantPaye: nouveauPaye,
+                  datePaiement: details.date,
+                  mode: details.mode,
+                  recu: details.recu ?? existing.recu,
+                  statut: nouveauStatut,
+                  notes: details.notes ?? existing.notes,
+                });
+              } else {
+                const nouveauStatut: StatutPaiement =
+                  montantParMois >= etudiant.fraisMensuels ? "paye" : "en_attente";
+                newRecords.push({
+                  id: `tmp-${crypto.randomUUID()}`,
+                  etudiantId,
+                  mois: m,
+                  montantDu: etudiant.fraisMensuels,
+                  montantPaye: montantParMois,
+                  datePaiement: details.date,
+                  mode: details.mode,
+                  recu: details.recu ?? "",
+                  statut: nouveauStatut,
+                  notes: details.notes ?? "",
+                });
+              }
+            }
+
+            const allPaye = newRecords.length > 0 && newRecords.every((r) => r.statut === "paye");
+            const hasRetard = newRecords.some((r) => r.statut === "retard");
+            const hasImpaye = newRecords.some((r) => r.statut === "impaye");
+            const overallStatut: StatutPaiement = allPaye
+              ? "paye"
+              : hasRetard
+                ? "retard"
+                : hasImpaye
+                  ? "impaye"
+                  : "en_attente";
+
             return {
               ...s,
               etudiants: s.etudiants.map((e) =>
@@ -938,54 +1072,87 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
                   ? e
                   : {
                       ...e,
-                      resteAPayer: res.nouveauReste,
-                      paiement: res.statut as StatutPaiement,
-                      historique: [
-                        ...e.historique,
-                        {
-                          ...ligne,
-                          recu: res.recu,
-                          id: `tmp-${Date.now()}`,
-                          statut: "paye",
-                        },
-                      ],
-                      paiementsMensuels: ligne.mois
-                        ? { ...e.paiementsMensuels, [ligne.mois]: "paye" }
-                        : e.paiementsMensuels,
+                      paiement: overallStatut,
+                      paiementsMensuelsRecords: newRecords,
                     },
               ),
               activite: [
                 {
                   type: "paiement" as const,
-                  texte: `Paiement reçu   ${etudiant.prenom} ${etudiant.nom}, ${ligne.montant.toLocaleString("fr-FR")} MAD (${ligne.periode})`,
+                  texte: `Paiement reçu   ${etudiant.prenom} ${etudiant.nom}, ${details.montant.toLocaleString("fr-FR")} MAD`,
                   date: today(),
                 },
                 ...s.activite,
               ].slice(0, 30),
             };
           });
+        };
+      if (isUUID(etudiantId)) {
+        apiCreatePaiementsMensuels({
+          etudiantId,
+          mois,
+          montant: details.montant,
+          mode: details.mode,
+          date: details.date,
+          recu: details.recu,
+          notes: details.notes,
         })
-        .catch(() => {
-          toast.error("Erreur lors de l'enregistrement du paiement");
-        });
+          .then(() => applyLocalUpdate())
+          .catch(() => {
+            toast.error("Erreur lors de l'enregistrement du paiement");
+          });
+      } else {
+        applyLocalUpdate();
+      }
     },
     [],
   );
 
-  const setMoisPaiementStatut = useCallback(
-    (etudiantId: string, mois: string, statut: StatutPaiement) => {
-      apiUpdateMoisPaiementStatut(etudiantId, mois, statut).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        etudiants: s.etudiants.map((e) =>
-          e.id === etudiantId
-            ? {
-                ...e,
-                paiementsMensuels: { ...e.paiementsMensuels, [mois]: statut },
-              }
-            : e,
-        ),
-      }));
+  const updatePaiementMensuel = useCallback(
+    (
+      id: string,
+      etudiantId: string,
+      patch: Partial<{
+        montantPaye: number;
+        datePaiement: string;
+        mode: "Espèces" | "Virement" | "Carte" | "Chèque";
+        recu: string;
+        statut: StatutPaiement;
+        notes: string;
+      }>,
+    ) => {
+      if (isUUID(id)) {
+        apiUpdatePaiementMensuel(id, patch).catch(() => {});
+      }
+      setSnap((s) => {
+        const updatedRecords = s.etudiants
+          .find((e) => e.id === etudiantId)
+          ?.paiementsMensuelsRecords.map((r) =>
+            r.id === id ? { ...r, ...patch } : r,
+          ) ?? [];
+        const allPaye = updatedRecords.length > 0 && updatedRecords.every((r) => r.statut === "paye");
+        const hasRetard = updatedRecords.some((r) => r.statut === "retard");
+        const hasImpaye = updatedRecords.some((r) => r.statut === "impaye");
+        const overallStatut: StatutPaiement = allPaye
+          ? "paye"
+          : hasRetard
+            ? "retard"
+            : hasImpaye
+              ? "impaye"
+              : "en_attente";
+        return {
+          ...s,
+          etudiants: s.etudiants.map((e) =>
+            e.id === etudiantId
+              ? {
+                  ...e,
+                  paiement: overallStatut,
+                  paiementsMensuelsRecords: updatedRecords,
+                }
+              : e,
+          ),
+        };
+      });
     },
     [],
   );
@@ -1241,69 +1408,83 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   const paiements = useMemo<PaiementLigne[]>(
     () =>
       snap.etudiants.flatMap((e) =>
-        e.historique.map((h, i) => ({
-          id: `${e.id}-p${i}`,
+        e.paiementsMensuelsRecords.map((r) => ({
+          id: r.id,
           etudiantId: e.id,
           cne: e.cne,
           etudiant: `${e.prenom} ${e.nom}`,
           filiere: e.filiere,
           niveau: e.niveau,
-          date: h.date,
-          montant: h.montant,
-          mode: h.mode,
-          periode: h.periode,
-          recu: h.recu,
-          statut: h.statut,
-          mois: h.mois,
+          date: r.datePaiement,
+          montant: r.montantPaye,
+          mode: r.mode,
+          periode: r.mois,
+          recu: r.recu,
+          statut: r.statut,
+          mois: r.mois,
         })),
       ),
-    [snap.etudiants],
-  );
-
-  const unpaidForStatus = useCallback(
-    (status: StatutPaiement) =>
-      snap.etudiants.reduce((s, e) => {
-        const months = Object.values(e.paiementsMensuels ?? {});
-        return s + months.filter((v) => v === status).length * e.fraisMensuels;
-      }, 0),
     [snap.etudiants],
   );
 
   const totalUnpaidMonths = useMemo(
     () =>
       snap.etudiants.reduce((s, e) => {
-        const months = Object.values(e.paiementsMensuels ?? {});
-        return s + months.filter((v) => v !== "paye").length * e.fraisMensuels;
+        const unpaid = e.paiementsMensuelsRecords
+          .filter((r) => r.statut !== "paye")
+          .reduce((sum, r) => sum + (r.montantDu - r.montantPaye), 0);
+        return s + unpaid;
       }, 0),
     [snap.etudiants],
   );
 
   const financier = useMemo(() => {
-    const encaisse = paiements
-      .filter((p) => p.statut === "paye")
-      .reduce((s, p) => s + p.montant, 0);
+    const encaisse = snap.etudiants.reduce((sum, e) => {
+      const paye = e.paiementsMensuelsRecords
+        .filter((r) => r.statut === "paye")
+        .reduce((s, r) => s + r.montantPaye, 0);
+      return sum + paye;
+    }, 0);
 
-    const ceMois = paiements
-      .filter(
-        (p) =>
-          p.statut === "paye" &&
-          new Date(p.date).getMonth() === new Date().getMonth() &&
-          new Date(p.date).getFullYear() === new Date().getFullYear(),
-      )
-      .reduce((s, p) => s + p.montant, 0);
+    const now = new Date();
+    const encaisseCeMois = snap.etudiants.reduce((sum, e) => {
+      const paye = e.paiementsMensuelsRecords
+        .filter(
+          (r) =>
+            r.statut === "paye" &&
+            r.datePaiement &&
+            new Date(r.datePaiement).getMonth() === now.getMonth() &&
+            new Date(r.datePaiement).getFullYear() === now.getFullYear(),
+        )
+        .reduce((s, r) => s + r.montantPaye, 0);
+      return sum + paye;
+    }, 0);
+
+    let enAttente = 0;
+    let impaye = 0;
+    let retard = 0;
+    for (const e of snap.etudiants) {
+      for (const r of e.paiementsMensuelsRecords) {
+        const reste = r.montantDu - r.montantPaye;
+        if (reste <= 0) continue;
+        if (r.statut === "en_attente") enAttente += reste;
+        else if (r.statut === "impaye") impaye += reste;
+        else if (r.statut === "retard") retard += reste;
+      }
+    }
 
     return {
       encaisse,
-      encaisseCeMois: ceMois,
-      enAttente: unpaidForStatus("en_attente"),
-      impaye: unpaidForStatus("impaye"),
-      retard: unpaidForStatus("retard"),
+      encaisseCeMois,
+      enAttente,
+      impaye,
+      retard,
       tauxRecouvrement:
         encaisse + totalUnpaidMonths === 0
           ? 100
           : Math.round((encaisse / (encaisse + totalUnpaidMonths)) * 100),
     };
-  }, [paiements, unpaidForStatus, totalUnpaidMonths]);
+  }, [snap.etudiants, totalUnpaidMonths]);
 
   const dashboard = useMemo(() => {
     const inscrits = snap.etudiants.filter(
@@ -1354,8 +1535,10 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   const aRelancer = useMemo(
     () =>
       snap.etudiants.filter((e) => {
-        const months = Object.values(e.paiementsMensuels ?? {});
-        return months.length > 0 && months.some((v) => v !== "paye");
+        const moisNonPayes = e.paiementsMensuelsRecords.filter(
+          (r) => r.statut !== "paye" && r.montantPaye < r.montantDu,
+        );
+        return moisNonPayes.length > 0;
       }),
     [snap.etudiants],
   );
@@ -1430,8 +1613,8 @@ addSeance,
     addStage,
     updateStage,
     deleteStage,
-    addPaiement,
-    setMoisPaiementStatut,
+    payerMois,
+    updatePaiementMensuel,
     addNote,
     addFiliere,
     deleteFiliere,

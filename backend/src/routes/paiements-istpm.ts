@@ -3,25 +3,29 @@ import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { etudiants } from "@/db/schema/etudiants";
-import { historiquePaiements } from "@/db/schema/historique-paiements";
-import { eq, desc, sql } from "drizzle-orm";
+import { paiementsMensuels } from "@/db/schema/paiements-mensuels";
+import { eq, and, desc, sql } from "drizzle-orm";
 
-const paiementSchema = z.object({
+const paiementMensuelSchema = z.object({
   etudiantId: z.string().uuid(),
+  mois: z.array(z.string().min(1)).min(1, "Au moins un mois requis"),
   montant: z.number().min(1, "Le montant doit être positif"),
   mode: z
-    .enum(["Especes", "Virement", "Carte", "Cheque"])
+    .enum(["Espèces", "Virement", "Carte", "Chèque"])
     .optional()
-    .default("Especes"),
-  periode: z.string().optional().default(""),
-  mois: z.string().optional().default(""),
+    .default("Espèces"),
   date: z.string().optional(),
+  recu: z.string().optional().default(""),
+  notes: z.string().optional().default(""),
 });
 
-const STATUTS_PAIEMENT = ["paye", "en_attente", "retard", "impaye"] as const;
-
-const moisPaiementSchema = z.object({
-  statut: z.enum(STATUTS_PAIEMENT),
+const updateMensuelSchema = z.object({
+  montantPaye: z.number().min(0).optional(),
+  datePaiement: z.string().optional(),
+  mode: z.enum(["Espèces", "Virement", "Carte", "Chèque"]).optional(),
+  recu: z.string().optional(),
+  statut: z.enum(["paye", "en_attente", "retard", "impaye"]).optional(),
+  notes: z.string().optional(),
 });
 
 let recuCounter = Date.now();
@@ -38,35 +42,37 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
 
     const rows = db
       .select({
-        id: historiquePaiements.id,
-        etudiantId: historiquePaiements.etudiantId,
-        date: historiquePaiements.date,
-        montant: historiquePaiements.montant,
-        mode: historiquePaiements.mode,
-        periode: historiquePaiements.periode,
-        mois: historiquePaiements.mois,
-        recu: historiquePaiements.recu,
-        statut: historiquePaiements.statut,
+        id: paiementsMensuels.id,
+        etudiantId: paiementsMensuels.etudiantId,
+        mois: paiementsMensuels.mois,
+        montantDu: paiementsMensuels.montantDu,
+        montantPaye: paiementsMensuels.montantPaye,
+        datePaiement: paiementsMensuels.datePaiement,
+        mode: paiementsMensuels.mode,
+        recu: paiementsMensuels.recu,
+        statut: paiementsMensuels.statut,
+        notes: paiementsMensuels.notes,
         etudiantPrenom: etudiants.prenom,
         etudiantNom: etudiants.nom,
         etudiantCne: etudiants.cne,
         etudiantFiliere: etudiants.filiere,
         etudiantNiveau: etudiants.niveau,
+        etudiantFraisAnnuels: etudiants.fraisAnnuels,
       })
-      .from(historiquePaiements)
-      .leftJoin(etudiants, eq(historiquePaiements.etudiantId, etudiants.id))
-      .orderBy(desc(historiquePaiements.date))
+      .from(paiementsMensuels)
+      .leftJoin(etudiants, eq(paiementsMensuels.etudiantId, etudiants.id))
+      .orderBy(desc(paiementsMensuels.createdAt))
       .$dynamic();
 
     if (query.etudiantId) {
-      rows.where(eq(historiquePaiements.etudiantId, query.etudiantId));
+      rows.where(eq(paiementsMensuels.etudiantId, query.etudiantId));
     }
 
     return rows;
   });
 
   app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
-    const input = paiementSchema.parse(request.body);
+    const input = paiementMensuelSchema.parse(request.body);
     const db = getDb();
 
     const [etudiant] = await db
@@ -76,81 +82,115 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
       .limit(1);
     if (!etudiant) return reply.status(404).send({ error: "Étudiant introuvable" });
 
-    const reste = Number(etudiant.resteAPayer);
-    if (input.montant > reste) {
-      return reply.status(400).send({
-        error: "Le montant ne peut pas dépasser le solde restant",
-        solde: reste,
-      });
-    }
-
+    const fraisMensuels = Math.round(Number(etudiant.fraisAnnuels) / 10);
     const dateStr = input.date ?? new Date().toISOString().split("T")[0];
-    const recu = genererRecu();
+    const recu = input.recu || genererRecu();
 
-    const nouveauReste = reste - input.montant;
-    const nouveauStatut = nouveauReste <= 0 ? "paye" : "en_attente";
+    const result: Array<{ mois: string; statut: string }> = [];
 
-    await db.insert(historiquePaiements).values({
-      etudiantId: input.etudiantId,
-      date: dateStr,
-      montant: String(input.montant),
-      mode: input.mode,
-      periode: input.periode,
-      mois: input.mois,
-      recu,
-      statut: "paye",
-    });
+    for (const mois of input.mois) {
+      const montantParMois = Math.round(input.montant / input.mois.length);
 
-    const paiementsMensuels = (etudiant.paiementsMensuels ?? {}) as Record<string, string>;
-    if (input.mois) {
-      paiementsMensuels[input.mois] = "paye";
+      const [existing] = await db
+        .select()
+        .from(paiementsMensuels)
+        .where(
+          and(
+            eq(paiementsMensuels.etudiantId, input.etudiantId),
+            eq(paiementsMensuels.mois, mois),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        const nouveauPaye = Number(existing.montantPaye) + montantParMois;
+        const nouveauStatut = nouveauPaye >= fraisMensuels ? "paye" : "en_attente";
+
+        await db
+          .update(paiementsMensuels)
+          .set({
+            montantPaye: String(nouveauPaye),
+            datePaiement: dateStr,
+            mode: input.mode,
+            recu,
+            statut: nouveauStatut,
+            notes: input.notes,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(paiementsMensuels.id, existing.id));
+
+        result.push({ mois, statut: nouveauStatut });
+      } else {
+        const nouveauStatut = montantParMois >= fraisMensuels ? "paye" : "en_attente";
+
+        await db.insert(paiementsMensuels).values({
+          etudiantId: input.etudiantId,
+          mois,
+          montantDu: String(fraisMensuels),
+          montantPaye: String(montantParMois),
+          datePaiement: dateStr,
+          mode: input.mode,
+          recu,
+          statut: nouveauStatut,
+          notes: input.notes,
+        });
+
+        result.push({ mois, statut: nouveauStatut });
+      }
     }
 
-    await db
-      .update(etudiants)
-      .set({
-        resteAPayer: String(nouveauReste),
-        paiement: nouveauStatut,
-        paiementsMensuels: paiementsMensuels,
-      })
-      .where(eq(etudiants.id, input.etudiantId));
+    const tousMois = await db
+      .select()
+      .from(paiementsMensuels)
+      .where(eq(paiementsMensuels.etudiantId, input.etudiantId));
+
+    const totalPaye = tousMois.reduce((s, m) => s + Number(m.montantPaye), 0);
+    const totalDu = tousMois.reduce((s, m) => s + Number(m.montantDu), 0);
+    const reste = totalDu - totalPaye;
 
     return {
       ok: true,
       recu,
-      nouveauReste,
-      statut: nouveauStatut,
+      result,
+      reste,
     };
   });
 
-  app.put("/:etudiantId/mois/:mois", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
-    const { etudiantId, mois } = request.params as { etudiantId: string; mois: string };
-    const { statut } = moisPaiementSchema.parse(request.body);
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = updateMensuelSchema.parse(request.body);
     const db = getDb();
 
-    const [etudiant] = await db
+    const [existing] = await db
       .select()
-      .from(etudiants)
-      .where(eq(etudiants.id, etudiantId))
+      .from(paiementsMensuels)
+      .where(eq(paiementsMensuels.id, id))
       .limit(1);
-    if (!etudiant) return reply.status(404).send({ error: "Étudiant introuvable" });
+    if (!existing) return reply.status(404).send({ error: "Enregistrement introuvable" });
 
-    const paiementsMensuels = (etudiant.paiementsMensuels ?? {}) as Record<string, string>;
-    paiementsMensuels[mois] = statut;
+    const patch: Record<string, string> = {};
+    if (input.montantPaye !== undefined) patch.montantPaye = String(input.montantPaye);
+    if (input.datePaiement !== undefined) patch.datePaiement = input.datePaiement;
+    if (input.mode !== undefined) patch.mode = input.mode;
+    if (input.recu !== undefined) patch.recu = input.recu;
+    if (input.statut !== undefined) patch.statut = input.statut;
+    if (input.notes !== undefined) patch.notes = input.notes;
+    patch.updatedAt = sql`now()` as unknown as string;
 
     await db
-      .update(etudiants)
-      .set({ paiementsMensuels })
-      .where(eq(etudiants.id, etudiantId));
+      .update(paiementsMensuels)
+      .set(patch)
+      .where(eq(paiementsMensuels.id, id));
 
-    return { ok: true, mois, statut };
+    return { ok: true };
   });
 
   app.get("/stats", { preHandler: [authenticate] }, async () => {
     const db = getDb();
-    const rows = await db.select().from(historiquePaiements);
 
-    const totalMontant = rows.reduce((s, p) => s + Number(p.montant), 0);
+    const rows = await db.select().from(paiementsMensuels);
+
+    const total = rows.reduce((s, p) => s + Number(p.montantPaye), 0);
 
     const now = new Date();
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -158,43 +198,34 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
       .split("T")[0];
 
     const ceMois = rows.filter(
-      (p) => p.date >= firstOfMonth && p.date <= now.toISOString().split("T")[0],
+      (p) =>
+        p.datePaiement &&
+        p.datePaiement >= firstOfMonth &&
+        p.datePaiement <= now.toISOString().split("T")[0],
     );
-    const encaisseCeMois = ceMois.reduce((s, p) => s + Number(p.montant), 0);
-
-    const etudiantsRows = await db
-      .select({
-        fraisAnnuels: etudiants.fraisAnnuels,
-        paiementsMensuels: etudiants.paiementsMensuels,
-      })
-      .from(etudiants);
-
-    const fm = (e: { fraisAnnuels: string }) =>
-      Math.round(Number(e.fraisAnnuels) / 10);
+    const encaisseCeMois = ceMois.reduce((s, p) => s + Number(p.montantPaye), 0);
 
     let enAttente = 0;
     let impaye = 0;
     let retard = 0;
-    for (const e of etudiantsRows) {
-      const pm = (e.paiementsMensuels ?? {}) as Record<string, string>;
-      for (const st of Object.values(pm)) {
-        if (st === "en_attente") enAttente += fm(e);
-        else if (st === "impaye") impaye += fm(e);
-        else if (st === "retard") retard += fm(e);
-      }
+    for (const r of rows) {
+      const reste = Number(r.montantDu) - Number(r.montantPaye);
+      if (r.statut === "en_attente") enAttente += reste;
+      else if (r.statut === "impaye") impaye += reste;
+      else if (r.statut === "retard") retard += reste;
     }
 
     const totalARecouvrer = enAttente + impaye + retard;
-    const totalPotentiel = totalMontant + totalARecouvrer;
+    const totalPotentiel = total + totalARecouvrer;
     const tauxRecouvrement =
       totalPotentiel > 0
-        ? Math.round((totalMontant / totalPotentiel) * 100)
-        : totalMontant > 0
-        ? 100
-        : 0;
+        ? Math.round((total / totalPotentiel) * 100)
+        : total > 0
+          ? 100
+          : 0;
 
     return {
-      total: totalMontant,
+      total,
       count: rows.length,
       encaisseCeMois,
       enAttente,

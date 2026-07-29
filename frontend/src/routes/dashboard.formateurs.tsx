@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Eye, Trash2, Upload, Archive } from "lucide-react";
+import { Plus, Pencil, Eye, Trash2, Upload, Archive, Download, FileUp } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -183,6 +183,60 @@ function FormateursPage() {
     toast.success(`${compteur} formateur(s) importé(s)`);
   };
 
+  /** Sérialise une liste de lignes (déjà ordonnées comme `colonnesImportFormateurs`)
+   *  en CSV, avec BOM pour qu'Excel lise correctement les accents. */
+  const telechargerCsvFormateurs = (
+    lignes: (string | number)[][],
+    fichier: string,
+  ) => {
+    const entetes = colonnesImportFormateurs.map((c) => c.label);
+    const csv = [entetes, ...lignes]
+      .map((r) =>
+        r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","),
+      )
+      .join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fichier;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  /** Exporte tous les formateurs affichés au format CSV (ré-importable). */
+  const exportFormateursCsv = () => {
+    if (!filtered.length) {
+      toast.error("Aucun formateur à exporter");
+      return;
+    }
+    const lignes = filtered.map((f) => [
+      f.matricule,
+      f.cin,
+      f.prenom,
+      f.nom,
+      GRADE_LABEL[f.grade],
+      f.departement,
+      f.modules.join(", "),
+      f.groupes.join(", "),
+      STATUT_FORMATEUR_LABEL[f.statut],
+      f.telephone,
+      f.email,
+    ]);
+    const jour = new Date().toISOString().split("T")[0];
+    telechargerCsvFormateurs(lignes, `formateurs-${jour}.csv`);
+    toast.success(`${filtered.length} formateur(s) exporté(s)`);
+  };
+
+  /** Télécharge un modèle CSV d'exemple (entêtes + lignes types) pour l'import. */
+  const exportExempleFormateursCsv = () => {
+    const exemples: (string | number)[][] = [
+      ["PR-2025-001", "AB123456", "Yassine", "El Amrani", "PES", FILIERES[0], "Anatomie, Physiologie", "S3-G1, S3-G2", "Permanent", "0612345678", "y.elamrani@istpm.ma"],
+      ["PR-2025-002", "CD789012", "Salma", "Benali", "Vacataire", FILIERES[0], "Pharmacologie", "S5-G1", "Vacataire", "0698765432", "s.benali@istpm.ma"],
+    ];
+    telechargerCsvFormateurs(exemples, "formateurs-import-exemple.csv");
+    toast.success("Modèle CSV d'exemple téléchargé");
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -193,6 +247,12 @@ function FormateursPage() {
             <>
               <button className={cn(ghostPill, "gap-1.5")} onClick={() => setImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" /> Importer
+              </button>
+              <button className={cn(ghostPill, "gap-1.5")} onClick={exportExempleFormateursCsv}>
+                <FileUp className="h-3.5 w-3.5" /> Exemple CSV
+              </button>
+              <button className={cn(ghostPill, "gap-1.5")} onClick={exportFormateursCsv}>
+                <Download className="h-3.5 w-3.5" /> Exporter
               </button>
               <button
                 className={primaryPill}

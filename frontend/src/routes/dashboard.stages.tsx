@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { Eye, FileDown, FileText, Plus, Pencil, Trash2, Mail } from "lucide-react";
+import { Eye, FileDown, FileText, Pencil, Trash2, Mail, Users, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -46,6 +47,7 @@ import {
   rowActions,
   initials,
   TONE_COLORS,
+  BRAND_CHART_COLORS,
   dashTooltip,
 } from "@/lib/dash-ui";
 import {
@@ -76,6 +78,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { AffectationStagesDialog } from "@/components/affectation-stages-dialog";
+import { StructuresAccueilDialog } from "@/components/structures-accueil-dialog";
 import { cn } from "@/lib/utils";
 
 const STATUTS: StatutStage[] = [
@@ -213,7 +217,14 @@ function StagesAnalytics({
             width={28}
           />
           <Tooltip contentStyle={dashTooltip} cursor={false} />
-          <Bar dataKey="value" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+          <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+            {parStatut.map((_, i) => (
+              <Cell
+                key={i}
+                fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
+              />
+            ))}
+          </Bar>
         </BarChart>
       </ChartCard>
 
@@ -234,7 +245,14 @@ function StagesAnalytics({
             width={130}
           />
           <Tooltip contentStyle={dashTooltip} cursor={false} />
-          <Bar dataKey="value" fill="var(--chart-2)" radius={[0, 6, 6, 0]} />
+          <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+            {parStructure.map((_, i) => (
+              <Cell
+                key={i}
+                fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
+              />
+            ))}
+          </Bar>
         </BarChart>
       </ChartCard>
       {/* Carte des étudiants éligibles */}
@@ -275,7 +293,14 @@ function StagesAnalytics({
                 width={28}
               />
               <Tooltip contentStyle={dashTooltip} cursor={false} />
-              <Bar dataKey="value" fill="var(--chart-3)" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                {eligibleParNiveau.map((_, i) => (
+                  <Cell
+                    key={i}
+                    fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
+                  />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -305,6 +330,8 @@ function StagesPage() {
   const [toDelete, setToDelete] = useState<Stage | null>(null);
   const [emailTarget, setEmailTarget] = useState<Stage | null>(null);
   const [emailTo, setEmailTo] = useState("");
+  const [affectOpen, setAffectOpen] = useState(false);
+  const [structuresOpen, setStructuresOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -329,15 +356,17 @@ function StagesPage() {
         title="Stages cliniques"
         actions={
           canManage ? (
-            <button
-              className={primaryPill}
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> Nouvelle convention
-            </button>
+            <>
+              <button
+                className={cn(ghostPill, "gap-1.5")}
+                onClick={() => setStructuresOpen(true)}
+              >
+                <Building2 className="h-3.5 w-3.5" /> Structures d'accueil
+              </button>
+              <button className={primaryPill} onClick={() => setAffectOpen(true)}>
+                <Users className="h-4 w-4" /> Affecter les étudiants
+              </button>
+            </>
           ) : undefined
         }
       />
@@ -708,6 +737,46 @@ function StagesPage() {
             }
             setFormOpen(false);
           }}
+        />
+      ) : null}
+
+      {affectOpen ? (
+        <AffectationStagesDialog
+          open={affectOpen}
+          onOpenChange={setAffectOpen}
+          etudiants={etudiants}
+          stages={stages}
+          structuresAccueil={structuresAccueil}
+          onConfirm={(affectations) => {
+            for (const { etudiant, structure } of affectations) {
+              addStage({
+                etudiantId: etudiant.id,
+                cne: etudiant.cne,
+                prenom: etudiant.prenom,
+                nom: etudiant.nom,
+                filiere: etudiant.filiere,
+                niveau: etudiant.niveau,
+                structure,
+                service: "",
+                encadrantClinique: "",
+                tuteurAcademique: "",
+                debut: "",
+                fin: "",
+                statut: "recherche",
+                conventionSignee: false,
+              });
+            }
+            toast.success(
+              `${affectations.length} étudiant(s) affecté(s) à un stage`,
+            );
+          }}
+        />
+      ) : null}
+
+      {structuresOpen ? (
+        <StructuresAccueilDialog
+          open={structuresOpen}
+          onOpenChange={setStructuresOpen}
         />
       ) : null}
 

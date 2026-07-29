@@ -3,7 +3,9 @@ import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { emailLogs } from "@/db/schema/email-logs";
+import { settings } from "@/db/schema/settings";
 import nodemailer from "nodemailer";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { getEnv } from "@/config/env";
 
 const sendSchema = z.object({
@@ -114,6 +116,59 @@ export async function emailRoutes(app: FastifyInstance) {
       return { ok: false, error: "SMTP non configuré" };
     }
 
+    const db = getDb();
+    const settingsRows = await db.select().from(settings);
+    const settingsMap: Record<string, any> = {};
+    for (const r of settingsRows) settingsMap[r.key] = r.value;
+    const stampImage = settingsMap.stamp_image as string | null;
+
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const page = pdfDoc.addPage([595, 842]);
+    const { height } = page.getSize();
+
+    let y = height - 60;
+    page.drawText("Reçu de paiement", { x: 50, y, size: 20, font: fontBold, color: rgb(0.01, 0.6, 0.58) });
+    y -= 30;
+
+    const lines: [string, string][] = [
+      ["Reçu", input.receipt],
+      ["Montant", `${input.amount.toLocaleString("fr-FR")} MAD`],
+      ["Date", input.date],
+      ["Mode", input.mode],
+      ["Période", input.period],
+    ];
+    for (const [label, value] of lines) {
+      page.drawText(label, { x: 50, y, size: 11, font, color: rgb(0.2, 0.2, 0.2) });
+      page.drawText(value, { x: 200, y, size: 11, font, color: rgb(0, 0, 0) });
+      y -= 20;
+    }
+
+    if (stampImage) {
+      const comma = stampImage.indexOf(",");
+      if (comma !== -1) {
+        const raw = stampImage.slice(comma + 1);
+        try {
+          const bytes = Buffer.from(raw, "base64");
+          const stampImg = await pdfDoc.embedPng(bytes);
+          const BOX = 120;
+          const aspect = stampImg.width / stampImg.height;
+          let dw = BOX, dh = BOX;
+          if (aspect > 1) dh = BOX / aspect;
+          else dw = BOX * aspect;
+          page.drawImage(stampImg, { x: 50, y: 100, width: dw, height: dh });
+          page.drawText("Cachet de l'etablissement", {
+            x: 50, y: 88, size: 8, font,
+            color: rgb(0.4, 0.4, 0.4),
+          });
+        } catch {}
+      }
+    }
+
+    const pdfBytes = await pdfDoc.save();
+    const pdfBase64 = Buffer.from(pdfBytes).toString("base64");
+
     const html = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
         <h2>Reçu de paiement</h2>
@@ -126,7 +181,6 @@ export async function emailRoutes(app: FastifyInstance) {
           <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;">Mode</td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${input.mode}</td></tr>
           <tr><td style="padding: 8px;">Période</td><td style="padding: 8px;">${input.period}</td></tr>
         </table>
-        ${input.pdfUrl ? `<p>Votre reçu PDF est joint ci-dessous.</p>` : ""}
         <p style="margin-top: 24px; color: #666;">Cordialement,<br>L'équipe de gestion</p>
       </div>
     `;
@@ -137,6 +191,14 @@ export async function emailRoutes(app: FastifyInstance) {
         to: input.to,
         subject: `Reçu de paiement ${input.receipt}`,
         html,
+        attachments: [
+          {
+            filename: `recu-${input.receipt}.pdf`,
+            content: pdfBase64,
+            encoding: "base64",
+            contentType: "application/pdf",
+          },
+        ],
       });
 
       await logEmail(input.to, `Reçu ${input.receipt}`, "receipt", "sent");

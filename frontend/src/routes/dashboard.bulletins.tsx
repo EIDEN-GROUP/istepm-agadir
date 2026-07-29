@@ -124,7 +124,7 @@ function printBulletin(b: Bulletin, groupe?: string) {
   .formula{background:#eef7f6;border:1px solid #d6efee;border-radius:8px;
            padding:10px 12px;font-size:13px;color:#123b3a;margin:0 0 4px;}
   .note{color:#556;font-size:11px;margin-top:6px;}
-  .cachet{margin-top:36px;text-align:right;page-break-inside:avoid;}
+  .cachet{margin-top:36px;text-align:left;page-break-inside:avoid;}
   .cachet img{max-width:150px;max-height:120px;}
   .cachet .lbl{color:#556;font-size:10px;margin-top:2px;
                text-transform:uppercase;letter-spacing:.06em;}

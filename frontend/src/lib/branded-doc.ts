@@ -10,7 +10,12 @@
  * flux `DCTDecode` embarqué dans le PDF.
  */
 
-import { fmtDate, type Stage } from "@/lib/istpm-data";
+import {
+  fmtDate,
+  STATUT_PAIEMENT_LABEL,
+  type Stage,
+  type StatutPaiement,
+} from "@/lib/istpm-data";
 import { getStamp } from "@/lib/stamp";
 
 /* ------------------------------------------------------------------ */
@@ -312,14 +317,14 @@ function buildContentStream(
     y -= 16;
   }
 
-  // Cachet officiel de l'établissement, apposé en bas à droite au-dessus du pied.
+  // Cachet officiel de l'établissement, apposé en bas à gauche au-dessus du pied.
   if (hasStamp) {
     const BOX = 92;
     let dw = BOX;
     let dh = BOX;
     if (stampAspect > 1) dh = BOX / stampAspect;
     else dw = BOX * stampAspect;
-    const sx = RIGHT - dw;
+    const sx = LEFT;
     const sy = 112;
     ops.push(
       `q ${dw.toFixed(2)} 0 0 ${dh.toFixed(2)} ${sx.toFixed(2)} ${sy.toFixed(

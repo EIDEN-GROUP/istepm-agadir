@@ -26,6 +26,7 @@ export { notesExamen } from "./notes-examen";
 export { bulletins } from "./bulletins";
 export { stages } from "./stages";
 export { historiquePaiements } from "./historique-paiements";
+export { paiementsMensuels } from "./paiements-mensuels";
 export { roles } from "./roles";
 export { events } from "./events";
 export { notifications } from "./notifications";

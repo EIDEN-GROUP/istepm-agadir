@@ -51,7 +51,7 @@ import {
   dashTooltip,
   dashCursor,
   BRAND_CHART_COLORS,
-  dialogSurface,
+  dialogSurfaceWide,
 } from "@/lib/dash-ui";
 import { DetailShell, DetailSection } from "@/components/dash-page";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -964,7 +964,7 @@ function DashboardDirecteur() {
 
       {/* Séances d'un formateur (depuis « Charge des formateurs ») */}
       <Dialog open={!!chargeSel} onOpenChange={(o) => !o && setChargeSel(null)}>
-        <DialogContent className={dialogSurface}>
+        <DialogContent className={dialogSurfaceWide}>
           <DialogTitle className="sr-only">Séances du formateur</DialogTitle>
           <DialogDescription className="sr-only">Liste des séances programmées</DialogDescription>
           {chargeSel ? (

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, BellRing, Eye, Receipt, ListChecks, CalendarDays, Search, Check, Clock, AlertTriangle, Ban } from "lucide-react";
+import { Plus, BellRing, Eye, Receipt, PenLine, CalendarDays, Search, Check, Clock, AlertTriangle, Ban, Save, Download } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -18,9 +18,8 @@ import {
   fmtMAD,
   getAcademicYearMonths,
   getCurrentAcademicYear,
-  getDefaultMois,
   type Etudiant,
-  type LignePaiement,
+  type PaiementMensuel,
   type StatutPaiement,
 } from "@/lib/istpm-data";
 import {
@@ -34,6 +33,7 @@ import {
   iconButton,
   TONE_COLORS,
   dialogSurface,
+  dialogSurfaceWide,
   softInput,
   labelClass,
 } from "@/lib/dash-ui";
@@ -54,7 +54,6 @@ import {
   TextField,
   NumberField,
   SelectField,
-  ComboBoxField,
   FullWidth,
 } from "@/components/dash-form";
 import {
@@ -63,20 +62,13 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { softSelectTrigger, softSelectContent } from "@/lib/dash-ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DashTabs } from "@/components/dash-tabs";
 import { cn } from "@/lib/utils";
 
-const MODES: LignePaiement["mode"][] = [
+const MODES: Array<"Espèces" | "Virement" | "Carte" | "Chèque"> = [
   "Espèces",
   "Virement",
   "Carte",
@@ -84,30 +76,27 @@ const MODES: LignePaiement["mode"][] = [
 ];
 const STATUTS: StatutPaiement[] = ["paye", "en_attente", "retard", "impaye"];
 
-const ICON_BY_STATUT: Record<StatutPaiement, typeof Check> = {
-  paye: Check,
-  en_attente: Clock,
-  retard: AlertTriangle,
-  impaye: Ban,
-};
+function deriveStatutPaiement(records: PaiementMensuel[]): StatutPaiement {
+  if (records.length === 0) return "impaye";
+  if (records.every((r) => r.statut === "paye")) return "paye";
+  if (records.some((r) => r.statut === "retard")) return "retard";
+  if (records.some((r) => r.statut === "impaye")) return "impaye";
+  return "en_attente";
+}
 
-/**
- * Clé de tri d'un mois de scolarité (« septembre 2025 ») selon l'ordre de
- * l'année scolaire (septembre → juin), toutes années confondues.
- */
-function moisSortKey(key: string): number {
-  const [name = "", yearStr = "0"] = key.trim().split(/\s+/);
-  const idx = (MOIS_ACADEMIQUE as readonly string[]).indexOf(name.toLowerCase());
-  const i = idx < 0 ? 99 : idx;
-  const year = Number.parseInt(yearStr, 10) || 0;
-  // Sep–déc (0–3) appartiennent à l'année de début ; jan–juin à l'année suivante.
-  const startYear = i <= 3 ? year : year - 1;
-  return startYear * 100 + i;
+function totalPaye(records: PaiementMensuel[]): number {
+  return records
+    .filter((r) => r.statut === "paye")
+    .reduce((s, r) => s + r.montantPaye, 0);
+}
+
+function resteDu(records: PaiementMensuel[]): number {
+  return records.reduce((s, r) => s + (r.montantDu - r.montantPaye), 0);
 }
 
 function PaiementsPage() {
   const { role } = useAuth();
-  const { etudiants, financier, aRelancer, addPaiement } = useIstpm();
+  const { etudiants, financier, aRelancer, payerMois, updatePaiementMensuel } = useIstpm();
   const canEdit = role === "directeur" || role === "responsable";
 
   const [search, setSearch] = useState("");
@@ -117,20 +106,15 @@ function PaiementsPage() {
   const [statut, setStatut] = useState<string>(ALL);
   const [mois, setMois] = useState<string>(ALL);
 
-  // Options du filtre « Mois » : mois académiques (septembre → juin), capitalisés.
   const moisOptions = useMemo(
     () => MOIS_ACADEMIQUE.map((m) => m.charAt(0).toUpperCase() + m.slice(1)),
     [],
   );
   const [addOpen, setAddOpen] = useState(false);
   const [relanceOpen, setRelanceOpen] = useState(false);
-  const [detail, setDetail] = useState<Etudiant | null>(null);
-  const [tab, setTab] = useState(0); // 0 = transactions · 1 = suivi mensuel
-  const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear);
-  const months = useMemo(() => getAcademicYearMonths(academicYear), [academicYear]);
+  const [editStudent, setEditStudent] = useState<Etudiant | null>(null);
+  const [historyStudent, setHistoryStudent] = useState<Etudiant | null>(null);
 
-  // Vue « historique par étudiant » : une ligne par étudiant, résumant l'ensemble
-  // de ses règlements. Le détail complet s'ouvre dans une modale.
   const parEtudiant = useMemo(() => {
     const q = search.trim().toLowerCase();
     return etudiants
@@ -138,51 +122,26 @@ function PaiementsPage() {
         if (filiere !== ALL && e.filiere !== filiere) return false;
         if (semestre !== ALL && e.niveau !== semestre) return false;
         if (annee !== ALL && anneeEtude(e.niveau) !== annee) return false;
-        if (statut !== ALL && STATUT_PAIEMENT_LABEL[e.paiement] !== statut)
-          return false;
+        const statutE = deriveStatutPaiement(e.paiementsMensuelsRecords);
+        if (statut !== ALL && STATUT_PAIEMENT_LABEL[statutE] !== statut) return false;
         if (mois !== ALL) {
-          // Le suivi mensuel vit dans `paiementsMensuels` (clé « septembre 2025 »
-          // → statut). On retient l'étudiant qui a réglé le mois choisi ; à
-          // défaut, on retombe sur une ligne d'historique portant ce mois.
           const target = mois.toLowerCase();
-          const regleParMois = Object.entries(e.paiementsMensuels ?? {}).some(
-            ([k, v]) => k.toLowerCase().startsWith(target) && v === "paye",
+          const payeCeMois = e.paiementsMensuelsRecords.some(
+            (r) => r.mois.toLowerCase().startsWith(target) && r.statut === "paye",
           );
-          const regleParHistorique = e.historique.some(
-            (h) =>
-              h.statut === "paye" &&
-              (h.mois?.toLowerCase().startsWith(target) ||
-                h.periode?.toLowerCase().includes(target)),
-          );
-          if (!regleParMois && !regleParHistorique) return false;
+          if (!payeCeMois) return false;
         }
         if (!q) return true;
         return `${e.cne} ${e.prenom} ${e.nom}`.toLowerCase().includes(q);
       })
       .map((e) => {
-        const totalPaye = e.historique
-          .filter((h) => h.statut === "paye")
-          .reduce((s, h) => s + h.montant, 0);
-        const dernier = e.historique.reduce(
-          (d, h) => (h.date > d ? h.date : d),
-          "",
-        );
-        // Décompte des mois par statut (source : suivi mensuel).
-        const vals = Object.values(e.paiementsMensuels ?? {});
-        const moisImpaye = vals.filter((v) => v === "impaye").length;
-        const moisRetard = vals.filter((v) => v === "retard").length;
-        const moisEnAttente = vals.filter((v) => v === "en_attente").length;
-        const moisNonPayes = vals.filter((v) => v !== "paye").length;
-        const resteDu = moisNonPayes * e.fraisMensuels;
-        return {
-          etudiant: e,
-          totalPaye,
-          dernier,
-          resteDu,
-          moisImpaye,
-          moisRetard,
-          moisEnAttente,
-        };
+        const records = e.paiementsMensuelsRecords;
+        const total = totalPaye(records);
+        const reste = resteDu(records);
+        const statutE = deriveStatutPaiement(records);
+        const moisNonPayes = records.filter((r) => r.statut !== "paye").length;
+        const moisRetard = records.filter((r) => r.statut === "retard").length;
+        return { etudiant: e, statut: statutE, totalPaye: total, resteDu: reste, moisNonPayes, moisRetard };
       });
   }, [etudiants, search, filiere, semestre, annee, statut, mois]);
 
@@ -193,11 +152,7 @@ function PaiementsPage() {
 
   const kpis = [
     { label: "Encaissé", value: fmtMAD(financier.encaisse), tone: "teal" },
-    {
-      label: "Encaissé ce mois",
-      value: fmtMAD(financier.encaisseCeMois),
-      tone: "teal",
-    },
+    { label: "Encaissé ce mois", value: fmtMAD(financier.encaisseCeMois), tone: "teal" },
     { label: "En attente", value: fmtMAD(financier.enAttente), tone: "amber" },
     { label: "Retard", value: fmtMAD(financier.retard), tone: "red" },
     { label: "Impayé", value: fmtMAD(financier.impaye), tone: "red" },
@@ -250,61 +205,30 @@ function PaiementsPage() {
         ))}
       </div>
 
-      <DashTabs
-        tabs={[
-          { label: "Transactions", icon: ListChecks },
-          { label: "Suivi mensuel", short: "Mensuel", icon: CalendarDays },
-        ]}
-        active={tab}
-        onChange={setTab}
-      />
-
-      {tab === 0 ? (
-        <>
       <FilterPanel
         search={search}
         onSearch={setSearch}
-        placeholder="Rechercher par CNE, étudiant, reçu, période…"
+        placeholder="Rechercher par CNE, étudiant, reçu…"
         filters={[
           {
-            id: "filiere",
-            label: "Filière",
-            value: filiere,
-            onChange: setFiliere,
-            options: FILIERES,
-            allLabel: "Toutes les filières",
+            id: "filiere", label: "Filière", value: filiere, onChange: setFiliere,
+            options: FILIERES, allLabel: "Toutes les filières",
           },
           {
-            id: "semestre",
-            label: "Semestre",
-            value: semestre,
-            onChange: setSemestre,
-            options: NIVEAUX,
-            allLabel: "Tous les semestres",
+            id: "semestre", label: "Semestre", value: semestre, onChange: setSemestre,
+            options: NIVEAUX, allLabel: "Tous les semestres",
           },
           {
-            id: "annee",
-            label: "Année",
-            value: annee,
-            onChange: setAnnee,
-            options: ANNEES_ETUDE,
-            allLabel: "Toutes les années",
+            id: "annee", label: "Année", value: annee, onChange: setAnnee,
+            options: ANNEES_ETUDE, allLabel: "Toutes les années",
           },
           {
-            id: "statut",
-            label: "Statut",
-            value: statut,
-            onChange: setStatut,
-            options: STATUTS.map((s) => STATUT_PAIEMENT_LABEL[s]),
-            allLabel: "Tous les statuts",
+            id: "statut", label: "Statut", value: statut, onChange: setStatut,
+            options: STATUTS.map((s) => STATUT_PAIEMENT_LABEL[s]), allLabel: "Tous les statuts",
           },
           {
-            id: "mois",
-            label: "Mois",
-            value: mois,
-            onChange: setMois,
-            options: moisOptions,
-            allLabel: "Tous les mois",
+            id: "mois", label: "Mois", value: mois, onChange: setMois,
+            options: moisOptions, allLabel: "Tous les mois",
           },
         ]}
       />
@@ -332,7 +256,7 @@ function PaiementsPage() {
             <th className="text-right">Total réglé</th>
             <th className="text-right">Reste dû</th>
             <th>Statut</th>
-            <th className="w-20 text-center">Actions</th>
+            <th className="w-32 text-center">Actions</th>
           </>
         }
       >
@@ -342,13 +266,12 @@ function PaiementsPage() {
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
-            onClick={() => setDetail(r.etudiant)}
             className={tableRow}
           >
             <td
               className={cn("border-l-[3px] font-medium", cellTruncate)}
               style={{
-                borderLeftColor: TONE_COLORS[STATUT_PAIEMENT_TONE[r.etudiant.paiement]],
+                borderLeftColor: TONE_COLORS[STATUT_PAIEMENT_TONE[r.statut]],
               }}
             >
               {r.etudiant.prenom} {r.etudiant.nom}
@@ -375,12 +298,10 @@ function PaiementsPage() {
             </td>
             <td>
               {(() => {
-                // Précision selon le statut : nb de mois impayés / en retard,
-                // ou reste à payer pour « en attente ».
-                const st = r.etudiant.paiement;
+                const st = r.statut;
                 let detail: string | null = null;
-                if (st === "impaye" && r.moisImpaye > 0)
-                  detail = `${r.moisImpaye} mois impayé${r.moisImpaye > 1 ? "s" : ""}`;
+                if (st === "impaye" && r.moisNonPayes > 0)
+                  detail = `${r.moisNonPayes} mois impayé${r.moisNonPayes > 1 ? "s" : ""}`;
                 else if (st === "retard" && r.moisRetard > 0)
                   detail = `${r.moisRetard} mois en retard`;
                 else if (st === "en_attente" && r.resteDu > 0)
@@ -391,192 +312,73 @@ function PaiementsPage() {
                       {STATUT_PAIEMENT_LABEL[st]}
                     </span>
                     {detail ? (
-                      <span className="text-[11px] text-muted-foreground">
-                        {detail}
-                      </span>
+                      <span className="text-[11px] text-muted-foreground">{detail}</span>
                     ) : null}
                   </div>
                 );
               })()}
             </td>
-            <td
-              className="text-center"
-              onClick={(ev) => ev.stopPropagation()}
-            >
+            <td className="text-center" onClick={(ev) => ev.stopPropagation()}>
               <div className={rowActions}>
+                {canEdit ? (
+                  <button
+                    className={iconButton}
+                    aria-label="Modifier le paiement"
+                    onClick={() => setEditStudent(r.etudiant)}
+                  >
+                    <PenLine className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
                 <button
                   className={iconButton}
                   aria-label="Voir l'historique"
-                  onClick={() => setDetail(r.etudiant)}
+                  onClick={() => setHistoryStudent(r.etudiant)}
                 >
-                  <Eye className="h-3.5 w-3.5" />
+                  <Receipt className="h-3.5 w-3.5" />
                 </button>
               </div>
             </td>
           </motion.tr>
         ))}
       </DataTable>
-        </>
-      ) : (
-        <MonthlyTracker etudiants={etudiants} canEdit={canEdit} academicYear={academicYear} onAcademicYearChange={setAcademicYear} months={months} />
-      )}
 
-      {/* Historique complet des paiements d'un étudiant */}
-      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent className={dialogSurface}>
-          <DialogTitle className="sr-only">Historique des paiements</DialogTitle>
-          <DialogDescription className="sr-only">
-            Tous les règlements de l'étudiant sélectionné
-          </DialogDescription>
-          {detail ? (() => {
-            const e = etudiants.find((x) => x.id === detail.id) ?? detail;
-            const totalPaye = e.historique
-              .filter((h) => h.statut === "paye")
-              .reduce((s, h) => s + h.montant, 0);
-            const lignes = e.historique
-              .slice()
-              .sort((a, b) => (a.date > b.date ? -1 : 1));
-            // Tous les mois de scolarité avec leur statut (suivi mensuel).
-            const moisRows = Object.entries(e.paiementsMensuels ?? {})
-              .map(([m, st]) => ({ mois: m, statut: st as StatutPaiement }))
-              .sort((a, b) => moisSortKey(a.mois) - moisSortKey(b.mois));
-            const moisNonPayes = moisRows.filter((m) => m.statut !== "paye").length;
-            const resteDu = moisNonPayes * e.fraisMensuels;
-            return (
-              <DetailShell
-                icon={<Receipt className="h-5 w-5" />}
-                title={`${e.prenom} ${e.nom}`}
-                subtitle={`${e.cne} · ${e.filiere}`}
-                badges={
-                  <span className={toneBadge(STATUT_PAIEMENT_TONE[e.paiement])}>
-                    {STATUT_PAIEMENT_LABEL[e.paiement]}
-                  </span>
-                }
-              >
-                <DetailSection title="Synthèse">
-                  <DetailGrid>
-                    <DetailField label="Semestre" value={e.niveau} />
-                    <DetailField label="Année" value={anneeEtude(e.niveau)} />
-                    <DetailField label="Groupe" value={e.groupe} />
-                    <DetailField
-                      label="Frais mensuels"
-                      value={fmtMAD(e.fraisMensuels)}
-                    />
-                    <DetailField
-                      label="Total réglé"
-                      value={fmtMAD(totalPaye)}
-                      tone="positive"
-                    />
-                    <DetailField
-                      label="Reste dû"
-                      value={resteDu > 0 ? fmtMAD(resteDu) : "—"}
-                      tone={resteDu > 0 ? "negative" : "default"}
-                    />
-                  </DetailGrid>
-                </DetailSection>
+      {editStudent ? (
+        <EditPaiementDialog
+          etudiant={editStudent}
+          onClose={() => setEditStudent(null)}
+          onSave={(mois, details) => {
+            payerMois(editStudent.id, mois, details);
+            toast.success(`Paiement enregistré pour ${editStudent.prenom} ${editStudent.nom}`);
+            setEditStudent(null);
+          }}
+        />
+      ) : null}
 
-                <DetailSection
-                  title={`Statut mensuel${
-                    moisNonPayes ? ` · ${moisNonPayes} mois non réglé(s)` : ""
-                  }`}
-                >
-                  {moisRows.length ? (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {moisRows.map((m) => (
-                        <div
-                          key={m.mois}
-                          className={cn(
-                            "flex items-center justify-between gap-2 rounded-xl border px-3 py-2",
-                            m.statut === "paye"
-                              ? "border-brand/20 bg-brand/5"
-                              : "border-brand/12 bg-muted/40",
-                          )}
-                        >
-                          <span className="truncate text-xs font-medium capitalize text-foreground">
-                            {m.mois}
-                          </span>
-                          <span className={toneBadge(STATUT_PAIEMENT_TONE[m.statut])}>
-                            {STATUT_PAIEMENT_LABEL[m.statut]}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Aucun suivi mensuel enregistré pour cet étudiant.
-                    </p>
-                  )}
-                </DetailSection>
-
-                <DetailSection title={`Historique des paiements (${lignes.length})`}>
-                  {lignes.length ? (
-                    <DetailTable
-                      head={
-                        <>
-                          <th className="px-3 py-2">Date</th>
-                          <th className="px-3 py-2">Mois réglé</th>
-                          <th className="px-3 py-2 text-right">Montant</th>
-                          <th className="px-3 py-2">Mode</th>
-                          <th className="px-3 py-2">Reçu</th>
-                          <th className="px-3 py-2">Statut</th>
-                        </>
-                      }
-                    >
-                      {lignes.map((h, idx) => (
-                        <tr key={`${h.recu}-${idx}`}>
-                          <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                            {fmtDate(h.date)}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 capitalize">
-                            {h.mois ?? h.periode}
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold tabular-nums">
-                            {fmtMAD(h.montant)}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                            {h.mode}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted-foreground">
-                            {h.recu}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className={toneBadge(STATUT_PAIEMENT_TONE[h.statut])}>
-                              {STATUT_PAIEMENT_LABEL[h.statut]}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </DetailTable>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Aucun règlement enregistré pour cet étudiant.
-                    </p>
-                  )}
-                </DetailSection>
-              </DetailShell>
-            );
-          })() : null}
-        </DialogContent>
-      </Dialog>
+      {historyStudent ? (
+        <HistoriquePaiementsDialog
+          etudiant={historyStudent}
+          onClose={() => setHistoryStudent(null)}
+        />
+      ) : null}
 
       {addOpen ? (
-        <PaiementForm
+        <EditPaiementDialog
+          etudiant={null}
+          onClose={() => setAddOpen(false)}
+          onSave={(mois, details) => {
+            toast.error("Veuillez sélectionner un étudiant");
+          }}
+          isNew
           etudiants={etudiants}
-          academicYear={academicYear}
-          months={months}
-          onCancel={() => setAddOpen(false)}
-          onSubmit={({ etudiantId, ligne }) => {
-            const et = etudiants.find((e) => e.id === etudiantId)!;
-            addPaiement(etudiantId, ligne);
-            toast.success(
-              `Paiement de ${fmtMAD(ligne.montant)} enregistré   ${et.prenom} ${et.nom}`,
-            );
+          onNewPayment={(etudiantId, mois, details) => {
+            payerMois(etudiantId, mois, details);
+            const et = etudiants.find((e) => e.id === etudiantId);
+            toast.success(`Paiement enregistré pour ${et?.prenom} ${et?.nom}`);
             setAddOpen(false);
           }}
         />
       ) : null}
 
-      {/* Relances   outstanding balances to chase. */}
       <Dialog open={relanceOpen} onOpenChange={setRelanceOpen}>
         <DialogContent className={dialogSurface}>
           <DialogTitle className="sr-only">Relances</DialogTitle>
@@ -591,9 +393,7 @@ function PaiementsPage() {
                 className={cn(primaryPill, "w-full justify-center")}
                 disabled={aRelancer.length === 0}
                 onClick={() => {
-                  toast.success(
-                    `${aRelancer.length} relance(s) envoyée(s) par e-mail et SMS`,
-                  );
+                  toast.success(`${aRelancer.length} relance(s) envoyée(s) par e-mail et SMS`);
                   setRelanceOpen(false);
                 }}
               >
@@ -617,9 +417,7 @@ function PaiementsPage() {
                       </span>
                     </span>
                     <span className="shrink-0 text-right">
-                      <span
-                        className={toneBadge(STATUT_PAIEMENT_TONE[e.paiement])}
-                      >
+                      <span className={toneBadge(STATUT_PAIEMENT_TONE[e.paiement])}>
                         {STATUT_PAIEMENT_LABEL[e.paiement]}
                       </span>
                     </span>
@@ -628,7 +426,7 @@ function PaiementsPage() {
               </ul>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Aucun solde en attente   tous les étudiants sont à jour.
+                Aucun solde en attente — tous les étudiants sont à jour.
               </p>
             )}
           </DetailShell>
@@ -639,189 +437,393 @@ function PaiementsPage() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Suivi mensuel des paiements                                        */
+/*  Edit Paiement Dialog                                               */
 /* ------------------------------------------------------------------ */
 
-/**
- * Suivi mensuel des paiements.
- *
- * L'institut fonctionne au mois : pour un étudiant donné, chaque mois de l'année
- * scolaire porte son propre statut de règlement (payé / en attente / retard /
- * impayé), modifiable directement ici. Le statut provient de `paiementsMensuels`
- * (ou, à défaut, du dernier règlement rattaché à ce mois) et « Non renseigné »
- * vaut impayé.
- */
-function MonthlyTracker({
+function EditPaiementDialog({
+  etudiant,
   etudiants,
-  canEdit,
-  academicYear,
-  onAcademicYearChange,
-  months,
+  onClose,
+  onSave,
+  onNewPayment,
+  isNew,
 }: {
-  etudiants: ReturnType<typeof useIstpm>["etudiants"];
-  canEdit: boolean;
-  academicYear: string;
-  onAcademicYearChange: (y: string) => void;
-  months: string[];
+  etudiant: Etudiant | null;
+  etudiants?: Etudiant[];
+  onClose: () => void;
+  onSave: (mois: string[], details: { montant: number; mode: "Espèces" | "Virement" | "Carte" | "Chèque"; date: string; recu?: string; notes?: string }) => void;
+  onNewPayment?: (etudiantId: string, mois: string[], details: { montant: number; mode: "Espèces" | "Virement" | "Carte" | "Chèque"; date: string; recu?: string; notes?: string }) => void;
+  isNew?: boolean;
 }) {
-  const { setMoisPaiementStatut } = useIstpm();
-  const [etudiantId, setEtudiantId] = useState<string>(etudiants[0]?.id ?? "");
-  const etudiant = etudiants.find((e) => e.id === etudiantId);
+  const academicYear = getCurrentAcademicYear();
+  const months = useMemo(() => getAcademicYearMonths(academicYear), [academicYear]);
 
-  const statutMois = (mois: string): StatutPaiement => {
-    if (!etudiant) return "impaye";
-    const explicite = etudiant.paiementsMensuels?.[mois];
-    if (explicite) return explicite;
-    const ligne = etudiant.historique.find(
-      (h) => h.mois?.toLowerCase() === mois,
-    );
-    return ligne?.statut ?? "impaye";
+  const [selectedId, setSelectedId] = useState(etudiant?.id ?? "");
+  const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
+  const [montant, setMontant] = useState<number | "">("");
+  const [mode, setMode] = useState<"Espèces" | "Virement" | "Carte" | "Chèque">("Espèces");
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const [notes, setNotes] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const currentEtudiant = isNew
+    ? etudiants?.find((e) => e.id === selectedId)
+    : etudiant;
+
+  const records = currentEtudiant?.paiementsMensuelsRecords ?? [];
+  const monthlyFee = currentEtudiant?.fraisMensuels ?? 0;
+
+  const monthStatus = useMemo(() => {
+    return months.map((m) => {
+      const record = records.find((r) => r.mois === m);
+      const paye = record ? record.montantPaye : 0;
+      const du = record ? record.montantDu : monthlyFee;
+      const statut = record?.statut ?? "impaye";
+      const unpaid = paye < du;
+      return { mois: m, paye, du, statut, unpaid };
+    });
+  }, [months, records, monthlyFee]);
+
+  const toggleMonth = (mois: string) => {
+    setSelectedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(mois)) next.delete(mois);
+      else next.add(mois);
+      return next;
+    });
   };
 
-  const montantMois = (mois: string): number =>
-    etudiant?.historique
-      .filter((h) => h.mois?.toLowerCase() === mois)
-      .reduce((s, h) => s + h.montant, 0) ?? 0;
+  const submit = () => {
+    const errs: Record<string, string> = {};
+    if (isNew && !selectedId) errs.etudiant = "Étudiant obligatoire";
+    if (selectedMonths.size === 0) errs.mois = "Sélectionnez au moins un mois";
+    if (montant === "" || Number(montant) <= 0) errs.montant = "Montant supérieur à 0 requis";
+    if (!date) errs.date = "Date obligatoire";
 
-  const nbRegles = etudiant
-    ? months.filter((m) => statutMois(m) === "paye").length
-    : 0;
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      toast.error("Veuillez corriger les champs signalés");
+      return;
+    }
+
+    const details = { montant: Number(montant), mode, date, notes: notes || undefined };
+
+    if (isNew && onNewPayment) {
+      onNewPayment(selectedId, [...selectedMonths], details);
+    } else {
+      onSave([...selectedMonths], details);
+    }
+  };
 
   return (
-    <section className={cn(softCard, "overflow-hidden p-0")}>
-      {/* Gradient header */}
-      <div className="bg-gradient-to-r from-brand/10 via-brand/5 to-transparent px-5 pb-4 pt-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-          <div>
-            <h3 className="font-display text-base font-bold tracking-tight text-foreground">
-              Suivi mensuel
-            </h3>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Statut de règlement, mois par mois, pour un étudiant donné.
-            </p>
-          </div>
-          <div className="w-full sm:w-44">
-            <SelectField
-              label="Année universitaire"
-              value={academicYear}
-              onChange={onAcademicYearChange}
-              options={ANNEES_UNIVERSITAIRES.map((y) => ({
-                value: y,
-                label: `${y.replace("/", "–")}`,
-              }))}
-            />
-          </div>
-          <div className="w-full max-w-xs">
-            <ComboBoxField
-            label="Étudiant"
-            value={etudiantId}
-            onChange={setEtudiantId}
-            options={etudiants.map((e) => ({
-              value: e.id,
-              label: `${e.prenom} ${e.nom}   ${e.cne}`,
-            }))}
-            placeholder="Choisir un étudiant…"
-            searchPlaceholder="Nom, prénom ou CNE…"
-            emptyText="Aucun étudiant trouvé."
+    <FormDialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={isNew ? "Nouveau paiement" : "Modifier le paiement"}
+      subtitle={
+        isNew
+          ? "Enregistrer un règlement de frais de scolarité"
+          : `Sélectionner les mois à régler pour ${currentEtudiant?.prenom} ${currentEtudiant?.nom}`
+      }
+      submitLabel="Enregistrer"
+      onSubmit={submit}
+    >
+      {isNew ? (
+        <FullWidth>
+          <StudentSearchField
+            students={etudiants ?? []}
+            value={selectedId}
+            onChange={(v) => setSelectedId(v)}
+            error={errors.etudiant}
           />
-          </div>
-      </div>
-      </div>
+        </FullWidth>
+      ) : null}
 
-      {etudiant ? (
-        <>
-          <div className="px-5 pt-4">
-            <p className="text-xs text-muted-foreground">
-              <strong className="font-semibold text-foreground">{nbRegles}</strong>{" "}
-              mois payé(s) sur {months.length} · <strong className="font-semibold text-foreground">{fmtMAD(etudiant.fraisMensuels)}</strong>/mois
-            </p>
+      {currentEtudiant ? (
+        <FullWidth>
+          <div className="rounded-2xl bg-muted px-4 py-3 text-xs text-muted-foreground">
+            Frais mensuels&nbsp;:{" "}
+            <strong className="text-brand-dk">{fmtMAD(monthlyFee)}</strong>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2.5 px-5 pb-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {months.map((m, i) => {
-              const st = statutMois(m);
-              const montant = montantMois(m);
-              const StatutIcon = ICON_BY_STATUT[st];
+        </FullWidth>
+      ) : null}
+
+      <FullWidth>
+        <div className="space-y-1.5">
+          <Label className={labelClass}>
+            Mois à régler<span className="ml-0.5 text-alert">*</span>
+          </Label>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {monthStatus.map((m) => {
+              const selected = selectedMonths.has(m.mois);
               return (
-                <motion.div
-                  key={m}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
+                <button
+                  key={m.mois}
+                  type="button"
+                  disabled={m.statut === "paye" && !m.unpaid}
+                  onClick={() => toggleMonth(m.mois)}
                   className={cn(
-                    "rounded-2xl border px-3 py-3",
-                    st === "paye"
-                      ? "border-brand/25 bg-brand/5"
-                      : "border-brand/12 bg-muted/40",
+                    "flex flex-col items-center gap-1 rounded-xl border px-2 py-2 text-xs transition-colors",
+                    selected
+                      ? "border-brand bg-brand/10 text-brand-dk"
+                      : m.statut === "paye" && !m.unpaid
+                        ? "border-brand/20 bg-brand/5 opacity-50"
+                        : "border-brand/12 bg-muted/40 hover:border-brand/30",
                   )}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold capitalize text-foreground">
-                      {m}
-                    </p>
-                    <StatutIcon
-                      className="h-4 w-4 shrink-0"
-                      style={{ color: TONE_COLORS[STATUT_PAIEMENT_TONE[st]] }}
-                    />
-                  </div>
-                  {canEdit ? (
-                    <Select
-                      value={st}
-                      onValueChange={(v) =>
-                        setMoisPaiementStatut(etudiant.id, m, v as StatutPaiement)
-                      }
-                    >
-                      <SelectTrigger
-                        className={cn(softSelectTrigger, "mt-2 h-8 w-full text-xs")}
-                        aria-label={`Statut de ${m}`}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className={softSelectContent}>
-                        {STATUTS.map((s) => (
-                          <SelectItem key={s} value={s} className="text-xs">
-                            <span className="flex items-center gap-1.5">
-                              {(() => {
-                                const Icn = ICON_BY_STATUT[s];
-                                return <Icn className="h-3.5 w-3.5" />;
-                              })()}
-                              {STATUT_PAIEMENT_LABEL[s]}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <span className="font-semibold capitalize">{m.mois.split(" ")[0]}</span>
+                  {m.statut === "paye" && !m.unpaid ? (
+                    <span className={toneBadge("teal")}>Payé</span>
+                  ) : m.paye > 0 ? (
+                    <span className="text-[10px] text-muted-foreground">
+                      {fmtMAD(m.paye)}/{fmtMAD(m.du)}
+                    </span>
                   ) : (
-                    <p className="mt-2">
-                      <span className={toneBadge(STATUT_PAIEMENT_TONE[st])}>
-                        {STATUT_PAIEMENT_LABEL[st]}
-                      </span>
-                    </p>
+                    <span className={toneBadge("red")}>Impayé</span>
                   )}
-                  {montant > 0 ? (
-                    <p className="mt-1.5 text-[11px] font-medium tabular-nums text-muted-foreground">
-                      {fmtMAD(montant)}
-                    </p>
-                  ) : null}
-                </motion.div>
+                </button>
               );
             })}
           </div>
-        </>
-      ) : (
-        <p className="px-5 pb-5 pt-4 text-sm text-muted-foreground">
-          Sélectionner un étudiant pour afficher son suivi mensuel.
-        </p>
-      )}
-    </section>
+          {errors.mois ? <p className="text-[11px] text-alert">{errors.mois}</p> : null}
+        </div>
+      </FullWidth>
+
+      <NumberField
+        label="Montant"
+        required
+        suffix="MAD"
+        min={0}
+        value={montant}
+        onChange={(v) => setMontant(v)}
+        error={errors.montant}
+      />
+
+      <SelectField
+        label="Mode de règlement"
+        value={mode}
+        onChange={(v) => setMode(v as typeof mode)}
+        options={MODES}
+      />
+
+      <TextField
+        label="Date"
+        required
+        type="date"
+        value={date}
+        onChange={(v) => setDate(v)}
+        error={errors.date}
+      />
+
+      <TextField
+        label="Notes"
+        value={notes}
+        onChange={(v) => setNotes(v)}
+      />
+    </FormDialog>
   );
 }
 
 /* ------------------------------------------------------------------ */
+/*  Historique Paiements Dialog                                        */
+/* ------------------------------------------------------------------ */
 
-/**
- * Champ étudiant en autocomplétion : l'utilisateur tape directement dans le
- * champ et la liste se filtre en direct sous le champ (nom, prénom ou CNE).
- */
+function HistoriquePaiementsDialog({
+  etudiant,
+  onClose,
+}: {
+  etudiant: Etudiant;
+  onClose: () => void;
+}) {
+  const { updatePaiementMensuel } = useIstpm();
+  const academicYear = getCurrentAcademicYear();
+  const months = useMemo(() => getAcademicYearMonths(academicYear), [academicYear]);
+  const canEdit = useAuth().role === "directeur" || useAuth().role === "responsable";
+
+  const records = etudiant.paiementsMensuelsRecords;
+  const totalPayeE = records
+    .filter((r) => r.statut === "paye")
+    .reduce((s, r) => s + r.montantPaye, 0);
+  const resteDuE = records.reduce((s, r) => s + (r.montantDu - r.montantPaye), 0);
+  const nbPaye = records.filter((r) => r.statut === "paye").length;
+
+  const monthData = useMemo(() => {
+    return months.map((m) => {
+      const record = records.find((r) => r.mois === m);
+      return {
+        mois: m,
+        montantDu: record?.montantDu ?? etudiant.fraisMensuels,
+        montantPaye: record?.montantPaye ?? 0,
+        datePaiement: record?.datePaiement ?? "",
+        statut: record?.statut ?? "impaye",
+        recu: record?.recu ?? "",
+      };
+    });
+  }, [months, records, etudiant.fraisMensuels]);
+
+  const [editingMois, setEditingMois] = useState<string | null>(null);
+  const [editStatut, setEditStatut] = useState<StatutPaiement>("paye");
+
+  const saveStatut = (record: typeof monthData[0]) => {
+    const existing = records.find((r) => r.mois === record.mois);
+    if (existing) {
+      updatePaiementMensuel(existing.id, etudiant.id, { statut: editStatut });
+    }
+    setEditingMois(null);
+    toast.success(`Statut mis à jour pour ${record.mois}`);
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className={dialogSurfaceWide}>
+        <DialogTitle className="sr-only">Historique des paiements</DialogTitle>
+        <DialogDescription className="sr-only">
+          Historique mensuel des paiements de l'étudiant
+        </DialogDescription>
+        <DetailShell
+          icon={<Receipt className="h-5 w-5" />}
+          title={`${etudiant.prenom} ${etudiant.nom}`}
+          subtitle={`${etudiant.cne} · ${etudiant.filiere}`}
+          badges={
+            <span className={toneBadge(STATUT_PAIEMENT_TONE[etudiant.paiement])}>
+              {STATUT_PAIEMENT_LABEL[etudiant.paiement]}
+            </span>
+          }
+        >
+          <DetailSection title="Synthèse">
+            <DetailGrid>
+              <DetailField label="Semestre" value={etudiant.niveau} />
+              <DetailField label="Année" value={anneeEtude(etudiant.niveau)} />
+              <DetailField label="Groupe" value={etudiant.groupe} />
+              <DetailField
+                label="Frais mensuels"
+                value={fmtMAD(etudiant.fraisMensuels)}
+              />
+              <DetailField
+                label="Total réglé"
+                value={fmtMAD(totalPayeE)}
+                tone="positive"
+              />
+              <DetailField
+                label="Reste dû"
+                value={resteDuE > 0 ? fmtMAD(resteDuE) : "—"}
+                tone={resteDuE > 0 ? "negative" : "default"}
+              />
+            </DetailGrid>
+          </DetailSection>
+
+          <DetailSection
+            title={`Suivi mensuel (${nbPaye}/${months.length} réglés)`}
+          >
+            <DetailTable
+              head={
+                <>
+                  <th className="px-3 py-2">Mois</th>
+                  <th className="px-3 py-2 text-right">Montant dû</th>
+                  <th className="px-3 py-2 text-right">Montant payé</th>
+                  <th className="px-3 py-2 text-right">Reste</th>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Statut</th>
+                  <th className="px-3 py-2">Reçu</th>
+                </>
+              }
+            >
+              {monthData.map((m) => {
+                const reste = m.montantDu - m.montantPaye;
+                return (
+                  <tr key={m.mois}>
+                    <td className="whitespace-nowrap px-3 py-2 font-medium capitalize">
+                      {m.mois}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums">
+                      {fmtMAD(m.montantDu)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums text-brand-dk">
+                      {m.montantPaye > 0 ? fmtMAD(m.montantPaye) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums">
+                      {reste > 0 ? (
+                        <span className="text-alert">{fmtMAD(reste)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                      {m.datePaiement ? fmtDate(m.datePaiement) : "—"}
+                    </td>
+                    <td className="px-3 py-2">
+                      {canEdit && editingMois === m.mois ? (
+                        <div className="flex items-center gap-1">
+                          <Select
+                            value={editStatut}
+                            onValueChange={(v) => setEditStatut(v as StatutPaiement)}
+                          >
+                            <SelectTrigger className={cn(softSelectTrigger, "h-7 w-28 text-xs")}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className={softSelectContent}>
+                              {STATUTS.map((s) => (
+                                <SelectItem key={s} value={s} className="text-xs">
+                                  {STATUT_PAIEMENT_LABEL[s]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <button
+                            type="button"
+                            className={cn(primaryPill, "h-7 w-7 justify-center p-0")}
+                            onClick={() => saveStatut(m)}
+                          >
+                            <Save className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : m.statut ? (
+                        <button
+                          type="button"
+                          disabled={!canEdit}
+                          onClick={() => {
+                            setEditingMois(m.mois);
+                            setEditStatut(m.statut);
+                          }}
+                          className="cursor-pointer disabled:cursor-default"
+                        >
+                          <span className={toneBadge(STATUT_PAIEMENT_TONE[m.statut])}>
+                            {STATUT_PAIEMENT_LABEL[m.statut]}
+                          </span>
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Non facturé</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted-foreground">
+                      {m.recu ? (
+                        <a
+                          href={`/api/documents/${m.recu}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-brand hover:underline"
+                        >
+                          <Download className="h-3 w-3" />
+                          Télécharger
+                        </a>
+                      ) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </DetailTable>
+          </DetailSection>
+        </DetailShell>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Student Search Field                                               */
+/* ------------------------------------------------------------------ */
+
 function StudentSearchField({
   students,
   value,
@@ -834,7 +836,7 @@ function StudentSearchField({
   error?: string;
 }) {
   const label = (s: { prenom: string; nom: string; cne: string }) =>
-    `${s.prenom} ${s.nom}   ${s.cne}`;
+    `${s.prenom} ${s.nom} — ${s.cne}`;
   const selected = students.find((s) => s.id === value);
   const [query, setQuery] = useState(selected ? label(selected) : "");
   const [open, setOpen] = useState(false);
@@ -850,7 +852,6 @@ function StudentSearchField({
     return base.slice(0, 8);
   }, [students, q]);
 
-  // Un clic hors du champ referme la liste.
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
@@ -926,138 +927,6 @@ function StudentSearchField({
       </div>
       {error ? <p className="text-[11px] text-alert">{error}</p> : null}
     </div>
-  );
-}
-
-function PaiementForm({
-  etudiants,
-  academicYear,
-  months,
-  onSubmit,
-  onCancel,
-}: {
-  etudiants: ReturnType<typeof useIstpm>["etudiants"];
-  academicYear: string;
-  months: string[];
-  onSubmit: (v: {
-    etudiantId: string;
-    ligne: Omit<LignePaiement, "recu">;
-  }) => void;
-  onCancel: () => void;
-}) {
-  const [f, setF] = useState({
-    etudiantId: "",
-    montant: "" as number | "",
-    mode: "Espèces" as LignePaiement["mode"],
-    statut: "paye" as StatutPaiement,
-    mois: getDefaultMois(academicYear),
-    date: new Date().toISOString().slice(0, 10),
-  });
-  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
-
-  const etudiant = etudiants.find((e) => e.id === f.etudiantId);
-
-  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => {
-    setF((prev) => ({ ...prev, [k]: v }));
-    setErrors((prev) => ({ ...prev, [k]: undefined }));
-  };
-
-  const submit = () => {
-    const next: Record<string, string> = {};
-    if (!etudiant) next.etudiantId = "Étudiant obligatoire";
-    if (f.montant === "" || Number(f.montant) <= 0)
-      next.montant = "Montant supérieur à 0 requis";
-    if (!f.date) next.date = "Date obligatoire";
-
-    if (Object.keys(next).length || !etudiant) {
-      setErrors(next);
-      toast.error("Veuillez corriger les champs signalés");
-      return;
-    }
-
-    onSubmit({
-      etudiantId: etudiant.id,
-      ligne: {
-        date: f.date,
-        montant: Number(f.montant),
-        mode: f.mode,
-        periode: `${f.mois.charAt(0).toUpperCase()}${f.mois.slice(1)} ${academicYear}`,
-        mois: f.mois,
-        statut: f.statut,
-      },
-    });
-  };
-
-  return (
-    <FormDialog
-      open
-      onOpenChange={(o) => !o && onCancel()}
-      title="Nouveau paiement"
-      subtitle="Enregistrer un règlement de frais de scolarité"
-      submitLabel="Enregistrer"
-      onSubmit={submit}
-    >
-      <FullWidth>
-        <StudentSearchField
-          students={etudiants}
-          value={f.etudiantId}
-          onChange={(v) => set("etudiantId", v)}
-          error={errors.etudiantId}
-        />
-      </FullWidth>
-      {etudiant ? (
-        <FullWidth>
-          <div className="rounded-2xl bg-muted px-4 py-3 text-xs text-muted-foreground">
-            Frais mensuels&nbsp;:{" "}
-            <strong className="text-brand-dk">
-              {fmtMAD(etudiant.fraisMensuels)}
-            </strong>
-          </div>
-        </FullWidth>
-      ) : null}
-      <NumberField
-        label="Montant"
-        required
-        suffix="MAD"
-        min={0}
-        value={f.montant}
-        onChange={(v) => set("montant", v)}
-        error={errors.montant}
-      />
-      <SelectField
-        label="Mode de règlement"
-        value={f.mode}
-        onChange={(v) => set("mode", v)}
-        options={MODES}
-      />
-      <SelectField
-        label="Statut"
-        value={f.statut}
-        onChange={(v) => set("statut", v)}
-        options={STATUTS.map((s) => ({
-          value: s,
-          label: STATUT_PAIEMENT_LABEL[s],
-        }))}
-      />
-      <SelectField
-        label="Mois réglé"
-        required
-        value={f.mois}
-        onChange={(v) => set("mois", v)}
-        options={months.map((m) => ({
-          value: m,
-          label: m.charAt(0).toUpperCase() + m.slice(1),
-        }))}
-      />
-      <TextField
-        label="Date"
-        required
-        type="date"
-        value={f.date}
-        onChange={(v) => set("date", v)}
-        error={errors.date}
-      />
-    </FormDialog>
   );
 }
 
