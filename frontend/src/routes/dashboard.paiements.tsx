@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
+import { makePaiementDocPdf } from "@/lib/branded-doc";
 import {
   ANNEES_UNIVERSITAIRES,
   FILIERES,
@@ -797,16 +798,40 @@ function HistoriquePaiementsDialog({
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted-foreground">
-                      {m.recu ? (
-                        <a
-                          href={`/api/documents/${m.recu}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                      {m.montantPaye > 0 ? (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const blob = await makePaiementDocPdf({
+                                prenom: etudiant.prenom,
+                                nom: etudiant.nom,
+                                cne: etudiant.cne,
+                                filiere: etudiant.filiere,
+                                mois: m.mois,
+                                montantDu: m.montantDu,
+                                montantPaye: m.montantPaye,
+                                datePaiement: m.datePaiement,
+                                statut: m.statut,
+                              });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = `recu-${etudiant.nom.toLowerCase()}-${m.mois.replace(/\s+/g, "-")}.pdf`;
+                              document.body.appendChild(a);
+                              a.click();
+                              a.remove();
+                              setTimeout(() => URL.revokeObjectURL(url), 30_000);
+                              toast.success("Reçu téléchargé (PDF)");
+                            } catch {
+                              toast.error("Erreur lors du téléchargement");
+                            }
+                          }}
                           className="inline-flex items-center gap-1 text-brand hover:underline"
                         >
                           <Download className="h-3 w-3" />
                           Télécharger
-                        </a>
+                        </button>
                       ) : "—"}
                     </td>
                   </tr>

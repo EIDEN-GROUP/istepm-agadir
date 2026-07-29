@@ -10,6 +10,49 @@ import {
   type ProposedAction,
 } from "@/lib/istpm-api";
 
+function formatActionResult(actionName: string, data: unknown): string {
+  const label = actionName.replace(/_/g, " ");
+
+  const sectionMap: Record<string, string> = {
+    formateurs: "Formateurs",
+    etudiants: "Étudiants",
+    examens: "Examens",
+    seances: "Séances",
+    paiements: "Paiements",
+    bulletins: "Bulletins",
+    stages: "Stages",
+    evenements: "Événements",
+    utilisateurs: "Utilisateurs",
+    notifications: "Notifications",
+    presences: "Présences",
+    modules: "Modules",
+    notes: "Notes",
+  };
+  const entity = Object.keys(sectionMap).find((k) => actionName.includes(k));
+  const section = entity ? sectionMap[entity] : label;
+
+  if (Array.isArray(data)) {
+    if (data.length === 0) {
+      return `📋 **${label}**\n\nAucun résultat trouvé. Pour voir la liste complète, rendez-vous dans la section **${section}** de l'application ou affinez votre recherche.`;
+    }
+    const count = data.length;
+    const sample = data.slice(0, Math.min(count, 3));
+    const items = sample
+      .map((item: Record<string, unknown>) => {
+        const name =
+          [item.prenom, item.nom, item.name, item.titre, item.libelle, item.intitule].find(
+            Boolean,
+          ) || `#${data.indexOf(item) + 1}`;
+        const extra = item.grade || item.departement || item.email || item.niveau || "";
+        return `  • ${name}${extra ? ` (${extra})` : ""}`;
+      })
+      .join("\n");
+    return `📋 **${label}** — ${count} résultat(s)\n\n${items}\n\n*Pour voir l'ensemble des ${count} résultats, rendez-vous dans la section **${section}** ou précisez votre recherche.*`;
+  }
+
+  return `📋 **${label}**\n\nDonnée chargée avec succès. Pour plus de détails, consultez la section **${section}**.`;
+}
+
 function LoadingDots() {
   return (
     <span className="inline-flex items-center gap-1">
@@ -226,15 +269,11 @@ export function AiChatFloating() {
             setExecuting(action.actionName);
             try {
               const res = await confirmAction(action.actionName, action.params);
-              const dataStr =
-                typeof res.data === "object"
-                  ? JSON.stringify(res.data, null, 1).slice(0, 800)
-                  : String(res.data);
               setMessages((prev) => [
                 ...prev,
                 {
                   role: "assistant",
-                  content: `📋 Résultat de **${action.actionName.replace(/_/g, " ")}** :\n\`\`\`json\n${dataStr}\n\`\`\``,
+                  content: formatActionResult(action.actionName, res.data),
                 },
               ]);
             } catch (err) {
@@ -279,15 +318,11 @@ export function AiChatFloating() {
     setExecuting(action.actionName);
     try {
       const res = await confirmAction(action.actionName, action.params);
-      const dataStr =
-        typeof res.data === "object"
-          ? JSON.stringify(res.data, null, 1).slice(0, 800)
-          : String(res.data);
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `✅ Action **${action.actionName.replace(/_/g, " ")}** exécutée avec succès.\n\`\`\`json\n${dataStr}\n\`\`\``,
+          content: `✅ **${action.actionName.replace(/_/g, " ")}** exécutée avec succès.\n\n${formatActionResult(action.actionName, res.data)}`,
         },
       ]);
       setPendingActions([]);

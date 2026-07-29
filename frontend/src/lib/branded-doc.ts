@@ -453,6 +453,147 @@ export async function makeStageDocPdf(s: Stage, kind: Kind): Promise<Blob> {
   return new Blob(parts as BlobPart[], { type: "application/pdf" });
 }
 
+/**
+ * Reçu de paiement — génère un PDF estampillé pour un règlement mensuel.
+ *
+ * Utilise le même logo, le même cachet et la même mise en page que les
+ * conventions de stage, avec les données de l'étudiant et de la ligne de
+ * paiement.
+ */
+export async function makePaiementDocPdf(params: {
+  prenom: string;
+  nom: string;
+  cne: string;
+  filiere: string;
+  mois: string;
+  montantDu: number;
+  montantPaye: number;
+  datePaiement: string;
+  statut: StatutPaiement;
+}): Promise<Blob> {
+  const logo = await loadLogo();
+  const stampRaw = getStamp();
+  const stamp = stampRaw ? await rasterizeDataUrl(stampRaw, 220) : null;
+
+  const sections: Section[] = [
+    {
+      title: "Étudiant",
+      rows: [
+        { label: "Nom complet", value: `${params.prenom} ${params.nom}` },
+        { label: "CNE", value: params.cne },
+        { label: "Filière", value: params.filiere },
+      ],
+    },
+    {
+      title: "Paiement",
+      rows: [
+        { label: "Mois concerné", value: params.mois },
+        { label: "Montant dû", value: `${params.montantDu.toFixed(2)} MAD` },
+        { label: "Montant réglé", value: `${params.montantPaye.toFixed(2)} MAD` },
+        {
+          label: "Date de paiement",
+          value: params.datePaiement ? fmtDate(params.datePaiement) : "—",
+        },
+        {
+          label: "Statut",
+          value: STATUT_PAIEMENT_LABEL[params.statut],
+        },
+      ],
+    },
+  ];
+
+  const content = buildContentStream(
+    "Reçu de paiement",
+    sections,
+    !!logo,
+    logo ? logo.w / logo.h : 1,
+    !!stamp,
+    stamp ? stamp.w / stamp.h : 1,
+  );
+  const contentBytes = enc.encode(content);
+
+  const images: { name: string; raster: LogoRaster }[] = [];
+  if (logo) images.push({ name: "Im0", raster: logo });
+  if (stamp) images.push({ name: "Im1", raster: stamp });
+  const imgObjNum: Record<string, number> = {};
+  images.forEach((im, i) => {
+    imgObjNum[im.name] = 7 + i;
+  });
+
+  const parts: Uint8Array[] = [];
+  let len = 0;
+  const offsets: number[] = [];
+  const push = (chunk: string | Uint8Array) => {
+    const u = typeof chunk === "string" ? enc.encode(chunk) : chunk;
+    parts.push(u);
+    len += u.length;
+  };
+  const startObject = (n: number) => {
+    offsets[n] = len;
+  };
+
+  push("%PDF-1.4\n");
+
+  startObject(1);
+  push("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+
+  startObject(2);
+  push("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
+
+  const xobjs = images
+    .map((im) => `/${im.name} ${imgObjNum[im.name]} 0 R`)
+    .join(" ");
+  const resources = images.length
+    ? `/Font << /F1 5 0 R /F2 6 0 R >> /XObject << ${xobjs} >>`
+    : "/Font << /F1 5 0 R /F2 6 0 R >>";
+  startObject(3);
+  push(
+    `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] ` +
+      `/Contents 4 0 R /Resources << ${resources} >> >>\nendobj\n`,
+  );
+
+  startObject(4);
+  push(`4 0 obj\n<< /Length ${contentBytes.length} >>\nstream\n`);
+  push(contentBytes);
+  push("\nendstream\nendobj\n");
+
+  startObject(5);
+  push(
+    "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+  );
+
+  startObject(6);
+  push(
+    "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n",
+  );
+
+  for (const im of images) {
+    const n = imgObjNum[im.name];
+    startObject(n);
+    push(
+      `${n} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${im.raster.w} ` +
+        `/Height ${im.raster.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 ` +
+        `/Filter /DCTDecode /Length ${im.raster.jpeg.length} >>\nstream\n`,
+    );
+    push(im.raster.jpeg);
+    push("\nendstream\nendobj\n");
+  }
+
+  const count = 6 + images.length;
+  const xrefStart = len;
+  let xref = `xref\n0 ${count + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i <= count; i++) {
+    xref += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  }
+  push(xref);
+  push(
+    `trailer\n<< /Size ${count + 1} /Root 1 0 R >>\n` +
+      `startxref\n${xrefStart}\n%%EOF\n`,
+  );
+
+  return new Blob(parts as BlobPart[], { type: "application/pdf" });
+}
+
 /* ------------------------------------------------------------------ */
 /*  Génération de l'e-mail                                             */
 /* ------------------------------------------------------------------ */

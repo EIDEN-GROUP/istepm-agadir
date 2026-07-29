@@ -35,19 +35,6 @@ export const FILIERE_COURT: Record<Filiere, string> = {
 export const NIVEAUX = ["S1", "S2", "S3", "S4", "S5", "S6"] as const;
 export type Niveau = (typeof NIVEAUX)[number];
 
-/** Années d'étude (cycle sur 3 ans), dans l'ordre. */
-export const ANNEES_ETUDE = ["1ère année", "2ème année", "3ème année"] as const;
-export type AnneeEtude = (typeof ANNEES_ETUDE)[number];
-
-/**
- * Déduit l'année d'étude à partir du semestre : S1/S2 → 1ère année,
- * S3/S4 → 2ème année, S5/S6 → 3ème année.
- */
-export function anneeEtude(niveau: Niveau): AnneeEtude {
-  const n = Number(niveau.slice(1)); // "S3" → 3
-  return ANNEES_ETUDE[Math.min(Math.ceil(n / 2), 3) - 1];
-}
-
 /** CHU / hôpitaux / cliniques d'accueil (structures de stage réelles au Maroc). */
 export type StructureAccueil = {
   nom: string;
@@ -166,19 +153,6 @@ export type LignePaiement = {
   mois?: string;
 };
 
-export type PaiementMensuel = {
-  id: string;
-  etudiantId: string;
-  mois: string;
-  montantDu: number;
-  montantPaye: number;
-  datePaiement: string;
-  mode: "Espèces" | "Virement" | "Carte" | "Chèque";
-  recu: string;
-  statut: StatutPaiement;
-  notes: string;
-};
-
 /** Mois de l'année scolaire, dans l'ordre académique (septembre → juin), sans année. */
 export const MOIS_ACADEMIQUE = [
   "septembre",
@@ -256,42 +230,8 @@ export type Etudiant = {
    * Clé = mois (« septembre 2025 » … « juin 2026 »), valeur = statut du règlement.
    */
   paiementsMensuels?: Partial<Record<string, StatutPaiement>>;
-  paiementsMensuelsRecords: PaiementMensuel[];
   archived: boolean;
 };
-
-/**
- * Statut de règlement d'un mois donné pour un étudiant.
- *
- * Source de vérité unique : `paiementsMensuels[mois]` ; à défaut, on retombe sur
- * une ligne d'historique rattachée à ce mois. Un mois ni renseigné ni réglé
- * renvoie `undefined` (« non facturé ») : il n'entre pas dans le reste dû ni dans
- * le statut global, mais reste affiché dans la revue mensuelle.
- */
-export function statutMoisEtudiant(
-  e: Pick<Etudiant, "paiementsMensuels" | "historique">,
-  mois: string,
-): StatutPaiement | undefined {
-  const explicite = e.paiementsMensuels?.[mois];
-  if (explicite) return explicite;
-  const key = mois.toLowerCase();
-  const ligne = e.historique.find((h) => (h.mois ?? "").toLowerCase() === key);
-  return ligne?.statut;
-}
-
-/**
- * Statut de paiement global dérivé des statuts mensuels : tout réglé → « payé » ;
- * un retard prime, puis un impayé, sinon « en attente ». Ainsi le tableau et les
- * badges reflètent en direct toute modification du suivi mensuel.
- */
-export function deriveStatutPaiement(
-  statuts: StatutPaiement[],
-): StatutPaiement {
-  if (statuts.length && statuts.every((s) => s === "paye")) return "paye";
-  if (statuts.some((s) => s === "retard")) return "retard";
-  if (statuts.some((s) => s === "impaye")) return "impaye";
-  return "en_attente";
-}
 
 export const ETUDIANTS: Etudiant[] = [
   {
@@ -336,7 +276,6 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "paye",
     },
     stageEnCours: "CHR Hassan II   Service de Médecine interne",
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -345,7 +284,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-23-0155",
     prenom: "Youssef",
     nom: "Ait Taleb",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S5",
     annee: "3e année",
     groupe: "G1",
@@ -380,7 +319,6 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "retard",
     },
     stageEnCours: "CHR Hassan II   Bloc opératoire",
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -423,7 +361,6 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "paye",
     },
     stageEnCours: "Hôpital Hassan II   Maternité",
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -466,7 +403,6 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "en_attente",
     },
     stageEnCours: "Clinique Al Massira   Rééducation",
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -475,7 +411,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-22-0098",
     prenom: "Khadija",
     nom: "Ouhssaine",
-    filiere: "Radiologie / Imagerie médicale",
+    filiere: "Sage-femme",
     niveau: "S6",
     annee: "3e année",
     groupe: "G1",
@@ -509,7 +445,6 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "paye",
     },
     stageEnCours: "CHR Hassan II   Service d'imagerie",
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -518,7 +453,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-22-0104",
     prenom: "Omar",
     nom: "Bennani",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Infirmier polyvalent",
     niveau: "S6",
     annee: "3e année",
     groupe: "G2",
@@ -552,7 +487,6 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "impaye",
     },
     stageEnCours: "Hôpital Hassan II   Laboratoire d'analyses",
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -561,7 +495,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-24-0230",
     prenom: "Fatima Zahra",
     nom: "Lahlou",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "A",
@@ -594,7 +528,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye",
     },
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -637,7 +570,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard",
     },
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -680,7 +612,6 @@ export const ETUDIANTS: Etudiant[] = [
       "juin 2026": "paye",
     },
     stageEnCours: "Hôpital préfectoral Inezgane   Maternité",
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -721,7 +652,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye",
     },
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -730,7 +660,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-24-0251",
     prenom: "Nisrine",
     nom: "Fadili",
-    filiere: "Radiologie / Imagerie médicale",
+    filiere: "Sage-femme",
     niveau: "S2",
     annee: "1re année",
     groupe: "A",
@@ -762,7 +692,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente",
     },
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -771,7 +700,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-22-0087",
     prenom: "Ayoub",
     nom: "Naciri",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S6",
     annee: "3e année",
     groupe: "G1",
@@ -803,7 +732,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye",
     },
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -812,7 +740,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-24-0260",
     prenom: "Sara",
     nom: "El Ghazi",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "B",
@@ -844,7 +772,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente",
     },
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -853,7 +780,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-23-0190",
     prenom: "Bilal",
     nom: "Ramdani",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S4",
     annee: "2e année",
     groupe: "A",
@@ -885,7 +812,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye",
     },
-    paiementsMensuelsRecords: [],
     archived: false,
   },
   {
@@ -970,7 +896,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1055,7 +980,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1140,7 +1064,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1225,7 +1148,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1310,7 +1232,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1395,7 +1316,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1480,7 +1400,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1565,7 +1484,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1650,7 +1568,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1735,7 +1652,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1820,7 +1736,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1905,7 +1820,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -1990,7 +1904,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2050,7 +1963,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2135,7 +2047,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2220,7 +2131,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2305,7 +2215,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2390,7 +2299,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2475,7 +2383,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2560,7 +2467,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2645,7 +2551,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2730,7 +2635,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2815,7 +2719,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2900,7 +2803,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -2985,7 +2887,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3070,7 +2971,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3155,7 +3055,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3215,7 +3114,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3300,7 +3198,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3385,7 +3282,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3470,7 +3366,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3555,7 +3450,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3640,7 +3534,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3725,7 +3618,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3810,7 +3702,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3895,7 +3786,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -3980,7 +3870,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4065,7 +3954,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4150,7 +4038,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4235,7 +4122,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4320,7 +4206,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4380,7 +4265,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4465,7 +4349,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4550,7 +4433,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4635,7 +4517,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4720,7 +4601,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4805,7 +4685,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4890,7 +4769,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -4975,7 +4853,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5060,7 +4937,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5145,7 +5021,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5230,7 +5105,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5315,7 +5189,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5400,7 +5273,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5485,7 +5357,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5545,7 +5416,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5630,7 +5500,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5715,7 +5584,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5800,7 +5668,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5885,7 +5752,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -5970,7 +5836,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6055,7 +5920,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6140,7 +6004,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6225,7 +6088,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6310,7 +6172,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6395,7 +6256,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6480,7 +6340,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6565,7 +6424,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6650,7 +6508,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6710,7 +6567,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6795,7 +6651,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6880,7 +6735,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -6965,7 +6819,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7050,7 +6903,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7135,7 +6987,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7220,7 +7071,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7305,7 +7155,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7390,7 +7239,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7475,7 +7323,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7560,7 +7407,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7645,7 +7491,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7730,7 +7575,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7815,7 +7659,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7900,7 +7743,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -7985,7 +7827,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8070,7 +7911,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8155,7 +7995,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8240,7 +8079,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8249,7 +8087,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-103",
     prenom: "Amine",
     nom: "Ait Baha",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -8319,7 +8157,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8328,7 +8165,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-104",
     prenom: "Chaimae",
     nom: "Ait Oumghar",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -8398,7 +8235,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8407,7 +8243,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-105",
     prenom: "Widad",
     nom: "Rhouni",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -8477,7 +8313,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8486,7 +8321,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-106",
     prenom: "Ali",
     nom: "Sabri",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -8556,7 +8391,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8565,7 +8399,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-107",
     prenom: "Malak",
     nom: "Moutaouakil",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -8635,7 +8469,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8644,7 +8477,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-108",
     prenom: "Nizar",
     nom: "Sabri",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -8714,7 +8547,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8723,7 +8555,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-109",
     prenom: "Rania",
     nom: "Bennani",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -8793,7 +8625,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8802,7 +8633,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-110",
     prenom: "Hanane",
     nom: "El Amrani",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -8872,7 +8703,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8881,7 +8711,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-111",
     prenom: "Oumaima",
     nom: "El Karkouri",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -8951,7 +8781,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -8960,7 +8789,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-112",
     prenom: "Soufiane",
     nom: "Bouzidi",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -9011,7 +8840,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9020,7 +8848,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-113",
     prenom: "Siham",
     nom: "Rhouni",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -9090,7 +8918,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9099,7 +8926,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-114",
     prenom: "Sanaa",
     nom: "Sahli",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -9169,7 +8996,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9178,7 +9004,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-115",
     prenom: "Ikram",
     nom: "Nejjar",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -9248,7 +9074,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9257,7 +9082,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-116",
     prenom: "Taha",
     nom: "Rhouni",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -9327,7 +9152,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9336,7 +9160,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-117",
     prenom: "Yasmine",
     nom: "Hilali",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -9406,7 +9230,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9415,7 +9238,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-118",
     prenom: "Hajar",
     nom: "Hilali",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -9485,7 +9308,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9494,7 +9316,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-119",
     prenom: "Zineb",
     nom: "Cherkaoui",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -9564,7 +9386,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9573,7 +9394,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-120",
     prenom: "Rania",
     nom: "Alaoui",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -9643,7 +9464,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9652,7 +9472,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-121",
     prenom: "Hafsa",
     nom: "Rhouni",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -9722,7 +9542,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9731,7 +9550,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-122",
     prenom: "Ismail",
     nom: "Ounir",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -9801,7 +9620,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9810,7 +9628,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-123",
     prenom: "Oussama",
     nom: "Ezzaki",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -9880,7 +9698,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9889,7 +9706,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-124",
     prenom: "Driss",
     nom: "Fadili",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -9959,7 +9776,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -9968,7 +9784,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-125",
     prenom: "Amina",
     nom: "Lahlou",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -10038,7 +9854,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10047,7 +9862,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-126",
     prenom: "Abdellah",
     nom: "Chafik",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -10098,7 +9913,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10107,7 +9921,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-127",
     prenom: "Saad",
     nom: "Alaoui",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -10177,7 +9991,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10186,7 +9999,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-128",
     prenom: "Adam",
     nom: "Ramdani",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -10256,7 +10069,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10265,7 +10077,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-129",
     prenom: "Mohammed",
     nom: "Naciri",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -10335,7 +10147,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10344,7 +10155,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-130",
     prenom: "Oumaima",
     nom: "Ezzaki",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -10414,7 +10225,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10423,7 +10233,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-131",
     prenom: "Soukaina",
     nom: "Hilali",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -10493,7 +10303,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10502,7 +10311,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-132",
     prenom: "Amine",
     nom: "Bendriss",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -10572,7 +10381,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10581,7 +10389,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-24-133",
     prenom: "Abdellah",
     nom: "El Amrani",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S3",
     annee: "2e année",
     groupe: "G1",
@@ -10651,7 +10459,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10660,7 +10467,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-24-134",
     prenom: "Naima",
     nom: "Lahlou",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S3",
     annee: "2e année",
     groupe: "G2",
@@ -10730,7 +10537,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10739,7 +10545,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-24-135",
     prenom: "Sanaa",
     nom: "Ouhssaine",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S3",
     annee: "2e année",
     groupe: "G1",
@@ -10809,7 +10615,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10818,7 +10623,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-24-136",
     prenom: "Reda",
     nom: "Lamrini",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S3",
     annee: "2e année",
     groupe: "G2",
@@ -10888,7 +10693,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10897,7 +10701,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-24-137",
     prenom: "Hajar",
     nom: "El Ghazi",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S3",
     annee: "2e année",
     groupe: "G1",
@@ -10967,7 +10771,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -10976,7 +10779,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-24-138",
     prenom: "Loubna",
     nom: "Naciri",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S3",
     annee: "2e année",
     groupe: "G2",
@@ -11046,7 +10849,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11055,7 +10857,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-24-139",
     prenom: "Badr",
     nom: "Ait Baha",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S3",
     annee: "2e année",
     groupe: "G1",
@@ -11125,7 +10927,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11134,7 +10935,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-24-140",
     prenom: "Khadija",
     nom: "Boukhris",
-    filiere: "Infirmier en anesthésie-réanimation",
+    filiere: "Infirmier polyvalent",
     niveau: "S3",
     annee: "2e année",
     groupe: "G2",
@@ -11185,7 +10986,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11264,7 +11064,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11343,7 +11142,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11422,7 +11220,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11501,7 +11298,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11580,7 +11376,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11659,7 +11454,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11738,7 +11532,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11817,7 +11610,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11896,7 +11688,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -11975,7 +11766,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12054,7 +11844,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12133,7 +11922,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12212,7 +12000,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12272,7 +12059,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12351,7 +12137,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12430,7 +12215,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12509,7 +12293,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12588,7 +12371,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12667,7 +12449,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12746,7 +12527,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12825,7 +12605,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12904,7 +12683,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -12983,7 +12761,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13062,7 +12839,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13141,7 +12917,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13220,7 +12995,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13299,7 +13073,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13359,7 +13132,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13438,7 +13210,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13517,7 +13288,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13596,7 +13366,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13675,7 +13444,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13754,7 +13522,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13833,7 +13600,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13912,7 +13678,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -13991,7 +13756,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14070,7 +13834,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14149,7 +13912,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14228,7 +13990,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14307,7 +14068,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14386,7 +14146,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14465,7 +14224,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14544,7 +14302,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14623,7 +14380,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14702,7 +14458,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14781,7 +14536,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14860,7 +14614,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -14939,7 +14692,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15018,7 +14770,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15097,7 +14848,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15176,7 +14926,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15255,7 +15004,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15334,7 +15082,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15413,7 +15160,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15492,7 +15238,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15552,7 +15297,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15631,7 +15375,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15710,7 +15453,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15789,7 +15531,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15868,7 +15609,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -15947,7 +15687,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16026,7 +15765,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16105,7 +15843,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16184,7 +15921,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16263,7 +15999,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16342,7 +16077,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16421,7 +16155,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16500,7 +16233,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16579,7 +16311,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16639,7 +16370,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16718,7 +16448,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16797,7 +16526,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16876,7 +16604,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -16955,7 +16682,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17034,7 +16760,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17113,7 +16838,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17192,7 +16916,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17271,7 +16994,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17350,7 +17072,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17429,7 +17150,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17508,7 +17228,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17587,7 +17306,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17666,7 +17384,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17726,7 +17443,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17805,7 +17521,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17884,7 +17599,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -17963,7 +17677,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18042,7 +17755,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18121,7 +17833,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18200,7 +17911,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18279,7 +17989,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18358,7 +18067,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18437,7 +18145,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18516,7 +18223,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18595,7 +18301,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18674,7 +18379,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18753,7 +18457,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18813,7 +18516,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18892,7 +18594,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -18971,7 +18672,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19050,7 +18750,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19129,7 +18828,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19208,7 +18906,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19287,7 +18984,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19366,7 +19062,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19445,7 +19140,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19524,7 +19218,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19603,7 +19296,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19682,7 +19374,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19761,7 +19452,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19840,7 +19530,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19900,7 +19589,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -19979,7 +19667,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20058,7 +19745,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20137,7 +19823,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20216,7 +19901,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20295,7 +19979,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20374,7 +20057,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20453,7 +20135,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20532,7 +20213,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20611,7 +20291,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20690,7 +20369,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20769,7 +20447,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20848,7 +20525,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20927,7 +20603,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -20987,7 +20662,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21066,7 +20740,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21145,7 +20818,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21224,7 +20896,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21303,7 +20974,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21382,7 +21052,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21461,7 +21130,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21540,7 +21208,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21619,7 +21286,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21698,7 +21364,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21777,7 +21442,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21856,7 +21520,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -21935,7 +21598,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22014,7 +21676,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22074,7 +21735,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22153,7 +21813,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22232,7 +21891,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22311,7 +21969,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22390,7 +22047,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22469,7 +22125,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22548,7 +22203,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22627,7 +22281,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22706,7 +22359,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22785,7 +22437,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22864,7 +22515,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -22943,7 +22593,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23022,7 +22671,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23101,7 +22749,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23161,7 +22808,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23240,7 +22886,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23319,7 +22964,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23398,7 +23042,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23477,7 +23120,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23556,7 +23198,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23635,7 +23276,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23714,7 +23354,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23793,7 +23432,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23872,7 +23510,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -23951,7 +23588,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24030,7 +23666,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24109,7 +23744,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24188,7 +23822,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24248,7 +23881,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24327,7 +23959,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24406,7 +24037,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24485,7 +24115,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24564,7 +24193,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24643,7 +24271,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24722,7 +24349,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24801,7 +24427,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24880,7 +24505,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -24959,7 +24583,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25038,7 +24661,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25117,7 +24739,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25196,7 +24817,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25275,7 +24895,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25335,7 +24954,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25414,7 +25032,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25493,7 +25110,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25572,7 +25188,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25651,7 +25266,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25730,7 +25344,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25809,7 +25422,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25888,7 +25500,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -25967,7 +25578,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26046,7 +25656,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26125,7 +25734,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26204,7 +25812,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26283,7 +25890,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26362,7 +25968,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26422,7 +26027,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26501,7 +26105,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26580,7 +26183,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26659,7 +26261,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26738,7 +26339,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26817,7 +26417,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26896,7 +26495,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -26975,7 +26573,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27054,7 +26651,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27133,7 +26729,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27212,7 +26807,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27291,7 +26885,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27370,7 +26963,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27449,7 +27041,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27509,7 +27100,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27588,7 +27178,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27667,7 +27256,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27746,7 +27334,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27825,7 +27412,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27904,7 +27490,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -27983,7 +27568,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28062,7 +27646,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28141,7 +27724,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28220,7 +27802,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28299,7 +27880,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28378,7 +27958,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28457,7 +28036,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28536,7 +28114,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28596,7 +28173,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28675,7 +28251,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28754,7 +28329,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28763,7 +28337,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-367",
     prenom: "Nada",
     nom: "Chraibi",
-    filiere: "Radiologie / Imagerie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -28833,7 +28407,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28842,7 +28415,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-368",
     prenom: "Othmane",
     nom: "Cherkaoui",
-    filiere: "Radiologie / Imagerie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -28912,7 +28485,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -28921,7 +28493,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-369",
     prenom: "Zakia",
     nom: "Bourkadi",
-    filiere: "Radiologie / Imagerie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -28991,7 +28563,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29000,7 +28571,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-370",
     prenom: "Chaimae",
     nom: "Lahlou",
-    filiere: "Radiologie / Imagerie médicale",
+    filiere: "Kinésithérapie",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -29070,7 +28641,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29079,7 +28649,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-371",
     prenom: "Naima",
     nom: "Saadi",
-    filiere: "Radiologie / Imagerie médicale",
+    filiere: "Kinésithérapie",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -29149,7 +28719,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29158,7 +28727,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-372",
     prenom: "Anas",
     nom: "Boukhris",
-    filiere: "Radiologie / Imagerie médicale",
+    filiere: "Kinésithérapie",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -29228,7 +28797,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29237,7 +28805,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-373",
     prenom: "Omar",
     nom: "Ait Taleb",
-    filiere: "Radiologie / Imagerie médicale",
+    filiere: "Kinésithérapie",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -29307,7 +28875,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29316,7 +28883,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-374",
     prenom: "Adam",
     nom: "Sahli",
-    filiere: "Radiologie / Imagerie médicale",
+    filiere: "Kinésithérapie",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -29386,7 +28953,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29465,7 +29031,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29544,7 +29109,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29623,7 +29187,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29683,7 +29246,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29762,7 +29324,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29841,7 +29402,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29920,7 +29480,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -29999,7 +29558,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30078,7 +29636,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30157,7 +29714,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30236,7 +29792,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30315,7 +29870,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30394,7 +29948,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30473,7 +30026,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30552,7 +30104,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30631,7 +30182,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30710,7 +30260,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30770,7 +30319,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30849,7 +30397,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -30928,7 +30475,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31007,7 +30553,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31086,7 +30631,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31165,7 +30709,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31244,7 +30787,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31323,7 +30865,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31402,7 +30943,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31481,7 +31021,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31560,7 +31099,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31639,7 +31177,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31718,7 +31255,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31797,7 +31333,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31857,7 +31392,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -31936,7 +31470,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32015,7 +31548,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32094,7 +31626,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32173,7 +31704,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32252,7 +31782,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32331,7 +31860,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32410,7 +31938,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32489,7 +32016,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32568,7 +32094,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32647,7 +32172,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32726,7 +32250,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32805,7 +32328,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32884,7 +32406,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -32944,7 +32465,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33023,7 +32543,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33102,7 +32621,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33181,7 +32699,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33260,7 +32777,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33339,7 +32855,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33418,7 +32933,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33497,7 +33011,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33576,7 +33089,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33655,7 +33167,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33734,7 +33245,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33813,7 +33323,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33892,7 +33401,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -33971,7 +33479,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34031,7 +33538,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34110,7 +33616,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34189,7 +33694,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34268,7 +33772,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34347,7 +33850,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34426,7 +33928,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34505,7 +34006,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34584,7 +34084,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34663,7 +34162,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34742,7 +34240,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34821,7 +34318,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34900,7 +34396,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -34979,7 +34474,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35058,7 +34552,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35118,7 +34611,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35197,7 +34689,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35276,7 +34767,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35355,7 +34845,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35434,7 +34923,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35513,7 +35001,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35592,7 +35079,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35601,7 +35087,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-455",
     prenom: "Lamiae",
     nom: "El Karkouri",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -35671,7 +35157,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35680,7 +35165,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-456",
     prenom: "Abdellah",
     nom: "Bennani",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -35750,7 +35235,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35759,7 +35243,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-457",
     prenom: "Fadwa",
     nom: "Ouazzani",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -35829,7 +35313,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35838,7 +35321,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-458",
     prenom: "Rania",
     nom: "Sahli",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -35908,7 +35391,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35917,7 +35399,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-459",
     prenom: "Ikram",
     nom: "Hilali",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -35987,7 +35469,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -35996,7 +35477,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-460",
     prenom: "Bilal",
     nom: "Bennis",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -36066,7 +35547,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36075,7 +35555,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-461",
     prenom: "Youssef",
     nom: "Ramdani",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -36145,7 +35625,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36154,7 +35633,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-462",
     prenom: "Wiam",
     nom: "Naciri",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -36205,7 +35684,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36214,7 +35692,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-463",
     prenom: "Zineb",
     nom: "Ounir",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -36284,7 +35762,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36293,7 +35770,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-464",
     prenom: "Zakia",
     nom: "El Karkouri",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -36363,7 +35840,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36372,7 +35848,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-465",
     prenom: "Hassan",
     nom: "Ouhssaine",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -36442,7 +35918,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36451,7 +35926,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-466",
     prenom: "Zakaria",
     nom: "El Karkouri",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -36521,7 +35996,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36530,7 +36004,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-467",
     prenom: "Nisrine",
     nom: "Naciri",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -36600,7 +36074,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36609,7 +36082,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-468",
     prenom: "Amina",
     nom: "Naciri",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -36679,7 +36152,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36688,7 +36160,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-469",
     prenom: "Yasmine",
     nom: "El Fassi",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -36758,7 +36230,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36767,7 +36238,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-470",
     prenom: "Hanane",
     nom: "Ezzaki",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -36837,7 +36308,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36846,7 +36316,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-471",
     prenom: "Ikram",
     nom: "Bennis",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -36916,7 +36386,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -36925,7 +36394,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-472",
     prenom: "Sanaa",
     nom: "Sbai",
-    filiere: "Laboratoire / Biologie médicale",
+    filiere: "Sage-femme",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -36995,7 +36464,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37074,7 +36542,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37153,7 +36620,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37232,7 +36698,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37292,7 +36757,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37371,7 +36835,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37450,7 +36913,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37529,7 +36991,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37608,7 +37069,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37687,7 +37147,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37766,7 +37225,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37845,7 +37303,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -37924,7 +37381,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38003,7 +37459,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38082,7 +37537,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38161,7 +37615,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38240,7 +37693,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38319,7 +37771,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38379,7 +37830,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38458,7 +37908,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38537,7 +37986,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38616,7 +38064,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38695,7 +38142,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38774,7 +38220,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38853,7 +38298,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -38932,7 +38376,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39011,7 +38454,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39090,7 +38532,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39169,7 +38610,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39248,7 +38688,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39327,7 +38766,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39406,7 +38844,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39466,7 +38903,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39545,7 +38981,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39624,7 +39059,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39703,7 +39137,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39782,7 +39215,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39861,7 +39293,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -39940,7 +39371,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40019,7 +39449,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40098,7 +39527,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40177,7 +39605,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40256,7 +39683,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40335,7 +39761,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40414,7 +39839,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40493,7 +39917,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40553,7 +39976,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40632,7 +40054,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40711,7 +40132,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40790,7 +40210,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40869,7 +40288,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -40948,7 +40366,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41027,7 +40444,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41106,7 +40522,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41185,7 +40600,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41264,7 +40678,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41343,7 +40756,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41422,7 +40834,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41501,7 +40912,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41580,7 +40990,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41640,7 +41049,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41719,7 +41127,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41798,7 +41205,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41877,7 +41283,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -41956,7 +41361,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42035,7 +41439,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42114,7 +41517,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42193,7 +41595,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42272,7 +41673,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42351,7 +41751,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42430,7 +41829,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42439,7 +41837,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-543",
     prenom: "Rachid",
     nom: "Boukhris",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -42509,7 +41907,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42518,7 +41915,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-544",
     prenom: "Lamiae",
     nom: "El Amrani",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -42588,7 +41985,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42597,7 +41993,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-545",
     prenom: "Hicham",
     nom: "Nait Brahim",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -42667,7 +42063,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42676,7 +42071,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-546",
     prenom: "Ayoub",
     nom: "Zeroual",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -42727,7 +42122,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42736,7 +42130,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-547",
     prenom: "Soukaina",
     nom: "Ounir",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -42806,7 +42200,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42815,7 +42208,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-548",
     prenom: "Nada",
     nom: "Mansouri",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -42885,7 +42278,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42894,7 +42286,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-549",
     prenom: "Ismail",
     nom: "Bendriss",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -42964,7 +42356,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -42973,7 +42364,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-550",
     prenom: "Hind",
     nom: "Sabri",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -43043,7 +42434,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43052,7 +42442,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-551",
     prenom: "Hamza",
     nom: "Sbai",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -43122,7 +42512,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43131,7 +42520,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-552",
     prenom: "Soukaina",
     nom: "Saadi",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -43201,7 +42590,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43210,7 +42598,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-553",
     prenom: "Rania",
     nom: "Bourkadi",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -43280,7 +42668,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43289,7 +42676,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-554",
     prenom: "Reda",
     nom: "Skalli",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -43359,7 +42746,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43368,7 +42754,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-555",
     prenom: "Abdellah",
     nom: "Lahlou",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G1",
@@ -43438,7 +42824,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43447,7 +42832,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-556",
     prenom: "Younes",
     nom: "El Ghazi",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S1",
     annee: "1re année",
     groupe: "G2",
@@ -43517,7 +42902,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43526,7 +42910,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-557",
     prenom: "Hajar",
     nom: "Saadi",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -43596,7 +42980,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43605,7 +42988,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-558",
     prenom: "Yassine",
     nom: "Sabri",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -43675,7 +43058,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43684,7 +43066,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-559",
     prenom: "Ayoub",
     nom: "Chafik",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -43754,7 +43136,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43763,7 +43144,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-560",
     prenom: "Ilyas",
     nom: "Skalli",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -43814,7 +43195,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43823,7 +43203,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-561",
     prenom: "Khadija",
     nom: "Benkirane",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -43893,7 +43273,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43902,7 +43281,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-562",
     prenom: "Zineb",
     nom: "El Yazidi",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -43972,7 +43351,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -43981,7 +43359,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-563",
     prenom: "Douaa",
     nom: "Ounir",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -44051,7 +43429,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44060,7 +43437,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-564",
     prenom: "Mehdi",
     nom: "Berrada",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G2",
@@ -44130,7 +43507,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44139,7 +43515,7 @@ export const ETUDIANTS: Etudiant[] = [
     matricule: "ISTPM-25-565",
     prenom: "Zineb",
     nom: "Hakimi",
-    filiere: "Prothèse dentaire",
+    filiere: "Infirmier polyvalent",
     niveau: "S2",
     annee: "1re année",
     groupe: "G1",
@@ -44209,7 +43585,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44288,7 +43663,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44367,7 +43741,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44446,7 +43819,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44525,7 +43897,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44604,7 +43975,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44683,7 +44053,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44762,7 +44131,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44841,7 +44209,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44901,7 +44268,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -44980,7 +44346,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45059,7 +44424,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45138,7 +44502,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45217,7 +44580,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45296,7 +44658,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45375,7 +44736,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45454,7 +44814,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45533,7 +44892,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45612,7 +44970,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45691,7 +45048,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45770,7 +45126,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45849,7 +45204,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45928,7 +45282,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -45988,7 +45341,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46067,7 +45419,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46146,7 +45497,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46225,7 +45575,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46304,7 +45653,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46383,7 +45731,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46462,7 +45809,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46541,7 +45887,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "impaye",
       "juin 2026": "impaye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46620,7 +45965,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46699,7 +46043,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46778,7 +46121,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "retard",
       "juin 2026": "retard"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46857,7 +46199,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -46936,7 +46277,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47015,7 +46355,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47075,7 +46414,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47154,7 +46492,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47233,7 +46570,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47312,7 +46648,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47391,7 +46726,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47470,7 +46804,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47549,7 +46882,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47628,7 +46960,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47707,7 +47038,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47786,7 +47116,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47865,7 +47194,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -47944,7 +47272,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48023,7 +47350,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48102,7 +47428,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48181,7 +47506,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48260,7 +47584,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48339,7 +47662,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48418,7 +47740,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48497,7 +47818,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48576,7 +47896,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48655,7 +47974,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48734,7 +48052,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48813,7 +48130,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48892,7 +48208,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -48971,7 +48286,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -49050,7 +48364,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -49129,7 +48442,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "paye",
       "juin 2026": "paye"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -49208,7 +48520,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
   {
@@ -49268,7 +48579,6 @@ export const ETUDIANTS: Etudiant[] = [
       "mai 2026": "en_attente",
       "juin 2026": "en_attente"
     },
-    paiementsMensuelsRecords: [],
     archived: false
   },
 ];
@@ -49568,7 +48878,7 @@ export const EXAMENS: Examen[] = [
     classe: "S1-B",
     anneeUniversitaire: "2025/2026",
     type: "examen_theorique",
-    date: "2026-07-01",
+    date: "2026-09-05",
     heure: "09:00",
     duree: 90,
     salle: "Salle 3",
@@ -49623,7 +48933,7 @@ export const EXAMENS: Examen[] = [
     classe: "S2-A",
     anneeUniversitaire: "2025/2026",
     type: "examen_theorique",
-    date: "2026-07-05",
+    date: "2026-10-08",
     heure: "08:30",
     duree: 90,
     salle: "Salle 12",
@@ -49759,7 +49069,7 @@ export const EXAMENS: Examen[] = [
     classe: "S3-G2",
     anneeUniversitaire: "2025/2026",
     type: "examen_theorique",
-    date: "2026-07-10",
+    date: "2026-10-22",
     heure: "08:30",
     duree: 120,
     salle: "Labo biologie",
@@ -49786,7 +49096,7 @@ export const EXAMENS: Examen[] = [
     classe: "S3-G2",
     anneeUniversitaire: "2025/2026",
     type: "examen_theorique",
-    date: "2026-09-05",
+    date: "2026-11-15",
     heure: "09:00",
     duree: 120,
     salle: "Labo biologie",
@@ -49813,7 +49123,7 @@ export const EXAMENS: Examen[] = [
     classe: "S3-G2",
     anneeUniversitaire: "2025/2026",
     type: "controle_continu",
-    date: "2026-07-25",
+    date: "2027-01-12",
     heure: "10:00",
     duree: 60,
     salle: "Salle 12",
@@ -49867,7 +49177,7 @@ export const EXAMENS: Examen[] = [
     classe: "S3-G1",
     anneeUniversitaire: "2025/2026",
     type: "evaluation_pratique",
-    date: "2026-07-20",
+    date: "2027-02-10",
     heure: "08:30",
     duree: 90,
     salle: "Salle de rééducation",
@@ -49922,7 +49232,7 @@ export const EXAMENS: Examen[] = [
     classe: "S4-G1",
     anneeUniversitaire: "2025/2026",
     type: "examen_theorique",
-    date: "2026-08-25",
+    date: "2027-03-08",
     heure: "09:00",
     duree: 150,
     salle: "Amphi A",
@@ -50030,7 +49340,7 @@ export const EXAMENS: Examen[] = [
     classe: "S4-A",
     anneeUniversitaire: "2025/2026",
     type: "evaluation_pratique",
-    date: "2026-07-15",
+    date: "2027-03-22",
     heure: "08:30",
     duree: 180,
     salle: "Labo TP prothèse",
@@ -50085,7 +49395,7 @@ export const EXAMENS: Examen[] = [
     classe: "S5-G1",
     anneeUniversitaire: "2025/2026",
     type: "evaluation_pratique",
-    date: "2026-08-10",
+    date: "2027-04-05",
     heure: "08:30",
     duree: 90,
     salle: "Labo simulation 2",
@@ -50112,7 +49422,7 @@ export const EXAMENS: Examen[] = [
     classe: "S5-G1",
     anneeUniversitaire: "2025/2026",
     type: "evaluation_pratique",
-    date: "2026-08-05",
+    date: "2027-04-20",
     heure: "10:00",
     duree: 120,
     salle: "Salle radiologie",
@@ -50870,10 +50180,10 @@ export function isoDate(d: Date): string {
 const SEMAINE_TYPE: Array<
   Omit<Seance, "id" | "date" | "filiere"> & { jour: number }
 > = [
-  { jour: 0, module: "Soins infirmiers en médecine", professeurId: "fo-1", groupe: "S5-G1", salle: "Amphi A", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
-  { jour: 0, module: "Réanimation et soins intensifs", professeurId: "fo-2", groupe: "S5-G2", salle: "Labo simulation 2", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S5", type: "tp" },
-  { jour: 0, module: "Obstétrique", professeurId: "fo-3", groupe: "S3-G2", salle: "Salle 12", debut: "14:00", fin: "15:30", anneeUniversitaire: "2025/2026", semestre: "S3", type: "cours" },
-  { jour: 0, module: "Anatomie dentaire", professeurId: "fo-7", groupe: "S1-A", salle: "Salle 5", debut: "15:45", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S1", type: "cours" },
+  { jour: 1, module: "Soins infirmiers en médecine", professeurId: "fo-1", groupe: "S5-G1", salle: "Amphi A", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
+  { jour: 2, module: "Réanimation et soins intensifs", professeurId: "fo-2", groupe: "S5-G2", salle: "Labo simulation 2", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S5", type: "tp" },
+  { jour: 6, module: "Obstétrique", professeurId: "fo-3", groupe: "S3-G2", salle: "Salle 12", debut: "14:00", fin: "15:30", anneeUniversitaire: "2025/2026", semestre: "S3", type: "cours" },
+  { jour: 6, module: "Anatomie dentaire", professeurId: "fo-7", groupe: "S1-A", salle: "Salle 5", debut: "15:45", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S1", type: "cours" },
 
   { jour: 1, module: "Hygiène hospitalière", professeurId: "fo-1", groupe: "S5-G1", salle: "Salle 8", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "td" },
   { jour: 1, module: "Rééducation fonctionnelle", professeurId: "fo-4", groupe: "S3-G1", salle: "Salle de rééducation", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S3", type: "tp" },
@@ -50893,7 +50203,7 @@ const SEMAINE_TYPE: Array<
   { jour: 4, module: "Kinésithérapie respiratoire", professeurId: "fo-4", groupe: "S4-G1", salle: "Salle de rééducation", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S4", type: "tp" },
   { jour: 4, module: "Imagerie médicale avancée", professeurId: "fo-5", groupe: "S6-G1", salle: "Amphi B", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S6", type: "cours" },
   { jour: 4, module: "Santé publique", professeurId: "fo-8", groupe: "S5-G1", salle: "Amphi A", debut: "14:00", fin: "15:30", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
-  { jour: 4, module: "Encadrement de stage", professeurId: "fo-1", groupe: "S5-G1", salle: "Salle 8", debut: "15:45", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S5", type: "stage" },
+  { jour: 5, module: "Encadrement de stage", professeurId: "fo-1", groupe: "S5-G1", salle: "Salle 8", debut: "15:45", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S5", type: "stage" },
 
   { jour: 5, module: "Pharmacologie", professeurId: "fo-8", groupe: "S5-G2", salle: "Salle 9", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
   { jour: 5, module: "Anatomie dentaire", professeurId: "fo-7", groupe: "S1-B", salle: "Salle 5", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S1", type: "td" },
