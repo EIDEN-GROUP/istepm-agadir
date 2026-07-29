@@ -1274,6 +1274,10 @@ function SettingsPage() {
     updateStructureAccueil,
     deleteStructureAccueil,
     reset,
+    // Les créneaux ne sont pas un état local de cette page : l'emploi du temps
+    // en dérive sa grille horaire, ils vivent donc dans le store partagé.
+    creneauxLabels: creneaux,
+    setCreneaux,
   } = useIstpm();
 
   const autorisees = role ? SECTIONS_PAR_ROLE[role] : [];
@@ -1283,9 +1287,6 @@ function SettingsPage() {
   const [annees, setAnnees] = useState<string[]>([...ANNEES_UNIVERSITAIRES]);
   const [semestres, setSemestres] = useState<string[]>([...NIVEAUX]);
   const [salles, setSalles] = useState<string[]>([...SALLES]);
-  const [creneaux, setCreneaux] = useState<string[]>(
-    CRENEAUX.map((c) => `${c.debut} – ${c.fin}`),
-  );
   const [listeFilieres, setListeFilieres] = useState<string[]>([...filieres]);
   const [listeStructures, setListeStructures] = useState<StructureAccueil[]>(
     structuresAccueil.map((s) => (typeof s === "string" ? { nom: s, capacite: 5 } : s)),
@@ -1336,8 +1337,7 @@ function SettingsPage() {
           setSemestres(data.semestres as string[]);
         if (Array.isArray(data.salles))
           setSalles(data.salles as string[]);
-        if (Array.isArray(data.creneaux))
-          setCreneaux(data.creneaux as string[]);
+        // `creneaux` est hydraté par le store, qui les partage avec le planning.
         if (Array.isArray(data.types_examen))
           setTypesExamen(data.types_examen as string[]);
         if (typeof data.institut_nom === "string")
@@ -1595,11 +1595,17 @@ function SettingsPage() {
       case "creneaux":
         return (
           <Carte id="creneaux">
+            {/* `setCreneaux` du store écrit aussi le réglage côté serveur. */}
             <ListeEditable
               valeurs={creneaux}
-              onChange={(v) => { setCreneaux(v); updateSetting("creneaux", v).catch(() => {}); }}
+              onChange={setCreneaux}
               placeholder="19:15 – 20:45"
             />
+            <p className="mt-3 text-xs text-muted-foreground">
+              Ces plages pilotent la grille de l&rsquo;emploi du temps :
+              amplitude affichée, créneaux cliquables et aimantation des séances
+              déplacées.
+            </p>
           </Carte>
         );
 

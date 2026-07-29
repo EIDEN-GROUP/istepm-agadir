@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Plus,
   ChevronLeft,
@@ -38,6 +38,8 @@ import {
   ANNEES_UNIVERSITAIRES,
   ANNEES_ETUDE,
   anneeEtude,
+  bornesAnneeUniversitaire,
+  joursChomes,
   TYPE_SEANCE_LABEL,
   couleurSeance,
   lundiDeLaSemaine,
@@ -130,6 +132,7 @@ function PlanningPage() {
     deleteSeance,
     moveSeance,
     conflitsSeance,
+    creneaux,
   } = useIstpm();
 
   // La direction et le responsable des affaires estudiantines organisent les
@@ -139,7 +142,25 @@ function PlanningPage() {
   const moiFormateur = useCurrentFormateur();
 
   const [vue, setVue] = useState<VueCalendrier>("semaine");
-  const [curseur, setCurseur] = useState(() => new Date());
+  // L'année scolaire court de septembre à juin : juillet et août sont hors
+  // calendrier et ne doivent jamais s'afficher.
+  const bornes = useMemo(() => bornesAnneeUniversitaire(), []);
+  // Fêtes nationales, fêtes religieuses et vacances scolaires : jours sans cours.
+  const chomes = useMemo(() => joursChomes(), []);
+  const jourChome = useCallback(
+    (iso: string) => chomes.get(iso) ?? null,
+    [chomes],
+  );
+  /**
+   * Position d'ouverture : aujourd'hui pendant l'année scolaire, la rentrée
+   * sinon — en juillet ou en août, s'ouvrir sur « aujourd'hui » ne montrerait
+   * qu'une période vide.
+   */
+  const positionDouverture = () => {
+    const today = new Date();
+    return today >= bornes.debut && today <= bornes.fin ? today : bornes.debut;
+  };
+  const [curseur, setCurseur] = useState(positionDouverture);
 
   const [search, setSearch] = useState("");
   const [prof, setProf] = useState<string>(ALL);
@@ -208,20 +229,28 @@ const [importOpen, setImportOpen] = useState(false);
 
   const joursSemaine = useMemo(() => {
     const lundi = lundiDeLaSemaine(curseur);
-    // Semaine de 6 jours : pas de cours le dimanche.
+    // Semaine de 6 jours : pas de cours le dimanche. La semaine à cheval sur
+    // la fin de l'année scolaire est tronquée — le 1er juillet n'appartient
+    // pas au calendrier.
     return Array.from({ length: 6 }, (_, i) => {
       const d = new Date(lundi);
       d.setDate(lundi.getDate() + i);
       return d;
-    });
-  }, [curseur]);
+    }).filter((d) => d >= bornes.debut && d <= bornes.fin);
+  }, [curseur, bornes]);
 
-  const decaler = (sens: -1 | 1) => {
+  /** Date visée par un déplacement, ou `null` si elle sort de l'année scolaire. */
+  const cible = (sens: -1 | 1): Date | null => {
     const d = new Date(curseur);
     if (vue === "jour") d.setDate(d.getDate() + sens);
     else if (vue === "semaine") d.setDate(d.getDate() + sens * 7);
     else d.setMonth(d.getMonth() + sens);
-    setCurseur(d);
+    return d < bornes.debut || d > bornes.fin ? null : d;
+  };
+
+  const decaler = (sens: -1 | 1) => {
+    const d = cible(sens);
+    if (d) setCurseur(d);
   };
 
   const titrePeriode = useMemo(() => {
@@ -254,6 +283,13 @@ const [importOpen, setImportOpen] = useState(false);
   const handleDrop = (id: string, date: string, debut: string) => {
     const s = seances.find((x) => x.id === id);
     if (!s) return;
+    // Un jour chômé n'accueille pas de séance : le dépôt est refusé, pas
+    // seulement signalé.
+    const chome = chomes.get(date);
+    if (chome) {
+      toast.error(`${fmtDate(date)} est un jour chômé (${chome.nom})`);
+      return;
+    }
     const duree = minutesDepuisMinuit(s.fin) - minutesDepuisMinuit(s.debut);
     const fin = ajouterMinutes(debut, duree);
 
@@ -501,16 +537,20 @@ const [importOpen, setImportOpen] = useState(false);
         {/* Barre de navigation du calendrier */}
         <div className="flex flex-wrap items-center gap-3 border-b border-brand/12 bg-muted/50 px-4 py-3">
           <div className="flex items-center gap-1">
+            {/* Bornes de l'année scolaire : on ne navigue pas vers juillet
+                ni vers août, il ne s'y tient aucun cours. */}
             <button
-              className={iconButton}
+              className={cn(iconButton, "disabled:opacity-35 disabled:pointer-events-none")}
               aria-label="Période précédente"
+              disabled={!cible(-1)}
               onClick={() => decaler(-1)}
             >
               <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
             </button>
             <button
-              className={iconButton}
+              className={cn(iconButton, "disabled:opacity-35 disabled:pointer-events-none")}
               aria-label="Période suivante"
+              disabled={!cible(1)}
               onClick={() => decaler(1)}
             >
               <ChevronRight className="h-4 w-4 rtl:rotate-180" />
@@ -519,9 +559,9 @@ const [importOpen, setImportOpen] = useState(false);
 
           <button
             className={cn(ghostPill, "h-9 px-3 py-0 text-xs")}
-            onClick={() => setCurseur(new Date())}
+            onClick={() => setCurseur(positionDouverture())}
           >
-            Aujourd'hui
+            Aujourd&rsquo;hui
           </button>
 
           <p className="min-w-0 flex-1 truncate font-display text-base font-bold capitalize tracking-tight text-foreground">
@@ -570,6 +610,8 @@ const [importOpen, setImportOpen] = useState(false);
               onOpen={setDetail}
               onDrop={handleDrop}
               onCreneauVide={canEdit ? ouvrirCreation : undefined}
+              jourChome={jourChome}
+              creneaux={creneaux}
             />
           ) : vue === "semaine" ? (
             <VueSemaine
@@ -580,6 +622,8 @@ const [importOpen, setImportOpen] = useState(false);
               onOpen={setDetail}
               onDrop={handleDrop}
               onCreneauVide={canEdit ? ouvrirCreation : undefined}
+              jourChome={jourChome}
+              creneaux={creneaux}
             />
           ) : (
             <VueMois
@@ -587,7 +631,10 @@ const [importOpen, setImportOpen] = useState(false);
               seances={filtrees}
               nomProf={nomProf}
               onOpen={setDetail}
+              jourChome={jourChome}
+              horsCalendrier={(d) => d < bornes.debut || d > bornes.fin}
               onJour={(d) => {
+                if (d < bornes.debut || d > bornes.fin) return;
                 setCurseur(d);
                 setVue("jour");
               }}

@@ -41,8 +41,12 @@ import {
   type ActiviteItem,
   type Seance,
   SEANCES,
-  lundiDeLaSemaine,
   genererSeances,
+  bornesAnneeUniversitaire,
+  joursChomes,
+  CRENEAUX_LABELS,
+  parseCreneaux,
+  type Creneau,
   minutesDepuisMinuit,
   ajouterMinutes,
   STRUCTURES_ACCUEIL,
@@ -116,6 +120,8 @@ import {
   updateModuleApi,
   deleteModuleApi,
   fetchSeances as apiFetchSeances,
+  fetchSettings,
+  updateSetting,
   createSeance as apiCreateSeance,
   updateSeance as apiUpdateSeance,
   deleteSeance as apiDeleteSeance,
@@ -142,6 +148,8 @@ type Snapshot = {
   structuresAccueil: StructureAccueil[];
   modules: ModuleRecord[];
   groupConfigs: GroupConfig[];
+  /** Créneaux horaires, au format libellé des Paramètres (« 08:30 – 10:00 »). */
+  creneaux: string[];
 };
 
 function seedModules(): ModuleRecord[] {
@@ -217,6 +225,7 @@ function seed(): Snapshot {
     structuresAccueil: structuredClone(STRUCTURES_ACCUEIL),
     modules: seedModules(),
     groupConfigs: structuredClone(DEFAULT_GROUP_CONFIGS),
+    creneaux: [...CRENEAUX_LABELS],
   }) as Snapshot;
 }
 
@@ -232,6 +241,8 @@ function load(): Snapshot {
     // Backfill fields added after this snapshot was persisted.
     if (!Array.isArray(parsed.modules)) parsed.modules = seedModules();
     if (!Array.isArray(parsed.groupConfigs)) parsed.groupConfigs = structuredClone(DEFAULT_GROUP_CONFIGS);
+    if (!Array.isArray(parsed.creneaux) || !parsed.creneaux.length)
+      parsed.creneaux = [...CRENEAUX_LABELS];
     for (const e of parsed.etudiants) {
       // Suivi mensuel de démonstration si aucun paiement n'a encore été saisi,
       // pour que tous les statuts soient visibles dans la liste.
@@ -243,18 +254,30 @@ function load(): Snapshot {
       }
     }
 
-    // Rebase seance dates to the current week.
-    // Seed‑pattern seances ("se-0-…", "se-1-…") have dates frozen at save
-    // time; regenerate them so the planning always shows the present week.
-    const expectedLundi = lundiDeLaSemaine(new Date()).toISOString().slice(0, 10);
-    const storedLundi = parsed.seances?.[0]?.date?.slice(0, 10);
-    if (storedLundi && storedLundi !== expectedLundi) {
-      const hasSeedIds = parsed.seances.some(
-        (s) => /^se-\d+-\d+$/.test(s.id),
+    // Réaligne le planning sur l'année universitaire courante.
+    //
+    // Les séances du gabarit ("se-0-…", "se-1-…") sont figées à la date de
+    // sauvegarde : un instantané écrit sous l'ancien générateur ne couvrait que
+    // deux semaines autour du jour de consultation, éventuellement hors année
+    // scolaire. On les régénère dès qu'elles ne correspondent plus à l'année en
+    // cours ; les séances créées à la main (autres ids) sont conservées.
+    const anneeCourante = getCurrentAcademicYear();
+    const seedSeances = parsed.seances?.filter((s) => /^se-\d+-\d+$/.test(s.id)) ?? [];
+    const { debut, fin } = bornesAnneeUniversitaire(anneeCourante);
+    const chomes = joursChomes(anneeCourante);
+    // Un instantané est périmé s'il déborde de l'année scolaire ou s'il place
+    // encore des cours sur un jour férié ou de vacances.
+    const couvreAnnee =
+      seedSeances.length > 0 &&
+      seedSeances.every((s) => {
+        const d = new Date(s.date);
+        return d >= debut && d <= fin && !chomes.has(s.date);
+      });
+    if (!couvreAnnee) {
+      const surMesure = (parsed.seances ?? []).filter(
+        (s) => !/^se-\d+-\d+$/.test(s.id),
       );
-      if (hasSeedIds) {
-        parsed.seances = genererSeances();
-      }
+      parsed.seances = [...genererSeances(anneeCourante), ...surMesure];
     }
 
     return parsed;
@@ -351,6 +374,11 @@ type IstpmCtx = {
   structuresAccueil: StructureAccueil[];
   modules: ModuleRecord[];
   groupConfigs: GroupConfig[];
+  /** Libellés bruts des créneaux, tels qu'édités dans les Paramètres. */
+  creneauxLabels: string[];
+  /** Créneaux exploitables, triés par heure de début. */
+  creneaux: Creneau[];
+  setCreneaux: (labels: string[]) => void;
 
   /* Dérivés */
   paiements: PaiementLigne[];
@@ -517,7 +545,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        const [etudiants, formateurs, examens, bulletins, stages, seances, structures] =
+        const [etudiants, formateurs, examens, bulletins, stages, seances, structures, reglages] =
           await Promise.all([
             apiFetchEtudiants(),
             apiFetchFormateurs(),
@@ -526,6 +554,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
             apiFetchStages(),
             apiFetchSeances(),
             apiFetchStructures().catch(() => [] as string[]),
+            fetchSettings().catch(() => ({}) as Record<string, unknown>),
           ]);
         if (!mounted) return;
         // Keep local data when we already have some; only backfill empties.
@@ -562,6 +591,11 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           structuresAccueil: (structures as StructureAccueil[])?.length
             ? (structures as StructureAccueil[])
             : s.structuresAccueil,
+          // Les créneaux paramétrés côté serveur font foi : ils pilotent la
+          // grille de l'emploi du temps sur tous les postes.
+          creneaux: Array.isArray(reglages.creneaux) && reglages.creneaux.length
+            ? (reglages.creneaux as string[])
+            : s.creneaux,
         }));
       } catch {
         // Backend not available   keep localStorage data.
@@ -1212,6 +1246,23 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /* ---------------- Créneaux horaires ---------------- */
+
+  /**
+   * Les créneaux vivent dans le store (et non dans l'état local de la page
+   * Paramètres) : l'emploi du temps en dérive sa grille horaire, il doit donc
+   * voir la même valeur. La synchronisation serveur reste best-effort.
+   */
+  const setCreneaux = useCallback((labels: string[]) => {
+    updateSetting("creneaux", labels).catch(() => {});
+    setSnap((s) => ({ ...s, creneaux: labels }));
+  }, []);
+
+  const creneaux = useMemo(
+    () => parseCreneaux(snap.creneaux),
+    [snap.creneaux],
+  );
+
   const addFiliere = useCallback(
     (nom: string) => {
       createFiliereApi(nom).catch(() => {});
@@ -1369,15 +1420,32 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
    * professeur, la salle et le groupe. `ignorerId` exclut la séance en cours
    * d'édition, sinon elle entrerait en conflit avec elle-même.
    */
+  /**
+   * Séances indexées par jour.
+   *
+   * Deux séances ne peuvent se gêner que le même jour : depuis que le planning
+   * couvre l'année scolaire entière (~950 séances), balayer toute la liste à
+   * chaque appel rendait le calcul des conflits quadratique sur la page
+   * Planning. L'index ramène chaque appel aux seules séances du jour visé.
+   */
+  const seancesParJour = useMemo(() => {
+    const map = new Map<string, Seance[]>();
+    for (const s of snap.seances) {
+      const jour = map.get(s.date);
+      if (jour) jour.push(s);
+      else map.set(s.date, [s]);
+    }
+    return map;
+  }, [snap.seances]);
+
   const conflitsSeance = useCallback(
     (candidate: ConflitCandidate, ignorerId?: string): Conflit[] => {
       const debut = minutesDepuisMinuit(candidate.debut);
       const fin = minutesDepuisMinuit(candidate.fin);
       const out: Conflit[] = [];
 
-      for (const s of snap.seances) {
+      for (const s of seancesParJour.get(candidate.date) ?? []) {
         if (s.id === ignorerId) continue;
-        if (s.date !== candidate.date) continue;
         // Chevauchement strict : deux séances qui se touchent ne gênent pas.
         const d = minutesDepuisMinuit(s.debut);
         const f = minutesDepuisMinuit(s.fin);
@@ -1395,7 +1463,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
       }
       return out;
     },
-    [snap.seances],
+    [seancesParJour],
   );
 
   const reset = useCallback(() => {
@@ -1575,6 +1643,11 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const value: IstpmCtx = {
     ...snap,
+    // `snap.creneaux` porte les libellés bruts ; le contexte expose en plus la
+    // version analysée, d'où l'écrasement après le spread.
+    creneauxLabels: snap.creneaux,
+    creneaux,
+    setCreneaux,
     paiements,
     dashboard,
     financier,

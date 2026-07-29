@@ -50729,18 +50729,73 @@ export const GROUPES = [
 ] as const;
 
 /** Créneaux horaires standards de l'emploi du temps. */
-export const CRENEAUX = [
+/** Plage horaire officielle de l'emploi du temps. */
+export type Creneau = { debut: string; fin: string };
+
+export const CRENEAUX: readonly Creneau[] = [
   { debut: "08:30", fin: "10:00" },
   { debut: "10:15", fin: "11:45" },
   { debut: "12:00", fin: "13:30" },
   { debut: "14:00", fin: "15:30" },
   { debut: "15:45", fin: "17:15" },
   { debut: "17:30", fin: "19:00" },
-] as const;
+];
 
-/** Bornes de la grille horaire (heures pleines). */
+/** Bornes de repli de la grille horaire, si aucun créneau n'est paramétré. */
 export const PLANNING_HEURE_DEBUT = 8;
 export const PLANNING_HEURE_FIN = 19;
+
+/** Libellé éditable d'un créneau, tel qu'affiché dans les Paramètres. */
+export function formatCreneau(c: Creneau): string {
+  return `${c.debut} – ${c.fin}`;
+}
+
+export const CRENEAUX_LABELS: string[] = CRENEAUX.map(formatCreneau);
+
+/**
+ * Relit les créneaux saisis dans les Paramètres.
+ *
+ * Le réglage est stocké en texte libre (« 08:30 – 10:00 »), saisi à la main :
+ * le séparateur peut être un tiret court, long ou cadratin, et les espaces
+ * sont variables. Les lignes illisibles sont ignorées plutôt que de casser la
+ * grille, et le résultat est trié par heure de début.
+ */
+export function parseCreneaux(labels: readonly string[]): Creneau[] {
+  const out: Creneau[] = [];
+  for (const label of labels) {
+    const m = String(label).match(
+      /(\d{1,2})\s*[:hH]\s*(\d{2}).*?[-–—]\s*(\d{1,2})\s*[:hH]\s*(\d{2})/,
+    );
+    if (!m) continue;
+    const pad = (n: string) => n.padStart(2, "0");
+    const debut = `${pad(m[1])}:${m[2]}`;
+    const fin = `${pad(m[3])}:${m[4]}`;
+    if (minutesDepuisMinuit(fin) <= minutesDepuisMinuit(debut)) continue;
+    out.push({ debut, fin });
+  }
+  return out.sort(
+    (a, b) => minutesDepuisMinuit(a.debut) - minutesDepuisMinuit(b.debut),
+  );
+}
+
+/**
+ * Bornes de la grille horaire déduites des créneaux paramétrés : l'heure pleine
+ * juste avant le premier créneau, l'heure pleine juste après le dernier. La
+ * grille suit ainsi les Paramètres au lieu d'une plage figée.
+ */
+export function bornesGrilleHoraire(creneaux: readonly Creneau[]): {
+  debut: number;
+  fin: number;
+} {
+  if (!creneaux.length)
+    return { debut: PLANNING_HEURE_DEBUT, fin: PLANNING_HEURE_FIN };
+  const min = Math.min(...creneaux.map((c) => minutesDepuisMinuit(c.debut)));
+  const max = Math.max(...creneaux.map((c) => minutesDepuisMinuit(c.fin)));
+  const debut = Math.floor(min / 60);
+  const fin = Math.ceil(max / 60);
+  // Une grille d'au moins deux heures reste lisible même avec un seul créneau.
+  return { debut, fin: Math.max(fin, debut + 2) };
+}
 
 export type TypeSeance = "cours" | "td" | "tp" | "stage";
 
@@ -50825,25 +50880,140 @@ export function isoDate(d: Date): string {
 }
 
 /**
- * Gabarit d'une semaine type : jour (0 = lundi) plutôt que date absolue.
- * Les dates réelles sont calculées à partir de la semaine courante, pour que
- * le planning soit toujours peuplé quelle que soit la date de consultation.
+ * Bornes de l'année universitaire : du 1er septembre au 30 juin.
+ *
+ * Juillet et août sont hors année scolaire — aucune séance n'y est planifiée.
+ */
+export function bornesAnneeUniversitaire(annee = getCurrentAcademicYear()): {
+  debut: Date;
+  fin: Date;
+} {
+  const [an1, an2] = annee.split("/").map((y) => Number.parseInt(y, 10));
+  return { debut: new Date(an1, 8, 1), fin: new Date(an2, 5, 30) };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Jours chômés   fêtes nationales, fêtes religieuses, vacances        */
+/* ------------------------------------------------------------------ */
+
+export type TypeJourChome = "ferie" | "vacances";
+/** Jour sans cours : fête légale ou période de vacances scolaires. */
+export type JourChome = { nom: string; type: TypeJourChome };
+
+/**
+ * Fêtes nationales marocaines à date fixe (calendrier grégorien).
+ *
+ * La Fête du Trône (30 juillet), l'Allégeance Oued Eddahab (14 août), la
+ * Révolution du Roi et du Peuple (20 août) et la Fête de la Jeunesse (21 août)
+ * ne figurent pas ici : elles tombent hors année scolaire.
+ */
+const FERIES_FIXES: { mois: number; jour: number; nom: string }[] = [
+  { mois: 0, jour: 1, nom: "Jour de l'An" },
+  { mois: 0, jour: 11, nom: "Manifeste de l'Indépendance" },
+  { mois: 0, jour: 14, nom: "Nouvel An amazigh" },
+  { mois: 4, jour: 1, nom: "Fête du Travail" },
+  { mois: 10, jour: 6, nom: "Marche Verte" },
+  { mois: 10, jour: 18, nom: "Fête de l'Indépendance" },
+];
+
+/**
+ * Fêtes religieuses : elles suivent le calendrier hégirien et reculent d'une
+ * dizaine de jours chaque année grégorienne, d'où une table par année scolaire
+ * plutôt qu'une règle de calcul.
+ *
+ * ⚠ Dates prévisionnelles : au Maroc, elles sont arrêtées par observation
+ * lunaire et annoncées par le ministère des Habous. À confirmer chaque année.
+ */
+const FERIES_MOBILES: Record<string, { date: string; nom: string }[]> = {
+  "2025/2026": [
+    { date: "2025-09-04", nom: "Aïd Al Mawlid" },
+    { date: "2025-09-05", nom: "Aïd Al Mawlid (2e jour)" },
+    { date: "2026-03-20", nom: "Aïd Al Fitr" },
+    { date: "2026-03-21", nom: "Aïd Al Fitr (2e jour)" },
+    { date: "2026-05-27", nom: "Aïd Al Adha" },
+    { date: "2026-05-28", nom: "Aïd Al Adha (2e jour)" },
+    { date: "2026-06-16", nom: "1er Moharram" },
+  ],
+};
+
+/**
+ * Vacances scolaires, bornes incluses.
+ *
+ * ⚠ Calendrier indicatif, calé sur le rythme habituel du ministère de
+ * l'Éducation nationale. À ajuster sur la note ministérielle de l'année.
+ */
+const VACANCES_SCOLAIRES: Record<
+  string,
+  { debut: string; fin: string; nom: string }[]
+> = {
+  "2025/2026": [
+    { debut: "2025-10-26", fin: "2025-11-02", nom: "Vacances de mi-premier semestre" },
+    { debut: "2025-12-21", fin: "2026-01-04", nom: "Vacances de fin d'année" },
+    { debut: "2026-02-08", fin: "2026-02-15", nom: "Vacances du premier semestre" },
+    { debut: "2026-04-05", fin: "2026-04-19", nom: "Vacances de mi-deuxième semestre" },
+  ],
+};
+
+/**
+ * Table des jours sans cours de l'année scolaire, indexée par date ISO.
+ *
+ * Les vacances sont posées d'abord, les fêtes ensuite : une fête tombant
+ * pendant les vacances garde son nom propre, plus parlant dans le calendrier.
+ */
+export function joursChomes(
+  annee = getCurrentAcademicYear(),
+): Map<string, JourChome> {
+  const map = new Map<string, JourChome>();
+  const { debut, fin } = bornesAnneeUniversitaire(annee);
+  const dansLAnnee = (d: Date) => d >= debut && d <= fin;
+
+  for (const v of VACANCES_SCOLAIRES[annee] ?? []) {
+    const d = new Date(`${v.debut}T00:00:00`);
+    const stop = new Date(`${v.fin}T00:00:00`);
+    for (; d <= stop; d.setDate(d.getDate() + 1)) {
+      if (dansLAnnee(d)) map.set(isoDate(d), { nom: v.nom, type: "vacances" });
+    }
+  }
+
+  const [an1, an2] = annee.split("/").map((y) => Number.parseInt(y, 10));
+  for (const an of [an1, an2]) {
+    for (const f of FERIES_FIXES) {
+      const d = new Date(an, f.mois, f.jour);
+      if (dansLAnnee(d)) map.set(isoDate(d), { nom: f.nom, type: "ferie" });
+    }
+  }
+  for (const f of FERIES_MOBILES[annee] ?? []) {
+    const d = new Date(`${f.date}T00:00:00`);
+    if (dansLAnnee(d)) map.set(f.date, { nom: f.nom, type: "ferie" });
+  }
+
+  return map;
+}
+
+/**
+ * Gabarit d'une semaine type : jour (0 = lundi … 5 = samedi) plutôt que date
+ * absolue. Les dates réelles sont déroulées sur toute l'année universitaire.
+ * Le dimanche (6) n'est jamais utilisé : l'institut ne dispense pas de cours.
  */
 const SEMAINE_TYPE: Array<
   Omit<Seance, "id" | "date" | "filiere"> & { jour: number }
 > = [
   { jour: 1, module: "Soins infirmiers en médecine", professeurId: "fo-1", groupe: "S5-G1", salle: "Amphi A", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
   { jour: 2, module: "Réanimation et soins intensifs", professeurId: "fo-2", groupe: "S5-G2", salle: "Labo simulation 2", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S5", type: "tp" },
-  { jour: 6, module: "Obstétrique", professeurId: "fo-3", groupe: "S3-G2", salle: "Salle 12", debut: "14:00", fin: "15:30", anneeUniversitaire: "2025/2026", semestre: "S3", type: "cours" },
-  { jour: 6, module: "Anatomie dentaire", professeurId: "fo-7", groupe: "S1-A", salle: "Salle 5", debut: "15:45", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S1", type: "cours" },
+  { jour: 0, module: "Obstétrique", professeurId: "fo-3", groupe: "S3-G2", salle: "Salle 12", debut: "14:00", fin: "15:30", anneeUniversitaire: "2025/2026", semestre: "S3", type: "cours" },
+  { jour: 0, module: "Anatomie dentaire", professeurId: "fo-7", groupe: "S1-A", salle: "Salle 5", debut: "15:45", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S1", type: "cours" },
 
-  { jour: 1, module: "Hygiène hospitalière", professeurId: "fo-1", groupe: "S5-G1", salle: "Salle 8", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "td" },
+  // Créneau de 10 h 15 et non de 8 h 30 : fo-1 assure déjà « Soins infirmiers
+  // en médecine » au même groupe à cette heure-là.
+  { jour: 1, module: "Hygiène hospitalière", professeurId: "fo-1", groupe: "S5-G1", salle: "Salle 8", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S5", type: "td" },
   { jour: 1, module: "Rééducation fonctionnelle", professeurId: "fo-4", groupe: "S3-G1", salle: "Salle de rééducation", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S3", type: "tp" },
   { jour: 1, module: "Techniques de radiologie", professeurId: "fo-5", groupe: "S6-G1", salle: "Amphi B", debut: "14:00", fin: "15:30", anneeUniversitaire: "2025/2026", semestre: "S6", type: "cours" },
   { jour: 1, module: "Hématologie", professeurId: "fo-6", groupe: "S6-G2", salle: "Labo biologie", debut: "15:45", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S6", type: "tp" },
 
   { jour: 2, module: "Éthique et déontologie", professeurId: "fo-1", groupe: "S1-B", salle: "Salle 3", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S1", type: "cours" },
-  { jour: 2, module: "Anesthésie clinique", professeurId: "fo-2", groupe: "S5-G1", salle: "Amphi A", debut: "10:15", fin: "11:45", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
+  // Créneau de 8 h 30 et non de 10 h 15 : fo-2 assure déjà « Réanimation et
+  // soins intensifs » à cette heure-là.
+  { jour: 2, module: "Anesthésie clinique", professeurId: "fo-2", groupe: "S5-G1", salle: "Amphi A", debut: "08:30", fin: "10:00", anneeUniversitaire: "2025/2026", semestre: "S5", type: "cours" },
   { jour: 2, module: "Suivi de grossesse", professeurId: "fo-3", groupe: "S3-G2", salle: "Salle 12", debut: "12:00", fin: "13:30", anneeUniversitaire: "2025/2026", semestre: "S3", type: "td" },
   { jour: 2, module: "Prothèse fixe (TP)", professeurId: "fo-7", groupe: "S1-A", salle: "Atelier prothèse", debut: "14:00", fin: "17:15", anneeUniversitaire: "2025/2026", semestre: "S1", type: "tp" },
 
@@ -50862,12 +51032,17 @@ const SEMAINE_TYPE: Array<
 ];
 
 /**
- * Génère les séances des deux prochaines semaines (courante + suivante).
- * Les dates sont calculées depuis le lundi de la semaine en cours, donc
- * l'appel est idempotent à l'intérieur de la même semaine.
+ * Déroule la semaine type sur toute l'année universitaire (1er septembre →
+ * 30 juin), semaine après semaine.
+ *
+ * Le planning couvre ainsi l'année scolaire entière plutôt qu'une poignée de
+ * jours autour de la date de consultation : chaque formateur a un emploi du
+ * temps de septembre à juin, et les mois d'été restent vides.
  */
-export function genererSeances(): Seance[] {
-  const lundi = lundiDeLaSemaine(new Date());
+export function genererSeances(annee = getCurrentAcademicYear()): Seance[] {
+  const { debut, fin } = bornesAnneeUniversitaire(annee);
+  // Fêtes légales et vacances scolaires : aucune séance n'y est posée.
+  const chomes = joursChomes(annee);
   // La filière de chaque séance est déduite du département du formateur qui
   // l'assure : deux séances du même enseignant partagent toujours la filière,
   // sans champ redondant à maintenir dans le gabarit hebdomadaire.
@@ -50875,21 +51050,30 @@ export function genererSeances(): Seance[] {
     FORMATEURS.map((f) => [f.id, f.departement] as const),
   );
   const out: Seance[] = [];
-  for (const semaine of [0, 1]) {
+  // On part du lundi de la semaine contenant le 1er septembre ; les jours qui
+  // débordent des bornes sont écartés un par un, pour que la première et la
+  // dernière semaine soient tronquées proprement.
+  const lundi = lundiDeLaSemaine(debut);
+  for (let semaine = 0; lundi <= fin; semaine += 1) {
     SEMAINE_TYPE.forEach((s, i) => {
       const d = new Date(lundi);
-      d.setDate(lundi.getDate() + s.jour + semaine * 7);
+      d.setDate(lundi.getDate() + s.jour);
+      if (d < debut || d > fin) return;
+      const iso = isoDate(d);
+      if (chomes.has(iso)) return;
       const { jour: _jour, ...reste } = s;
       out.push({
         ...reste,
+        anneeUniversitaire: annee,
         filiere: filiereParProf.get(s.professeurId) ?? FILIERES[0],
         id: `se-${semaine}-${i}`,
-        date: isoDate(d),
+        date: iso,
       });
     });
+    lundi.setDate(lundi.getDate() + 7);
   }
   return out;
 }
 
-/** Séances de la semaine courante et de la suivante. */
+/** Emploi du temps de l'année universitaire courante (septembre → juin). */
 export const SEANCES: Seance[] = genererSeances();

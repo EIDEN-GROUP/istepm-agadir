@@ -13,14 +13,37 @@ import {
   couleurSeance,
   minutesDepuisMinuit,
   isoDate,
-  PLANNING_HEURE_DEBUT,
-  PLANNING_HEURE_FIN,
+  CRENEAUX,
+  bornesGrilleHoraire,
   TYPE_SEANCE_LABEL,
   type Seance,
+  type JourChome,
+  type Creneau,
 } from "@/lib/istpm-data";
 import { cn } from "@/lib/utils";
 
 export type VueCalendrier = "jour" | "semaine" | "mois";
+
+/** Résout le jour chômé d'une date ISO, ou `null` si l'institut travaille. */
+export type LookupJourChome = (iso: string) => JourChome | null;
+
+/** Pastille « férié » / « vacances » posée sur un jour sans cours. */
+function BadgeChome({ jour, compact }: { jour: JourChome; compact?: boolean }) {
+  return (
+    <span
+      title={jour.nom}
+      className={cn(
+        "inline-block max-w-full truncate rounded-full px-1.5 py-0.5 font-semibold",
+        compact ? "text-[9px]" : "text-[10px]",
+        jour.type === "ferie"
+          ? "bg-alert/12 text-alert-dk"
+          : "bg-warn-pale text-warn",
+      )}
+    >
+      {jour.nom}
+    </span>
+  );
+}
 
 /** Hauteur d'une heure dans la grille, en pixels. */
 const HEURE_PX = 64;
@@ -178,6 +201,8 @@ function GrilleHoraire({
   onOpen,
   onDrop,
   onCreneauVide,
+  jourChome,
+  creneaux = CRENEAUX,
 }: {
   jours: Date[];
   seances: Seance[];
@@ -186,25 +211,50 @@ function GrilleHoraire({
   onOpen: (s: Seance) => void;
   onDrop: (id: string, date: string, debut: string) => void;
   onCreneauVide?: (date: string, debut: string) => void;
+  jourChome?: LookupJourChome;
+  /** Créneaux paramétrés : ils fixent l'amplitude de la grille et l'aimantation. */
+  creneaux?: readonly Creneau[];
 }) {
+  // L'amplitude de la grille suit les créneaux paramétrés au lieu d'une plage
+  // figée : ajouter un créneau du soir agrandit l'emploi du temps d'autant.
+  const { debut: HEURE_DEBUT, fin: HEURE_FIN } = useMemo(
+    () => bornesGrilleHoraire(creneaux),
+    [creneaux],
+  );
+
   const heures = useMemo(() => {
     const out: number[] = [];
-    for (let h = PLANNING_HEURE_DEBUT; h <= PLANNING_HEURE_FIN; h += 1) out.push(h);
+    for (let h = HEURE_DEBUT; h <= HEURE_FIN; h += 1) out.push(h);
     return out;
-  }, []);
+  }, [HEURE_DEBUT, HEURE_FIN]);
 
-  const hauteur = (PLANNING_HEURE_FIN - PLANNING_HEURE_DEBUT) * HEURE_PX;
+  const hauteur = (HEURE_FIN - HEURE_DEBUT) * HEURE_PX;
   const dragId = useRef<string | null>(null);
   const [survol, setSurvol] = useState<string | null>(null);
 
-  /** Convertit une position verticale en heure alignée sur le pas. */
+  /**
+   * Convertit une position verticale en heure de début.
+   *
+   * La séance déposée s'aimante sur le créneau paramétré dont le début est le
+   * plus proche ; sans créneau exploitable, on retombe sur un pas régulier.
+   */
   const heureDepuisY = (y: number) => {
-    const minutes = Math.max(0, y / MINUTE_PX);
+    const minutes = Math.max(0, y / MINUTE_PX) + HEURE_DEBUT * 60;
+    if (creneaux.length) {
+      let proche = creneaux[0];
+      let ecart = Infinity;
+      for (const c of creneaux) {
+        const d = Math.abs(minutesDepuisMinuit(c.debut) - minutes);
+        if (d < ecart) {
+          ecart = d;
+          proche = c;
+        }
+      }
+      return proche.debut;
+    }
     const cale = Math.round(minutes / PAS_MINUTES) * PAS_MINUTES;
-    const total = PLANNING_HEURE_DEBUT * 60 + cale;
-    const h = Math.min(PLANNING_HEURE_FIN, Math.floor(total / 60));
-    const m = total % 60;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    const h = Math.min(HEURE_FIN, Math.floor(cale / 60));
+    return `${String(h).padStart(2, "0")}:${String(cale % 60).padStart(2, "0")}`;
   };
 
   return (
@@ -219,12 +269,14 @@ function GrilleHoraire({
         <div className="sticky top-0 z-20 border-b border-brand/12 bg-card" />
         {jours.map((j) => {
           const today = estAujourdhui(j);
+          const chome = jourChome?.(isoDate(j)) ?? null;
           return (
             <div
               key={j.toISOString()}
               className={cn(
                 "sticky top-0 z-20 border-b border-s border-brand/12 bg-card px-2 py-2 text-center",
                 today && "bg-brand/8",
+                chome && "bg-muted/70",
               )}
             >
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -233,11 +285,20 @@ function GrilleHoraire({
               <p
                 className={cn(
                   "mx-auto mt-1 grid h-7 w-7 place-items-center rounded-full text-sm font-bold",
-                  today ? "bg-brand text-white" : "text-foreground",
+                  today && !chome
+                    ? "bg-brand text-white"
+                    : chome
+                      ? "text-muted-foreground"
+                      : "text-foreground",
                 )}
               >
                 {j.getDate()}
               </p>
+              {chome ? (
+                <div className="mt-1">
+                  <BadgeChome jour={chome} compact />
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -260,24 +321,36 @@ function GrilleHoraire({
           const iso = isoDate(j);
           const duJour = seances.filter((s) => s.date === iso);
           const places = disposer(duJour);
+          // Jour chômé : ni dépôt ni création de séance, et un fond hachuré
+          // pour que la colonne vide se lise comme fermée, pas comme libre.
+          const chome = jourChome?.(iso) ?? null;
 
           return (
             <div
               key={iso}
               className={cn(
                 "relative border-s border-brand/12",
-                estAujourdhui(j) && "bg-brand/[0.03]",
-                survol === iso && canDrag && "bg-brand/8",
+                estAujourdhui(j) && !chome && "bg-brand/[0.03]",
+                survol === iso && canDrag && !chome && "bg-brand/8",
+                chome && "bg-muted/40",
               )}
-              style={{ height: hauteur }}
+              style={{
+                height: hauteur,
+                ...(chome
+                  ? {
+                      backgroundImage:
+                        "repeating-linear-gradient(45deg, rgb(var(--istpm-shadow) / 0.05) 0 6px, transparent 6px 12px)",
+                    }
+                  : null),
+              }}
               onDragOver={(e) => {
-                if (!canDrag) return;
+                if (!canDrag || chome) return;
                 e.preventDefault();
                 setSurvol(iso);
               }}
               onDragLeave={() => setSurvol((v) => (v === iso ? null : v))}
               onDrop={(e) => {
-                if (!canDrag || !dragId.current) return;
+                if (!canDrag || chome || !dragId.current) return;
                 e.preventDefault();
                 const rect = e.currentTarget.getBoundingClientRect();
                 onDrop(dragId.current, iso, heureDepuisY(e.clientY - rect.top));
@@ -285,25 +358,46 @@ function GrilleHoraire({
                 setSurvol(null);
               }}
             >
-              {/* Lignes horaires */}
+              {/* Lignes horaires   repères visuels seulement */}
               {heures.slice(0, -1).map((h, i) => (
                 <div
                   key={h}
-                  className="absolute inset-x-0 border-t border-brand/8"
+                  className="pointer-events-none absolute inset-x-0 border-t border-brand/8"
                   style={{ top: i * HEURE_PX }}
-                  onClick={() =>
-                    onCreneauVide?.(
-                      iso,
-                      `${String(h).padStart(2, "0")}:00`,
-                    )
-                  }
                 />
               ))}
 
+              {/* Bandes des créneaux paramétrés : cliquer en pose une séance
+                  aux heures officielles, plutôt qu'à une heure ronde arbitraire. */}
+              {!chome &&
+                creneaux.map((c) => {
+                  const top =
+                    (minutesDepuisMinuit(c.debut) - HEURE_DEBUT * 60) *
+                    MINUTE_PX;
+                  const h =
+                    (minutesDepuisMinuit(c.fin) - minutesDepuisMinuit(c.debut)) *
+                    MINUTE_PX;
+                  return (
+                    <div
+                      key={c.debut}
+                      className={cn(
+                        "absolute inset-x-0 border-y border-brand/5 bg-brand/[0.02]",
+                        onCreneauVide && "cursor-pointer hover:bg-brand/8",
+                      )}
+                      style={{ top, height: Math.max(h, 0) }}
+                      title={
+                        onCreneauVide
+                          ? `Créer une séance ${c.debut} – ${c.fin}`
+                          : `${c.debut} – ${c.fin}`
+                      }
+                      onClick={() => onCreneauVide?.(iso, c.debut)}
+                    />
+                  );
+                })}
+
               {places.map(({ seance, colonne, colonnes }) => {
                 const top =
-                  (minutesDepuisMinuit(seance.debut) -
-                    PLANNING_HEURE_DEBUT * 60) *
+                  (minutesDepuisMinuit(seance.debut) - HEURE_DEBUT * 60) *
                   MINUTE_PX;
                 const h =
                   (minutesDepuisMinuit(seance.fin) -
@@ -357,6 +451,8 @@ export function VueJour(props: {
   onOpen: (s: Seance) => void;
   onDrop: (id: string, date: string, debut: string) => void;
   onCreneauVide?: (date: string, debut: string) => void;
+  jourChome?: LookupJourChome;
+  creneaux?: readonly Creneau[];
 }) {
   return <GrilleHoraire {...props} jours={[props.date]} />;
 }
@@ -369,6 +465,8 @@ export function VueSemaine(props: {
   onOpen: (s: Seance) => void;
   onDrop: (id: string, date: string, debut: string) => void;
   onCreneauVide?: (date: string, debut: string) => void;
+  jourChome?: LookupJourChome;
+  creneaux?: readonly Creneau[];
 }) {
   return <GrilleHoraire {...props} />;
 }
@@ -379,6 +477,8 @@ export function VueMois({
   nomProf,
   onOpen,
   onJour,
+  horsCalendrier,
+  jourChome,
 }: {
   /** N'importe quelle date du mois affiché. */
   mois: Date;
@@ -386,6 +486,13 @@ export function VueMois({
   nomProf: (id: string) => string;
   onOpen: (s: Seance) => void;
   onJour: (d: Date) => void;
+  /**
+   * Jours hors année scolaire (juillet, août) : la grille du mois déborde
+   * toujours sur les mois voisins, et ces cases-là ne doivent ni s'ouvrir ni
+   * laisser croire qu'un cours pourrait y être posé.
+   */
+  horsCalendrier?: (d: Date) => boolean;
+  jourChome?: LookupJourChome;
 }) {
   const cellules = useMemo(() => {
     const premier = new Date(mois.getFullYear(), mois.getMonth(), 1);
@@ -420,6 +527,8 @@ export function VueMois({
                 minutesDepuisMinuit(a.debut) - minutesDepuisMinuit(b.debut),
             );
           const horsMois = d.getMonth() !== mois.getMonth();
+          const horsAnnee = horsCalendrier?.(d) ?? false;
+          const chome = horsAnnee ? null : (jourChome?.(iso) ?? null);
           const today = estAujourdhui(d);
 
           return (
@@ -428,15 +537,22 @@ export function VueMois({
               className={cn(
                 "min-h-[6.5rem] border-b border-e border-brand/8 p-1.5 transition-colors",
                 horsMois && "bg-muted/40",
-                today && "bg-brand/[0.06]",
+                horsAnnee && "bg-muted/60",
+                chome && "bg-muted/30",
+                today && !horsAnnee && !chome && "bg-brand/[0.06]",
               )}
             >
               <button
                 type="button"
                 onClick={() => onJour(d)}
+                disabled={horsAnnee}
+                title={horsAnnee ? "Hors année scolaire" : undefined}
                 className={cn(
-                  "mb-1 grid h-6 w-6 place-items-center rounded-full text-[11px] font-semibold transition-colors hover:bg-brand/15",
-                  today
+                  "mb-1 grid h-6 w-6 place-items-center rounded-full text-[11px] font-semibold transition-colors",
+                  horsAnnee
+                    ? "cursor-default text-muted-foreground/35"
+                    : "hover:bg-brand/15",
+                  today && !horsAnnee
                     ? "bg-brand text-white"
                     : horsMois
                       ? "text-muted-foreground/50"
@@ -445,6 +561,12 @@ export function VueMois({
               >
                 {d.getDate()}
               </button>
+
+              {chome ? (
+                <div className="mb-1">
+                  <BadgeChome jour={chome} compact />
+                </div>
+              ) : null}
 
               <div className="space-y-1">
                 {duJour.slice(0, 3).map((s) => {
