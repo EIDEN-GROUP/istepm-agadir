@@ -237,12 +237,21 @@ function EspaceEtudiantPage() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Photo refusée"),
   });
 
+  const [aTraiter, setATraiter] = useState<StudentRequest | null>(null);
+
   const traiterMut = useMutation({
-    mutationFn: ({ id, statut }: { id: string; statut: StudentRequest["statut"] }) =>
-      updateStudentRequest(id, { statut }),
-    onSuccess: () => {
+    mutationFn: ({ id, statut, reponse }: { id: string; statut: StudentRequest["statut"]; reponse?: string }) =>
+      updateStudentRequest(id, { statut, reponse }),
+    onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["student-requests-all"] });
-      toast.success("Demande mise à jour");
+      toast.success(
+        vars.statut === "traite"
+          ? "Demande approuvée — l'étudiant est notifié"
+          : vars.statut === "rejete"
+            ? "Demande rejetée — l'étudiant est notifié"
+            : "Demande mise à jour",
+      );
+      setATraiter(null);
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Mise à jour impossible"),
   });
@@ -621,24 +630,11 @@ function EspaceEtudiantPage() {
                       <div className={cn(rowActions, "justify-center")}>
                         <button
                           className={iconButton}
-                          title="Marquer en cours"
-                          onClick={() => traiterMut.mutate({ id: d.id, statut: "en_cours" })}
+                          title="Approuver / rejeter avec réponse"
+                          aria-label={`Traiter « ${d.titre} »`}
+                          onClick={() => setATraiter(d)}
                         >
-                          →
-                        </button>
-                        <button
-                          className={iconButton}
-                          title="Marquer traitée"
-                          onClick={() => traiterMut.mutate({ id: d.id, statut: "traite" })}
-                        >
-                          ✓
-                        </button>
-                        <button
-                          className={cn(iconButton, "text-alert")}
-                          title="Rejeter"
-                          onClick={() => traiterMut.mutate({ id: d.id, statut: "rejete" })}
-                        >
-                          ✕
+                          <ClipboardCheck className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </td>
@@ -655,6 +651,13 @@ function EspaceEtudiantPage() {
         onOpenChange={setDemandeOpen}
         onSubmit={(v) => createReq.mutate(v)}
         pending={createReq.isPending}
+      />
+
+      <TraiterModal
+        demande={aTraiter}
+        onOpenChange={(o) => !o && setATraiter(null)}
+        onSubmit={(v) => traiterMut.mutate(v)}
+        pending={traiterMut.isPending}
       />
 
       <Dialog open={!!detailSeance} onOpenChange={(o) => !o && setDetailSeance(null)}>
@@ -791,6 +794,118 @@ function DemandeModal({
             className="w-full rounded-xl border border-brand/20 bg-card px-3 py-2.5 text-sm hover:border-brand/35 focus-visible:border-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
           />
           {errors.description ? <p className="text-[11px] text-alert">{errors.description}</p> : null}
+        </div>
+      </FullWidth>
+    </FormDialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * Décision du staff sur une demande : approuver ou rejeter **avec une réponse
+ * écrite** que l'étudiant reçoit via sa cloche (badge + modale) et sa table
+ * « Mes demandes ». Le motif est obligatoire en cas de rejet (validé aussi côté API).
+ */
+function TraiterModal({
+  demande,
+  onOpenChange,
+  onSubmit,
+  pending,
+}: {
+  demande: StudentRequest | null;
+  onOpenChange: (o: boolean) => void;
+  onSubmit: (v: { id: string; statut: StudentRequest["statut"]; reponse: string }) => void;
+  pending: boolean;
+}) {
+  const [statut, setStatut] = useState<StudentRequest["statut"]>("traite");
+  const [reponse, setReponse] = useState("");
+  const [error, setError] = useState<string | undefined>(undefined);
+
+  // Réinitialise le formulaire à chaque demande ouverte.
+  const demandeId = demande?.id;
+  useEffect(() => {
+    setStatut("traite");
+    setReponse("");
+    setError(undefined);
+  }, [demandeId]);
+
+  if (!demande) return null;
+
+  const submit = () => {
+    if (statut === "rejete" && reponse.trim().length < 3) {
+      setError("Un motif de refus est requis (3 caractères min)");
+      toast.error("Indiquez le motif du refus");
+      return;
+    }
+    onSubmit({ id: demande.id, statut, reponse: reponse.trim() });
+  };
+
+  return (
+    <FormDialog
+      open
+      onOpenChange={onOpenChange}
+      wide
+      title={statut === "rejete" ? "Rejeter la demande" : statut === "en_cours" ? "Mettre en cours" : "Approuver la demande"}
+      subtitle={demande.titre}
+      submitLabel={pending ? "Envoi…" : "Confirmer et notifier l'étudiant"}
+      onSubmit={submit}
+    >
+      <FullWidth>
+        <div className="rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
+          <p className="font-semibold text-foreground">{demande.titre}</p>
+          {demande.description ? <p className="mt-1">{demande.description}</p> : null}
+          <p className="mt-1">Type : {demande.type === "predefini" ? "Prédéfini" : "Libre"} · {new Date(demande.createdAt).toLocaleDateString("fr-FR")}</p>
+        </div>
+      </FullWidth>
+      <FullWidth>
+        <div className="flex items-center gap-1 rounded-full border border-brand/12 bg-muted/60 p-1">
+          {(
+            [
+              ["traite", "Approuver"],
+              ["en_cours", "En cours"],
+              ["rejete", "Rejeter"],
+            ] as const
+          ).map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setStatut(v)}
+              className={cn(
+                "flex-1 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors",
+                statut === v
+                  ? v === "rejete"
+                    ? "bg-alert text-white"
+                    : "bg-brand text-white"
+                  : "text-muted-foreground hover:text-brand-dk",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </FullWidth>
+      <FullWidth>
+        <div className="space-y-1.5">
+          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Réponse à l'étudiant {statut === "rejete" ? <span className="ml-0.5 text-alert">*</span> : "(optionnel)"}
+          </Label>
+          <textarea
+            value={reponse}
+            onChange={(e) => {
+              setReponse(e.target.value);
+              setError(undefined);
+            }}
+            rows={3}
+            maxLength={2000}
+            placeholder={
+              statut === "rejete"
+                ? "Expliquez pourquoi (ex. pièce manquante, délai dépassé)…"
+                : "Ex. Disponible au secrétariat dès demain matin…"
+            }
+            className="w-full rounded-xl border border-brand/20 bg-card px-3 py-2.5 text-sm hover:border-brand/35 focus-visible:border-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
+          />
+          {error ? <p className="text-[11px] text-alert">{error}</p> : null}
         </div>
       </FullWidth>
     </FormDialog>

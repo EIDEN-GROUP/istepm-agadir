@@ -171,28 +171,33 @@ export async function studentRoutes(app: FastifyInstance) {
     return reply.status(201).send(created);
   });
 
-  // ── Notifications : réponses du staff non encore vues ──
+  // ── Notifications : réponses du staff (non lues + lues récentes, non masquées) ──
   app.get("/notifications", { preHandler: [authenticate] }, async (request, reply) => {
     const db = getDb();
     const etudiant = await resolveEtudiant(db, request.user.id);
     if (!etudiant) return reply.status(404).send({ error: "Fiche étudiant introuvable pour ce compte" });
-    const condition = and(
+    const visibles = and(
       eq(studentRequests.etudiantId, etudiant.id),
       ne(studentRequests.statut, "en_attente"),
-      eq(studentRequests.luParEtudiant, false),
+      eq(studentRequests.masqueParEtudiant, false),
     );
     const [total, items] = await Promise.all([
-      db.select({ n: count() }).from(studentRequests).where(condition),
+      db
+        .select({ n: count() })
+        .from(studentRequests)
+        .where(and(visibles, eq(studentRequests.luParEtudiant, false))),
       db
         .select({
           id: studentRequests.id,
           titre: studentRequests.titre,
+          description: studentRequests.description,
           statut: studentRequests.statut,
           reponse: studentRequests.reponse,
+          luParEtudiant: studentRequests.luParEtudiant,
           updatedAt: studentRequests.updatedAt,
         })
         .from(studentRequests)
-        .where(condition)
+        .where(visibles)
         .orderBy(desc(studentRequests.updatedAt))
         .limit(10),
     ]);
@@ -210,6 +215,36 @@ export async function studentRoutes(app: FastifyInstance) {
       .where(and(eq(studentRequests.etudiantId, etudiant.id), eq(studentRequests.luParEtudiant, false)))
       .returning({ id: studentRequests.id });
     return { ok: true, lues: lues.length };
+  });
+
+  // ── Notifications : marquer UNE demande comme lue (reste visible, grisée) ──
+  app.post("/notifications/:id/lu", { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const db = getDb();
+    const etudiant = await resolveEtudiant(db, request.user.id);
+    if (!etudiant) return reply.status(404).send({ error: "Fiche étudiant introuvable pour ce compte" });
+    const [updated] = await db
+      .update(studentRequests)
+      .set({ luParEtudiant: true })
+      .where(and(eq(studentRequests.id, id), eq(studentRequests.etudiantId, etudiant.id)))
+      .returning({ id: studentRequests.id });
+    if (!updated) return reply.status(404).send({ error: "Demande introuvable" });
+    return { ok: true };
+  });
+
+  // ── Notifications : effacer UNE notification (cachée, jamais supprimée) ──
+  app.post("/notifications/:id/masquer", { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const db = getDb();
+    const etudiant = await resolveEtudiant(db, request.user.id);
+    if (!etudiant) return reply.status(404).send({ error: "Fiche étudiant introuvable pour ce compte" });
+    const [updated] = await db
+      .update(studentRequests)
+      .set({ masqueParEtudiant: true })
+      .where(and(eq(studentRequests.id, id), eq(studentRequests.etudiantId, etudiant.id)))
+      .returning({ id: studentRequests.id });
+    if (!updated) return reply.status(404).send({ error: "Demande introuvable" });
+    return { ok: true };
   });
 
   // ── Staff : toutes les demandes + traitement ──
@@ -238,6 +273,9 @@ export async function studentRoutes(app: FastifyInstance) {
         .object({
           statut: z.enum(["en_attente", "en_cours", "traite", "rejete"]),
           reponse: z.string().max(2000).optional().default(""),
+        })
+        .refine((v) => v.statut !== "rejete" || v.reponse.trim().length >= 3, {
+          message: "Un motif de refus est requis (3 caractères min)",
         })
         .parse(request.body);
       const db = getDb();

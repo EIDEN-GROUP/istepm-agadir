@@ -19,6 +19,8 @@ export const studentRequests = pgTable("student_requests", {
   reponse: text("reponse").notNull().default(""),
   /** Mis à false à chaque réponse du staff → cloche de l'étudiant. */
   luParEtudiant: boolean("lu_par_etudiant").notNull().default(false),
+  /** L'étudiant a effacé la notif (bouton X) : cachée, jamais supprimée. */
+  masqueParEtudiant: boolean("masque_par_etudiant").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -1,56 +1,59 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import {
   fetchStudentNotifications,
   markStudentNotificationsRead,
+  markStudentNotificationRead,
+  hideStudentNotification,
   fetchAllStudentRequests,
 } from "@/lib/istpm-api";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { softSelectContent, toneBadge } from "@/lib/dash-ui";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { DetailShell } from "@/components/dash-page";
+import { dialogSurface, toneBadge } from "@/lib/dash-ui";
 import { cn } from "@/lib/utils";
 
+type Tone = "amber" | "blue" | "teal" | "red";
+
+type BellItem = {
+  id: string;
+  title: string;
+  sub: string;
+  detail: string;
+  date: string;
+  tone: Tone;
+  label: string;
+  lu: boolean;
+};
+
 /**
- * Cloche des demandes — petit bouton qui n'existe que s'il y a du nouveau.
+ * Cloche des demandes — petit bouton qui n'existe que s'il y a du nouveau,
+ * et qui ouvre une **modale** (pas un simple menu).
  *
- * - Étudiant : réponses du staff non encore vues (`GET /student/notifications`,
- *   sondé toutes les 60 s). « Tout marquer comme lu » solde le compteur.
- * - Direction/responsable : demandes `en_attente` à traiter ; clic → espace étudiant.
- * - Autres rôles / compteur à zéro : rien n'est rendu (pas même le bouton).
+ * - Étudiant : réponses du staff. Cliquer sur une demande l'ouvre (détail) et la
+ *   marque comme lue : elle **reste visible mais grisée**. Le bouton X **efface**
+ *   la notification (cachée côté cloche, jamais supprimée en base).
+ * - Direction/responsable : demandes `en_attente` ; clic → espace étudiant.
+ * - Compteur à zéro (et modale fermée) : rien n'est rendu, pas même le bouton.
  */
 export function RequestBell() {
   const { role } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const isStudent = role === "etudiant";
   const isStaff = role === "directeur" || role === "responsable";
-  if (!isStudent && !isStaff) return null;
 
-  return <RequestBellInner isStudent={isStudent} open={open} setOpen={setOpen} navigate={navigate} qc={qc} />;
-}
-
-function RequestBellInner({
-  isStudent,
-  open,
-  setOpen,
-  navigate,
-  qc,
-}: {
-  isStudent: boolean;
-  open: boolean;
-  setOpen: (o: boolean) => void;
-  navigate: ReturnType<typeof useNavigate>;
-  qc: ReturnType<typeof useQueryClient>;
-}) {
   const studentQ = useQuery({
     queryKey: ["student-notifications"],
     queryFn: fetchStudentNotifications,
@@ -61,52 +64,90 @@ function RequestBellInner({
   const staffQ = useQuery({
     queryKey: ["student-requests-all"],
     queryFn: () => fetchAllStudentRequests(),
-    enabled: !isStudent,
+    enabled: isStaff,
     refetchInterval: 60_000,
     retry: false,
   });
 
-  const luMut = useMutation({
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["student-notifications"] });
+    qc.invalidateQueries({ queryKey: ["student-requests"] });
+  };
+  const onErr = (err: unknown) =>
+    toast.error(err instanceof Error ? err.message : "Action impossible");
+
+  const markOne = useMutation({
+    mutationFn: markStudentNotificationRead,
+    onSuccess: refresh,
+    onError: onErr,
+  });
+  const hideOne = useMutation({
+    mutationFn: hideStudentNotification,
+    onSuccess: refresh,
+    onError: onErr,
+  });
+  const markAll = useMutation({
     mutationFn: markStudentNotificationsRead,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["student-notifications"] });
-      qc.invalidateQueries({ queryKey: ["student-requests"] });
-      setOpen(false);
+      refresh();
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Marquage impossible"),
+    onError: onErr,
   });
+
+  if (!isStudent && !isStaff) return null;
 
   const unread = isStudent
     ? (studentQ.data?.unread ?? 0)
     : ((staffQ.data ?? []).filter((d) => d.statut === "en_attente").length ?? 0);
-  if (!unread) return null;
+  if (!unread && !open) return null;
 
-  const items = isStudent
-    ? ((studentQ.data?.items ?? []).map((n) => ({
-        id: n.id,
-        title: n.titre,
-        sub: n.reponse || "Statut mis à jour",
-        date: new Date(n.updatedAt).toLocaleDateString("fr-FR"),
-        tone: n.statut === "traite" ? ("teal" as const) : n.statut === "rejete" ? ("red" as const) : ("blue" as const),
-        label: n.statut === "traite" ? "Traitée" : n.statut === "rejete" ? "Rejetée" : "En cours",
-      })))
+  const items: BellItem[] = isStudent
+    ? [...(studentQ.data?.items ?? [])]
+        .sort(
+          (a, b) =>
+            Number(a.luParEtudiant) - Number(b.luParEtudiant) ||
+            +new Date(b.updatedAt) - +new Date(a.updatedAt),
+        )
+        .map((n) => ({
+          id: n.id,
+          title: n.titre,
+          sub: n.reponse || "Statut mis à jour",
+          detail: n.description || "",
+          date: new Date(n.updatedAt).toLocaleDateString("fr-FR"),
+          tone: (n.statut === "traite" ? "teal" : n.statut === "rejete" ? "red" : "blue") as Tone,
+          label: n.statut === "traite" ? "Traitée" : n.statut === "rejete" ? "Rejetée" : "En cours",
+          lu: n.luParEtudiant,
+        }))
     : ((staffQ.data ?? [])
         .filter((d) => d.statut === "en_attente")
-        .slice(0, 6)
+        .slice(0, 8)
         .map((d) => ({
           id: d.id,
           title: d.titre,
           sub: d.description,
+          detail: d.description,
           date: new Date(d.createdAt).toLocaleDateString("fr-FR"),
-          tone: "amber" as const,
+          tone: "amber" as Tone,
           label: "À traiter",
+          lu: false,
         })));
 
+  const openItem = (it: BellItem) => {
+    if (isStudent) {
+      if (!it.lu) markOne.mutate(it.id);
+      setExpandedId((prev) => (prev === it.id ? null : it.id));
+    } else {
+      setOpen(false);
+      navigate({ to: "/dashboard/espace-etudiant" });
+    }
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <>
+      {!unread ? null : (
         <button
           type="button"
+          onClick={() => setOpen(true)}
           aria-label={isStudent ? "Réponses à mes demandes" : "Demandes à traiter"}
           className="relative grid h-9 w-9 place-items-center rounded-xl border border-brand/20 bg-card text-muted-foreground shadow-[var(--elevation-1)] transition hover:bg-brand/10 hover:text-brand-dk"
         >
@@ -115,57 +156,116 @@ function RequestBellInner({
             {unread > 9 ? "9+" : unread}
           </span>
         </button>
-      </PopoverTrigger>
-      <PopoverContent className={cn(softSelectContent, "w-80 p-0")} align="end">
-        <p className="border-b border-brand/10 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {isStudent ? "Réponses du secrétariat" : "Demandes en attente"}
-        </p>
-        <ul className="max-h-72 divide-y divide-brand/8 overflow-y-auto">
-          {items.map((it) => (
-            <li key={it.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  navigate({ to: "/dashboard/espace-etudiant" });
-                }}
-                className="block w-full px-4 py-2.5 text-start transition hover:bg-brand/5"
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold text-foreground">{it.title}</span>
-                  <span className={cn(toneBadge(it.tone), "shrink-0")}>{it.label}</span>
-                </span>
-                <span className="mt-0.5 block truncate text-xs text-muted-foreground">{it.sub}</span>
-                <span className="text-[10px] text-muted-foreground/70">{it.date}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        <div className="border-t border-brand/10 p-2">
-          {isStudent ? (
-            <button
-              type="button"
-              disabled={luMut.isPending}
-              onClick={() => luMut.mutate()}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-brand-dk transition hover:bg-brand/10 disabled:opacity-50"
-            >
-              <CheckCheck className="h-3.5 w-3.5" />
-              {luMut.isPending ? "Marquage…" : "Tout marquer comme lu"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                navigate({ to: "/dashboard/espace-etudiant" });
-              }}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-brand-dk transition hover:bg-brand/10"
-            >
-              Ouvrir l'espace étudiant
-            </button>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className={dialogSurface}>
+          <DialogTitle className="sr-only">Notifications des demandes</DialogTitle>
+          <DialogDescription className="sr-only">
+            {isStudent ? "Réponses du secrétariat" : "Demandes en attente"}
+          </DialogDescription>
+          <DetailShell
+            icon={<Bell className="h-5 w-5" />}
+            title="Notifications"
+            subtitle={
+              isStudent
+                ? unread
+                  ? `${unread} non lue${unread > 1 ? "s" : ""}`
+                  : "Tout est à jour"
+                : `${unread} demande${unread > 1 ? "s" : ""} en attente`
+            }
+            footer={
+              isStudent ? (
+                <button
+                  type="button"
+                  disabled={!unread || markAll.isPending}
+                  onClick={() => markAll.mutate()}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-brand-dk transition hover:bg-brand/10 disabled:opacity-50"
+                >
+                  <CheckCheck className="h-3.5 w-3.5" />
+                  {markAll.isPending ? "Marquage…" : "Tout marquer comme lu"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate({ to: "/dashboard/espace-etudiant" });
+                  }}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-brand-dk transition hover:bg-brand/10"
+                >
+                  Ouvrir l'espace étudiant
+                </button>
+              )
+            }
+          >
+            {items.length ? (
+              <ul className="max-h-[50vh] divide-y divide-brand/8 overflow-y-auto">
+                {items.map((it) => {
+                  const expanded = expandedId === it.id;
+                  return (
+                    <li
+                      key={it.id}
+                      className={cn(it.lu && "opacity-55 saturate-50")}
+                    >
+                      <div className="flex items-start gap-1 px-1 py-1">
+                        <button
+                          type="button"
+                          onClick={() => openItem(it)}
+                          className="min-w-0 flex-1 rounded-xl px-3 py-2 text-start transition hover:bg-brand/5"
+                        >
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              {!it.lu ? (
+                                <span className="h-2 w-2 shrink-0 rounded-full bg-med" aria-hidden />
+                              ) : null}
+                              <span className="truncate text-sm font-semibold text-foreground">
+                                {it.title}
+                              </span>
+                            </span>
+                            <span className={cn(toneBadge(it.tone), "shrink-0")}>{it.label}</span>
+                          </span>
+                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                            {it.sub}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/70">{it.date}</span>
+                          {expanded && isStudent ? (
+                            <span className="mt-2 block space-y-1.5 rounded-xl bg-muted/50 p-3">
+                              {it.detail ? (
+                                <span className="block text-xs text-foreground">{it.detail}</span>
+                              ) : null}
+                              {it.sub ? (
+                                <span className="block text-xs text-muted-foreground">
+                                  Réponse : {it.sub}
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : null}
+                        </button>
+                        {isStudent ? (
+                          <button
+                            type="button"
+                            onClick={() => hideOne.mutate(it.id)}
+                            aria-label={`Effacer « ${it.title} »`}
+                            title="Effacer"
+                            className="mt-1.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-alert/10 hover:text-alert-dk"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                Aucune notification — tout est à jour.
+              </p>
+            )}
+          </DetailShell>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

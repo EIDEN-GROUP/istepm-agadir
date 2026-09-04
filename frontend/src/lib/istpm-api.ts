@@ -816,8 +816,10 @@ export function updateStudentRequest(id: string, data: { statut: StudentRequest[
 export interface StudentNotification {
   id: string;
   titre: string;
+  description: string;
   statut: string;
   reponse: string;
+  luParEtudiant: boolean;
   updatedAt: string;
 }
 
@@ -828,6 +830,16 @@ export function fetchStudentNotifications() {
 
 export function markStudentNotificationsRead() {
   return api.post<{ ok: boolean; lues: number }>("/student/notifications/lu");
+}
+
+/** Ouvrir = marquer comme lue (reste visible, grisée). */
+export function markStudentNotificationRead(id: string) {
+  return api.post<{ ok: boolean }>(`/student/notifications/${id}/lu`);
+}
+
+/** Bouton X = effacer la notification (cachée, jamais supprimée). */
+export function hideStudentNotification(id: string) {
+  return api.post<{ ok: boolean }>(`/student/notifications/${id}/masquer`);
 }
 
 /** Catalogue officiel des demandes prédéfinies (même liste front + back-office). */
