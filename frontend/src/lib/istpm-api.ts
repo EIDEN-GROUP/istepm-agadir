@@ -813,6 +813,23 @@ export function updateStudentRequest(id: string, data: { statut: StudentRequest[
   return api.patch<StudentRequest>(`/student/requests/${id}`, data);
 }
 
+export interface StudentNotification {
+  id: string;
+  titre: string;
+  statut: string;
+  reponse: string;
+  updatedAt: string;
+}
+
+/** Cloche étudiant : réponses du staff non encore vues (sondée toutes les 60 s). */
+export function fetchStudentNotifications() {
+  return api.get<{ unread: number; items: StudentNotification[] }>("/student/notifications");
+}
+
+export function markStudentNotificationsRead() {
+  return api.post<{ ok: boolean; lues: number }>("/student/notifications/lu");
+}
+
 /** Catalogue officiel des demandes prédéfinies (même liste front + back-office). */
 export const CATALOGUE_DEMANDES: { titre: string; description: string }[] = [
   { titre: "Attestation de scolarité", description: "Je souhaite obtenir une attestation de scolarité pour l'année en cours." },

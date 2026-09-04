@@ -16,7 +16,7 @@ import { schoolVacations } from "@/db/schema/vacations";
 import { calendarExceptions } from "@/db/schema/calendar-exceptions";
 import { attendance } from "@/db/schema/attendance";
 import { historiquePaiements } from "@/db/schema/historique-paiements";
-import { eq, and, desc, gte, lte, sql, count } from "drizzle-orm";
+import { eq, and, ne, desc, gte, lte, sql, count } from "drizzle-orm";
 
 const createRequestSchema = z.object({
   type: z.enum(["libre", "predefini"]).optional().default("libre"),
@@ -166,9 +166,50 @@ export async function studentRoutes(app: FastifyInstance) {
 
     const [created] = await db
       .insert(studentRequests)
-      .values({ etudiantId: etudiant.id, type: input.type, titre: input.titre.trim(), description: (input.description ?? "").trim() })
+      .values({ etudiantId: etudiant.id, type: input.type, titre: input.titre.trim(), description: (input.description ?? "").trim(), luParEtudiant: true })
       .returning();
     return reply.status(201).send(created);
+  });
+
+  // ── Notifications : réponses du staff non encore vues ──
+  app.get("/notifications", { preHandler: [authenticate] }, async (request, reply) => {
+    const db = getDb();
+    const etudiant = await resolveEtudiant(db, request.user.id);
+    if (!etudiant) return reply.status(404).send({ error: "Fiche étudiant introuvable pour ce compte" });
+    const condition = and(
+      eq(studentRequests.etudiantId, etudiant.id),
+      ne(studentRequests.statut, "en_attente"),
+      eq(studentRequests.luParEtudiant, false),
+    );
+    const [total, items] = await Promise.all([
+      db.select({ n: count() }).from(studentRequests).where(condition),
+      db
+        .select({
+          id: studentRequests.id,
+          titre: studentRequests.titre,
+          statut: studentRequests.statut,
+          reponse: studentRequests.reponse,
+          updatedAt: studentRequests.updatedAt,
+        })
+        .from(studentRequests)
+        .where(condition)
+        .orderBy(desc(studentRequests.updatedAt))
+        .limit(10),
+    ]);
+    return { unread: Number(total[0]?.n ?? 0), items };
+  });
+
+  // ── Notifications : tout marquer comme lu ──
+  app.post("/notifications/lu", { preHandler: [authenticate] }, async (request, reply) => {
+    const db = getDb();
+    const etudiant = await resolveEtudiant(db, request.user.id);
+    if (!etudiant) return reply.status(404).send({ error: "Fiche étudiant introuvable pour ce compte" });
+    const lues = await db
+      .update(studentRequests)
+      .set({ luParEtudiant: true })
+      .where(and(eq(studentRequests.etudiantId, etudiant.id), eq(studentRequests.luParEtudiant, false)))
+      .returning({ id: studentRequests.id });
+    return { ok: true, lues: lues.length };
   });
 
   // ── Staff : toutes les demandes + traitement ──
@@ -202,7 +243,7 @@ export async function studentRoutes(app: FastifyInstance) {
       const db = getDb();
       const [updated] = await db
         .update(studentRequests)
-        .set({ statut: input.statut, reponse: input.reponse ?? "", updatedAt: new Date() })
+        .set({ statut: input.statut, reponse: input.reponse ?? "", luParEtudiant: false, updatedAt: new Date() })
         .where(eq(studentRequests.id, id))
         .returning();
       if (!updated) return reply.status(404).send({ error: "Demande introuvable" });

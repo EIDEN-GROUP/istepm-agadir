@@ -54,6 +54,7 @@ Pure Vite + React SPA. No SSR. TanStack Router file-based routing with auth guar
 | `/dashboard` | Dashboard (auth required) |
 | `/dashboard/` | Dashboard home   stats, charts, recent payments (étudiant : carte vers son espace) |
 | `/dashboard/espace-etudiant` | Espace étudiant (rôle `etudiant`) : profil + photo, enseignants, stage, calendrier, notes, paiements, demandes |
+| `/dashboard` | Cloche des demandes en haut à droite (visible uniquement s'il y a du nouveau : réponses non lues côté étudiant, demandes en attente côté staff) |
 | `/dashboard/familles` | Client management |
 | `/dashboard/paiements` | Payment tracking |
 | `/dashboard/calendar` | Calendar with holidays/vacations |
@@ -110,8 +111,10 @@ npm run db:migrate
 npm run db:studio
 ```
 
-Latest: `0013_student_workspace` (`etudiants.user_id` + `photo_url`,
-`student_requests`). On the VPS, verify/apply with (see
+Latest: `0014_student_request_read` (`student_requests.lu_par_etudiant` pour la
+cloche). `src/db/migrate.ts` fait un baseline automatique (0000..0013) quand
+l'historique `drizzle.__drizzle_migrations` est vide sur une base déjà migrée
+en SQL manuel — les deploys restent verts. On the VPS, verify/apply with (see
 `M:\plan\istepm\TASK_NOTES.md` for the full commands):
 
 ```bash

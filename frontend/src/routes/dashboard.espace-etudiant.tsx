@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
@@ -25,6 +25,8 @@ import {
   updateStudentPhoto,
   fetchAllStudentRequests,
   updateStudentRequest,
+  fetchStudentNotifications,
+  markStudentNotificationsRead,
   CATALOGUE_DEMANDES,
   type StudentRequest,
 } from "@/lib/istpm-api";
@@ -120,6 +122,7 @@ function EspaceEtudiantPage() {
     queryKey: ["student-requests"],
     queryFn: fetchStudentRequests,
     retry: false,
+    refetchInterval: 60_000,
   });
 
   const allReqQuery = useQuery({
@@ -127,7 +130,30 @@ function EspaceEtudiantPage() {
     queryFn: () => fetchAllStudentRequests(),
     retry: false,
     enabled: isStaff,
+    refetchInterval: 60_000,
   });
+
+  // Cloche partagée : réponses non lues (lues auto à l'ouverture de cette page).
+  const notifQ = useQuery({
+    queryKey: ["student-notifications"],
+    queryFn: fetchStudentNotifications,
+    retry: false,
+    enabled: !isStaff,
+    refetchInterval: 60_000,
+  });
+  const luMut = useMutation({
+    mutationFn: markStudentNotificationsRead,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["student-notifications"] });
+    },
+  });
+  const autoLu = useRef(false);
+  useEffect(() => {
+    if (!isStaff && !autoLu.current && (notifQ.data?.unread ?? 0) > 0 && reqQuery.data) {
+      autoLu.current = true;
+      luMut.mutate();
+    }
+  }, [isStaff, notifQ.data, reqQuery.data, luMut]);
 
   /* ----- Repli démo : backend indisponible ou compte non lié ----- */
   const fallback = useMemo(() => {

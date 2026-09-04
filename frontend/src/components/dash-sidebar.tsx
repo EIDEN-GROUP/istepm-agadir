@@ -25,6 +25,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { ROLES, ROLE_META, useAuth } from "@/lib/auth";
+import { RequestBell } from "@/components/request-bell";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
 import { useIstpm } from "@/lib/istpm-store";
 import { toast } from "sonner";
@@ -836,6 +837,10 @@ export function DashSidebarShell({
               {brand}
             </span>
           </Link>
+          {/* Cloche des demandes (rendue seulement s'il y a du nouveau). */}
+          <div className="ms-auto shrink-0">
+            <RequestBell />
+          </div>
         </header>
 
         <main className="scroll-touch min-h-0 flex-1 overflow-y-auto">
@@ -849,6 +854,10 @@ export function DashSidebarShell({
 
       <Toaster />
       <AiChatFloating />
+      {/* Cloche des demandes sur desktop (coin haut-droit, seulement s'il y a du nouveau). */}
+      <div className="fixed end-6 top-6 z-40 hidden lg:block">
+        <RequestBell />
+      </div>
     </div>
   );
 }

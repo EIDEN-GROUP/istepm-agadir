@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, boolean, timestamp } from "drizzle-orm/pg-core";
 import { etudiants } from "./etudiants";
 
 /**
@@ -17,6 +17,8 @@ export const studentRequests = pgTable("student_requests", {
   description: text("description").notNull().default(""),
   statut: text("statut").notNull().default("en_attente"),
   reponse: text("reponse").notNull().default(""),
+  /** Mis à false à chaque réponse du staff → cloche de l'étudiant. */
+  luParEtudiant: boolean("lu_par_etudiant").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
