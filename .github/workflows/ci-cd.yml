@@ -173,34 +173,62 @@ jobs:
               sleep 3
             done || echo "Postgres wait timed out, proceeding anyway..."
 
-            # Run database migrations as a one-off Swarm service
+            # Run database migrations inside the updated backend task.
+            # A one-off swarm service was flaky here: fresh tasks raced the
+            # rolling update and failed DNS for `postgres` (ENOTFOUND).
+            # Exec reuses the backend task's own network + env, like deploy.sh.
             echo "Running database migrations..."
+            # Hygiene: remove any leftover one-off migrate service
             docker service rm school-crm-migrate 2>/dev/null || true
-            docker service create \
-              --name school-crm-migrate \
-              --network school-crm_school-crm \
-              --restart-condition none \
-              -e DATABASE_URL="postgres://postgres:${DB_PASSWORD}@postgres:5432/school_crm" \
-              ghcr.io/eiden-group/istepm-agadir/school-crm-api:${{ github.sha }} \
-              node --import tsx/esm dist/db/migrate.js
 
-            # Wait for migration task to complete
-            sleep 5
-            echo "Waiting for migration to finish..."
+            # Wait for the backend rolling update to finish so we migrate
+            # from a task running the NEW image (which carries 0013).
             for i in $(seq 1 60); do
-              STATE=$(docker service ps school-crm-migrate --format '{{.CurrentState}}' 2>/dev/null)
-              case "$STATE" in
-                *"Complete"*) echo "Migration completed successfully"; break;;
-                *"Failed"*) echo "Migration failed"; docker service logs school-crm-migrate --tail 50; exit 1;;
-                *"Shutdown"*) echo "Migration shut down"; break;;
-                "") echo "  No task yet... ($i)"; sleep 3; continue;;
-                *) echo "  State: $STATE ($i)";;
-              esac
-              sleep 3
+              STATE=$(docker service inspect --format '{{.UpdateStatus.State}}' school-crm_backend 2>/dev/null || echo "")
+              if [ "$STATE" = "completed" ] || [ -z "$STATE" ]; then
+                echo "Backend update state: ${STATE:-none (first deploy)}"
+                break
+              fi
+              echo "  Backend update state: $STATE ($i)"
+              sleep 5
             done
 
-            # Show migration logs
-            docker service logs school-crm-migrate --tail 20 || true
-            docker service rm school-crm-migrate 2>/dev/null || true
+            # Wait for a backend task to answer /health
+            BACKEND_CONTAINER=""
+            for i in $(seq 1 60); do
+              BACKEND_CONTAINER=$(docker ps --filter name=school-crm_backend --format '{{.ID}}' | head -1)
+              if [ -n "$BACKEND_CONTAINER" ]; then
+                if docker exec "$BACKEND_CONTAINER" node --eval "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))" 2>/dev/null; then
+                  echo "Backend is healthy, running migrations..."
+                  break
+                fi
+                echo "  Backend task starting... ($i)"
+              else
+                echo "  Waiting for backend task... ($i)"
+              fi
+              BACKEND_CONTAINER=""
+              sleep 5
+            done
+            if [ -z "$BACKEND_CONTAINER" ]; then
+              echo "Backend never became healthy"
+              docker service logs school-crm_backend --tail 50
+              exit 1
+            fi
+
+            MIG_OK=0
+            for i in 1 2 3; do
+              if docker exec "$BACKEND_CONTAINER" node --import tsx/esm dist/db/migrate.js; then
+                echo "Migration completed successfully"
+                MIG_OK=1
+                break
+              fi
+              echo "  Migration attempt $i failed, retrying in 10s..."
+              sleep 10
+            done
+            if [ "$MIG_OK" != "1" ]; then
+              echo "Migration failed"
+              docker service logs school-crm_backend --tail 50
+              exit 1
+            fi
 
             echo "Deployment complete!"

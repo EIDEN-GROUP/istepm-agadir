@@ -66,14 +66,15 @@ for i in $(seq 1 30); do
   BACKEND_CONTAINER=$(docker ps --filter "name=${STACK_NAME}_backend" --format '{{.ID}}' | head -1)
   if [ -n "$BACKEND_CONTAINER" ]; then
     echo "→ Running database migrations..."
-    docker exec "$BACKEND_CONTAINER" node dist/db/migrate.js && echo "→ Migrations complete." || echo "⚠️  Migration failed!"
+    # tsx loader required: dist/ keeps @/ path aliases (plain node can't resolve them)
+    docker exec "$BACKEND_CONTAINER" node --import tsx/esm dist/db/migrate.js && echo "→ Migrations complete." || echo "⚠️  Migration failed!"
     break
   fi
   sleep 2
 done
 if [ -z "${BACKEND_CONTAINER:-}" ]; then
   echo "⚠️  Backend container not found after 60s. Run migrations manually:"
-  echo "   docker exec -it \$(docker ps --filter name=${STACK_NAME}_backend -q | head -1) node dist/db/migrate.js"
+  echo "   docker exec -it \$(docker ps --filter name=${STACK_NAME}_backend -q | head -1) node --import tsx/esm dist/db/migrate.js"
 fi
 
 echo ""
