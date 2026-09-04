@@ -147,6 +147,8 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
     "/dashboard/paiements",
     "/dashboard/settings",
   ],
+  // L'étudiant ne voit que son tableau de bord et son espace personnel.
+  etudiant: ["/dashboard", "/dashboard/espace-etudiant"],
 };
 
 /** Is this destination reachable by this role? Used to gate routes and links. */
@@ -213,6 +215,12 @@ export function useDashboardNav(role: UserRole | null) {
         Users,
       ),
       item("/dashboard/stages", t.nav.stages, t.navShort.stages, Stethoscope),
+      item(
+        "/dashboard/espace-etudiant",
+        "Mon espace",
+        "Espace",
+        GraduationCap,
+      ),
       item(
         "/dashboard/paiements",
         t.nav.paiements,

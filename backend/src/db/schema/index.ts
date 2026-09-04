@@ -37,3 +37,4 @@ export { attendance, attendanceSession } from "./attendance";
 export { reminders } from "./reminders";
 export { modules } from "./modules";
 export { groupConfigs } from "./groupConfigs";
+export { studentRequests } from "./student-requests";

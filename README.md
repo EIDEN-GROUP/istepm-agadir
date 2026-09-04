@@ -52,14 +52,23 @@ Pure Vite + React SPA. No SSR. TanStack Router file-based routing with auth guar
 | `/` | Redirects to `/login` |
 | `/login` | Login form |
 | `/dashboard` | Dashboard (auth required) |
-| `/dashboard/` | Dashboard home   stats, charts, recent payments |
+| `/dashboard/` | Dashboard home   stats, charts, recent payments (étudiant : carte vers son espace) |
+| `/dashboard/espace-etudiant` | Espace étudiant (rôle `etudiant`) : profil + photo, enseignants, stage, calendrier, notes, paiements, demandes |
 | `/dashboard/familles` | Client management |
 | `/dashboard/paiements` | Payment tracking |
 | `/dashboard/calendar` | Calendar with holidays/vacations |
 | `/dashboard/affiches` | Employee management |
 | `/dashboard/planifications` | Academic planning |
+| `/dashboard/stages` | Stages cliniques (Structure d'accueil + Service en dropdowns créables : taper une valeur l'enregistre) |
 | `/dashboard/rapports` | Reports |
-| `/dashboard/settings` | Centre settings |
+| `/dashboard/settings` | Centre settings (dont création des comptes étudiants : rôle + CNE de liaison) |
+
+### Roles
+
+`directeur` (accès complet) · `enseignant` (pédagogie) · `responsable`
+(scolarité) · **`etudiant`** (espace personnel uniquement). Voir
+`frontend/src/lib/dashboard-i18n.tsx` (`NAV_BY_ROLE`) et le contrat détaillé dans
+`M:\plan\istepm\STUDENT_WORKSPACE.md`.
 
 ### Dev
 
@@ -99,6 +108,17 @@ npm run db:migrate
 
 # Open Drizzle Studio (GUI)
 npm run db:studio
+```
+
+Latest: `0013_student_workspace` (`etudiants.user_id` + `photo_url`,
+`student_requests`). On the VPS, verify/apply with (see
+`M:\plan\istepm\TASK_NOTES.md` for the full commands):
+
+```bash
+PG=$(docker ps --filter name=school-crm_postgres --format '{{.ID}}' | head -1)
+docker exec -i "$PG" psql -U postgres -d school_crm -c "\d student_requests"
+BACKEND=$(docker ps --filter name=school-crm_backend --format '{{.ID}}' | head -1)
+docker exec "$BACKEND" node dist/db/migrate.js
 ```
 
 ## Docker
@@ -228,3 +248,9 @@ Traefik auto-provisions Let's Encrypt TLS certificates for `API_DOMAIN`.
 ## Project structure
 
 See `frontend/STRUCTURE.md` and `backend/STRUCTURE.md` for detailed file-by-file breakdown.
+
+## Working notes (M:\plan\istepm)
+
+- `STUDENT_WORKSPACE.md`   spec + API contract of the student workspace
+- `TASK_NOTES.md`   decisions, VPS commands, test account, manual QA checklist
+- `DEAD_CODE.md`   unused/legacy code inventory (listed, NOT removed)

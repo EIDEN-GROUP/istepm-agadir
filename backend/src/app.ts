@@ -33,6 +33,7 @@ import { eventRoutes } from "@/routes/events";
 import { notificationRoutes } from "@/routes/notifications";
 import { seanceRoutes } from "@/routes/seances";
 import { teacherRoutes } from "@/routes/teacher";
+import { studentRoutes } from "@/routes/student";
 import { userPreferenceRoutes } from "@/routes/user-preferences";
 import { attendanceRoutes } from "@/routes/attendance";
 import { reminderRoutes } from "@/routes/reminders";
@@ -111,6 +112,7 @@ export async function buildApp() {
   await app.register(notificationRoutes, { prefix: "/api/notifications" });
   await app.register(seanceRoutes, { prefix: "/api/seances" });
   await app.register(teacherRoutes, { prefix: "/api/teacher" });
+  await app.register(studentRoutes, { prefix: "/api/student" });
   await app.register(userPreferenceRoutes, { prefix: "/api/preferences" });
   await app.register(attendanceRoutes, { prefix: "/api/attendance" });
   await app.register(reminderRoutes, { prefix: "/api/reminders" });

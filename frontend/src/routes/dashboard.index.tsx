@@ -1303,9 +1303,35 @@ function DashboardResponsable() {
 
 function DashboardIndex() {
   const { role } = useAuth();
+  if (role === "etudiant") return <DashboardEtudiant />;
   return (
     <div className="space-y-6">
       {role === "enseignant" ? <DashboardEnseignant /> : role === "responsable" ? <DashboardResponsable /> : <DashboardDirecteur />}
+    </div>
+  );
+}
+
+/** Accueil minimal de l'étudiant : renvoie vers son espace personnel. */
+function DashboardEtudiant() {
+  return (
+    <div className="space-y-6">
+      <div className="overflow-hidden rounded-3xl border border-brand/10 bg-card p-6 shadow-[var(--elevation-2)] sm:p-8">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Espace étudiant
+        </p>
+        <h1 className="mt-1 font-display text-2xl tracking-tight text-foreground sm:text-3xl">
+          Bienvenue sur votre espace
+        </h1>
+        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+          Retrouvez votre profil, vos enseignants, votre stage, votre calendrier et vos demandes au même endroit.
+        </p>
+        <Link
+          to="/dashboard/espace-etudiant"
+          className="mt-4 inline-flex items-center gap-2 rounded-full bg-med px-5 py-2.5 text-sm font-bold text-white shadow transition hover:bg-med-dk active:scale-[0.98]"
+        >
+          Ouvrir mon espace
+        </Link>
+      </div>
     </div>
   );
 }

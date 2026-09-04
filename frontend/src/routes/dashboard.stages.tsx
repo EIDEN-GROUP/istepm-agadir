@@ -72,6 +72,7 @@ import {
   TextField,
   NumberField,
   SelectField,
+  CreatableComboField,
   FullWidth,
 } from "@/components/dash-form";
 import {
@@ -424,7 +425,7 @@ function StagesAnalytics({
 
 function StagesPage() {
   const { role } = useAuth();
-  const { stages, etudiants, structuresAccueil, addStage, updateStage, deleteStage } = useIstpm();
+  const { stages, etudiants, structuresAccueil, servicesStage, addStage, updateStage, deleteStage, addStructureAccueil, addServiceStage } = useIstpm();
   // Conventions are handled by student administration.
   const canManage = role === "directeur" || role === "responsable";
 
@@ -835,6 +836,15 @@ function StagesPage() {
           initial={editing}
           etudiants={etudiants}
           structuresAccueil={structuresAccueil.map((s) => s.nom)}
+          servicesStage={servicesStage}
+          onCreateStructure={(nom) => {
+            addStructureAccueil(nom, 5);
+            toast.success(`Structure enregistrée — ${nom}`);
+          }}
+          onCreateService={(nom) => {
+            addServiceStage(nom);
+            toast.success(`Service enregistré — ${nom}`);
+          }}
           onCancel={() => setFormOpen(false)}
           onSubmit={(data) => {
             if (editing) {
@@ -856,6 +866,10 @@ function StagesPage() {
           etudiants={etudiants}
           stages={stages}
           structuresAccueil={structuresAccueil}
+          onCreateStructure={(nom) => {
+            addStructureAccueil(nom, 5);
+            toast.success(`Structure enregistrée — ${nom}`);
+          }}
           onConfirm={(affectations) => {
             for (const { etudiant, structure } of affectations) {
               addStage({
@@ -915,12 +929,18 @@ function StageForm({
   initial,
   etudiants,
   structuresAccueil: structures,
+  servicesStage,
+  onCreateStructure,
+  onCreateService,
   onSubmit,
   onCancel,
 }: {
   initial: Stage | null;
   etudiants: ReturnType<typeof useIstpm>["etudiants"];
   structuresAccueil: string[];
+  servicesStage: string[];
+  onCreateStructure: (nom: string) => void;
+  onCreateService: (nom: string) => void;
   onSubmit: (data: Omit<Stage, "id">) => void;
   onCancel: () => void;
 }) {
@@ -950,7 +970,7 @@ function StageForm({
     const next: Record<string, string> = {};
     const etudiant = etudiants.find((e) => e.id === f.etudiantId);
     if (!etudiant) next.etudiantId = "Étudiant obligatoire";
-    if (!f.structure) next.structure = "Structure obligatoire";
+    if (!f.structure.trim()) next.structure = "Structure obligatoire";
     if (!f.service.trim()) next.service = "Service obligatoire";
     if (!f.debut) next.debut = "Date de début obligatoire";
     if (!f.fin) next.fin = "Date de fin obligatoire";
@@ -974,8 +994,8 @@ function StageForm({
       nom: etudiant.nom,
       filiere: etudiant.filiere as Filiere,
       niveau: etudiant.niveau as Niveau,
-      structure: f.structure,
-      service: f.service.trim(),
+      structure: f.structure.trim().replace(/\s+/g, " "),
+      service: f.service.trim().replace(/\s+/g, " "),
       encadrantClinique: f.encadrantClinique.trim(),
       tuteurAcademique: f.tuteurAcademique.trim(),
       debut: f.debut,
@@ -1016,21 +1036,27 @@ function StageForm({
         />
       </FullWidth>
       <FullWidth>
-        <SelectField
+        <CreatableComboField
           label="Structure d'accueil"
           required
           value={f.structure}
           onChange={(v) => set("structure", v)}
+          onCreate={onCreateStructure}
           options={structures}
+          placeholder="Sélectionner ou taper une structure…"
+          searchPlaceholder="Rechercher ou taper une structure…"
           error={errors.structure}
         />
       </FullWidth>
-      <TextField
+      <CreatableComboField
         label="Service"
         required
         value={f.service}
         onChange={(v) => set("service", v)}
-        placeholder="Médecine interne"
+        onCreate={onCreateService}
+        options={servicesStage}
+        placeholder="Sélectionner ou taper un service…"
+        searchPlaceholder="Rechercher ou taper un service…"
         error={errors.service}
       />
       <SelectField

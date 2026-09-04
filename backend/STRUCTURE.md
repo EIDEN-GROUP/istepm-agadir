@@ -64,7 +64,16 @@ backend/
 └── package.json
 ```
 
-## Database tables (19)
+## Database tables (19 legacy + ISTPM)
+
+> Le tableau ci-dessous listait 19 tables historiques. Le schéma réel
+> (`src/db/schema/`, 40 exports) ajoute les tables ISTPM suivantes :
+> `etudiants` (+`user_id` → `users.id`, +`photo_url`), `notes_etudiant`,
+> `formateurs` (+`archived`), `examens` (+colonnes document MinIO), `notes_examen`,
+> `bulletins`, `stages`, `historique_paiements`, `paiements_mensuels`,
+> `student_requests` (demandes de l'espace étudiant), `modules`, `group_configs`,
+> `seances`, `attendance` + `attendance_session`, `teacher_availability`, `events`,
+> `roles`, `notifications`, `reminders`, `user_preferences`.
 
 | Table | Purpose |
 |---|---|
@@ -87,6 +96,23 @@ backend/
 | `demo_requests` | Landing page enquiries |
 | `support_sessions` | Chat sessions |
 | `support_messages` | Chat messages |
+| `student_requests` | Demandes étudiants (titre, description, statut, réponse) |
+| `etudiants.user_id` / `photo_url` | Liaison compte `etudiant` + photo de profil |
+
+## API endpoints — ISTPM
+
+| Endpoint | Rôle | Description |
+|---|---|---|
+| `GET/POST /api/settings/stage-services` | auth / directeur+responsable | Services de stage libres (dropdown créable) |
+| `GET /api/student/me` | self (+prévisu staff `?etudiantId=`) | Profil + enseignants + stages + notes + bulletins + paiements + présence |
+| `PUT /api/student/me/photo` | self | Photo de profil (`http(s)` ou `data:image/`) |
+| `GET /api/student/calendar` | self | Séances du groupe + examens + fériés/vacances |
+| `GET/POST /api/student/requests` | self | Demandes perso (création limitée à 10/jour) |
+| `GET /api/student/requests/all` | directeur/responsable | Toutes les demandes |
+| `PATCH /api/student/requests/:id` | directeur/responsable | Traitement (`statut` + `reponse`) |
+
+Rôles : `admin | superadmin | directeur | enseignant | responsable | etudiant`.
+`POST /api/auth/register` accepte `role: "etudiant"` + `cne`/`etudiantId` pour lier la fiche.
 
 ## API endpoints
 

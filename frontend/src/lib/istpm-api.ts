@@ -485,6 +485,14 @@ export function deleteStructureApi(nom: string) {
   return api.delete<{ structures: StructureAccueil[] }>(`/settings/structures/${encodeURIComponent(nom)}`);
 }
 
+export function fetchStageServicesApi() {
+  return api.get<string[]>("/settings/stage-services");
+}
+
+export function createStageServiceApi(nom: string) {
+  return api.post<{ services: string[] }>("/settings/stage-services", { nom });
+}
+
 /* ------------------------------------------------------------------ */
 /*  Modules                                                           */
 /* ------------------------------------------------------------------ */
@@ -667,6 +675,8 @@ export function createUser(data: {
   password: string;
   name: string;
   role?: string;
+  cne?: string;
+  etudiantId?: string;
 }) {
   return api.post<UserRecord>("/auth/register", data);
 }
@@ -729,6 +739,91 @@ export function fetchAgentActions() {
     { name: string; description: string; category: string; paramsCount: number }[]
   >("/agent/actions");
 }
+
+/* ------------------------------------------------------------------ */
+/*  Espace étudiant (self-service)                                     */
+/* ------------------------------------------------------------------ */
+
+export interface StudentMe {
+  etudiant: Record<string, unknown> & {
+    id: string;
+    prenom: string;
+    nom: string;
+    cne: string;
+    filiere: string;
+    niveau: string;
+    groupe: string;
+    photoUrl?: string;
+    photo_url?: string;
+  };
+  enseignants: Record<string, unknown>[];
+  stageEnCours: Record<string, unknown> | null;
+  stages: Record<string, unknown>[];
+  notes: Record<string, unknown>[];
+  bulletins: Record<string, unknown>[];
+  paiements: Record<string, unknown>[];
+  presence: { total: number; presents: number; taux: number };
+}
+
+export interface StudentCalendar {
+  seances: Record<string, unknown>[];
+  examens: Record<string, unknown>[];
+  holidays: Record<string, unknown>[];
+  vacations: Record<string, unknown>[];
+  exceptions: Record<string, unknown>[];
+}
+
+export interface StudentRequest {
+  id: string;
+  etudiantId: string;
+  type: "libre" | "predefini";
+  titre: string;
+  description: string;
+  statut: "en_attente" | "en_cours" | "traite" | "rejete";
+  reponse: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function fetchStudentMe(etudiantId?: string) {
+  return api.get<StudentMe>("/student/me", etudiantId ? { etudiantId } : undefined);
+}
+
+export function updateStudentPhoto(photoUrl: string) {
+  return api.put<{ photoUrl: string }>("/student/me/photo", { photoUrl });
+}
+
+export function fetchStudentCalendar(params?: { start?: string; end?: string }) {
+  return api.get<StudentCalendar>("/student/calendar", params);
+}
+
+export function fetchStudentRequests() {
+  return api.get<StudentRequest[]>("/student/requests");
+}
+
+export function createStudentRequest(data: { type: "libre" | "predefini"; titre: string; description?: string }) {
+  return api.post<StudentRequest>("/student/requests", data);
+}
+
+export function fetchAllStudentRequests(params?: { statut?: string; search?: string }) {
+  return api.get<StudentRequest[]>("/student/requests/all", params);
+}
+
+export function updateStudentRequest(id: string, data: { statut: StudentRequest["statut"]; reponse?: string }) {
+  return api.patch<StudentRequest>(`/student/requests/${id}`, data);
+}
+
+/** Catalogue officiel des demandes prédéfinies (même liste front + back-office). */
+export const CATALOGUE_DEMANDES: { titre: string; description: string }[] = [
+  { titre: "Attestation de scolarité", description: "Je souhaite obtenir une attestation de scolarité pour l'année en cours." },
+  { titre: "Relevé de notes", description: "Je souhaite obtenir mon relevé de notes du semestre." },
+  { titre: "Convention de stage", description: "Je souhaite obtenir / renouveler ma convention de stage." },
+  { titre: "Changement de groupe", description: "Je souhaite demander un changement de groupe. Motif : " },
+  { titre: "Justificatif d'absence", description: "Je souhaite justifier mon absence du " },
+  { titre: "Relevé de paiement / reçu", description: "Je souhaite obtenir un reçu / relevé de mes paiements." },
+  { titre: "Lettre de recommandation", description: "Je souhaite obtenir une lettre de recommandation." },
+  { titre: "Duplicata carte étudiant", description: "Je souhaite obtenir un duplicata de ma carte d'étudiant (perte / vol)." },
+];
 
 export function sendEmailApi(payload: {
   to: string;

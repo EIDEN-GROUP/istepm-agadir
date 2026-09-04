@@ -1,7 +1,8 @@
-import { Outlet, createFileRoute, redirect, useLocation } from "@tanstack/react-router";
+import { Outlet, createFileRoute, redirect, useLocation, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { DashSidebarShell } from "@/components/dash-sidebar";
-import { useDashboardI18n, useDashboardNav } from "@/lib/dashboard-i18n";
+import { useDashboardI18n, useDashboardNav, canAccess } from "@/lib/dashboard-i18n";
 import { getStoredRole, useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/dashboard")({
@@ -19,6 +20,17 @@ function DashboardLayout() {
   const { role } = useAuth();
   const { nav, brand } = useDashboardNav(role);
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  // RBAC UI : renvoie un rôle vers ses destinations autorisées
+  // (ex. un étudiant sur /dashboard/etudiants → son espace).
+  useEffect(() => {
+    if (!role) return;
+    const clean = pathname.endsWith("/") && pathname !== "/" ? pathname.slice(0, -1) : pathname;
+    if (!canAccess(role, clean)) {
+      navigate({ to: role === "etudiant" ? "/dashboard/espace-etudiant" : "/dashboard" });
+    }
+  }, [role, pathname, navigate]);
 
   return (
     <DashSidebarShell brand={brand} nav={nav} dir={dir}>

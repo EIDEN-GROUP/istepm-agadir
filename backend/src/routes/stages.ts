@@ -7,21 +7,31 @@ import { eq, desc, sql, or } from "drizzle-orm";
 
 const stageSchema = z.object({
   etudiantId: z.string().uuid(),
-  cne: z.string().optional().default(""),
-  prenom: z.string().optional().default(""),
-  nom: z.string().optional().default(""),
-  filiere: z.string().optional().default(""),
-  niveau: z.string().optional().default(""),
-  structure: z.string().optional().default(""),
-  service: z.string().optional().default(""),
-  encadrantClinique: z.string().optional().default(""),
-  tuteurAcademique: z.string().optional().default(""),
+  cne: z.string().max(50).optional().default(""),
+  prenom: z.string().max(100).optional().default(""),
+  nom: z.string().max(100).optional().default(""),
+  filiere: z.string().max(150).optional().default(""),
+  niveau: z.string().max(50).optional().default(""),
+  structure: z.string().max(200).optional().default(""),
+  service: z.string().max(200).optional().default(""),
+  encadrantClinique: z.string().max(150).optional().default(""),
+  tuteurAcademique: z.string().max(150).optional().default(""),
   debut: z.string().optional().default(""),
   fin: z.string().optional().default(""),
   statut: z.string().optional().default("recherche"),
   conventionSignee: z.boolean().optional().default(false),
   noteSoutenance: z.number().min(0).max(20).optional().nullable(),
 });
+
+function cleanStageInput<T extends Record<string, unknown>>(input: T): T {
+  // Normalise les champs libres (structure / service créables depuis le front) :
+  // trim + collapse des espaces, sans changer la casse d'affichage.
+  const out: Record<string, unknown> = { ...input };
+  for (const k of ["structure", "service", "encadrantClinique", "tuteurAcademique", "cne", "prenom", "nom", "filiere", "niveau"] as const) {
+    if (typeof out[k] === "string") out[k] = (out[k] as string).trim().replace(/\s+/g, " ");
+  }
+  return out as T;
+}
 
 export async function stageRoutes(app: FastifyInstance) {
   app.get("/", { preHandler: [authenticate] }, async (request) => {
@@ -75,7 +85,8 @@ export async function stageRoutes(app: FastifyInstance) {
   });
 
   app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
-    const input = stageSchema.parse(request.body);
+    const raw = stageSchema.parse(request.body);
+    const input = cleanStageInput(raw);
     const db = getDb();
     const [stage] = await db
       .insert(stages)
@@ -92,7 +103,8 @@ export async function stageRoutes(app: FastifyInstance) {
 
   app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const input = stageSchema.partial().parse(request.body);
+    const raw = stageSchema.partial().parse(request.body);
+    const input = cleanStageInput(raw);
     const db = getDb();
     const values: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(input)) {

@@ -215,8 +215,50 @@ export async function settingsRoutes(app: FastifyInstance) {
     await db
       .update(settings)
       .set({ value: list })
-      .where(eq(settings.key, "filieres"));
-    return { filieres: list };
+      .where(eq(settings.key, "structures_accueil"));
+    return { structures: list };
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Stage services (lieux de stage libres, créables depuis le front)     */
+  /* ------------------------------------------------------------------ */
+  function asStrings(v: unknown): string[] {
+    if (!Array.isArray(v)) return [];
+    return v.filter((s): s is string => typeof s === "string" && s.trim().length > 0);
+  }
+
+  app.get("/stage-services", { preHandler: [authenticate] }, async () => {
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "services_stage"))
+      .limit(1);
+    return asStrings(row?.value);
+  });
+
+  app.post("/stage-services", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const { nom } = z.object({ nom: z.string().min(1).max(200) }).parse(request.body);
+    const clean = nom.trim().replace(/\s+/g, " ");
+    if (!clean) return reply.status(400).send({ error: "Nom de service requis" });
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "services_stage"))
+      .limit(1);
+    const list = asStrings(row?.value);
+    if (list.some((s) => s.toLowerCase() === clean.toLowerCase())) {
+      return reply.status(409).send({ error: "Ce service existe déjà" });
+    }
+    list.push(clean);
+    list.sort((a, b) => a.localeCompare(b));
+    if (row) {
+      await db.update(settings).set({ value: list }).where(eq(settings.key, "services_stage"));
+    } else {
+      await db.insert(settings).values({ key: "services_stage", value: list });
+    }
+    return { services: list };
   });
 
   const structSchema = z.object({
@@ -246,7 +288,10 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   app.post("/structures", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
-    const { nom, capacite } = structSchema.parse(request.body);
+    const parsed = structSchema.parse(request.body);
+    const nom = parsed.nom.trim().replace(/\s+/g, " ");
+    const capacite = parsed.capacite;
+    if (!nom) return reply.status(400).send({ error: "Nom de structure requis" });
     const db = getDb();
     const [row] = await db
       .select()
@@ -255,7 +300,8 @@ export async function settingsRoutes(app: FastifyInstance) {
       .limit(1);
 
     const list = asStructs(row?.value);
-    if (list.some((s) => s.nom === nom)) {
+    const norm = nom.toLowerCase();
+    if (list.some((s) => s.nom.toLowerCase() === norm)) {
       return reply.status(409).send({ error: "Cette structure existe déjà" });
     }
     list.push({ nom, capacite });

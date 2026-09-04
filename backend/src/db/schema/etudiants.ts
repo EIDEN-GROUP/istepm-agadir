@@ -1,7 +1,9 @@
 import { pgTable, uuid, text, numeric, jsonb, boolean, timestamp } from "drizzle-orm/pg-core";
+import { users } from "./users";
 
 export const etudiants = pgTable("etudiants", {
   id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   cne: text("cne").notNull().default(""),
   matricule: text("matricule").notNull().default(""),
   prenom: text("prenom").notNull(),
@@ -17,6 +19,7 @@ export const etudiants = pgTable("etudiants", {
   email: text("email").notNull().default(""),
   dateNaissance: text("date_naissance").notNull().default(""),
   ville: text("ville").notNull().default(""),
+  photoUrl: text("photo_url").notNull().default(""),
   fraisAnnuels: numeric("frais_annuels").notNull().default("0"),
   resteAPayer: numeric("reste_a_payer").notNull().default("0"),
   paiementsMensuels: jsonb("paiements_mensuels").notNull().default({}),

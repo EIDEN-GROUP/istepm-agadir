@@ -149,6 +149,7 @@ const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
     "structures",
   ],
   enseignant: [],
+  etudiant: [],
 };
 
 const META: Record<
@@ -975,18 +976,21 @@ function NewUserForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("enseignant");
+  const [cne, setCne] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) return;
     setLoading(true);
 
-    const userData = {
+    const userData: { name: string; email: string; password: string; role: string; cne?: string } = {
       name: name.trim(),
       email: email.trim(),
       password,
       role,
     };
+    // Compte étudiant : lie la fiche via le CNE (ou l'email côté backend).
+    if (role === "etudiant" && cne.trim()) userData.cne = cne.trim();
 
     createUser(userData).catch(() => {});
 
@@ -1029,11 +1033,17 @@ function NewUserForm({
             onChange={(e) => setRole(e.target.value)}
             className={selectClass}
           >
-            {["directeur", "responsable", "enseignant", "admin"].map((r) => (
+            {["directeur", "responsable", "enseignant", "etudiant", "admin"].map((r) => (
               <option key={r} value={r}>{ROLE_META[r as UserRole]?.label ?? r}</option>
             ))}
           </select>
         </div>
+        {role === "etudiant" ? (
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">CNE (liaison fiche)</label>
+            <Input value={cne} onChange={(e) => setCne(e.target.value)} placeholder="CNE de l'étudiant" className={cn(softInput, "h-8 text-sm")} />
+          </div>
+        ) : null}
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className={cn(ghostPill, "h-7 px-3 text-[11px]")}>

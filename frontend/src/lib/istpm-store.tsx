@@ -115,6 +115,8 @@ import {
   updateStructureApi,
   deleteStructureApi,
   fetchStructuresApi as apiFetchStructures,
+  fetchStageServicesApi as apiFetchStageServices,
+  createStageServiceApi as apiCreateStageService,
   fetchModulesApi,
   createModuleApi,
   updateModuleApi,
@@ -146,6 +148,8 @@ type Snapshot = {
   seances: Seance[];
   filieres: string[];
   structuresAccueil: StructureAccueil[];
+  /** Services de stage libres (créables depuis le formulaire de stage). */
+  servicesStage: string[];
   modules: ModuleRecord[];
   groupConfigs: GroupConfig[];
   /** Créneaux horaires, au format libellé des Paramètres (« 08:30 – 10:00 »). */
@@ -223,6 +227,7 @@ function seed(): Snapshot {
     seances: SEANCES,
     filieres: [...FILIERES],
     structuresAccueil: structuredClone(STRUCTURES_ACCUEIL),
+    servicesStage: [...new Set(STAGES.map((s) => (s.service ?? "").trim()).filter(Boolean))],
     modules: seedModules(),
     groupConfigs: structuredClone(DEFAULT_GROUP_CONFIGS),
     creneaux: [...CRENEAUX_LABELS],
@@ -240,6 +245,10 @@ function load(): Snapshot {
 
     // Backfill fields added after this snapshot was persisted.
     if (!Array.isArray(parsed.modules)) parsed.modules = seedModules();
+    if (!Array.isArray((parsed as Snapshot).servicesStage)) {
+      const stagesArr = Array.isArray(parsed.stages) ? parsed.stages : [];
+      (parsed as Snapshot).servicesStage = [...new Set(stagesArr.map((s) => ((s as Stage).service ?? "").trim()).filter(Boolean))];
+    }
     if (!Array.isArray(parsed.groupConfigs)) parsed.groupConfigs = structuredClone(DEFAULT_GROUP_CONFIGS);
     if (!Array.isArray(parsed.creneaux) || !parsed.creneaux.length)
       parsed.creneaux = [...CRENEAUX_LABELS];
@@ -372,6 +381,8 @@ type IstpmCtx = {
   seances: Seance[];
   filieres: string[];
   structuresAccueil: StructureAccueil[];
+  /** Services de stage libres (créables depuis le formulaire de stage). */
+  servicesStage: string[];
   modules: ModuleRecord[];
   groupConfigs: GroupConfig[];
   /** Libellés bruts des créneaux, tels qu'édités dans les Paramètres. */
@@ -476,6 +487,9 @@ type IstpmCtx = {
   updateStructureAccueil: (oldName: string, body: { nouveauNom?: string; capacite?: number }) => void;
   deleteStructureAccueil: (nom: string) => void;
 
+  /** Persiste un service de stage libre (dropdown créable). */
+  addServiceStage: (nom: string) => void;
+
   addModule: (data: Omit<ModuleRecord, "id">) => void;
   updateModule: (id: string, data: Omit<ModuleRecord, "id">) => void;
   deleteModule: (id: string) => void;
@@ -545,7 +559,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        const [etudiants, formateurs, examens, bulletins, stages, seances, structures, reglages] =
+        const [etudiants, formateurs, examens, bulletins, stages, seances, structures, servicesStageRemote, reglages] =
           await Promise.all([
             apiFetchEtudiants(),
             apiFetchFormateurs(),
@@ -554,6 +568,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
             apiFetchStages(),
             apiFetchSeances(),
             apiFetchStructures().catch(() => [] as string[]),
+            apiFetchStageServices().catch(() => [] as string[]),
             fetchSettings().catch(() => ({}) as Record<string, unknown>),
           ]);
         if (!mounted) return;
@@ -591,6 +606,11 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           structuresAccueil: (structures as StructureAccueil[])?.length
             ? (structures as StructureAccueil[])
             : s.structuresAccueil,
+          servicesStage: (servicesStageRemote as string[])?.length
+            ? (servicesStageRemote as string[])
+            : s.servicesStage.length
+              ? s.servicesStage
+              : [...new Set([...s.stages.map((st) => (st.service ?? "").trim()).filter(Boolean)])],
           // Les créneaux paramétrés côté serveur font foi : ils pilotent la
           // grille de l'emploi du temps sur tous les postes.
           creneaux: Array.isArray(reglages.creneaux) && reglages.creneaux.length
@@ -1289,12 +1309,14 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const addStructureAccueil = useCallback(
     (nom: string, capacite = 5) => {
-      createStructureApi(nom, capacite).catch(() => {});
+      const clean = nom.trim().replace(/\s+/g, " ");
+      if (!clean) return;
+      createStructureApi(clean, capacite).catch(() => {});
       setSnap((s) => ({
         ...s,
-        structuresAccueil: s.structuresAccueil.some((st) => st.nom === nom)
+        structuresAccueil: s.structuresAccueil.some((st) => st.nom.toLowerCase() === clean.toLowerCase())
           ? s.structuresAccueil
-          : [...s.structuresAccueil, { nom, capacite }],
+          : [...s.structuresAccueil, { nom: clean, capacite }],
       }));
     },
     [],
@@ -1325,6 +1347,18 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  const addServiceStage = useCallback((nom: string) => {
+    const clean = nom.trim().replace(/\s+/g, " ");
+    if (!clean) return;
+    apiCreateStageService(clean).catch(() => {});
+    setSnap((s) => ({
+      ...s,
+      servicesStage: s.servicesStage.some((x) => x.toLowerCase() === clean.toLowerCase())
+        ? s.servicesStage
+        : [...s.servicesStage, clean].sort((a, b) => a.localeCompare(b)),
+    }));
+  }, []);
 
   /* ---------------- Modules ---------------- */
 
@@ -1694,6 +1728,7 @@ addSeance,
     addStructureAccueil,
     updateStructureAccueil,
     deleteStructureAccueil,
+    addServiceStage,
     addModule,
     updateModule,
     deleteModule,

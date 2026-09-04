@@ -1,5 +1,5 @@
-import { useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Check, ChevronsUpDown, FileText, Upload, X } from "lucide-react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
+import { AlertTriangle, Check, ChevronsUpDown, FileText, Plus, Upload, X } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   Dialog,
@@ -273,6 +273,129 @@ export function ComboBoxField<T extends string>({
                     <span className="truncate">{o.label}</span>
                   </CommandItem>
                 ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </FieldShell>
+  );
+}
+
+/**
+ * Combo créable : dropdown recherchable + saisie libre.
+ *
+ * Même langage visuel que `ComboBoxField`, mais taper une valeur inédite
+ * propose `+ Créer "xxx"` qui appelle `onCreate` (persiste côté backend
+ * puis réapparaît dans la liste). Idéal pour Structure / Service de stage.
+ */
+export function CreatableComboField({
+  label,
+  value,
+  onChange,
+  onCreate,
+  options,
+  placeholder = "Sélectionner ou taper…",
+  searchPlaceholder = "Rechercher ou taper…",
+  createLabel = (v: string) => `+ Créer « ${v} »`,
+  error,
+  required,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  onCreate: (v: string) => void;
+  options: readonly string[];
+  placeholder?: string;
+  searchPlaceholder?: string;
+  createLabel?: (v: string) => string;
+  error?: string;
+  required?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const items = useMemo(() => [...options].sort((a, b) => a.localeCompare(b)), [options]);
+  const clean = query.trim().replace(/\s+/g, " ");
+  const exactMatch = clean !== "" && items.some((o) => o.toLowerCase() === clean.toLowerCase());
+  const showCreate = clean !== "" && !exactMatch;
+
+  const pick = (v: string) => {
+    onChange(v);
+    setQuery("");
+    setOpen(false);
+  };
+
+  return (
+    <FieldShell label={label} error={error} required={required}>
+      <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQuery(""); }}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            role="combobox"
+            aria-expanded={open}
+            className={cn(
+              softSelectTrigger,
+              "flex w-full items-center justify-between border px-3 text-sm",
+              !value && "text-muted-foreground/70",
+              error && "border-alert",
+            )}
+          >
+            <span className="truncate">{value || placeholder}</span>
+            <ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          className={cn(softSelectContent, "w-[--radix-popover-trigger-width] p-0")}
+          align="start"
+        >
+          <Command shouldFilter>
+            <CommandInput
+              placeholder={searchPlaceholder}
+              className="h-10"
+              value={query}
+              onValueChange={setQuery}
+            />
+            <CommandList>
+              <CommandEmpty className="p-2 text-sm">
+                {showCreate ? (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left font-semibold text-brand-dk hover:bg-brand/10"
+                    onClick={() => { onCreate(clean); pick(clean); }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="truncate">{createLabel(clean)}</span>
+                  </button>
+                ) : (
+                  <span className="px-2 text-muted-foreground">Aucun résultat.</span>
+                )}
+              </CommandEmpty>
+              <CommandGroup>
+                {items.map((o) => (
+                  <CommandItem
+                    key={o}
+                    value={o}
+                    onSelect={() => pick(o)}
+                  >
+                    <Check
+                      className={cn(
+                        "me-2 h-4 w-4",
+                        o === value ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    <span className="truncate">{o}</span>
+                  </CommandItem>
+                ))}
+                {showCreate ? (
+                  <CommandItem
+                    value={`__create__${clean}`}
+                    onSelect={() => { onCreate(clean); pick(clean); }}
+                    className="font-semibold text-brand-dk"
+                  >
+                    <Plus className="me-2 h-4 w-4" />
+                    <span className="truncate">{createLabel(clean)}</span>
+                  </CommandItem>
+                ) : null}
               </CommandGroup>
             </CommandList>
           </Command>

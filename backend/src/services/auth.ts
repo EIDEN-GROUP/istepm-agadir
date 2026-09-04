@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import { getDb } from "@/db";
 import { users } from "@/db/schema/users";
 import { formateurs } from "@/db/schema/formateurs";
+import { etudiants } from "@/db/schema/etudiants";
 import { eq } from "drizzle-orm";
 import { getEnv } from "@/config/env";
 
@@ -11,10 +12,13 @@ export type CreateUserInput = {
   email: string;
   password: string;
   name: string;
-  role?: "admin" | "superadmin" | "directeur" | "enseignant" | "responsable";
+  role?: "admin" | "superadmin" | "directeur" | "enseignant" | "responsable" | "etudiant";
   filiere?: string;
   niveau?: string;
   groupe?: string;
+  /** CNE ou id étudiant à lier quand role === "etudiant". */
+  etudiantId?: string;
+  cne?: string;
 };
 
 export type UserResult = {
@@ -70,6 +74,17 @@ export async function createUser(input: CreateUserInput): Promise<UserResult> {
       departement: input.filiere ?? "",
       groupes,
     });
+  }
+  if (input.role === "etudiant") {
+    // Lie le compte à une fiche étudiant existante (par id, CNE ou email).
+    // La fiche garde toutes les infos scolaires ; user_id sert au scope self-service.
+    if (input.etudiantId) {
+      await db.update(etudiants).set({ userId: user.id }).where(eq(etudiants.id, input.etudiantId));
+    } else if (input.cne) {
+      await db.update(etudiants).set({ userId: user.id }).where(eq(etudiants.cne, input.cne));
+    } else {
+      await db.update(etudiants).set({ userId: user.id }).where(eq(etudiants.email, input.email));
+    }
   }
   return toUserResult(user);
 }

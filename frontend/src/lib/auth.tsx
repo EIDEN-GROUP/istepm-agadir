@@ -8,9 +8,9 @@ import {
 } from "react";
 import { FORMATEURS } from "@/lib/istpm-data";
 
-export type UserRole = "directeur" | "enseignant" | "responsable";
+export type UserRole = "directeur" | "enseignant" | "responsable" | "etudiant";
 
-export const ROLES: UserRole[] = ["directeur", "enseignant", "responsable"];
+export const ROLES: UserRole[] = ["directeur", "enseignant", "responsable", "etudiant"];
 
 export const ROLE_META: Record<
   UserRole,
@@ -31,6 +31,11 @@ export const ROLE_META: Record<
     short: "Resp. affaires estudiantines",
     description: "Inscriptions, recouvrement, conventions de stage",
   },
+  etudiant: {
+    label: "Étudiant",
+    short: "Étudiant",
+    description: "Mon profil, mes cours, mes stages et mes demandes",
+  },
 };
 
 export const DEMO_FORMATEUR_ID = "fo-1";
@@ -46,6 +51,7 @@ const ROLE_USER: Record<UserRole, { name: string; email: string }> = {
     email: demoFormateur?.email ?? "formateur@istpm-agadir.ma",
   },
   responsable: { name: "M. Rachid El Ouafi", email: "scolarite@istpm-agadir.ma" },
+  etudiant: { name: "Étudiant ISTPM", email: "etudiant@istpm-agadir.ma" },
 };
 
 const ROLE_STORAGE_KEY = "istpm-role";
@@ -253,6 +259,8 @@ function mapBackendRole(backendRole: string): UserRole {
       return "enseignant";
     case "responsable":
       return "responsable";
+    case "etudiant":
+      return "etudiant";
     default:
       return "directeur";
   }

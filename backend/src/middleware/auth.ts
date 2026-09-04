@@ -7,7 +7,7 @@ export interface AuthUserPayload {
   id: string;
   email: string;
   name: string;
-  role: "admin" | "superadmin" | "directeur" | "enseignant" | "responsable";
+  role: "admin" | "superadmin" | "directeur" | "enseignant" | "responsable" | "etudiant";
 }
 
 declare module "@fastify/jwt" {

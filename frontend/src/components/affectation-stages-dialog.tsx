@@ -61,6 +61,7 @@ export function AffectationStagesDialog({
   etudiants,
   stages,
   structuresAccueil,
+  onCreateStructure,
   onConfirm,
 }: {
   open: boolean;
@@ -68,6 +69,8 @@ export function AffectationStagesDialog({
   etudiants: Etudiant[];
   stages: Stage[];
   structuresAccueil: StructureAccueil[];
+  /** Crée une structure libre (dropdown créable) puis la rend sélectionnable. */
+  onCreateStructure?: (nom: string) => void;
   onConfirm: (affectations: Affectation[]) => void;
 }) {
   const structs = useMemo(
@@ -84,6 +87,7 @@ export function AffectationStagesDialog({
   const [groupe, setGroupe] = useState<string>("");
   // étudiantId → nom de structure choisie ("" = pas encore affecté).
   const [assign, setAssign] = useState<Record<string, string>>({});
+  const [nouvelleStructure, setNouvelleStructure] = useState("");
 
   // Un étudiant est « déjà affecté » s'il a un stage non clôturé (statut ≠ validé).
   const idsAvecStage = useMemo(
@@ -315,6 +319,32 @@ export function AffectationStagesDialog({
 
           {step === 3 ? (
             <div className="space-y-4">
+              {onCreateStructure ? (
+                <form
+                  className="flex gap-2"
+                  onSubmit={(ev) => {
+                    ev.preventDefault();
+                    const clean = nouvelleStructure.trim().replace(/\s+/g, " ");
+                    if (!clean) {
+                      toast.error("Tapez le nom de la structure");
+                      return;
+                    }
+                    onCreateStructure(clean);
+                    setNouvelleStructure("");
+                  }}
+                >
+                  <input
+                    value={nouvelleStructure}
+                    onChange={(ev) => setNouvelleStructure(ev.target.value)}
+                    placeholder="Nouvelle structure… (tapez + Entrée pour l'ajouter)"
+                    aria-label="Nouvelle structure d'accueil"
+                    className={cn(softSelectTrigger, "h-10 flex-1 border px-3 text-sm")}
+                  />
+                  <button type="submit" className={cn(ghostPill, "shrink-0")}>
+                    + Ajouter
+                  </button>
+                </form>
+              ) : null}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                   <strong className="font-semibold text-foreground">
