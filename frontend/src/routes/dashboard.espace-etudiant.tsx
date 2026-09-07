@@ -1017,6 +1017,19 @@ function TraiterModal({
     >
       <FullWidth>
         <div className="rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
+          {demande.etudiantPrenom || demande.etudiantNom ? (
+            <p className="mb-1.5 flex items-center gap-2">
+              <PersonAvatar
+                name={`${demande.etudiantPrenom ?? ""} ${demande.etudiantNom ?? ""}`}
+                photoUrl={demande.etudiantPhotoUrl}
+                size="xs"
+              />
+              <span className="font-semibold text-foreground">
+                {demande.etudiantPrenom} {demande.etudiantNom}
+              </span>
+              {demande.etudiantCne ? <span>· {demande.etudiantCne}</span> : null}
+            </p>
+          ) : null}
           <p className="font-semibold text-foreground">{demande.titre}</p>
           {demande.description ? <p className="mt-1">{demande.description}</p> : null}
           <p className="mt-1">Type : {demande.type === "predefini" ? "Prédéfini" : "Libre"} · {new Date(demande.createdAt).toLocaleDateString("fr-FR")}</p>
@@ -1169,7 +1182,11 @@ function StaffRequestsView({
         >
           {filtered.map((d) => {
             const etu = parId.get(d.etudiantId);
-            const nom = etu ? `${etu.prenom} ${etu.nom}` : "Étudiant";
+            const prenom = d.etudiantPrenom ?? etu?.prenom ?? "";
+            const nomFam = d.etudiantNom ?? etu?.nom ?? "";
+            const nom = `${prenom} ${nomFam}`.trim() || "Étudiant";
+            const cne = d.etudiantCne ?? etu?.cne ?? "";
+            const filiere = d.etudiantFiliere ?? etu?.filiere ?? "";
             return (
               <tr
                 key={d.id}
@@ -1180,13 +1197,13 @@ function StaffRequestsView({
                   <span className="flex items-center gap-2.5">
                     <PersonAvatar
                       name={nom}
-                      photoUrl={photoDe(d.etudiantId) ?? photoDe(etu?.cne)}
+                      photoUrl={d.etudiantPhotoUrl ?? photoDe(d.etudiantId) ?? photoDe(cne)}
                     />
                     <span className="min-w-0">
                       <span className={cn("block font-medium", cellTruncate)}>{nom}</span>
-                      {etu ? (
+                      {cne || filiere ? (
                         <span className="block truncate text-xs text-muted-foreground">
-                          {etu.cne} · {etu.filiere}
+                          {[cne, filiere].filter(Boolean).join(" · ")}
                         </span>
                       ) : null}
                     </span>

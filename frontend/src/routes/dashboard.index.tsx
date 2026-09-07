@@ -1,5 +1,12 @@
 ﻿import { createFileRoute, Link } from "@tanstack/react-router";
-import { type ReactNode, useMemo, useRef, useState, useEffect } from "react";
+import { type ReactNode, type ComponentType, useMemo, useRef, useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  fetchStudentMe,
+  fetchStudentCalendar,
+  fetchStudentRequests,
+  fetchStudentNotifications,
+} from "@/lib/istpm-api";
 import { motion, animate, useInView } from "framer-motion";
 import {
   UserPlus,
@@ -602,7 +609,7 @@ function TableCard({ children }: { children: ReactNode }) {
   return <div className={cn(softCard, "overflow-hidden")}><div className="overflow-x-auto">{children}</div></div>;
 }
 
-function EmptyState({ icon: Icon, children }: { icon: React.ComponentType<LucideProps>; children: ReactNode }) {
+function EmptyState({ icon: Icon, children }: { icon: ComponentType<LucideProps>; children: ReactNode }) {
   return (
     <div className={cn(softCard, "flex flex-col items-center gap-2 px-5 py-10 text-center text-sm text-muted-foreground")}>
       <span className="grid h-11 w-11 place-items-center rounded-2xl bg-brand/10 text-brand-dk">
@@ -1311,27 +1318,165 @@ function DashboardIndex() {
   );
 }
 
-/** Accueil minimal de l'étudiant : renvoie vers son espace personnel. */
+/** Accueil de l'étudiant : aperçu de sa situation + accès rapide à son espace. */
 function DashboardEtudiant() {
+  const { user } = useAuth();
+  const store = useIstpm();
+  const meQ = useQuery({ queryKey: ["student-me"], queryFn: () => fetchStudentMe(), retry: false });
+  const calQ = useQuery({ queryKey: ["student-calendar"], queryFn: () => fetchStudentCalendar(), retry: false });
+  const reqQ = useQuery({ queryKey: ["student-requests"], queryFn: fetchStudentRequests, retry: false });
+  const notifQ = useQuery({ queryKey: ["student-notifications"], queryFn: fetchStudentNotifications, retry: false });
+
+  const fb = !meQ.data ? (store.etudiants[0] ?? null) : null;
+  const p = (meQ.data?.etudiant ?? fb ?? {}) as Record<string, unknown>;
+  const s = (k: string, k2?: string) => String(p[k] ?? (k2 ? p[k2] : "") ?? "");
+  const prenom = s("prenom") || (user?.name?.split(" ")[0] ?? "");
+  const nom = s("nom");
+  const photoUrl = s("photoUrl", "photo_url");
+  const notes = (meQ.data?.notes as { note: number }[] | undefined) ?? [];
+  const moyenne = notes.length ? (notes.reduce((a, n) => a + n.note, 0) / notes.length).toFixed(2) : null;
+  const presence = meQ.data?.presence ?? { taux: 100, presents: 0, total: 0 };
+  const reste = s("resteAPayer", "reste_a_payer");
+  const demandes = reqQ.data ?? [];
+  const enAttente = demandes.filter((d) => d.statut === "en_attente" || d.statut === "en_cours").length;
+  const reponses = notifQ.data?.unread ?? 0;
+
+  const seances = ((calQ.data?.seances as Seance[] | undefined) ?? [])
+    .filter((x) => {
+      const d = new Date(`${x.date}T${x.debut || "00:00"}`);
+      return !Number.isNaN(d.getTime()) && d.getTime() >= Date.now() - 3 * 3600_000;
+    })
+    .sort((a, b) => `${a.date}T${a.debut}`.localeCompare(`${b.date}T${b.debut}`))
+    .slice(0, 4);
+  const nomProf = useMemo(() => {
+    const m = new Map(store.formateurs.map((f) => [f.id, `${f.prenom} ${f.nom}`]));
+    return (id: string) => m.get(id) ?? "";
+  }, [store.formateurs]);
+
+  const liens: { to: string; label: string; icon: ComponentType<LucideProps>; hint: string }[] = [
+    { to: "/dashboard/espace-etudiant", label: "Mon profil", icon: Users, hint: "Identité, coordonnées, cursus" },
+    { to: "/dashboard/espace-etudiant", label: "Scolarité", icon: GraduationCap, hint: "Enseignants, notes, présence" },
+    { to: "/dashboard/espace-etudiant", label: "Mon stage", icon: Building2, hint: "Structure, période, encadrant" },
+    { to: "/dashboard/espace-etudiant", label: "Calendrier", icon: CalendarRange, hint: "Emploi du temps" },
+    { to: "/dashboard/espace-etudiant", label: "Paiements", icon: Wallet, hint: "Scolarité, reste à payer" },
+    { to: "/dashboard/espace-etudiant", label: "Demandes", icon: PenLine, hint: "Attestations, réclamations" },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="overflow-hidden rounded-3xl border border-brand/10 bg-card p-6 shadow-[var(--elevation-2)] sm:p-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Espace étudiant
-        </p>
-        <h1 className="mt-1 font-display text-2xl tracking-tight text-foreground sm:text-3xl">
-          Bienvenue sur votre espace
-        </h1>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Retrouvez votre profil, vos enseignants, votre stage, votre calendrier et vos demandes au même endroit.
-        </p>
-        <Link
-          to="/dashboard/espace-etudiant"
-          className="mt-4 inline-flex items-center gap-2 rounded-full bg-med px-5 py-2.5 text-sm font-bold text-white shadow transition hover:bg-med-dk active:scale-[0.98]"
-        >
-          Ouvrir mon espace
-        </Link>
+      {/* Hero */}
+      <div className={cn(softCard, "overflow-hidden p-6 sm:p-8")}>
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+          <PersonAvatar name={`${prenom} ${nom}`.trim() || "?"} photoUrl={photoUrl} size="xl" className="ring-2 ring-brand/20" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <p className={eyebrowClass}>Espace étudiant</p>
+            <h1 className="font-display text-2xl tracking-tight text-foreground sm:text-3xl">
+              Bonjour, {prenom || "bienvenue"}
+            </h1>
+            <div className="flex flex-wrap gap-1.5">
+              {s("filiere") ? <span className={toneBadge("teal")}>{s("filiere")}</span> : null}
+              {s("niveau") ? <span className={toneBadge("blue")}>{s("niveau")}</span> : null}
+              {s("groupe") ? <span className={toneBadge("neutral")}>{s("groupe")}</span> : null}
+              {s("statut") ? <span className={toneBadge("neutral")}>{s("statut")}</span> : null}
+            </div>
+          </div>
+          <Link to="/dashboard/espace-etudiant" className={cn(primaryPill, "shrink-0")}>
+            Ouvrir mon espace <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
+
+      {/* Situation en bref */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MiniStat label="Moyenne générale" value={moyenne ? `${moyenne}/20` : "—"} icon={BarChart3} />
+        <MiniStat label="Présence" value={`${presence.taux}%`} icon={CheckCircle2} />
+        <MiniStat label="Reste à payer" value={reste ? `${reste} MAD` : "—"} icon={Wallet} />
+        <MiniStat
+          label="Demandes"
+          value={reponses > 0 ? `${reponses} réponse(s)` : enAttente > 0 ? `${enAttente} en cours` : "À jour"}
+          icon={PenLine}
+          tone={reponses > 0 ? "amber" : undefined}
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Prochains cours */}
+        <section className={cn(softCard, "space-y-3 p-5 lg:col-span-2")}>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-brand-dk" />
+            <p className={eyebrowClass}>Prochains cours</p>
+          </div>
+          {seances.length ? (
+            <ul className="divide-y divide-brand/8">
+              {seances.map((c, i) => (
+                <li key={c.id ?? i} className="flex items-center gap-3 py-2.5">
+                  <span className="w-16 shrink-0 text-xs font-semibold text-brand-dk">
+                    {new Date(`${c.date}T00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">{c.module}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {c.debut}–{c.fin} · {c.salle || "—"}{nomProf(c.professeurId) ? ` · ${nomProf(c.professeurId)}` : ""}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">Aucun cours à venir cette semaine.</p>
+          )}
+          <Link to="/dashboard/espace-etudiant" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dk hover:underline">
+            Voir tout le calendrier <ArrowRight className="h-3 w-3" />
+          </Link>
+        </section>
+
+        {/* Accès rapide */}
+        <section className={cn(softCard, "space-y-2 p-5")}>
+          <p className={eyebrowClass}>Accès rapide</p>
+          <div className="grid grid-cols-2 gap-2">
+            {liens.map((l) => (
+              <Link
+                key={l.label}
+                to={l.to}
+                className="group flex flex-col gap-1 rounded-xl border border-brand/12 p-3 transition hover:border-brand/30 hover:bg-brand/6"
+              >
+                <l.icon className="h-4 w-4 text-brand-dk" />
+                <span className="text-xs font-semibold text-foreground">{l.label}</span>
+                <span className="text-[10px] leading-tight text-muted-foreground">{l.hint}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  icon: ComponentType<LucideProps>;
+  tone?: "amber";
+}) {
+  return (
+    <div className={cn(softCard, "flex items-center gap-3 p-4")}>
+      <span
+        className={cn(
+          "grid h-10 w-10 shrink-0 place-items-center rounded-xl",
+          tone === "amber" ? "bg-warn-pale text-warn" : "bg-brand/10 text-brand-dk",
+        )}
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className="block truncate text-sm font-bold text-foreground">{value}</span>
+      </span>
     </div>
   );
 }

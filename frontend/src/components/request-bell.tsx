@@ -132,16 +132,19 @@ export function RequestBell() {
     : ((staffQ.data ?? [])
         .filter((d) => d.statut === "en_attente")
         .slice(0, 8)
-        .map((d) => ({
-          id: String(d.id ?? ""),
-          title: String(d.titre ?? "Demande"),
-          sub: String(d.description ?? ""),
-          detail: String(d.description ?? ""),
-          date: fmtDateNotif(d.createdAt),
-          tone: "amber" as Tone,
-          label: "À traiter",
-          lu: false,
-        })));
+        .map((d) => {
+          const who = `${d.etudiantPrenom ?? ""} ${d.etudiantNom ?? ""}`.trim();
+          return {
+            id: String(d.id ?? ""),
+            title: String(d.titre ?? "Demande"),
+            sub: who || String(d.description ?? ""),
+            detail: [who, String(d.description ?? "")].filter(Boolean).join(" — "),
+            date: fmtDateNotif(d.createdAt),
+            tone: "amber" as Tone,
+            label: "À traiter",
+            lu: false,
+          };
+        }));
 
   const openItem = (it: BellItem) => {
     if (isStudent) {

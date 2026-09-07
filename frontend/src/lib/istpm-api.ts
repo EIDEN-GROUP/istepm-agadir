@@ -852,6 +852,12 @@ export interface StudentRequest {
   reponse: string;
   createdAt: string;
   updatedAt: string;
+  /** Renseignés uniquement par la file staff (`/student/requests/all`). */
+  etudiantPrenom?: string | null;
+  etudiantNom?: string | null;
+  etudiantCne?: string | null;
+  etudiantPhotoUrl?: string | null;
+  etudiantFiliere?: string | null;
 }
 
 export function fetchStudentMe(etudiantId?: string) {

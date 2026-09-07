@@ -256,11 +256,39 @@ export async function studentRoutes(app: FastifyInstance) {
     async (request) => {
       const db = getDb();
       const query = request.query as { statut?: string; search?: string };
-      let rows = await db.select().from(studentRequests).orderBy(desc(studentRequests.createdAt));
+      // Jointure sur la fiche étudiant : la file du staff a besoin du nom, du
+      // CNE et de la photo du demandeur, pas seulement de son id.
+      let rows = await db
+        .select({
+          id: studentRequests.id,
+          etudiantId: studentRequests.etudiantId,
+          type: studentRequests.type,
+          titre: studentRequests.titre,
+          description: studentRequests.description,
+          statut: studentRequests.statut,
+          reponse: studentRequests.reponse,
+          createdAt: studentRequests.createdAt,
+          updatedAt: studentRequests.updatedAt,
+          etudiantPrenom: etudiants.prenom,
+          etudiantNom: etudiants.nom,
+          etudiantCne: etudiants.cne,
+          etudiantPhotoUrl: etudiants.photoUrl,
+          etudiantFiliere: etudiants.filiere,
+        })
+        .from(studentRequests)
+        .leftJoin(etudiants, eq(studentRequests.etudiantId, etudiants.id))
+        .orderBy(desc(studentRequests.createdAt));
       if (query.statut) rows = rows.filter((r) => r.statut === query.statut);
       if (query.search) {
         const q = query.search.toLowerCase();
-        rows = rows.filter((r) => r.titre.toLowerCase().includes(q) || r.description.toLowerCase().includes(q));
+        rows = rows.filter(
+          (r) =>
+            r.titre.toLowerCase().includes(q) ||
+            r.description.toLowerCase().includes(q) ||
+            `${r.etudiantPrenom ?? ""} ${r.etudiantNom ?? ""} ${r.etudiantCne ?? ""}`
+              .toLowerCase()
+              .includes(q),
+        );
       }
       return rows;
     },
