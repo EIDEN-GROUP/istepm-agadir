@@ -15,9 +15,20 @@ import {
   RefreshCw,
   UserRound,
   BadgeCheck,
+  ChevronsUpDown,
+  Check,
 } from "lucide-react";
 import { DashTabs, DashTabPanel, type DashTab } from "@/components/dash-tabs";
 import { PersonAvatar } from "@/components/person-avatar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
@@ -70,7 +81,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { Seance } from "@/lib/istpm-data";
+import type { Seance, Etudiant } from "@/lib/istpm-data";
 
 const STATUT_DEMANDE_TONE: Record<StudentRequest["statut"], "amber" | "blue" | "teal" | "red"> = {
   en_attente: "amber",
@@ -864,23 +875,18 @@ function EspaceEtudiantPage() {
 
       {isStaff ? (
         <div className={cn(softCard, "flex flex-wrap items-center gap-3 p-4")}>
-          <Users className="h-4 w-4 text-muted-foreground" />
+          <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
           <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Prévisualiser la fiche de
           </Label>
-          <select
+          <StudentPicker
+            etudiants={store.etudiants}
             value={staffEtudiantId}
-            onChange={(e) => setStaffEtudiantId(e.target.value)}
-            className="h-10 rounded-xl border border-brand/20 bg-card px-3 text-sm"
-          >
-            <option value={ALL}>Mon compte lié (défaut)</option>
-            {store.etudiants.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.prenom} {e.nom} — {e.cne}
-              </option>
-            ))}
-          </select>
-          <span className="text-xs text-muted-foreground">Vue staff — l'étudiant ne voit que sa fiche.</span>
+            onChange={setStaffEtudiantId}
+          />
+          <span className="text-xs text-muted-foreground">
+            Vue staff — l'étudiant ne voit que sa fiche.
+          </span>
         </div>
       ) : null}
 
@@ -1179,6 +1185,114 @@ function TraiterModal({
         </div>
       </FullWidth>
     </FormDialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * Sélecteur d'étudiant pour la vue staff : recherche à la frappe (nom / CNE /
+ * groupe) au lieu d'un `<select>` de 3000+ options. Seuls les résultats
+ * filtrés sont rendus (max 30), donc reste fluide quelle que soit la promo.
+ */
+function StudentPicker({
+  etudiants,
+  value,
+  onChange,
+}: {
+  etudiants: Etudiant[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const selected = value !== ALL ? etudiants.find((e) => e.id === value) : null;
+
+  const matches = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return etudiants.slice(0, 20);
+    return etudiants
+      .filter((e) =>
+        `${e.prenom} ${e.nom} ${e.cne} ${e.groupe} ${e.niveau}`
+          .toLowerCase()
+          .includes(needle),
+      )
+      .slice(0, 30);
+  }, [etudiants, q]);
+
+  const pick = (v: string) => {
+    onChange(v);
+    setOpen(false);
+    setQ("");
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setQ("");
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          role="combobox"
+          aria-expanded={open}
+          className="flex h-10 min-w-[15rem] max-w-full items-center justify-between gap-2 rounded-xl border border-brand/20 bg-card px-3 text-sm transition hover:border-brand/35"
+        >
+          <span className={cn("truncate", !selected && "text-muted-foreground")}>
+            {selected
+              ? `${selected.prenom} ${selected.nom} — ${selected.cne}`
+              : "Mon compte lié (défaut)"}
+          </span>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-[22rem] max-w-[90vw] rounded-2xl border-brand/15 p-0"
+      >
+        <Command shouldFilter={false}>
+          <CommandInput
+            value={q}
+            onValueChange={setQ}
+            placeholder="Rechercher un étudiant (nom, CNE)…"
+            className="h-10"
+          />
+          <CommandList>
+            <CommandEmpty>Aucun étudiant trouvé.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="__self__" onSelect={() => pick(ALL)}>
+                <Check
+                  className={cn(
+                    "me-2 h-4 w-4",
+                    value === ALL ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                Mon compte lié (défaut)
+              </CommandItem>
+              {matches.map((e) => (
+                <CommandItem key={e.id} value={e.id} onSelect={() => pick(e.id)}>
+                  <Check
+                    className={cn(
+                      "me-2 h-4 w-4",
+                      value === e.id ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  <span className="min-w-0 flex-1 truncate">
+                    {e.prenom} {e.nom}
+                    <span className="ms-1.5 text-xs text-muted-foreground">
+                      {e.cne} · {e.niveau}
+                    </span>
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
