@@ -24,8 +24,10 @@ const createRequestSchema = z.object({
   description: z.string().trim().max(2000, "Description trop longue").optional().default(""),
 });
 
+// Une photo est soit une URL courte, soit un data:image/... (base64) : le
+// front réduit l'image avant l'envoi, mais un data URL reste ~50–150 Ko.
 const photoSchema = z.object({
-  photoUrl: z.string().max(2000).optional().default(""),
+  photoUrl: z.string().max(1_500_000).optional().default(""),
 });
 
 async function resolveEtudiant(db: ReturnType<typeof getDb>, userId: string) {
@@ -91,7 +93,7 @@ export async function studentRoutes(app: FastifyInstance) {
   });
 
   // ── Photo de profil (URL http(s) ou data:image, 2 Mo max côté front) ──
-  app.put("/me/photo", { preHandler: [authenticate] }, async (request, reply) => {
+  app.put("/me/photo", { preHandler: [authenticate], bodyLimit: 2_000_000 }, async (request, reply) => {
     const input = photoSchema.parse(request.body);
     const url = input.photoUrl.trim();
     if (url && !(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:image/"))) {

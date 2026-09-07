@@ -94,6 +94,44 @@ function mondayOf(d: Date) {
   return x;
 }
 
+/**
+ * Réduit une image à un carré `taille`×`taille` (recadrage centré) et la renvoie
+ * en data URL JPEG. Garde l'envoi léger quelle que soit la résolution source.
+ */
+function downscaleImage(file: File, taille: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const cote = Math.min(img.naturalWidth, img.naturalHeight);
+      if (!cote) return reject(new Error("empty"));
+      const canvas = document.createElement("canvas");
+      canvas.width = taille;
+      canvas.height = taille;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("no-2d"));
+      ctx.drawImage(
+        img,
+        (img.naturalWidth - cote) / 2,
+        (img.naturalHeight - cote) / 2,
+        cote,
+        cote,
+        0,
+        0,
+        taille,
+        taille,
+      );
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("decode"));
+    };
+    img.src = url;
+  });
+}
+
 function EspaceEtudiantPage() {
   const { role } = useAuth();
   const qc = useQueryClient();
@@ -226,6 +264,13 @@ function EspaceEtudiantPage() {
     });
   }, [ancre]);
 
+  const isoLocal = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const seancesSemaine = useMemo(() => {
+    const jours = new Set(joursSemaine.map(isoLocal));
+    return seances.filter((s) => jours.has(String(s.date)));
+  }, [seances, joursSemaine]);
+
   const createReq = useMutation({
     mutationFn: createStudentRequest,
     onSuccess: () => {
@@ -264,19 +309,24 @@ function EspaceEtudiantPage() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Mise à jour impossible"),
   });
 
-  const onPhotoFile = (file: File | undefined) => {
+  const onPhotoFile = async (file: File | undefined) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Choisissez une image (JPG/PNG)");
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image trop lourde (2 Mo max)");
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image trop lourde (8 Mo max)");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => photoMut.mutate(String(reader.result ?? ""));
-    reader.readAsDataURL(file);
+    try {
+      // Recadrage carré + réduction à 512 px : le data URL envoyé reste léger
+      // (~40–90 Ko) au lieu de plusieurs Mo, quelle que soit la photo source.
+      const dataUrl = await downscaleImage(file, 512);
+      photoMut.mutate(dataUrl);
+    } catch {
+      toast.error("Image illisible — essayez un autre fichier");
+    }
   };
 
   const loading = meQuery.isLoading;
@@ -301,12 +351,50 @@ function EspaceEtudiantPage() {
     },
   ];
 
+  const decalerAncre = (pas: number) =>
+    setAncre((d) => {
+      const n = new Date(d);
+      n.setDate(n.getDate() + pas * (vue === "mois" ? 30 : 7));
+      return n;
+    });
+  const libellePeriode =
+    vue === "mois"
+      ? ancre.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })
+      : `${joursSemaine[0].toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} – ${joursSemaine[6].toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`;
+
   const calendrierSection = (
     <section className={cn(softCard, "space-y-3 p-4 sm:p-5")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-brand-dk" />
-          <p className={eyebrowClass}>Mon calendrier</p>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-brand-dk" />
+            <p className={eyebrowClass}>Mon calendrier</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="Période précédente"
+              onClick={() => decalerAncre(-1)}
+              className="grid h-7 w-7 place-items-center rounded-full border border-brand/15 text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={() => setAncre(new Date())}
+              className="rounded-full border border-brand/15 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk"
+            >
+              Aujourd'hui
+            </button>
+            <button
+              type="button"
+              aria-label="Période suivante"
+              onClick={() => decalerAncre(1)}
+              className="grid h-7 w-7 place-items-center rounded-full border border-brand/15 text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk"
+            >
+              ›
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-1 rounded-full border border-brand/12 bg-muted/60 p-1">
           {(["semaine", "mois"] as VueCalendrier[]).map((v) => (
@@ -323,6 +411,14 @@ function EspaceEtudiantPage() {
             </button>
           ))}
         </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 text-[11px]">
+        <span className="font-semibold capitalize text-foreground">{libellePeriode}</span>
+        <span className="text-muted-foreground">
+          {vue === "semaine"
+            ? `${seancesSemaine.length} séance(s) cette semaine`
+            : `${seances.length} séance(s) au total`}
+        </span>
       </div>
       {vue === "semaine" ? (
         <VueSemaine
@@ -345,14 +441,6 @@ function EspaceEtudiantPage() {
           }}
         />
       )}
-      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-        <button className={ghostPill} onClick={() => setAncre(new Date())}>
-          Aujourd'hui
-        </button>
-        <span>
-          Semaine du {joursSemaine[0].toLocaleDateString("fr-FR")} — {seances.length} séance(s)
-        </span>
-      </div>
     </section>
   );
 

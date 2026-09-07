@@ -46,7 +46,7 @@ function BadgeChome({ jour, compact }: { jour: JourChome; compact?: boolean }) {
 }
 
 /** Hauteur d'une heure dans la grille, en pixels. */
-const HEURE_PX = 64;
+const HEURE_PX = 72;
 const MINUTE_PX = HEURE_PX / 60;
 /** Granularité du dépôt : les séances s'alignent sur 15 minutes. */
 const PAS_MINUTES = 15;
@@ -88,7 +88,9 @@ function SeanceBloc({
   const c = couleurSeance(seance.module);
   const duree =
     minutesDepuisMinuit(seance.fin) - minutesDepuisMinuit(seance.debut);
-  const court = duree <= 45;
+  // Assez haut pour deux lignes de titre + une ligne de détail.
+  const court = duree < 50;
+  const tresCourt = duree <= 30;
 
   return (
     <button
@@ -98,7 +100,7 @@ function SeanceBloc({
       onClick={() => onOpen(seance)}
       title={`${seance.module} · ${nomProf} · ${seance.groupe} · ${seance.salle} · ${seance.debut}–${seance.fin}`}
       className={cn(
-        "group h-full w-full overflow-hidden rounded-lg border-s-[3px] px-2 py-1 text-start transition-all duration-200",
+        "group flex h-full w-full flex-col gap-0.5 overflow-hidden rounded-lg border-s-[3px] px-2 py-1.5 text-start leading-tight transition-all duration-200",
         "hover:z-10 hover:shadow-[0_10px_24px_-12px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50",
         canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
       )}
@@ -108,30 +110,29 @@ function SeanceBloc({
         color: c.text,
       }}
     >
-      <span className="flex items-baseline gap-1.5">
-        <span
-          className={cn(
-            "truncate font-semibold leading-tight",
-            compact ? "text-[10px]" : "text-[11px]",
-          )}
-        >
-          {seance.module}
-        </span>
+      <span
+        className={cn(
+          "font-semibold leading-[1.15]",
+          tresCourt ? "truncate" : "line-clamp-2",
+          compact ? "text-[10px]" : "text-[11px]",
+        )}
+      >
+        {seance.module}
       </span>
       {!court && !compact ? (
         <>
-          <span className="mt-0.5 block truncate text-[10px] opacity-90">
+          <span className="block truncate text-[10px] font-medium opacity-95">
             {seance.debut}–{seance.fin} · {seance.salle}
           </span>
           <span className="block truncate text-[10px] opacity-75">
             {nomProf} · {seance.groupe}
           </span>
         </>
-      ) : (
+      ) : !compact ? (
         <span className="block truncate text-[9px] opacity-80">
           {seance.debut} · {seance.groupe}
         </span>
-      )}
+      ) : null}
     </button>
   );
 }
