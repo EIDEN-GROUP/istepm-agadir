@@ -19,6 +19,8 @@ import {
   Stethoscope,
   CreditCard,
   Settings,
+  Inbox,
+  IdCard,
 } from "lucide-react";
 import type { UserRole } from "@/lib/auth";
 import type { NavEntry, NavGroup, NavItem } from "@/components/dash-sidebar";
@@ -219,9 +221,9 @@ export function useDashboardNav(role: UserRole | null) {
       item("/dashboard/stages", t.nav.stages, t.navShort.stages, Stethoscope),
       item(
         "/dashboard/espace-etudiant",
-        role === "etudiant" ? "Mon espace" : "Espace étudiant",
-        "Espace",
-        GraduationCap,
+        role === "etudiant" ? "Mon espace" : "Demandes étudiants",
+        role === "etudiant" ? "Espace" : "Demandes",
+        role === "etudiant" ? IdCard : Inbox,
       ),
       item(
         "/dashboard/paiements",
