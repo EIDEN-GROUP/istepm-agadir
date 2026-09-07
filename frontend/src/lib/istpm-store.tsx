@@ -391,6 +391,9 @@ type IstpmCtx = {
   creneaux: Creneau[];
   setCreneaux: (labels: string[]) => void;
 
+  /** Photo d'identité d'un étudiant, résolue par id ou par CNE (ou `undefined`). */
+  photoDe: (cleOuCne: string | undefined | null) => string | undefined;
+
   /* Dérivés */
   paiements: PaiementLigne[];
   dashboard: {
@@ -1698,8 +1701,28 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [snap.etudiants],
   );
 
+  // Résolution de la photo d'identité d'un étudiant par id OU par CNE : les
+  // enregistrements bulletins / stages / paiements ne portent que le CNE, mais
+  // la photo (téléversée depuis l'espace étudiant) vit sur la fiche.
+  const photoParCle = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of snap.etudiants) {
+      const url = (e.photoUrl ?? "").trim();
+      if (!url) continue;
+      if (e.id) m.set(e.id, url);
+      if (e.cne) m.set(e.cne, url);
+    }
+    return m;
+  }, [snap.etudiants]);
+  const photoDe = useCallback(
+    (cleOuCne: string | undefined | null) =>
+      cleOuCne ? photoParCle.get(cleOuCne) : undefined,
+    [photoParCle],
+  );
+
   const value: IstpmCtx = {
     ...snap,
+    photoDe,
     // `snap.creneaux` porte les libellés bruts ; le contexte expose en plus la
     // version analysée, d'où l'écrasement après le spread.
     creneauxLabels: snap.creneaux,

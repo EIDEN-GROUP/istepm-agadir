@@ -25,7 +25,8 @@ const etudiantSchema = z.object({
   email: z.string().optional().default(""),
   dateNaissance: z.string().optional().default(""),
   ville: z.string().optional().default(""),
-  photoUrl: z.string().max(2000).optional().default(""),
+  // URL courte OU data:image/... (base64) : le front réduit l'image avant envoi.
+  photoUrl: z.string().max(1_500_000).optional().default(""),
   userId: z.string().uuid().nullable().optional(),
   fraisMensuels: z.number().optional().default(0),
   resteAPayer: z.number().optional().default(0),
@@ -308,7 +309,7 @@ export async function etudiantRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")], bodyLimit: 2_000_000 }, async (request, reply) => {
     const input = etudiantSchema.parse(request.body);
     const db = getDb();
     try {
@@ -337,7 +338,7 @@ export async function etudiantRoutes(app: FastifyInstance) {
     }
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")], bodyLimit: 2_000_000 }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = etudiantSchema.partial().parse(request.body);
     const db = getDb();

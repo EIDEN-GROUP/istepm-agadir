@@ -36,6 +36,7 @@ import {
   type StatutStage,
 } from "@/lib/istpm-data";
 import { sendEmailApi } from "@/lib/istpm-api";
+import { PersonAvatar } from "@/components/person-avatar";
 import {
   softCard,
   eyebrowClass,
@@ -48,7 +49,6 @@ import {
   tableRow,
   cellTruncate,
   rowActions,
-  initials,
   TONE_COLORS,
   BRAND_CHART_COLORS,
   dashTooltip,
@@ -425,7 +425,7 @@ function StagesAnalytics({
 
 function StagesPage() {
   const { role } = useAuth();
-  const { stages, etudiants, structuresAccueil, servicesStage, addStage, updateStage, deleteStage, addStructureAccueil, addServiceStage } = useIstpm();
+  const { stages, etudiants, structuresAccueil, servicesStage, addStage, updateStage, deleteStage, addStructureAccueil, addServiceStage, photoDe } = useIstpm();
   // Conventions are handled by student administration.
   const canManage = role === "directeur" || role === "responsable";
 
@@ -550,12 +550,17 @@ function StagesPage() {
             className={tableRow}
           >
             <td
-              className={cn("border-l-[3px] font-medium", cellTruncate)}
+              className="border-l-[3px] font-medium"
               style={{
                 borderLeftColor: TONE_COLORS[STATUT_STAGE_TONE[s.statut]],
               }}
             >
-              {s.prenom} {s.nom}
+              <span className="flex items-center gap-2.5">
+                <PersonAvatar name={`${s.prenom} ${s.nom}`} photoUrl={photoDe(s.cne)} />
+                <span className={cn("min-w-0", cellTruncate)}>
+                  {s.prenom} {s.nom}
+                </span>
+              </span>
             </td>
             <td className={cellTruncate}>{s.structure}</td>
             <td className={cn("text-muted-foreground", cellTruncate)}>
@@ -619,7 +624,14 @@ function StagesPage() {
                 const s = stages.find((x) => x.id === detail.id) ?? detail;
                 return (
                   <DetailShell
-                    icon={initials(`${s.prenom} ${s.nom}`)}
+                    icon={
+                      <PersonAvatar
+                        name={`${s.prenom} ${s.nom}`}
+                        photoUrl={photoDe(s.cne)}
+                        size="md"
+                        ring={false}
+                      />
+                    }
                     title={`${s.prenom} ${s.nom}`}
                     subtitle={`${s.cne} · ${s.filiere} · ${s.niveau}`}
                     badges={

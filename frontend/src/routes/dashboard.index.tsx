@@ -45,8 +45,6 @@ import {
   softCard,
   toneBadge,
   TONE_COLORS,
-  avatarChip,
-  initials,
   primaryPill,
   eyebrowClass,
   dashTooltip,
@@ -813,6 +811,7 @@ function ExamensRecentsTable({ examens }: { examens: Examen[] }) {
 }
 
 function BulletinsRecentsTable({ bulletins }: { bulletins: Bulletin[] }) {
+  const { photoDe } = useIstpm();
   if (!bulletins.length) return <EmptyState icon={GraduationCap}>Aucun bulletin.</EmptyState>;
   const dt = (d: string) => d === "Admis" ? "teal" as const : d === "Ajourné" || d === "échec" ? "red" as const : d === "Rattrapage" ? "amber" as const : "neutral" as const;
   const st = (s: string) => s === "publie" ? "teal" as const : s === "valide" ? "blue" as const : "amber" as const;
@@ -824,7 +823,7 @@ function BulletinsRecentsTable({ bulletins }: { bulletins: Bulletin[] }) {
         {rows.map((b) => (
           <div key={b.id} className="space-y-2 px-4 py-3.5">
             <div className="flex items-center gap-2">
-              <span className={avatarChip}>{initials(`${b.prenom} ${b.nom}`)}</span>
+              <PersonAvatar name={`${b.prenom} ${b.nom}`} photoUrl={photoDe(b.cne)} size="xs" />
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{b.prenom} {b.nom}</span>
               <span className="font-display text-sm font-bold text-foreground">{b.moyenne.toFixed(2)}</span>
             </div>
@@ -847,7 +846,7 @@ function BulletinsRecentsTable({ bulletins }: { bulletins: Bulletin[] }) {
                 <tr key={b.id} className="h-13 transition-colors hover:bg-brand/6">
                   <td className="whitespace-nowrap px-4 py-3">
                     <span className="flex items-center gap-2">
-                      <span className={avatarChip}>{initials(`${b.prenom} ${b.nom}`)}</span>
+                      <PersonAvatar name={`${b.prenom} ${b.nom}`} photoUrl={photoDe(b.cne)} size="xs" />
                       <span className="font-medium text-foreground">{b.prenom} {b.nom}</span>
                     </span>
                   </td>

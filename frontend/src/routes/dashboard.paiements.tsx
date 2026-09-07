@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
+import { PersonAvatar } from "@/components/person-avatar";
 import { makePaiementDocPdf } from "@/lib/branded-doc";
 import {
   ANNEES_UNIVERSITAIRES,
@@ -97,7 +98,7 @@ function resteDu(records: PaiementMensuel[]): number {
 
 function PaiementsPage() {
   const { role } = useAuth();
-  const { etudiants, financier, aRelancer, payerMois, updatePaiementMensuel } = useIstpm();
+  const { etudiants, financier, aRelancer, payerMois, updatePaiementMensuel, photoDe } = useIstpm();
   const canEdit = role === "directeur" || role === "responsable";
 
   const [search, setSearch] = useState("");
@@ -278,12 +279,20 @@ function PaiementsPage() {
             className={tableRow}
           >
             <td
-              className={cn("border-l-[3px] font-medium", cellTruncate)}
+              className="border-l-[3px] font-medium"
               style={{
                 borderLeftColor: TONE_COLORS[STATUT_PAIEMENT_TONE[r.statut]],
               }}
             >
-              {r.etudiant.prenom} {r.etudiant.nom}
+              <span className="flex items-center gap-2.5">
+                <PersonAvatar
+                  name={`${r.etudiant.prenom} ${r.etudiant.nom}`}
+                  photoUrl={r.etudiant.photoUrl ?? photoDe(r.etudiant.cne)}
+                />
+                <span className={cn("min-w-0", cellTruncate)}>
+                  {r.etudiant.prenom} {r.etudiant.nom}
+                </span>
+              </span>
             </td>
             <td className={cn("text-muted-foreground", cellTruncate)}>
               {r.etudiant.filiere}
@@ -691,7 +700,14 @@ function HistoriquePaiementsDialog({
           Historique mensuel des paiements de l'étudiant
         </DialogDescription>
         <DetailShell
-          icon={<Receipt className="h-5 w-5" />}
+          icon={
+            <PersonAvatar
+              name={`${etudiant.prenom} ${etudiant.nom}`}
+              photoUrl={etudiant.photoUrl}
+              size="md"
+              ring={false}
+            />
+          }
           title={`${etudiant.prenom} ${etudiant.nom}`}
           subtitle={`${etudiant.cne} · ${etudiant.filiere}`}
           badges={

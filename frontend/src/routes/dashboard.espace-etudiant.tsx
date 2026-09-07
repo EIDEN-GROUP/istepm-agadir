@@ -1,11 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
   Camera,
   GraduationCap,
-  Users,
   Stethoscope,
   CalendarDays,
   FileText,
@@ -15,20 +14,10 @@ import {
   RefreshCw,
   UserRound,
   BadgeCheck,
-  ChevronsUpDown,
-  Check,
 } from "lucide-react";
 import { DashTabs, DashTabPanel, type DashTab } from "@/components/dash-tabs";
 import { PersonAvatar } from "@/components/person-avatar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { downscaleImage } from "@/lib/image";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
@@ -64,7 +53,6 @@ import {
   DetailGrid,
   DetailField,
   DetailSection,
-  ALL,
 } from "@/components/dash-page";
 import {
   FormDialog,
@@ -105,52 +93,11 @@ function mondayOf(d: Date) {
   return x;
 }
 
-/**
- * Réduit une image à un carré `taille`×`taille` (recadrage centré) et la renvoie
- * en data URL JPEG. Garde l'envoi léger quelle que soit la résolution source.
- */
-function downscaleImage(file: File, taille: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const cote = Math.min(img.naturalWidth, img.naturalHeight);
-      if (!cote) return reject(new Error("empty"));
-      const canvas = document.createElement("canvas");
-      canvas.width = taille;
-      canvas.height = taille;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return reject(new Error("no-2d"));
-      ctx.drawImage(
-        img,
-        (img.naturalWidth - cote) / 2,
-        (img.naturalHeight - cote) / 2,
-        cote,
-        cote,
-        0,
-        0,
-        taille,
-        taille,
-      );
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("decode"));
-    };
-    img.src = url;
-  });
-}
-
 function EspaceEtudiantPage() {
   const { role } = useAuth();
   const qc = useQueryClient();
   const store = useIstpm();
   const isStaff = role === "directeur" || role === "responsable";
-
-  // Le staff peut prévisualiser la fiche d'un étudiant (support).
-  const [staffEtudiantId, setStaffEtudiantId] = useState<string>(ALL);
   const [tab, setTab] = useState(0);
   const [dir, setDir] = useState(0);
   const goTab = (i: number) => {
@@ -163,16 +110,20 @@ function EspaceEtudiantPage() {
   const [detailSeance, setDetailSeance] = useState<Seance | null>(null);
   const photoInput = useRef<HTMLInputElement>(null);
 
+  // Espace personnel : uniquement pour l'étudiant. Le staff n'a ici que la
+  // file des demandes à traiter.
   const meQuery = useQuery({
-    queryKey: ["student-me", isStaff ? staffEtudiantId : "self"],
-    queryFn: () => fetchStudentMe(isStaff && staffEtudiantId !== ALL ? staffEtudiantId : undefined),
+    queryKey: ["student-me"],
+    queryFn: () => fetchStudentMe(),
     retry: false,
+    enabled: !isStaff,
   });
 
   const calQuery = useQuery({
     queryKey: ["student-calendar"],
     queryFn: () => fetchStudentCalendar(),
     retry: false,
+    enabled: !isStaff,
   });
 
   const reqQuery = useQuery({
@@ -180,6 +131,7 @@ function EspaceEtudiantPage() {
     queryFn: fetchStudentRequests,
     retry: false,
     refetchInterval: 60_000,
+    enabled: !isStaff,
   });
 
   const allReqQuery = useQuery({
@@ -214,11 +166,8 @@ function EspaceEtudiantPage() {
 
   /* ----- Repli démo : backend indisponible ou compte non lié ----- */
   const fallback = useMemo(() => {
-    if (meQuery.data) return null;
-    const etu =
-      (isStaff && staffEtudiantId !== ALL
-        ? store.etudiants.find((e) => e.id === staffEtudiantId)
-        : store.etudiants[0]) ?? null;
+    if (meQuery.data || isStaff) return null;
+    const etu = store.etudiants[0] ?? null;
     if (!etu) return null;
     const enseignants = store.formateurs.filter((f) => {
       const sameFiliere = !f.departement || f.departement === etu.filiere;
@@ -231,7 +180,7 @@ function EspaceEtudiantPage() {
     });
     const stages = store.stages.filter((s) => s.etudiantId === etu.id);
     return { etu, enseignants, stages };
-  }, [meQuery.data, store.etudiants, store.formateurs, store.stages, isStaff, staffEtudiantId]);
+  }, [meQuery.data, store.etudiants, store.formateurs, store.stages, isStaff]);
 
   const me = meQuery.data;
   const profil = me?.etudiant as unknown as Record<string, string> | undefined;
@@ -301,6 +250,23 @@ function EspaceEtudiantPage() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Photo refusée"),
   });
 
+  const onPhotoFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Choisissez une image (JPG / PNG)");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image trop lourde (8 Mo max)");
+      return;
+    }
+    try {
+      photoMut.mutate(await downscaleImage(file, 512));
+    } catch {
+      toast.error("Image illisible — essayez un autre fichier");
+    }
+  };
+
   const [aTraiter, setATraiter] = useState<StudentRequest | null>(null);
 
   const traiterMut = useMutation({
@@ -319,26 +285,6 @@ function EspaceEtudiantPage() {
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Mise à jour impossible"),
   });
-
-  const onPhotoFile = async (file: File | undefined) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Choisissez une image (JPG/PNG)");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("Image trop lourde (8 Mo max)");
-      return;
-    }
-    try {
-      // Recadrage carré + réduction à 512 px : le data URL envoyé reste léger
-      // (~40–90 Ko) au lieu de plusieurs Mo, quelle que soit la photo source.
-      const dataUrl = await downscaleImage(file, 512);
-      photoMut.mutate(dataUrl);
-    } catch {
-      toast.error("Image illisible — essayez un autre fichier");
-    }
-  };
 
   const loading = meQuery.isLoading;
   const backendDown = meQuery.isError && !fallback;
@@ -510,7 +456,9 @@ function EspaceEtudiantPage() {
         </div>
         <p className="flex items-center gap-1.5 rounded-xl bg-brand/6 px-3 py-2 text-[11px] text-muted-foreground">
           <BadgeCheck className="h-3.5 w-3.5 text-brand-dk" />
-          Votre photo est visible par le secrétariat et vos enseignants (2 Mo max, JPG/PNG).
+          Votre photo est visible par le secrétariat et vos enseignants. Vos
+          informations sont gérées par les affaires estudiantines — signalez toute
+          erreur via une demande.
         </p>
         <DetailSection title="Coordonnées">
           <DetailGrid>
@@ -744,110 +692,49 @@ function EspaceEtudiantPage() {
   );
 
   const demandesTab = (
-    <div className="space-y-4">
-      {/* Vue étudiant : sa propre liste. Le staff ne voit que « à traiter »
-          ci-dessous — créer une demande n'est pas son rôle. */}
-      {!isStaff ? (
-        <section className={cn(softCard, "space-y-3 p-4 sm:p-5")}>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <ClipboardCheck className="h-4 w-4 text-brand-dk" />
-              <p className={eyebrowClass}>Mes demandes ({demandes.length})</p>
-            </div>
-            <button className={ghostPill} onClick={() => setDemandeOpen(true)}>
-              <Plus className="h-3.5 w-3.5" /> Nouvelle
-            </button>
-          </div>
-          <DataTable
-            minWidth="min-w-[760px]"
-            isEmpty={demandes.length === 0}
-            empty="Aucune demande. Utilisez « Nouvelle demande »."
-            head={
-              <>
-                <th>Titre</th>
-                <th>Type</th>
-                <th>Statut</th>
-                <th>Date</th>
-                <th>Réponse</th>
-              </>
-            }
-          >
-            {demandes.map((d) => (
-              <tr key={d.id} className={tableRow}>
-                <td className={cn("font-medium", cellTruncate)}>{d.titre}</td>
-                <td className="text-muted-foreground">
-                  {d.type === "predefini" ? "Prédéfini" : "Libre"}
-                </td>
-                <td>
-                  <span className={toneBadge(STATUT_DEMANDE_TONE[d.statut])}>
-                    {STATUT_DEMANDE_LABEL[d.statut]}
-                  </span>
-                </td>
-                <td className="text-muted-foreground">
-                  {new Date(d.createdAt).toLocaleDateString("fr-FR")}
-                </td>
-                <td className={cn("text-muted-foreground", cellTruncate)}>{d.reponse || "—"}</td>
-              </tr>
-            ))}
-          </DataTable>
-        </section>
-      ) : null}
-
-      {isStaff ? (
-        <section className={cn(softCard, "space-y-3 p-4 sm:p-5")}>
-          <div className="flex items-center gap-2">
-            <Inbox className="h-4 w-4 text-brand-dk" />
-            <p className={eyebrowClass}>
-              Demandes à traiter ({(allReqQuery.data ?? []).length})
-            </p>
-          </div>
-          <DataTable
-            minWidth="min-w-[860px]"
-            isEmpty={(allReqQuery.data ?? []).length === 0}
-            empty="Aucune demande d'étudiant."
-            head={
-              <>
-                <th>Titre</th>
-                <th>Statut</th>
-                <th>Date</th>
-                <th className="w-56 text-center">Actions</th>
-              </>
-            }
-          >
-            {(allReqQuery.data ?? []).slice(0, 20).map((d) => (
-              <tr key={d.id} className={tableRow}>
-                <td className={cn("font-medium", cellTruncate)}>
-                  {d.titre}
-                  <span className="block truncate text-xs font-normal text-muted-foreground">
-                    {d.description}
-                  </span>
-                </td>
-                <td>
-                  <span className={toneBadge(STATUT_DEMANDE_TONE[d.statut])}>
-                    {STATUT_DEMANDE_LABEL[d.statut]}
-                  </span>
-                </td>
-                <td className="text-muted-foreground">
-                  {new Date(d.createdAt).toLocaleDateString("fr-FR")}
-                </td>
-                <td className="text-center" onClick={(e) => e.stopPropagation()}>
-                  <div className={cn(rowActions, "justify-center")}>
-                    <button
-                      className={iconButton}
-                      title="Approuver / rejeter avec réponse"
-                      aria-label={`Traiter « ${d.titre} »`}
-                      onClick={() => setATraiter(d)}
-                    >
-                      <ClipboardCheck className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </DataTable>
-        </section>
-      ) : null}
-    </div>
+    <section className={cn(softCard, "space-y-3 p-4 sm:p-5")}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <ClipboardCheck className="h-4 w-4 text-brand-dk" />
+          <p className={eyebrowClass}>Mes demandes ({demandes.length})</p>
+        </div>
+        <button className={ghostPill} onClick={() => setDemandeOpen(true)}>
+          <Plus className="h-3.5 w-3.5" /> Nouvelle
+        </button>
+      </div>
+      <DataTable
+        minWidth="min-w-[760px]"
+        isEmpty={demandes.length === 0}
+        empty="Aucune demande. Utilisez « Nouvelle demande »."
+        head={
+          <>
+            <th>Titre</th>
+            <th>Type</th>
+            <th>Statut</th>
+            <th>Date</th>
+            <th>Réponse</th>
+          </>
+        }
+      >
+        {demandes.map((d) => (
+          <tr key={d.id} className={tableRow}>
+            <td className={cn("font-medium", cellTruncate)}>{d.titre}</td>
+            <td className="text-muted-foreground">
+              {d.type === "predefini" ? "Prédéfini" : "Libre"}
+            </td>
+            <td>
+              <span className={toneBadge(STATUT_DEMANDE_TONE[d.statut])}>
+                {STATUT_DEMANDE_LABEL[d.statut]}
+              </span>
+            </td>
+            <td className="text-muted-foreground">
+              {new Date(d.createdAt).toLocaleDateString("fr-FR")}
+            </td>
+            <td className={cn("text-muted-foreground", cellTruncate)}>{d.reponse || "—"}</td>
+          </tr>
+        ))}
+      </DataTable>
+    </section>
   );
 
   const tabBodies = [
@@ -859,36 +746,37 @@ function EspaceEtudiantPage() {
     demandesTab,
   ];
 
+  if (isStaff) {
+    return (
+      <StaffRequestsView
+        rows={allReqQuery.data ?? []}
+        loading={allReqQuery.isLoading}
+        etudiants={store.etudiants}
+        photoDe={store.photoDe}
+        onTraiter={setATraiter}
+        traiterModal={
+          <TraiterModal
+            demande={aTraiter}
+            onOpenChange={(o) => !o && setATraiter(null)}
+            onSubmit={(v) => traiterMut.mutate(v)}
+            pending={traiterMut.isPending}
+          />
+        }
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Espace étudiant"
         title={prenom || nom ? `Bonjour, ${prenom} ${nom}`.trim() : "Mon espace"}
         actions={
-          isStaff ? undefined : (
-            <button className={primaryPill} onClick={() => setDemandeOpen(true)}>
-              <Plus className="h-4 w-4" /> Nouvelle demande
-            </button>
-          )
+          <button className={primaryPill} onClick={() => setDemandeOpen(true)}>
+            <Plus className="h-4 w-4" /> Nouvelle demande
+          </button>
         }
       />
-
-      {isStaff ? (
-        <div className={cn(softCard, "flex flex-wrap items-center gap-3 p-4")}>
-          <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Prévisualiser la fiche de
-          </Label>
-          <StudentPicker
-            etudiants={store.etudiants}
-            value={staffEtudiantId}
-            onChange={setStaffEtudiantId}
-          />
-          <span className="text-xs text-muted-foreground">
-            Vue staff — l'étudiant ne voit que sa fiche.
-          </span>
-        </div>
-      ) : null}
 
       {loading ? (
         <div className={cn(softCard, "p-10 text-center text-sm text-muted-foreground")}>
@@ -1190,109 +1078,154 @@ function TraiterModal({
 
 /* ------------------------------------------------------------------ */
 
+const STATUT_FILTRES = [
+  ["en_attente", "En attente"],
+  ["en_cours", "En cours"],
+  ["traite", "Traitées"],
+  ["rejete", "Rejetées"],
+  ["", "Toutes"],
+] as const;
+
 /**
- * Sélecteur d'étudiant pour la vue staff : recherche à la frappe (nom / CNE /
- * groupe) au lieu d'un `<select>` de 3000+ options. Seuls les résultats
- * filtrés sont rendus (max 30), donc reste fluide quelle que soit la promo.
+ * Vue « Espace étudiant » côté staff (directeur / responsable) : ni fiche ni
+ * calendrier — le staff gère ça dans les pages dédiées. Ici, uniquement la
+ * file des demandes des étudiants, à approuver ou rejeter avec une réponse.
  */
-function StudentPicker({
+function StaffRequestsView({
+  rows,
+  loading,
   etudiants,
-  value,
-  onChange,
+  photoDe,
+  onTraiter,
+  traiterModal,
 }: {
+  rows: StudentRequest[];
+  loading: boolean;
   etudiants: Etudiant[];
-  value: string;
-  onChange: (v: string) => void;
+  photoDe: (k: string | undefined | null) => string | undefined;
+  onTraiter: (d: StudentRequest) => void;
+  traiterModal: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const selected = value !== ALL ? etudiants.find((e) => e.id === value) : null;
-
-  const matches = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return etudiants.slice(0, 20);
-    return etudiants
-      .filter((e) =>
-        `${e.prenom} ${e.nom} ${e.cne} ${e.groupe} ${e.niveau}`
-          .toLowerCase()
-          .includes(needle),
-      )
-      .slice(0, 30);
-  }, [etudiants, q]);
-
-  const pick = (v: string) => {
-    onChange(v);
-    setOpen(false);
-    setQ("");
-  };
+  const [filtre, setFiltre] = useState<string>("en_attente");
+  const parId = useMemo(
+    () => new Map(etudiants.map((e) => [e.id, e])),
+    [etudiants],
+  );
+  const filtered = filtre ? rows.filter((r) => r.statut === filtre) : rows;
+  const nbAttente = rows.filter((r) => r.statut === "en_attente").length;
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) setQ("");
-      }}
-    >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          role="combobox"
-          aria-expanded={open}
-          className="flex h-10 min-w-[15rem] max-w-full items-center justify-between gap-2 rounded-xl border border-brand/20 bg-card px-3 text-sm transition hover:border-brand/35"
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Affaires estudiantines"
+        title="Demandes des étudiants"
+      />
+
+      <section className={cn(softCard, "space-y-4 p-4 sm:p-5")}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Inbox className="h-4 w-4 text-brand-dk" />
+            <p className={eyebrowClass}>
+              File des demandes
+              {nbAttente > 0 ? (
+                <span className="ms-2 rounded-full bg-warn-pale px-2 py-0.5 text-[10px] font-bold text-warn">
+                  {nbAttente} en attente
+                </span>
+              ) : null}
+            </p>
+          </div>
+          <div className="flex items-center gap-1 rounded-full border border-brand/12 bg-muted/60 p-1">
+            {STATUT_FILTRES.map(([v, label]) => (
+              <button
+                key={v || "all"}
+                type="button"
+                onClick={() => setFiltre(v)}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors",
+                  filtre === v
+                    ? "bg-brand text-white"
+                    : "text-muted-foreground hover:text-brand-dk",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <DataTable
+          minWidth="min-w-[880px]"
+          isEmpty={!loading && filtered.length === 0}
+          empty={loading ? "Chargement…" : "Aucune demande dans cette catégorie."}
+          head={
+            <>
+              <th>Étudiant</th>
+              <th>Demande</th>
+              <th>Statut</th>
+              <th>Date</th>
+              <th className="w-40 text-center">Traiter</th>
+            </>
+          }
         >
-          <span className={cn("truncate", !selected && "text-muted-foreground")}>
-            {selected
-              ? `${selected.prenom} ${selected.nom} — ${selected.cne}`
-              : "Mon compte lié (défaut)"}
-          </span>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className="w-[22rem] max-w-[90vw] rounded-2xl border-brand/15 p-0"
-      >
-        <Command shouldFilter={false}>
-          <CommandInput
-            value={q}
-            onValueChange={setQ}
-            placeholder="Rechercher un étudiant (nom, CNE)…"
-            className="h-10"
-          />
-          <CommandList>
-            <CommandEmpty>Aucun étudiant trouvé.</CommandEmpty>
-            <CommandGroup>
-              <CommandItem value="__self__" onSelect={() => pick(ALL)}>
-                <Check
-                  className={cn(
-                    "me-2 h-4 w-4",
-                    value === ALL ? "opacity-100" : "opacity-0",
-                  )}
-                />
-                Mon compte lié (défaut)
-              </CommandItem>
-              {matches.map((e) => (
-                <CommandItem key={e.id} value={e.id} onSelect={() => pick(e.id)}>
-                  <Check
-                    className={cn(
-                      "me-2 h-4 w-4",
-                      value === e.id ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                  <span className="min-w-0 flex-1 truncate">
-                    {e.prenom} {e.nom}
-                    <span className="ms-1.5 text-xs text-muted-foreground">
-                      {e.cne} · {e.niveau}
+          {filtered.map((d) => {
+            const etu = parId.get(d.etudiantId);
+            const nom = etu ? `${etu.prenom} ${etu.nom}` : "Étudiant";
+            return (
+              <tr
+                key={d.id}
+                className={tableRow}
+                onClick={() => onTraiter(d)}
+              >
+                <td>
+                  <span className="flex items-center gap-2.5">
+                    <PersonAvatar
+                      name={nom}
+                      photoUrl={photoDe(d.etudiantId) ?? photoDe(etu?.cne)}
+                    />
+                    <span className="min-w-0">
+                      <span className={cn("block font-medium", cellTruncate)}>{nom}</span>
+                      {etu ? (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {etu.cne} · {etu.filiere}
+                        </span>
+                      ) : null}
                     </span>
                   </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                </td>
+                <td className={cn("font-medium", cellTruncate)}>
+                  {d.titre}
+                  <span className="block truncate text-xs font-normal text-muted-foreground">
+                    {d.description}
+                  </span>
+                </td>
+                <td>
+                  <span className={toneBadge(STATUT_DEMANDE_TONE[d.statut])}>
+                    {STATUT_DEMANDE_LABEL[d.statut]}
+                  </span>
+                </td>
+                <td className="text-muted-foreground">
+                  {new Date(d.createdAt).toLocaleDateString("fr-FR")}
+                </td>
+                <td className="text-center" onClick={(e) => e.stopPropagation()}>
+                  <div className={cn(rowActions, "justify-center")}>
+                    <button
+                      className={iconButton}
+                      title="Approuver / rejeter avec réponse"
+                      aria-label={`Traiter « ${d.titre} »`}
+                      onClick={() => onTraiter(d)}
+                    >
+                      <ClipboardCheck className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </DataTable>
+      </section>
+
+      {traiterModal}
+    </div>
   );
 }
 

@@ -30,7 +30,6 @@ import {
   tableRow,
   cellTruncate,
   rowActions,
-  initials,
   TONE_COLORS,
 } from "@/lib/dash-ui";
 import {
@@ -46,6 +45,7 @@ import {
   ALL,
 } from "@/components/dash-page";
 import { usePagination, TablePagination } from "@/components/table-pagination";
+import { PersonAvatar } from "@/components/person-avatar";
 import {
   FormDialog,
   ConfirmDialog,
@@ -179,7 +179,7 @@ ${cachet}
 
 function BulletinsPage() {
   const { role } = useAuth();
-  const { bulletins, etudiants, formateurs, updateBulletin, publierBulletin, publierTousBulletins } =
+  const { bulletins, etudiants, formateurs, updateBulletin, publierBulletin, publierTousBulletins, photoDe } =
     useIstpm();
   // Publishing transcripts is a student-administration act.
   const canPublish = role === "directeur" || role === "responsable";
@@ -362,10 +362,15 @@ function BulletinsPage() {
             className={tableRow}
           >
             <td
-              className={cn("border-l-[3px] font-medium", cellTruncate)}
+              className="border-l-[3px] font-medium"
               style={{ borderLeftColor: TONE_COLORS[DECISION_TONE[b.decision]] }}
             >
-              {b.prenom} {b.nom}
+              <span className="flex items-center gap-2.5">
+                <PersonAvatar name={`${b.prenom} ${b.nom}`} photoUrl={photoDe(b.cne)} />
+                <span className={cn("min-w-0", cellTruncate)}>
+                  {b.prenom} {b.nom}
+                </span>
+              </span>
             </td>
             <td className="text-center tabular-nums text-muted-foreground">
               {b.niveau}
@@ -605,6 +610,7 @@ function BulletinDetail({
   canPublish: boolean;
   onPublish: (b: Bulletin) => void;
 }) {
+  const { photoDe } = useIstpm();
   const totalCredits = b.notes.reduce((s, n) => s + n.credits, 0);
   const creditsValides = b.notes
     .filter((n) => n.note >= 10)
@@ -612,7 +618,14 @@ function BulletinDetail({
 
   return (
     <DetailShell
-      icon={initials(`${b.prenom} ${b.nom}`)}
+      icon={
+        <PersonAvatar
+          name={`${b.prenom} ${b.nom}`}
+          photoUrl={photoDe(b.cne)}
+          size="md"
+          ring={false}
+        />
+      }
       title={`${b.prenom} ${b.nom}`}
       subtitle={`${b.cne} · ${b.filiere}`}
       badges={

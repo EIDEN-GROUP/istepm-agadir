@@ -25,6 +25,7 @@ import {
   type StatutPaiement,
 } from "@/lib/istpm-data";
 import { PersonAvatar } from "@/components/person-avatar";
+import { downscaleImage } from "@/lib/image";
 import {
   primaryPill,
   ghostPill,
@@ -747,6 +748,8 @@ type FormState = {
   dateNaissance: string;
   ville: string;
   fraisMensuels: number | "";
+  /** Photo d'identité (data URL) — gérée par les affaires estudiantines. */
+  photoUrl: string;
   /** Nouvelle inscription : envoyer l'invitation mot de passe par e-mail. */
   invite: boolean;
 };
@@ -786,6 +789,7 @@ function EtudiantForm({
     dateNaissance: initial?.dateNaissance ?? "",
     ville: initial?.ville ?? "",
     fraisMensuels: initial?.fraisMensuels ?? 3400,
+    photoUrl: initial?.photoUrl ?? "",
     invite: !initial,
   }));
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
@@ -795,6 +799,24 @@ function EtudiantForm({
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setF((prev) => ({ ...prev, [k]: v }));
     setErrors((prev) => ({ ...prev, [k]: undefined }));
+  };
+
+  const photoInput = useRef<HTMLInputElement>(null);
+  const onPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Choisissez une image (JPG / PNG)");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image trop lourde (8 Mo max)");
+      return;
+    }
+    try {
+      set("photoUrl", await downscaleImage(file, 512));
+    } catch {
+      toast.error("Image illisible — essayez un autre fichier");
+    }
   };
 
   const submit = () => {
@@ -839,6 +861,51 @@ function EtudiantForm({
       submitLabel={initial ? "Enregistrer les modifications" : "Inscrire"}
       onSubmit={submit}
     >
+      <FullWidth>
+        <div className="flex items-center gap-4 rounded-xl border border-brand/15 bg-muted/40 p-3">
+          <PersonAvatar
+            name={`${f.prenom} ${f.nom}`.trim() || "?"}
+            photoUrl={f.photoUrl}
+            size="lg"
+          />
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Photo d'identité
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => photoInput.current?.click()}
+                className="rounded-lg border border-brand/25 bg-card px-3 py-1.5 text-xs font-semibold transition hover:bg-brand/8"
+              >
+                {f.photoUrl ? "Changer la photo" : "Téléverser une photo"}
+              </button>
+              {f.photoUrl ? (
+                <button
+                  type="button"
+                  onClick={() => set("photoUrl", "")}
+                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-alert transition hover:bg-alert/10"
+                >
+                  Retirer
+                </button>
+              ) : null}
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              JPG / PNG · recadrée en carré · visible dans toute l'application.
+            </p>
+          </div>
+          <input
+            ref={photoInput}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              onPhoto(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </div>
+      </FullWidth>
       <TextField
         label="CNE"
         required
