@@ -9,6 +9,7 @@ import {
   resendInvite,
   resendInviteByEmail,
   revokeInvite,
+  smtpConfigured,
   type InvitationRole,
 } from "@/services/invitations";
 
@@ -41,9 +42,17 @@ export async function invitationRoutes(app: FastifyInstance) {
         groupe: input.groupe,
       });
       if (!result.ok) return reply.status(409).send({ error: result.error });
-      return { user: result.user, emailSent: result.emailSent, inviteUrl: result.inviteUrl };
+      if (!result.emailSent) {
+        request.log.error({ email: input.email, reason: result.emailError }, "Échec envoi e-mail d'invitation");
+      }
+      return { user: result.user, emailSent: result.emailSent, emailError: result.emailError, inviteUrl: result.inviteUrl };
     },
   );
+
+  // État SMTP (staff) : l'UI affiche « configuré » ou invite au partage manuel.
+  app.get("/smtp", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async () => {
+    return { configured: smtpConfigured() };
+  });
 
   // Invitations en attente (staff).
   app.get("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async () => {
@@ -58,7 +67,10 @@ export async function invitationRoutes(app: FastifyInstance) {
       const { userId } = request.params as { userId: string };
       const result = await resendInvite(userId);
       if (!result.ok) return reply.status(404).send({ error: result.error });
-      return { emailSent: result.emailSent, inviteUrl: result.inviteUrl };
+      if (!result.emailSent) {
+        request.log.error({ userId, reason: result.emailError }, "Échec renvoi e-mail d'invitation");
+      }
+      return { emailSent: result.emailSent, emailError: result.emailError, inviteUrl: result.inviteUrl };
     },
   );
 

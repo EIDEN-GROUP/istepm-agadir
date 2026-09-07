@@ -13,11 +13,13 @@ export function InviteLinkBanner({
   email,
   inviteUrl,
   emailSent,
+  emailError,
   onClose,
 }: {
   email: string;
   inviteUrl: string;
   emailSent: boolean;
+  emailError?: string | null;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -39,8 +41,13 @@ export function InviteLinkBanner({
       <div className="min-w-0 flex-1 space-y-1.5">
         <p className="text-xs font-semibold text-foreground">
           Compte créé pour {email} —{" "}
-          {emailSent ? "invitation envoyée par e-mail." : "e-mail non envoyé (SMTP), partagez ce lien :"}
+          {emailSent ? "invitation envoyée par e-mail." : "e-mail non envoyé, partagez ce lien :"}
         </p>
+        {!emailSent ? (
+          <p className="text-[11px] text-alert">
+            Échec d'envoi : {emailError || "SMTP non configuré"}. Vérifiez les réglages SMTP du serveur.
+          </p>
+        ) : null}
         <div className="flex items-center gap-2">
           <input
             readOnly

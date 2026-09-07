@@ -62,6 +62,10 @@ function buildInviteEmail(name: string, role: string, inviteUrl: string) {
   };
 }
 
+export function smtpConfigured(): boolean {
+  return !!getEnv().SMTP_HOST;
+}
+
 /** Émet (ou réémet) un lien pour un utilisateur existant. */
 async function issueInvite(userId: string) {
   const db = getDb();
@@ -79,6 +83,7 @@ async function issueInvite(userId: string) {
 
   const inviteUrl = `${frontendBaseUrl()}/definir-mot-de-passe?token=${token}`;
   let emailSent = false;
+  let emailError: string | null = "SMTP non configuré";
   const transporter = getTransporter();
   if (transporter) {
     try {
@@ -86,11 +91,13 @@ async function issueInvite(userId: string) {
       const mail = buildInviteEmail(updated.name, updated.role, inviteUrl);
       await transporter.sendMail({ from: env.FROM_EMAIL, to: updated.email, ...mail });
       emailSent = true;
-    } catch {
+      emailError = null;
+    } catch (err) {
       emailSent = false;
+      emailError = err instanceof Error ? err.message : "Envoi impossible";
     }
   }
-  return { user: updated, inviteUrl, emailSent };
+  return { user: updated, inviteUrl, emailSent, emailError };
 }
 
 /**
@@ -131,7 +138,7 @@ export async function registerWithInvite(input: {
   }
   const issued = await issueInvite(user.id);
   if (!issued) return { ok: false as const, error: "Compte créé mais lien impossible" };
-  return { ok: true as const, user, inviteUrl: issued.inviteUrl, emailSent: issued.emailSent };
+  return { ok: true as const, user, inviteUrl: issued.inviteUrl, emailSent: issued.emailSent, emailError: issued.emailError };
 }
 
 export async function verifyInvite(token: string) {
@@ -213,7 +220,6 @@ export async function resendInvite(userId: string) {
   if (!issued) return { ok: false as const, error: "Utilisateur introuvable" };
   return { ok: true as const, ...issued };
 }
-
 /** Auto-renvoi par l'utilisateur (lien expiré) : même réponse dans tous les cas. */
 export async function resendInviteByEmail(email: string) {
   const db = getDb();

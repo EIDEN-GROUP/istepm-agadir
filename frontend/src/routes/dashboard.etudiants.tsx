@@ -160,7 +160,7 @@ function EtudiantsPage() {
   const [detail, setDetail] = useState<Etudiant | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Etudiant | null>(null);
-  const [inviteInfo, setInviteInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean } | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean; emailError?: string | null } | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [toDelete, setToDelete] = useState<Etudiant | null>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -432,6 +432,7 @@ function EtudiantsPage() {
           email={inviteInfo.email}
           inviteUrl={inviteInfo.inviteUrl}
           emailSent={inviteInfo.emailSent}
+          emailError={inviteInfo.emailError}
           onClose={() => setInviteInfo(null)}
         />
       ) : null}
@@ -637,7 +638,7 @@ function EtudiantsPage() {
                     role: "etudiant",
                     cne: data.cne,
                   });
-                  setInviteInfo({ email: data.email, inviteUrl: inv.inviteUrl, emailSent: inv.emailSent });
+                  setInviteInfo({ email: data.email, inviteUrl: inv.inviteUrl, emailSent: inv.emailSent, emailError: inv.emailError });
                   toast.success(
                     inv.emailSent
                       ? "Invitation envoyée par e-mail — l'étudiant définira son mot de passe"

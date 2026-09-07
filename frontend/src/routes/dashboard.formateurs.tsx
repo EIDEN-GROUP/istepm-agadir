@@ -98,7 +98,7 @@ function FormateursPage() {
   const [editing, setEditing] = useState<Formateur | null>(null);
   const [toDelete, setToDelete] = useState<Formateur | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [inviteInfo, setInviteInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean } | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean; emailError?: string | null } | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -291,6 +291,7 @@ function FormateursPage() {
           email={inviteInfo.email}
           inviteUrl={inviteInfo.inviteUrl}
           emailSent={inviteInfo.emailSent}
+          emailError={inviteInfo.emailError}
           onClose={() => setInviteInfo(null)}
         />
       ) : null}
@@ -504,7 +505,7 @@ function FormateursPage() {
             name: `${data.prenom} ${data.nom}`,
             role: "enseignant",
           });
-          setInviteInfo({ email: data.email, inviteUrl: inv.inviteUrl, emailSent: inv.emailSent });
+          setInviteInfo({ email: data.email, inviteUrl: inv.inviteUrl, emailSent: inv.emailSent, emailError: inv.emailError });
           toast.success(
             inv.emailSent
               ? "Invitation envoyée par e-mail — le formateur définira son mot de passe"

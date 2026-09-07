@@ -688,6 +688,7 @@ export function createUser(data: {
 export interface InviteResult {
   user: UserRecord;
   emailSent: boolean;
+  emailError: string | null;
   inviteUrl: string;
 }
 
@@ -730,13 +731,18 @@ export function fetchPendingInvites() {
 }
 
 export function resendInvitation(userId: string) {
-  return api.post<{ emailSent: boolean; inviteUrl: string }>(
+  return api.post<{ emailSent: boolean; emailError: string | null; inviteUrl: string }>(
     `/auth/invitations/${userId}/resend`,
   );
 }
 
 export function revokeInvitation(userId: string) {
   return api.delete<{ ok: boolean }>(`/auth/invitations/${userId}`);
+}
+
+/** L'envoi d'e-mails est-il configuré côté backend ? */
+export function fetchSmtpStatus() {
+  return api.get<{ configured: boolean }>("/auth/invitations/smtp");
 }
 
 /** Auto-renvoi public : nouveau lien si une invitation attend cet e-mail. */

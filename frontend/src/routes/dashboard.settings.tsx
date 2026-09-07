@@ -58,6 +58,7 @@ import {
   assignUserRole,
   createInvitation,
   fetchPendingInvites,
+  fetchSmtpStatus,
   resendInvitation,
   revokeInvitation,
   type PendingInvite,
@@ -985,7 +986,7 @@ function NewUserForm({
   const [cne, setCne] = useState("");
   const [mode, setMode] = useState<"password" | "invite">("invite");
   const [loading, setLoading] = useState(false);
-  const [inviteInfo, setInviteInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean } | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean; emailError?: string | null } | null>(null);
 
   const handleCreate = async () => {
     if (!name.trim() || !email.trim()) return;
@@ -1000,7 +1001,7 @@ function NewUserForm({
           role,
           ...(role === "etudiant" && cne.trim() ? { cne: cne.trim() } : {}),
         });
-        setInviteInfo({ email: email.trim(), inviteUrl: inv.inviteUrl, emailSent: inv.emailSent });
+        setInviteInfo({ email: email.trim(), inviteUrl: inv.inviteUrl, emailSent: inv.emailSent, emailError: inv.emailError });
         onCreated(inv.user);
         toast.success(
           inv.emailSent
@@ -1051,6 +1052,7 @@ function NewUserForm({
             email={inviteInfo.email}
             inviteUrl={inviteInfo.inviteUrl}
             emailSent={inviteInfo.emailSent}
+            emailError={inviteInfo.emailError}
             onClose={() => setInviteInfo(null)}
           />
           <div className="flex justify-end">
@@ -1470,7 +1472,8 @@ function SettingsPage() {
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState<string>("__all__");
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
-  const [resentInfo, setResentInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean } | null>(null);
+  const [smtpOk, setSmtpOk] = useState<boolean | null>(null);
+  const [resentInfo, setResentInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean; emailError?: string | null } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "role" | "user"; id: string; name: string } | null>(null);
 
   const reloadPendingInvites = () => {
@@ -1485,6 +1488,7 @@ function SettingsPage() {
       .then(setUsersList)
       .catch(() => {});
     reloadPendingInvites();
+    fetchSmtpStatus().then((s) => setSmtpOk(s.configured)).catch(() => setSmtpOk(false));
   }, []);
 
   const filteredUsers = useMemo(() => {
@@ -1798,6 +1802,12 @@ function SettingsPage() {
             }
           >
             <div className="space-y-1.5">
+              {smtpOk === false ? (
+                <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                  E-mails non configurés sur le serveur (SMTP) : les invitations devront être
+                  partagées manuellement via leur lien.
+                </p>
+              ) : null}
               <div className="flex flex-col gap-2 sm:flex-row">
                 <div className="relative flex-1">
                   <Input
@@ -1885,6 +1895,7 @@ function SettingsPage() {
                     email={resentInfo.email}
                     inviteUrl={resentInfo.inviteUrl}
                     emailSent={resentInfo.emailSent}
+                    emailError={resentInfo.emailError}
                     onClose={() => setResentInfo(null)}
                   />
                 ) : null}
@@ -1913,7 +1924,7 @@ function SettingsPage() {
                           resendInvitation(inv.id)
                             .then((r) => {
                               reloadPendingInvites();
-                              setResentInfo({ email: inv.email, inviteUrl: r.inviteUrl, emailSent: r.emailSent });
+                              setResentInfo({ email: inv.email, inviteUrl: r.inviteUrl, emailSent: r.emailSent, emailError: r.emailError });
                               toast.success(
                                 r.emailSent
                                   ? `Nouveau lien envoyé à ${inv.email}`
