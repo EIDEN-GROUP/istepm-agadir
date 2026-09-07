@@ -12,6 +12,7 @@ import {
   ANNEES_ETUDE,
   FILIERES,
   anneeEtude,
+  fmtDate,
   type Etudiant,
   type Stage,
   type StructureAccueil,
@@ -25,7 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DetailShell } from "@/components/dash-page";
-import { SelectField } from "@/components/dash-form";
+import { SelectField, TextField } from "@/components/dash-form";
 import {
   Select,
   SelectContent,
@@ -44,16 +45,17 @@ import {
 } from "@/lib/dash-ui";
 import { cn } from "@/lib/utils";
 
-export type Affectation = { etudiant: Etudiant; structure: string };
+export type Affectation = { etudiant: Etudiant; structure: string; debut: string; fin: string };
 
 /**
  * Affectation groupée des étudiants aux structures d'accueil.
  *
- * Parcours en quatre étapes : année → filière → groupe → liste des étudiants
- * non encore affectés à un stage. Chaque étudiant peut être rattaché
- * individuellement à une structure (dans la limite de sa capacité), ou tout le
- * monde peut être réparti d'un coup via « Aléatoire ». La création effective des
- * stages est déléguée au parent (`onConfirm`).
+ * Parcours en cinq étapes : période (Début → Fin) → année → filière → groupe →
+ * liste des étudiants non encore affectés à un stage. La période choisie en
+ * premier est appliquée à tous les stages créés. Chaque étudiant peut être
+ * rattaché individuellement à une structure (dans la limite de sa capacité),
+ * ou tout le monde peut être réparti d'un coup via « Aléatoire ». La création
+ * effective des stages est déléguée au parent (`onConfirm`).
  */
 export function AffectationStagesDialog({
   open,
@@ -82,12 +84,17 @@ export function AffectationStagesDialog({
   );
 
   const [step, setStep] = useState(0);
+  const [debut, setDebut] = useState("");
+  const [fin, setFin] = useState("");
   const [annee, setAnnee] = useState<AnneeEtude | "">("");
   const [filiere, setFiliere] = useState<Filiere | "">("");
   const [groupe, setGroupe] = useState<string>("");
   // étudiantId → nom de structure choisie ("" = pas encore affecté).
   const [assign, setAssign] = useState<Record<string, string>>({});
   const [nouvelleStructure, setNouvelleStructure] = useState("");
+
+  const dateError =
+    debut && fin && fin < debut ? "La fin doit suivre le début" : undefined;
 
   // Un étudiant est « déjà affecté » s'il a un stage non clôturé (statut ≠ validé).
   const idsAvecStage = useMemo(
@@ -190,9 +197,14 @@ export function AffectationStagesDialog({
   };
 
   const handleConfirm = () => {
+    if (!debut || !fin || dateError) {
+      toast.error("Indiquez d'abord la période du stage (Début → Fin)");
+      setStep(0);
+      return;
+    }
     const affectations: Affectation[] = etudiantsNonAffectes
       .filter((e) => assign[e.id])
-      .map((e) => ({ etudiant: e, structure: assign[e.id] }));
+      .map((e) => ({ etudiant: e, structure: assign[e.id], debut, fin }));
     if (!affectations.length) {
       toast.error("Aucune affectation sélectionnée");
       return;
@@ -208,11 +220,13 @@ export function AffectationStagesDialog({
     Object.values(assign).filter(Boolean).length;
 
   const peutSuivant =
-    (step === 0 && annee) ||
-    (step === 1 && filiere) ||
-    (step === 2 && groupe);
+    (step === 0 && debut && fin && !dateError) ||
+    (step === 1 && annee) ||
+    (step === 2 && filiere) ||
+    (step === 3 && groupe);
 
   const titres = [
+    "Période du stage",
     "Choisir l'année",
     "Choisir la filière",
     "Choisir le groupe",
@@ -229,9 +243,14 @@ export function AffectationStagesDialog({
         <DetailShell
           icon={<Users className="h-5 w-5" />}
           title="Affectation"
-          subtitle={`Étape ${step + 1}/4 · ${titres[step]}`}
+          subtitle={`Étape ${step + 1}/5 · ${titres[step]}`}
           badges={
             <>
+              {debut && fin && !dateError ? (
+                <span className={toneBadge("blue")}>
+                  {fmtDate(debut)} → {fmtDate(fin)}
+                </span>
+              ) : null}
               {annee ? <span className={toneBadge("teal")}>{annee}</span> : null}
               {filiere ? <span className={toneBadge("teal")}>{filiere}</span> : null}
               {groupe ? <span className={toneBadge("teal")}>Groupe {groupe}</span> : null}
@@ -246,7 +265,7 @@ export function AffectationStagesDialog({
               >
                 <ArrowLeft className="h-3.5 w-3.5" /> Retour
               </button>
-              {step < 3 ? (
+              {step < 4 ? (
                 <button
                   type="button"
                   className={cn(primaryPill, !peutSuivant && "pointer-events-none opacity-50")}
@@ -267,6 +286,29 @@ export function AffectationStagesDialog({
           }
         >
           {step === 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <TextField
+                label="Début"
+                required
+                type="date"
+                value={debut}
+                onChange={setDebut}
+              />
+              <TextField
+                label="Fin"
+                required
+                type="date"
+                value={fin}
+                onChange={setFin}
+                error={dateError}
+              />
+              <p className="-mt-1 text-xs text-muted-foreground sm:col-span-2">
+                Cette période sera appliquée à tous les stages créés.
+              </p>
+            </div>
+          ) : null}
+
+          {step === 1 ? (
             <SelectField
               label="Année d'étude"
               required
@@ -282,7 +324,7 @@ export function AffectationStagesDialog({
             />
           ) : null}
 
-          {step === 1 ? (
+          {step === 2 ? (
             <SelectField
               label="Filière"
               required
@@ -297,7 +339,7 @@ export function AffectationStagesDialog({
             />
           ) : null}
 
-          {step === 2 ? (
+          {step === 3 ? (
             groupesDisponibles.length ? (
               <SelectField
                 label="Groupe"
@@ -317,7 +359,7 @@ export function AffectationStagesDialog({
             )
           ) : null}
 
-          {step === 3 ? (
+          {step === 4 ? (
             <div className="space-y-4">
               {onCreateStructure ? (
                 <form

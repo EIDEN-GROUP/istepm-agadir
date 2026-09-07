@@ -34,6 +34,17 @@ type BellItem = {
   lu: boolean;
 };
 
+/** Formattage de date qui ne plante jamais (données inattendues → "—"). */
+function fmtDateNotif(v: unknown): string {
+  try {
+    const d = new Date(String(v ?? ""));
+    if (Number.isNaN(+d)) return "—";
+    return d.toLocaleDateString("fr-FR");
+  } catch {
+    return "—";
+  }
+}
+
 /**
  * Cloche des demandes — petit bouton qui n'existe que s'il y a du nouveau,
  * et qui ouvre une **modale** (pas un simple menu).
@@ -105,28 +116,28 @@ export function RequestBell() {
     ? [...(studentQ.data?.items ?? [])]
         .sort(
           (a, b) =>
-            Number(a.luParEtudiant) - Number(b.luParEtudiant) ||
-            +new Date(b.updatedAt) - +new Date(a.updatedAt),
+            Number(a.luParEtudiant === true) - Number(b.luParEtudiant === true) ||
+            +new Date(String(b.updatedAt ?? 0)) - +new Date(String(a.updatedAt ?? 0)),
         )
         .map((n) => ({
-          id: n.id,
-          title: n.titre,
-          sub: n.reponse || "Statut mis à jour",
-          detail: n.description || "",
-          date: new Date(n.updatedAt).toLocaleDateString("fr-FR"),
+          id: String(n.id ?? ""),
+          title: String(n.titre ?? "Demande"),
+          sub: String(n.reponse || "Statut mis à jour"),
+          detail: String(n.description || ""),
+          date: fmtDateNotif(n.updatedAt),
           tone: (n.statut === "traite" ? "teal" : n.statut === "rejete" ? "red" : "blue") as Tone,
           label: n.statut === "traite" ? "Traitée" : n.statut === "rejete" ? "Rejetée" : "En cours",
-          lu: n.luParEtudiant,
+          lu: n.luParEtudiant === true,
         }))
     : ((staffQ.data ?? [])
         .filter((d) => d.statut === "en_attente")
         .slice(0, 8)
         .map((d) => ({
-          id: d.id,
-          title: d.titre,
-          sub: d.description,
-          detail: d.description,
-          date: new Date(d.createdAt).toLocaleDateString("fr-FR"),
+          id: String(d.id ?? ""),
+          title: String(d.titre ?? "Demande"),
+          sub: String(d.description ?? ""),
+          detail: String(d.description ?? ""),
+          date: fmtDateNotif(d.createdAt),
           tone: "amber" as Tone,
           label: "À traiter",
           lu: false,

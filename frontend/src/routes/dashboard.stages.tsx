@@ -871,7 +871,7 @@ function StagesPage() {
             toast.success(`Structure enregistrée — ${nom}`);
           }}
           onConfirm={(affectations) => {
-            for (const { etudiant, structure } of affectations) {
+            for (const { etudiant, structure, debut, fin } of affectations) {
               addStage({
                 etudiantId: etudiant.id,
                 cne: etudiant.cne,
@@ -883,8 +883,8 @@ function StagesPage() {
                 service: "",
                 encadrantClinique: "",
                 tuteurAcademique: "",
-                debut: "",
-                fin: "",
+                debut,
+                fin,
                 statut: "recherche",
                 conventionSignee: false,
               });
