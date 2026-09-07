@@ -70,6 +70,9 @@ const envSchema = z.object({
 
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
 
+  /** Public frontend base URL for invitation links. Defaults to first CORS origin. */
+  FRONTEND_URL: z.string().default(""),
+
   ADMIN_API_KEY: z.string().default("superadmin-secret-key-change-me"),
 
   AI_API_KEY: z.string().default(""),

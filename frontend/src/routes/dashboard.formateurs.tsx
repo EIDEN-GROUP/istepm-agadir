@@ -5,8 +5,9 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm, type NouveauFormateur } from "@/lib/istpm-store";
-import { createUser } from "@/lib/istpm-api";
+import { createUser, createInvitation } from "@/lib/istpm-api";
 import { ImportCsvDialog, type ImportColumn } from "@/components/import-csv";
+import { InviteLinkBanner } from "@/components/invite-link-banner";
 import {
   FILIERES,
   GRADE_LABEL,
@@ -97,6 +98,7 @@ function FormateursPage() {
   const [editing, setEditing] = useState<Formateur | null>(null);
   const [toDelete, setToDelete] = useState<Formateur | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [inviteInfo, setInviteInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean } | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -283,6 +285,15 @@ function FormateursPage() {
           },
         ]}
       />
+
+      {inviteInfo ? (
+        <InviteLinkBanner
+          email={inviteInfo.email}
+          inviteUrl={inviteInfo.inviteUrl}
+          emailSent={inviteInfo.emailSent}
+          onClose={() => setInviteInfo(null)}
+        />
+      ) : null}
 
       <DataTable
         isEmpty={filtered.length === 0}
@@ -478,10 +489,30 @@ function FormateursPage() {
           initial={editing}
           modulesDisponibles={modulesDisponibles}
           onCancel={() => setFormOpen(false)}
-    onSubmit={(data) => {
+    onSubmit={async (data) => {
       if (editing) {
-        updateFormateur(editing.id, data);
+        const { acces: _acces, ...patch } = data;
+        updateFormateur(editing.id, patch);
         toast.success(`Fiche mise à jour   ${data.prenom} ${data.nom}`);
+      } else if (data.acces === "invite" && data.email) {
+        const { acces: _acces, password: _pw, ...fiche } = data;
+        addFormateur(fiche);
+        toast.success(`Formateur ajouté   ${data.prenom} ${data.nom}`);
+        try {
+          const inv = await createInvitation({
+            email: data.email,
+            name: `${data.prenom} ${data.nom}`,
+            role: "enseignant",
+          });
+          setInviteInfo({ email: data.email, inviteUrl: inv.inviteUrl, emailSent: inv.emailSent });
+          toast.success(
+            inv.emailSent
+              ? "Invitation envoyée par e-mail — le formateur définira son mot de passe"
+              : "Formateur ajouté — partagez le lien d'invitation ci-dessous",
+          );
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Invitation impossible");
+        }
       } else {
         if (data.password && data.email) {
           createUser({
@@ -553,6 +584,7 @@ function FormateurForm({
     telephone: string;
     email: string;
     password?: string;
+    acces: "password" | "invite";
   }) => void;
   onCancel: () => void;
   modulesDisponibles: string[];
@@ -572,7 +604,9 @@ function FormateurForm({
     telephone: initial?.telephone ?? "",
     email: initial?.email ?? "",
     password: "",
+    acces: "invite" as "password" | "invite",
   }));
+  const isNew = !initial;
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => {
@@ -588,8 +622,11 @@ function FormateurForm({
     else if (!/^[A-Za-z]{1,2}\d{1,6}$/.test(f.cin.trim()))
       next.cin = "Format CIN invalide (ex. JB145872)";
     if (!f.departement) next.departement = "Département obligatoire";
-    if (!f.password.trim()) next.password = "Mot de passe requis";
-    if (f.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email))
+    if (isNew && f.acces === "password" && !f.password.trim())
+      next.password = "Mot de passe requis";
+    if (isNew && f.acces === "invite" && !f.email.trim())
+      next.email = "E-mail requis pour envoyer l'invitation";
+    else if (f.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email))
       next.email = "Adresse e-mail invalide";
     if (!parseList(f.modules).length)
       next.modules = "Au moins un module est requis";
@@ -613,6 +650,7 @@ function FormateurForm({
       telephone: f.telephone,
       email: f.email,
       password: f.password,
+      acces: f.acces,
     });
   };
 
@@ -714,15 +752,41 @@ function FormateurForm({
         onChange={(v) => set("email", v)}
         error={errors.email}
       />
-      <TextField
-        label="Mot de passe"
-        type="password"
-        required
-        value={f.password}
-        onChange={(v) => set("password", v)}
-        placeholder="••••••"
-        error={errors.password}
-      />
+      {isNew ? (
+        <FullWidth>
+          <div className="flex items-center gap-1 rounded-full border border-brand/12 bg-muted/60 p-1">
+            {(["password", "invite"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => set("acces", m)}
+                className={cn(
+                  "flex-1 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors",
+                  f.acces === m ? "bg-brand text-white" : "text-muted-foreground hover:text-brand-dk",
+                )}
+              >
+                {m === "password" ? "Définir un mot de passe" : "Invitation par e-mail"}
+              </button>
+            ))}
+          </div>
+          {f.acces === "invite" ? (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Le formateur reçoit un lien pour définir son mot de passe (usage unique, 30 min, renvoi possible).
+            </p>
+          ) : null}
+        </FullWidth>
+      ) : null}
+      {(!isNew || f.acces === "password") ? (
+        <TextField
+          label="Mot de passe"
+          type="password"
+          required={isNew && f.acces === "password"}
+          value={f.password}
+          onChange={(v) => set("password", v)}
+          placeholder="••••••"
+          error={errors.password}
+        />
+      ) : null}
     </FormDialog>
   );
 }

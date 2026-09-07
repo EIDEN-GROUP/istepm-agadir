@@ -681,6 +681,69 @@ export function createUser(data: {
   return api.post<UserRecord>("/auth/register", data);
 }
 
+/* ------------------------------------------------------------------ */
+/*  Invitations (lien 30 min, usage unique)                            */
+/* ------------------------------------------------------------------ */
+
+export interface InviteResult {
+  user: UserRecord;
+  emailSent: boolean;
+  inviteUrl: string;
+}
+
+export function createInvitation(data: {
+  email: string;
+  name: string;
+  role?: string;
+  cne?: string;
+  etudiantId?: string;
+  filiere?: string;
+  groupe?: string;
+}) {
+  return api.post<InviteResult>("/auth/invitations", data);
+}
+
+export function verifyInvitation(token: string) {
+  return api.get<{ valid: boolean; email?: string; name?: string; role?: string }>(
+    "/auth/invitations/verify",
+    { token },
+  );
+}
+
+export function acceptInvitation(token: string, password: string) {
+  return api.post<{ token: string; user: UserRecord }>("/auth/invitations/accept", {
+    token,
+    password,
+  });
+}
+
+export interface PendingInvite {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  expiresAt: string | null;
+}
+
+export function fetchPendingInvites() {
+  return api.get<PendingInvite[]>("/auth/invitations");
+}
+
+export function resendInvitation(userId: string) {
+  return api.post<{ emailSent: boolean; inviteUrl: string }>(
+    `/auth/invitations/${userId}/resend`,
+  );
+}
+
+export function revokeInvitation(userId: string) {
+  return api.delete<{ ok: boolean }>(`/auth/invitations/${userId}`);
+}
+
+/** Auto-renvoi public : nouveau lien si une invitation attend cet e-mail. */
+export function requestInviteResend(email: string) {
+  return api.post<{ ok: boolean }>("/auth/invitations/renvoyer", { email });
+}
+
 export function updateUser(id: string, data: { name?: string; password?: string }) {
   return api.put<UserRecord>(`/auth/users/${id}`, data);
 }

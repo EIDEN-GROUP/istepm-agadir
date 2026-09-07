@@ -19,6 +19,8 @@ export type CreateUserInput = {
   /** CNE ou id étudiant à lier quand role === "etudiant". */
   etudiantId?: string;
   cne?: string;
+  /** Usage interne (invitations) : ne pas auto-créer la fiche liée. */
+  skipAutoCreate?: boolean;
 };
 
 export type UserResult = {
@@ -62,7 +64,7 @@ export async function createUser(input: CreateUserInput): Promise<UserResult> {
       role: input.role ?? "admin",
     })
     .returning();
-  if (input.role === "enseignant") {
+  if (input.role === "enseignant" && !input.skipAutoCreate) {
     const [prenom, ...reste] = input.name.split(" ");
     const groupes: string[] = [];
     if (input.groupe) groupes.push(input.groupe);

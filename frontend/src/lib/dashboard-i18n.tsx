@@ -128,6 +128,7 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
     "/dashboard/bulletins",
     "/dashboard/stages",
     "/dashboard/paiements",
+    "/dashboard/espace-etudiant",
     "/dashboard/settings",
   ],
   enseignant: [
@@ -145,6 +146,7 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
     "/dashboard/bulletins",
     "/dashboard/stages",
     "/dashboard/paiements",
+    "/dashboard/espace-etudiant",
     "/dashboard/settings",
   ],
   // L'étudiant ne voit que son tableau de bord et son espace personnel.
@@ -217,7 +219,7 @@ export function useDashboardNav(role: UserRole | null) {
       item("/dashboard/stages", t.nav.stages, t.navShort.stages, Stethoscope),
       item(
         "/dashboard/espace-etudiant",
-        "Mon espace",
+        role === "etudiant" ? "Mon espace" : "Espace étudiant",
         "Espace",
         GraduationCap,
       ),

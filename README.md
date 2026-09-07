@@ -71,6 +71,17 @@ Pure Vite + React SPA. No SSR. TanStack Router file-based routing with auth guar
 `frontend/src/lib/dashboard-i18n.tsx` (`NAV_BY_ROLE`) et le contrat détaillé dans
 `M:\plan\istepm\STUDENT_WORKSPACE.md`.
 
+### Comptes & invitations
+
+- Nouvelle inscription / Nouveau formateur : case « Invitation par e-mail »
+  (défaut) → fiche + compte créés, l'utilisateur définit son mot de passe via un
+  lien à usage unique valable 30 minutes (`/definir-mot-de-passe?token=…`).
+- Paramètres › Utilisateurs : création manuelle (mot de passe ou invitation),
+  recherche + filtre par rôle, liste des invitations en attente (Renvoyer/Révoquer).
+- Lien expiré : l'utilisateur peut demander lui-même un nouveau lien depuis
+  `/login` (anti-énumération). Sans SMTP configuré, le lien copiable suffit
+  (partage WhatsApp/affichage).
+
 ### Dev
 
 ```bash

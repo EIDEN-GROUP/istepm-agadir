@@ -168,6 +168,15 @@ function LoginPage() {
         <p className="mt-8 text-center text-[11px] leading-relaxed text-muted-foreground">
           Plateforme de gestion des formations paramédicales
         </p>
+        <p className="mt-2 text-center text-[11px]">
+          <button
+            type="button"
+            onClick={() => navigate({ to: "/definir-mot-de-passe" })}
+            className="font-medium text-brand-dk hover:underline"
+          >
+            Lien d'invitation expiré ou non reçu ? Recevoir un nouveau lien
+          </button>
+        </p>
       </motion.div>
     </div>
   );

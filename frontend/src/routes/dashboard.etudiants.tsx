@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm, useCurrentFormateur, type NouvelEtudiant } from "@/lib/istpm-store";
 import { ImportEtudiantsDialog, downloadExempleEtudiantsCsv } from "@/components/import-etudiants-dialog";
-import { fetchStudentSemestres, exportEtudiantsCsv } from "@/lib/istpm-api";
+import { InviteLinkBanner } from "@/components/invite-link-banner";
+import { fetchStudentSemestres, exportEtudiantsCsv, createInvitation } from "@/lib/istpm-api";
 import {
   FILIERES,
   NIVEAUX,
@@ -160,6 +161,7 @@ function EtudiantsPage() {
   const [detail, setDetail] = useState<Etudiant | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Etudiant | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean } | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [toDelete, setToDelete] = useState<Etudiant | null>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -426,6 +428,15 @@ function EtudiantsPage() {
         }
       />
 
+      {inviteInfo ? (
+        <InviteLinkBanner
+          email={inviteInfo.email}
+          inviteUrl={inviteInfo.inviteUrl}
+          emailSent={inviteInfo.emailSent}
+          onClose={() => setInviteInfo(null)}
+        />
+      ) : null}
+
       {noFormateur ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <p className="text-sm font-medium text-muted-foreground">
@@ -613,13 +624,32 @@ function EtudiantsPage() {
           key={editing?.id ?? "new"}
           initial={editing}
           onCancel={() => setFormOpen(false)}
-          onSubmit={(data) => {
+          onSubmit={async (data) => {
             if (editing) {
               updateEtudiant(editing.id, data);
               toast.success(`Fiche mise à jour   ${data.prenom} ${data.nom}`);
             } else {
-              addEtudiant(data);
+              const { invite, ...fiche } = data;
+              addEtudiant(fiche);
               toast.success(`Étudiant inscrit   ${data.prenom} ${data.nom}`);
+              if (invite && data.email) {
+                try {
+                  const inv = await createInvitation({
+                    email: data.email,
+                    name: `${data.prenom} ${data.nom}`,
+                    role: "etudiant",
+                    cne: data.cne,
+                  });
+                  setInviteInfo({ email: data.email, inviteUrl: inv.inviteUrl, emailSent: inv.emailSent });
+                  toast.success(
+                    inv.emailSent
+                      ? "Invitation envoyée par e-mail — l'étudiant définira son mot de passe"
+                      : "Compte créé — partagez le lien d'invitation ci-dessous",
+                  );
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Invitation impossible");
+                }
+              }
             }
             setFormOpen(false);
           }}
@@ -719,6 +749,8 @@ type FormState = {
   dateNaissance: string;
   ville: string;
   fraisMensuels: number | "";
+  /** Nouvelle inscription : envoyer l'invitation mot de passe par e-mail. */
+  invite: boolean;
 };
 
 function EtudiantForm({
@@ -734,6 +766,7 @@ function EtudiantForm({
   }) => void;
   onCancel: () => void;
 }) {
+  const isNew = !initial;
   const [f, setF] = useState<FormState>(() => ({
     cne: initial?.cne ?? "",
     // Suggest a matricule in the house format for new records.
@@ -755,6 +788,7 @@ function EtudiantForm({
     dateNaissance: initial?.dateNaissance ?? "",
     ville: initial?.ville ?? "",
     fraisMensuels: initial?.fraisMensuels ?? 3400,
+    invite: !initial,
   }));
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
@@ -774,6 +808,8 @@ function EtudiantForm({
     if (!f.niveau) next.niveau = "Niveau obligatoire";
     if (f.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email))
       next.email = "Adresse e-mail invalide";
+    if (f.invite && !initial && !f.email.trim())
+      next.email = "E-mail requis pour envoyer l'invitation";
     if (f.fraisMensuels === "" || Number(f.fraisMensuels) < 0)
       next.fraisMensuels = "Montant invalide";
 
@@ -887,6 +923,26 @@ function EtudiantForm({
         onChange={(v) => set("email", v)}
         error={errors.email}
       />
+      {isNew ? (
+        <FullWidth>
+          <label className="flex cursor-pointer select-none items-start gap-2.5 rounded-xl border border-brand/15 bg-brand/[0.04] px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={f.invite}
+              onChange={() => set("invite", !f.invite)}
+              className="mt-0.5 h-4 w-4 rounded border-muted-300 accent-brand"
+            />
+            <span>
+              <span className="block text-sm font-medium text-foreground">
+                Envoyer une invitation par e-mail
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                L'étudiant reçoit un lien pour définir son mot de passe (usage unique, 30 min) et son compte est créé avec le rôle Étudiant.
+              </span>
+            </span>
+          </label>
+        </FullWidth>
+      ) : null}
       <TextField
         label="Date de naissance"
         type="date"

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   Plus,
   Trash2,
@@ -56,9 +56,15 @@ import {
   createUser,
   deleteUser,
   assignUserRole,
+  createInvitation,
+  fetchPendingInvites,
+  resendInvitation,
+  revokeInvitation,
+  type PendingInvite,
   type RoleRecord,
   type UserRecord,
 } from "@/lib/istpm-api";
+import { InviteLinkBanner } from "@/components/invite-link-banner";
 import {
   ConfirmDialog,
   FormDialog,
@@ -977,11 +983,37 @@ function NewUserForm({
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("enseignant");
   const [cne, setCne] = useState("");
+  const [mode, setMode] = useState<"password" | "invite">("invite");
   const [loading, setLoading] = useState(false);
+  const [inviteInfo, setInviteInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean } | null>(null);
 
   const handleCreate = async () => {
-    if (!name.trim() || !email.trim() || !password.trim()) return;
+    if (!name.trim() || !email.trim()) return;
+    if (mode === "password" && !password.trim()) return;
     setLoading(true);
+
+    if (mode === "invite") {
+      try {
+        const inv = await createInvitation({
+          email: email.trim(),
+          name: name.trim(),
+          role,
+          ...(role === "etudiant" && cne.trim() ? { cne: cne.trim() } : {}),
+        });
+        setInviteInfo({ email: email.trim(), inviteUrl: inv.inviteUrl, emailSent: inv.emailSent });
+        onCreated(inv.user);
+        toast.success(
+          inv.emailSent
+            ? `Invitation envoyée à ${email.trim()}`
+            : `Compte créé — partagez le lien d'invitation`,
+        );
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Invitation impossible");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     const userData: { name: string; email: string; password: string; role: string; cne?: string } = {
       name: name.trim(),
@@ -1013,6 +1045,37 @@ function NewUserForm({
   return (
     <div className="mt-3 rounded-xl border border-brand/12 p-4">
       <h4 className="mb-3 text-xs font-bold text-foreground">Nouvel utilisateur</h4>
+      {inviteInfo ? (
+        <div className="mb-3 space-y-2">
+          <InviteLinkBanner
+            email={inviteInfo.email}
+            inviteUrl={inviteInfo.inviteUrl}
+            emailSent={inviteInfo.emailSent}
+            onClose={() => setInviteInfo(null)}
+          />
+          <div className="flex justify-end">
+            <button type="button" onClick={onClose} className={cn(ghostPill, "h-7 px-3 text-[11px]")}>
+              Fermer
+            </button>
+          </div>
+        </div>
+      ) : (
+      <>
+      <div className="mb-3 flex items-center gap-1 rounded-full border border-brand/12 bg-muted/60 p-1">
+        {(["password", "invite"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={cn(
+              "flex-1 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors",
+              mode === m ? "bg-brand text-white" : "text-muted-foreground hover:text-brand-dk",
+            )}
+          >
+            {m === "password" ? "Définir un mot de passe" : "Invitation par e-mail"}
+          </button>
+        ))}
+      </div>
       <div className="mb-3 grid gap-2 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Nom *</label>
@@ -1022,10 +1085,18 @@ function NewUserForm({
           <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Email *</label>
           <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@istpm.ma" className={cn(softInput, "h-8 text-sm")} />
         </div>
-        <div>
-          <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Mot de passe *</label>
-          <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="••••••" className={cn(softInput, "h-8 text-sm")} />
-        </div>
+        {mode === "password" ? (
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Mot de passe *</label>
+            <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="••••••" className={cn(softInput, "h-8 text-sm")} />
+          </div>
+        ) : (
+          <div className="sm:col-span-2">
+            <p className="rounded-lg bg-brand/8 px-3 py-2 text-[11px] text-brand-dk">
+              L'utilisateur reçoit un lien pour définir lui-même son mot de passe (usage unique, 30 min, renvoi possible depuis la liste ci-dessous).
+            </p>
+          </div>
+        )}
         <div>
           <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Rôle</label>
           <select
@@ -1033,7 +1104,7 @@ function NewUserForm({
             onChange={(e) => setRole(e.target.value)}
             className={selectClass}
           >
-            {["directeur", "responsable", "enseignant", "etudiant", "admin"].map((r) => (
+            {["directeur", "responsable", "enseignant", "etudiant", "admin", "superadmin"].map((r) => (
               <option key={r} value={r}>{ROLE_META[r as UserRole]?.label ?? r}</option>
             ))}
           </select>
@@ -1052,12 +1123,14 @@ function NewUserForm({
         <button
           type="button"
           onClick={handleCreate}
-          disabled={!name.trim() || !email.trim() || !password.trim() || loading}
+          disabled={!name.trim() || !email.trim() || (mode === "password" && !password.trim()) || loading}
           className={cn(primaryPill, "h-7 px-3 text-[11px]")}
         >
-          {loading ? "Création..." : "Créer l'utilisateur"}
+          {loading ? "Création..." : mode === "invite" ? "Créer et inviter" : "Créer l'utilisateur"}
         </button>
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -1394,7 +1467,15 @@ function SettingsPage() {
   const [editRole, setEditRole] = useState<RoleRecord | null>(null);
   const [showNewRole, setShowNewRole] = useState(false);
   const [showNewUser, setShowNewUser] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState<string>("__all__");
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
+  const [resentInfo, setResentInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "role" | "user"; id: string; name: string } | null>(null);
+
+  const reloadPendingInvites = () => {
+    fetchPendingInvites().then(setPendingInvites).catch(() => {});
+  };
 
   useEffect(() => {
     fetchRoles()
@@ -1403,7 +1484,17 @@ function SettingsPage() {
     fetchUsers()
       .then(setUsersList)
       .catch(() => {});
+    reloadPendingInvites();
   }, []);
+
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    return usersList.filter((u) => {
+      if (userRoleFilter !== "__all__" && u.role !== userRoleFilter) return false;
+      if (!q) return true;
+      return `${u.name} ${u.email} ${u.role}`.toLowerCase().includes(q);
+    });
+  }, [usersList, userSearch, userRoleFilter]);
 
   const PERM_GROUPS = [
     { label: "Étudiants", perms: ["etudiants.read", "etudiants.write", "etudiants.delete"] },
@@ -1707,10 +1798,38 @@ function SettingsPage() {
             }
           >
             <div className="space-y-1.5">
-              {usersList.length === 0 ? (
-                <p className="py-3 text-center text-xs text-muted-foreground">Aucun utilisateur.</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="relative flex-1">
+                  <Input
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    placeholder="Rechercher par nom, e-mail, rôle…"
+                    className={cn(softInput, "h-8 text-sm")}
+                  />
+                </div>
+                <select
+                  value={userRoleFilter}
+                  onChange={(e) => setUserRoleFilter(e.target.value)}
+                  className={cn(
+                    "h-8 rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none",
+                    "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
+                  )}
+                  aria-label="Filtrer par rôle"
+                >
+                  <option value="__all__">Tous les rôles ({usersList.length})</option>
+                  {["directeur", "responsable", "enseignant", "etudiant", "admin", "superadmin"].map((r) => (
+                    <option key={r} value={r}>
+                      {ROLE_META[r as UserRole]?.label ?? r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {filteredUsers.length === 0 ? (
+                <p className="py-3 text-center text-xs text-muted-foreground">
+                  {usersList.length === 0 ? "Aucun utilisateur." : "Aucun compte ne correspond à ces critères."}
+                </p>
               ) : (
-                usersList.map((u) => (
+                filteredUsers.map((u) => (
                   <div
                     key={u.id}
                     className="flex items-center justify-between gap-3 rounded-xl border border-brand/12 px-3 py-2"
@@ -1738,7 +1857,7 @@ function SettingsPage() {
                         "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
                       )}
                     >
-                      {["directeur", "responsable", "enseignant", "admin"].map((r) => (
+                      {["directeur", "responsable", "enseignant", "etudiant", "admin", "superadmin"].map((r) => (
                         <option key={r} value={r}>
                           {ROLE_META[r as UserRole]?.label ?? r}
                         </option>
@@ -1756,7 +1875,78 @@ function SettingsPage() {
                 ))
               )}
             </div>
-            {showNewUser ? <NewUserForm onClose={() => setShowNewUser(false)} onCreated={(u) => { setUsersList((prev) => [...prev, u]); setShowNewUser(false); }} /> : null}
+            {pendingInvites.length ? (
+              <div className="mt-3 space-y-1.5 rounded-xl border border-amber-300/40 bg-amber-50/50 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
+                  Invitations en attente ({pendingInvites.length}) — lien 30 min, usage unique
+                </p>
+                {resentInfo ? (
+                  <InviteLinkBanner
+                    email={resentInfo.email}
+                    inviteUrl={resentInfo.inviteUrl}
+                    emailSent={resentInfo.emailSent}
+                    onClose={() => setResentInfo(null)}
+                  />
+                ) : null}
+                {pendingInvites.map((inv) => {
+                  const expired = inv.expiresAt ? new Date(inv.expiresAt).getTime() < Date.now() : false;
+                  return (
+                    <div key={inv.id} className="flex items-center justify-between gap-2 rounded-lg bg-card px-2.5 py-1.5">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs font-medium text-foreground">
+                          {inv.name} <span className="font-normal text-muted-foreground">· {inv.email}</span>
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {ROLE_META[inv.role as UserRole]?.label ?? inv.role} ·{" "}
+                          {expired ? (
+                            <span className="font-semibold text-alert">expiré — renvoyez un lien</span>
+                          ) : inv.expiresAt ? (
+                            <>expire le {new Date(inv.expiresAt).toLocaleString("fr-FR")}</>
+                          ) : (
+                            "sans expiration"
+                          )}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resendInvitation(inv.id)
+                            .then((r) => {
+                              reloadPendingInvites();
+                              setResentInfo({ email: inv.email, inviteUrl: r.inviteUrl, emailSent: r.emailSent });
+                              toast.success(
+                                r.emailSent
+                                  ? `Nouveau lien envoyé à ${inv.email}`
+                                  : "Nouveau lien créé — copiez-le ci-dessus",
+                              );
+                            })
+                            .catch((err) => toast.error(err instanceof Error ? err.message : "Renvoi impossible"));
+                        }}
+                        className={cn(ghostPill, "h-7 shrink-0 px-2.5 text-[11px]")}
+                      >
+                        Renvoyer
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Révoquer l'invitation de ${inv.name}`}
+                        onClick={() => {
+                          revokeInvitation(inv.id)
+                            .then(() => {
+                              reloadPendingInvites();
+                              toast.success("Invitation révoquée");
+                            })
+                            .catch(() => toast.error("Révocation impossible"));
+                        }}
+                        className={cn(iconButtonDanger, "h-7 w-7 shrink-0")}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+            {showNewUser ? <NewUserForm onClose={() => setShowNewUser(false)} onCreated={(u) => { setUsersList((prev) => [...prev, u]); setShowNewUser(false); reloadPendingInvites(); }} /> : null}
           </Carte>
         );
 
