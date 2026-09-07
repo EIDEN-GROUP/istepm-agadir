@@ -1077,7 +1077,7 @@ export function DashShell({
         <main
           data-dashboard-main
           dir={shellDir}
-          className="min-h-0 flex-1 overflow-y-auto scroll-touch p-4 pb-36 lg:p-8 lg:pb-8"
+          className="min-h-0 flex-1 overflow-x-clip overflow-y-auto scroll-touch p-4 pb-36 lg:p-8 lg:pb-8"
         >
           {children}
         </main>
@@ -1155,7 +1155,7 @@ export function DashShell({
             </div>
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto scroll-touch p-6 lg:p-8">
+        <main className="min-h-0 flex-1 overflow-x-clip overflow-y-auto scroll-touch p-6 lg:p-8">
           {children}
         </main>
       </div>

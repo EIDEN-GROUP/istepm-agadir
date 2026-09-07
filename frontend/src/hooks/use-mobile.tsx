@@ -1,6 +1,9 @@
 import * as React from "react";
 
-const MOBILE_BREAKPOINT = 768;
+// Le shell « desktop » (sidebar fixe) n'apparaît qu'à partir de `lg` (1024px).
+// En dessous — téléphone ET tablette — on utilise le shell compact (menu
+// hamburger + barre du bas), sinon 768–1023px hérite d'une sidebar masquée.
+const MOBILE_BREAKPOINT = 1024;
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(
