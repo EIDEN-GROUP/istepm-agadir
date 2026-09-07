@@ -193,7 +193,6 @@ function EspaceEtudiantPage() {
   const notes = (me?.notes as unknown as { module: string; note: number }[] | undefined) ?? [];
   const bulletins = (me?.bulletins as unknown as Record<string, string | number>[] | undefined) ?? [];
   const paiements = (me?.paiements as unknown as Record<string, string | number>[] | undefined) ?? [];
-  const presence = me?.presence ?? { total: 0, presents: 0, taux: 100 };
   const demandes: StudentRequest[] = reqQuery.data ?? [];
 
   const seances: Seance[] = useMemo(() => {
@@ -515,10 +514,6 @@ function EspaceEtudiantPage() {
         <p className={eyebrowClass}>En bref</p>
         <DetailGrid single>
           <DetailField label="Moyenne générale" value={moyenne ? `${moyenne}/20` : "—"} />
-          <DetailField
-            label="Présence"
-            value={`${presence.taux}% (${presence.presents}/${presence.total})`}
-          />
           <DetailField label="Bulletins publiés" value={String(bulletins.length)} />
           <DetailField
             label="Statut de paiement"
@@ -593,10 +588,7 @@ function EspaceEtudiantPage() {
         <DetailSection title="Synthèse">
           <DetailGrid>
             <DetailField label="Moyenne" value={moyenne ? `${moyenne}/20` : "—"} />
-            <DetailField
-              label="Présence"
-              value={`${presence.taux}% (${presence.presents}/${presence.total})`}
-            />
+            <DetailField label="Bulletins" value={String(bulletins.length)} />
           </DetailGrid>
         </DetailSection>
       </section>

@@ -1335,7 +1335,7 @@ function DashboardEtudiant() {
   const photoUrl = s("photoUrl", "photo_url");
   const notes = (meQ.data?.notes as { note: number }[] | undefined) ?? [];
   const moyenne = notes.length ? (notes.reduce((a, n) => a + n.note, 0) / notes.length).toFixed(2) : null;
-  const presence = meQ.data?.presence ?? { taux: 100, presents: 0, total: 0 };
+  const bulletins = (meQ.data?.bulletins as unknown[] | undefined) ?? [];
   const reste = s("resteAPayer", "reste_a_payer");
   const demandes = reqQ.data ?? [];
   const enAttente = demandes.filter((d) => d.statut === "en_attente" || d.statut === "en_cours").length;
@@ -1389,7 +1389,7 @@ function DashboardEtudiant() {
       {/* Situation en bref */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MiniStat label="Moyenne générale" value={moyenne ? `${moyenne}/20` : "—"} icon={BarChart3} />
-        <MiniStat label="Présence" value={`${presence.taux}%`} icon={CheckCircle2} />
+        <MiniStat label="Bulletins" value={String(bulletins.length)} icon={CheckCircle2} />
         <MiniStat label="Reste à payer" value={reste ? `${reste} MAD` : "—"} icon={Wallet} />
         <MiniStat
           label="Demandes"
