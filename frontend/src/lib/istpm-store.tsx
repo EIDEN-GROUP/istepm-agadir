@@ -592,12 +592,35 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           }
           return e;
         };
+        const remoteEtudiants = (etudiants as unknown as Record<string, unknown>[]).map(
+          enrichEtudiant,
+        );
+        // La photo d'identité fait toujours foi côté serveur : quand l'étudiant
+        // la met à jour depuis son espace, elle doit se propager à toutes les
+        // listes même si le store local a déjà des fiches (prefer garderait
+        // l'ancienne). On superpose donc juste `photoUrl` par id.
+        const remotePhotoById = new Map(
+          remoteEtudiants.map((e) => [
+            e.id,
+            String(
+              (e as { photoUrl?: string }).photoUrl ??
+                (e as unknown as { photo_url?: string }).photo_url ??
+                "",
+            ),
+          ]),
+        );
+        const mergeEtudiants = (local: Etudiant[]): Etudiant[] => {
+          if (local.length === 0) return remoteEtudiants;
+          return local.map((e) => {
+            const remotePhoto = remotePhotoById.get(e.id);
+            return remotePhoto && remotePhoto !== e.photoUrl
+              ? { ...e, photoUrl: remotePhoto }
+              : e;
+          });
+        };
         setSnap((s) => ({
           ...s,
-          etudiants: prefer(
-            s.etudiants,
-            (etudiants as unknown as Record<string, unknown>[]).map(enrichEtudiant),
-          ),
+          etudiants: mergeEtudiants(s.etudiants),
           formateurs: prefer(s.formateurs, formateurs as Formateur[]),
           examens: prefer(s.examens, examens as Examen[]),
           bulletins: prefer(s.bulletins, bulletins as Bulletin[]),

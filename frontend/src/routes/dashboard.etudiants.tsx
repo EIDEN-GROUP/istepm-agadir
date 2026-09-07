@@ -24,14 +24,13 @@ import {
   type StatutEtudiant,
   type StatutPaiement,
 } from "@/lib/istpm-data";
+import { PersonAvatar } from "@/components/person-avatar";
 import {
   primaryPill,
   ghostPill,
   iconButton,
   iconButtonDanger,
   toneBadge,
-  avatarChip,
-  initials,
   dialogSurfaceWide,
   tableRow,
   cellTruncate,
@@ -515,9 +514,7 @@ function EtudiantsPage() {
             </td>
             <td>
               <span className="flex items-center gap-2.5">
-                <span className={avatarChip}>
-                  {initials(`${e.prenom} ${e.nom}`)}
-                </span>
+                <PersonAvatar name={`${e.prenom} ${e.nom}`} photoUrl={e.photoUrl} />
                 <span className={cn("font-medium", cellTruncate)}>
                   {e.prenom} {e.nom}
                 </span>
@@ -1047,7 +1044,14 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
 
   return (
     <DetailShell
-      icon={initials(`${e.prenom} ${e.nom}`)}
+      icon={
+        <PersonAvatar
+          name={`${e.prenom} ${e.nom}`}
+          photoUrl={e.photoUrl}
+          size="md"
+          ring={false}
+        />
+      }
       title={`${e.prenom} ${e.nom}`}
       subtitle={`${e.cne} · ${e.filiere}`}
       badges={

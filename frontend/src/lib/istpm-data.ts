@@ -237,6 +237,8 @@ export type Etudiant = {
   statut: StatutEtudiant;
   paiement: StatutPaiement;
   moyenne: number; // /20
+  /** Photo d'identité (data URL ou URL). Téléversée par l'étudiant depuis son espace. */
+  photoUrl?: string;
   // Fiche
   telephone: string;
   email: string;

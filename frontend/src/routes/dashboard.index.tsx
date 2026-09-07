@@ -40,6 +40,7 @@ import {
   minutesDepuisMinuit,
   SALLES,
 } from "@/lib/istpm-data";
+import { PersonAvatar } from "@/components/person-avatar";
 import {
   softCard,
   toneBadge,
@@ -865,13 +866,13 @@ function BulletinsRecentsTable({ bulletins }: { bulletins: Bulletin[] }) {
   );
 }
 
-function StudentAvatarList({ etudiants }: { etudiants: { id: string; prenom: string; nom: string; filiere: string; niveau: string }[] }) {
+function StudentAvatarList({ etudiants }: { etudiants: { id: string; prenom: string; nom: string; filiere: string; niveau: string; photoUrl?: string }[] }) {
   if (!etudiants.length) return <EmptyState icon={Users}>Aucun étudiant.</EmptyState>;
   return (
     <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
       {etudiants.slice(0, 6).map((e) => (
         <Link key={e.id} to="/dashboard/etudiants" className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-brand/8 sm:px-5">
-          <span className={avatarChip}>{initials(`${e.prenom} ${e.nom}`)}</span>
+          <PersonAvatar name={`${e.prenom} ${e.nom}`} photoUrl={e.photoUrl} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium text-foreground">{e.prenom} {e.nom}</span>
             <span className="block truncate text-xs text-muted-foreground">{e.filiere} Â· {e.niveau}</span>
