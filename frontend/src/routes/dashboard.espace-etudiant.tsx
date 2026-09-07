@@ -734,54 +734,58 @@ function EspaceEtudiantPage() {
 
   const demandesTab = (
     <div className="space-y-4">
-      <section className={cn(softCard, "space-y-3 p-4 sm:p-5")}>
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <ClipboardCheck className="h-4 w-4 text-brand-dk" />
-            <p className={eyebrowClass}>Mes demandes ({demandes.length})</p>
+      {/* Vue étudiant : sa propre liste. Le staff ne voit que « à traiter »
+          ci-dessous — créer une demande n'est pas son rôle. */}
+      {!isStaff ? (
+        <section className={cn(softCard, "space-y-3 p-4 sm:p-5")}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4 text-brand-dk" />
+              <p className={eyebrowClass}>Mes demandes ({demandes.length})</p>
+            </div>
+            <button className={ghostPill} onClick={() => setDemandeOpen(true)}>
+              <Plus className="h-3.5 w-3.5" /> Nouvelle
+            </button>
           </div>
-          <button className={ghostPill} onClick={() => setDemandeOpen(true)}>
-            <Plus className="h-3.5 w-3.5" /> Nouvelle
-          </button>
-        </div>
-        <DataTable
-          minWidth="min-w-[760px]"
-          isEmpty={demandes.length === 0}
-          empty="Aucune demande. Utilisez « Nouvelle demande »."
-          head={
-            <>
-              <th>Titre</th>
-              <th>Type</th>
-              <th>Statut</th>
-              <th>Date</th>
-              <th>Réponse</th>
-            </>
-          }
-        >
-          {demandes.map((d) => (
-            <tr key={d.id} className={tableRow}>
-              <td className={cn("font-medium", cellTruncate)}>{d.titre}</td>
-              <td className="text-muted-foreground">
-                {d.type === "predefini" ? "Prédéfini" : "Libre"}
-              </td>
-              <td>
-                <span className={toneBadge(STATUT_DEMANDE_TONE[d.statut])}>
-                  {STATUT_DEMANDE_LABEL[d.statut]}
-                </span>
-              </td>
-              <td className="text-muted-foreground">
-                {new Date(d.createdAt).toLocaleDateString("fr-FR")}
-              </td>
-              <td className={cn("text-muted-foreground", cellTruncate)}>{d.reponse || "—"}</td>
-            </tr>
-          ))}
-        </DataTable>
-      </section>
+          <DataTable
+            minWidth="min-w-[760px]"
+            isEmpty={demandes.length === 0}
+            empty="Aucune demande. Utilisez « Nouvelle demande »."
+            head={
+              <>
+                <th>Titre</th>
+                <th>Type</th>
+                <th>Statut</th>
+                <th>Date</th>
+                <th>Réponse</th>
+              </>
+            }
+          >
+            {demandes.map((d) => (
+              <tr key={d.id} className={tableRow}>
+                <td className={cn("font-medium", cellTruncate)}>{d.titre}</td>
+                <td className="text-muted-foreground">
+                  {d.type === "predefini" ? "Prédéfini" : "Libre"}
+                </td>
+                <td>
+                  <span className={toneBadge(STATUT_DEMANDE_TONE[d.statut])}>
+                    {STATUT_DEMANDE_LABEL[d.statut]}
+                  </span>
+                </td>
+                <td className="text-muted-foreground">
+                  {new Date(d.createdAt).toLocaleDateString("fr-FR")}
+                </td>
+                <td className={cn("text-muted-foreground", cellTruncate)}>{d.reponse || "—"}</td>
+              </tr>
+            ))}
+          </DataTable>
+        </section>
+      ) : null}
 
       {isStaff ? (
         <section className={cn(softCard, "space-y-3 p-4 sm:p-5")}>
           <div className="flex items-center gap-2">
-            <GraduationCap className="h-4 w-4 text-brand-dk" />
+            <Inbox className="h-4 w-4 text-brand-dk" />
             <p className={eyebrowClass}>
               Demandes à traiter ({(allReqQuery.data ?? []).length})
             </p>
@@ -850,9 +854,11 @@ function EspaceEtudiantPage() {
         eyebrow="Espace étudiant"
         title={prenom || nom ? `Bonjour, ${prenom} ${nom}`.trim() : "Mon espace"}
         actions={
-          <button className={primaryPill} onClick={() => setDemandeOpen(true)}>
-            <Plus className="h-4 w-4" /> Nouvelle demande
-          </button>
+          isStaff ? undefined : (
+            <button className={primaryPill} onClick={() => setDemandeOpen(true)}>
+              <Plus className="h-4 w-4" /> Nouvelle demande
+            </button>
+          )
         }
       />
 
