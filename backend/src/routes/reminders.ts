@@ -65,7 +65,7 @@ export async function reminderRoutes(app: FastifyInstance) {
     return reminder;
   });
 
-  app.post("/process", { preHandler: [authenticate, requireRole("directeur", "superadmin")] }, async () => {
+  app.post("/process", { preHandler: [authenticate, requireRole("directeur")] }, async () => {
     const db = getDb();
     const now = new Date();
     const due = await db

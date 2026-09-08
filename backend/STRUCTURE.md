@@ -111,7 +111,9 @@ backend/
 | `GET /api/student/requests/all` | directeur/responsable | Toutes les demandes |
 | `PATCH /api/student/requests/:id` | directeur/responsable | Traitement (`statut` + `reponse`) |
 
-Rôles : `admin | superadmin | directeur | enseignant | responsable | etudiant`.
+Rôles : `directeur | enseignant | responsable | etudiant`.
+(`admin`/`superadmin` supprimés ; la migration `0017` convertit les lignes
+existantes vers `directeur`.)
 `POST /api/auth/register` accepte `role: "etudiant"` + `cne`/`etudiantId` pour lier la fiche.
 
 ## API endpoints

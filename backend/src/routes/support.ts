@@ -19,7 +19,7 @@ const createSessionSchema = z.object({
 export async function supportRoutes(app: FastifyInstance) {
   app.get("/sessions/open", { preHandler: [authenticate] }, async (request) => {
     const db = getDb();
-    const isSuperadmin = request.user?.role === "superadmin";
+    const isDirecteur = request.user?.role === "directeur";
 
     let query = db
       .select()
@@ -28,7 +28,7 @@ export async function supportRoutes(app: FastifyInstance) {
       .orderBy(desc(supportSessions.createdAt))
       .$dynamic();
 
-    if (!isSuperadmin && request.user) {
+    if (!isDirecteur && request.user) {
       query = query.where(eq(supportSessions.adminId, request.user.id));
     }
 

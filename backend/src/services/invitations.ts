@@ -12,8 +12,6 @@ import { eq, and, desc, isNull, isNotNull, gt } from "drizzle-orm";
 export const INVITATION_TTL_MS = 30 * 60 * 1000;
 
 export type InvitationRole =
-  | "admin"
-  | "superadmin"
   | "directeur"
   | "enseignant"
   | "responsable"

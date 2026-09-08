@@ -782,7 +782,7 @@ const ACTIONS: ActionDefinition[] = [
       { name: "email", type: "string", description: "Email", required: true },
       { name: "password", type: "string", description: "Mot de passe (min 6 caractères)", required: true },
       { name: "name", type: "string", description: "Nom complet", required: true },
-      { name: "role", type: "string", description: "Rôle", enum: ["admin", "superadmin", "directeur", "enseignant", "responsable"] },
+      { name: "role", type: "string", description: "Rôle", enum: ["directeur", "enseignant", "responsable", "etudiant"] },
     ],
   },
   {
@@ -815,10 +815,10 @@ const ACTIONS: ActionDefinition[] = [
     method: "PUT",
     path: "/api/auth/users/:id/role",
     category: "Utilisateurs",
-    requiredRoles: ["directeur", "superadmin"],
+    requiredRoles: ["directeur"],
     params: [
       { name: "id", type: "string", description: "ID de l'utilisateur", required: true },
-      { name: "role", type: "string", description: "Nouveau rôle", required: true, enum: ["admin", "superadmin", "directeur", "enseignant", "responsable"] },
+      { name: "role", type: "string", description: "Nouveau rôle", required: true, enum: ["directeur", "enseignant", "responsable", "etudiant"] },
     ],
   },
   {
@@ -827,7 +827,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "GET",
     path: "/api/roles",
     category: "Rôles",
-    requiredRoles: ["directeur", "superadmin"],
+    requiredRoles: ["directeur"],
     params: [],
   },
   {
@@ -836,7 +836,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/roles",
     category: "Rôles",
-    requiredRoles: ["directeur", "superadmin"],
+    requiredRoles: ["directeur"],
     params: [
       { name: "name", type: "string", description: "Nom du rôle", required: true },
       { name: "description", type: "string", description: "Description" },
@@ -849,7 +849,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/roles/:id",
     category: "Rôles",
-    requiredRoles: ["directeur", "superadmin"],
+    requiredRoles: ["directeur"],
     params: [
       { name: "id", type: "string", description: "ID du rôle", required: true },
     ],
@@ -873,7 +873,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/notifications",
     category: "Notifications",
-    requiredRoles: ["directeur", "superadmin"],
+    requiredRoles: ["directeur"],
     params: [
       { name: "title", type: "string", description: "Titre", required: true },
       { name: "message", type: "string", description: "Message" },

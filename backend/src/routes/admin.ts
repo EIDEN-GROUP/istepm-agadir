@@ -45,7 +45,7 @@ export async function adminRoutes(app: FastifyInstance) {
         db
           .select({ count: sql<number>`count(*)` })
           .from(users)
-          .where(eq(users.role, "admin")),
+          .where(eq(users.role, "directeur")),
         db.select({ count: sql<number>`count(*)` }).from(clients),
         db.select({ amount: payments.amount }).from(payments),
         db.select({ count: sql<number>`count(*)` }).from(demoRequests),

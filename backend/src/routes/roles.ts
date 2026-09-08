@@ -34,12 +34,12 @@ export { PERMISSIONS_LIST };
 export type Permission = (typeof PERMISSIONS_LIST)[number];
 
 export async function roleRoutes(app: FastifyInstance) {
-  app.get("/", { preHandler: [authenticate, requireRole("directeur", "superadmin")] }, async () => {
+  app.get("/", { preHandler: [authenticate, requireRole("directeur")] }, async () => {
     const db = getDb();
     return db.select().from(roles).orderBy(roles.createdAt);
   });
 
-  app.get("/:id", { preHandler: [authenticate, requireRole("directeur", "superadmin")] }, async (request, reply) => {
+  app.get("/:id", { preHandler: [authenticate, requireRole("directeur")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [role] = await db.select().from(roles).where(eq(roles.id, id)).limit(1);
@@ -47,7 +47,7 @@ export async function roleRoutes(app: FastifyInstance) {
     return role;
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "superadmin")] }, async (request, reply) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur")] }, async (request, reply) => {
     const input = createRoleSchema.parse(request.body);
     const db = getDb();
     const [existing] = await db.select().from(roles).where(eq(roles.name, input.name)).limit(1);
@@ -56,7 +56,7 @@ export async function roleRoutes(app: FastifyInstance) {
     return role;
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "superadmin")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = updateRoleSchema.parse(request.body);
     const db = getDb();
@@ -66,7 +66,7 @@ export async function roleRoutes(app: FastifyInstance) {
     return updated;
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "superadmin")] }, async (request, reply) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [existing] = await db.select().from(roles).where(eq(roles.id, id)).limit(1);

@@ -12,7 +12,7 @@ export type CreateUserInput = {
   email: string;
   password: string;
   name: string;
-  role?: "admin" | "superadmin" | "directeur" | "enseignant" | "responsable" | "etudiant";
+  role?: "directeur" | "enseignant" | "responsable" | "etudiant";
   filiere?: string;
   niveau?: string;
   groupe?: string;
@@ -61,7 +61,7 @@ export async function createUser(input: CreateUserInput): Promise<UserResult> {
       email: input.email,
       passwordHash,
       name: input.name,
-      role: input.role ?? "admin",
+      role: input.role ?? "directeur",
     })
     .returning();
   if (input.role === "enseignant" && !input.skipAutoCreate) {

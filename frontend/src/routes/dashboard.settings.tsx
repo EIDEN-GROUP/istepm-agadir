@@ -1106,7 +1106,7 @@ function NewUserForm({
             onChange={(e) => setRole(e.target.value)}
             className={selectClass}
           >
-            {["directeur", "responsable", "enseignant", "etudiant", "admin", "superadmin"].map((r) => (
+            {["directeur", "responsable", "enseignant", "etudiant"].map((r) => (
               <option key={r} value={r}>{ROLE_META[r as UserRole]?.label ?? r}</option>
             ))}
           </select>
@@ -1827,7 +1827,7 @@ function SettingsPage() {
                   aria-label="Filtrer par rôle"
                 >
                   <option value="__all__">Tous les rôles ({usersList.length})</option>
-                  {["directeur", "responsable", "enseignant", "etudiant", "admin", "superadmin"].map((r) => (
+                  {["directeur", "responsable", "enseignant", "etudiant"].map((r) => (
                     <option key={r} value={r}>
                       {ROLE_META[r as UserRole]?.label ?? r}
                     </option>
@@ -1867,7 +1867,7 @@ function SettingsPage() {
                         "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
                       )}
                     >
-                      {["directeur", "responsable", "enseignant", "etudiant", "admin", "superadmin"].map((r) => (
+                      {["directeur", "responsable", "enseignant", "etudiant"].map((r) => (
                         <option key={r} value={r}>
                           {ROLE_META[r as UserRole]?.label ?? r}
                         </option>

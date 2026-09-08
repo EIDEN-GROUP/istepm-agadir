@@ -23,9 +23,9 @@ const createUserSchema = z.object({
   password: z.string().min(6, "Mot de passe trop court"),
   name: z.string().min(1, "Nom requis"),
   role: z
-    .enum(["admin", "superadmin", "directeur", "enseignant", "responsable", "etudiant"])
+    .enum(["directeur", "enseignant", "responsable", "etudiant"])
     .optional()
-    .default("admin"),
+    .default("directeur"),
   filiere: z.string().optional(),
   niveau: z.string().optional(),
   groupe: z.string().optional(),
@@ -38,7 +38,7 @@ const updateUserSchema = z.object({
   password: z.string().min(6).optional(),
 });
 
-const ROLES_ENUM = ["admin", "superadmin", "directeur", "enseignant", "responsable", "etudiant"] as const;
+const ROLES_ENUM = ["directeur", "enseignant", "responsable", "etudiant"] as const;
 const assignRoleSchema = z.object({
   role: z.enum(ROLES_ENUM),
 });
@@ -56,7 +56,7 @@ export async function authRoutes(app: FastifyInstance) {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role as "admin" | "superadmin" | "directeur" | "enseignant" | "responsable" | "etudiant",
+      role: user.role as "directeur" | "enseignant" | "responsable" | "etudiant",
     });
     return { token, user };
   });
@@ -109,7 +109,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.put(
     "/users/:id/role",
-    { preHandler: [authenticate, requireRole("directeur", "superadmin")] },
+    { preHandler: [authenticate, requireRole("directeur")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const { role } = assignRoleSchema.parse(request.body);

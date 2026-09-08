@@ -11,7 +11,7 @@ import { historiquePaiements } from "@/db/schema/historique-paiements";
 import { eq, ne, sql, desc, and, gte, lte } from "drizzle-orm";
 
 export async function reportRoutes(app: FastifyInstance) {
-  app.get("/operational", { preHandler: [authenticate, requireRole("directeur", "superadmin")] }, async () => {
+  app.get("/operational", { preHandler: [authenticate, requireRole("directeur")] }, async () => {
     const db = getDb();
     const today = new Date().toISOString().slice(0, 10);
     const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
@@ -55,7 +55,7 @@ export async function reportRoutes(app: FastifyInstance) {
     };
   });
 
-  app.get("/financial", { preHandler: [authenticate, requireRole("directeur", "superadmin")] }, async () => {
+  app.get("/financial", { preHandler: [authenticate, requireRole("directeur")] }, async () => {
     const db = getDb();
     const allPaiements = await db.select().from(historiquePaiements).orderBy(desc(historiquePaiements.date));
     const allEtudiants = await db.select({ fraisAnnuels: etudiants.fraisAnnuels, resteAPayer: etudiants.resteAPayer, statut: etudiants.statut, paiement: etudiants.paiement }).from(etudiants);
@@ -86,7 +86,7 @@ export async function reportRoutes(app: FastifyInstance) {
     };
   });
 
-  app.get("/academic", { preHandler: [authenticate, requireRole("directeur", "superadmin", "responsable")] }, async () => {
+  app.get("/academic", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async () => {
     const db = getDb();
 
     const [examensData, bulletinsData, stagesData, seancesData] = await Promise.all([

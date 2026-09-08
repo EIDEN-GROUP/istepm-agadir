@@ -5,7 +5,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   name: text("name").notNull().default(""),
-  role: text("role").notNull().default("admin"),
+  role: text("role").notNull().default("directeur"),
   /** Invitation : seul le hash du lien est stocké (usage unique, 30 min). */
   inviteTokenHash: text("invite_token_hash"),
   inviteExpiresAt: timestamp("invite_expires_at"),

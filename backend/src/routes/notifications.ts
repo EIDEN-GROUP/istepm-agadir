@@ -49,7 +49,7 @@ export async function notificationRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "superadmin")] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur")] }, async (request) => {
     const schema = z.object({
       userId: z.string().optional(),
       type: z.string().optional().default("info"),

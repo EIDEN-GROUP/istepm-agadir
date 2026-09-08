@@ -13,7 +13,7 @@ import {
   type InvitationRole,
 } from "@/services/invitations";
 
-const INVITE_ROLES = ["admin", "superadmin", "directeur", "enseignant", "responsable", "etudiant"] as const;
+const INVITE_ROLES = ["directeur", "enseignant", "responsable", "etudiant"] as const;
 
 const createInviteSchema = z.object({
   email: z.string().email("Email invalide"),
