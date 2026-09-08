@@ -58,7 +58,7 @@ import {
   SelectField,
   FullWidth,
 } from "@/components/dash-form";
-import { VueMois, type VueCalendrier } from "@/components/calendar-views";
+import { VueSemaine, VueMois } from "@/components/calendar-views";
 import {
   Dialog,
   DialogContent,
@@ -151,7 +151,9 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantTab]);
-  const [vue, setVue] = useState<VueCalendrier>("semaine");
+  // Vue du calendrier étudiant : liste (tableau), grille (emploi du temps
+  // hebdo) ou mois.
+  const [vue, setVue] = useState<"liste" | "grille" | "mois">("liste");
   const [ancre, setAncre] = useState(() => new Date());
   const [demandeOpen, setDemandeOpen] = useState(false);
   const [detailSeance, setDetailSeance] = useState<Seance | null>(null);
@@ -386,7 +388,13 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
           </div>
         </div>
         <div className="flex items-center gap-1 rounded-full border border-brand/12 bg-muted/60 p-1">
-          {(["semaine", "mois"] as VueCalendrier[]).map((v) => (
+          {(
+            [
+              ["liste", "Liste"],
+              ["grille", "Semaine"],
+              ["mois", "Mois"],
+            ] as const
+          ).map(([v, label]) => (
             <button
               key={v}
               type="button"
@@ -396,7 +404,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
                 vue === v ? "bg-brand text-white" : "text-muted-foreground hover:text-brand-dk",
               )}
             >
-              {v === "semaine" ? "Semaine" : "Mois"}
+              {label}
             </button>
           ))}
         </div>
@@ -404,12 +412,12 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
       <div className="flex items-center justify-between gap-2 text-[11px]">
         <span className="font-semibold capitalize text-foreground">{libellePeriode}</span>
         <span className="text-muted-foreground">
-          {vue === "semaine"
-            ? `${seancesSemaine.length} séance(s) cette semaine`
-            : `${seances.length} séance(s) au total`}
+          {vue === "mois"
+            ? `${seances.length} séance(s) au total`
+            : `${seancesSemaine.length} séance(s) cette semaine`}
         </span>
       </div>
-      {vue === "semaine" ? (
+      {vue === "liste" ? (
         (() => {
           const now = new Date();
           const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -494,6 +502,18 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
             </DataTable>
           );
         })()
+      ) : vue === "grille" ? (
+        <div className="overflow-x-auto">
+          <VueSemaine
+            jours={joursSemaine}
+            seances={seances}
+            nomProf={nomProf}
+            canDrag={false}
+            fit
+            onOpen={(s) => setDetailSeance(s)}
+            onDrop={() => {}}
+          />
+        </div>
       ) : (
         <VueMois
           mois={ancre}
@@ -502,7 +522,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
           onOpen={(s) => setDetailSeance(s)}
           onJour={(d) => {
             setAncre(d);
-            setVue("semaine");
+            setVue("grille");
           }}
         />
       )}
