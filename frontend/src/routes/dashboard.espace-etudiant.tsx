@@ -415,6 +415,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
           seances={seances}
           nomProf={nomProf}
           canDrag={false}
+          fit
           onOpen={(s) => setDetailSeance(s)}
           onDrop={() => {}}
         />

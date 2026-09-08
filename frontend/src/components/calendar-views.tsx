@@ -204,6 +204,7 @@ function GrilleHoraire({
   onCreneauVide,
   jourChome,
   creneaux = CRENEAUX,
+  fit,
 }: {
   jours: Date[];
   seances: Seance[];
@@ -215,13 +216,25 @@ function GrilleHoraire({
   jourChome?: LookupJourChome;
   /** Créneaux paramétrés : ils fixent l'amplitude de la grille et l'aimantation. */
   creneaux?: readonly Creneau[];
+  /** Vue consultation : la grille se limite aux heures réellement occupées. */
+  fit?: boolean;
 }) {
-  // L'amplitude de la grille suit les créneaux paramétrés au lieu d'une plage
-  // figée : ajouter un créneau du soir agrandit l'emploi du temps d'autant.
-  const { debut: HEURE_DEBUT, fin: HEURE_FIN } = useMemo(
-    () => bornesGrilleHoraire(creneaux),
-    [creneaux],
-  );
+  // Consultation (`fit`) : on cadre la grille sur les séances de la semaine —
+  // pas de plages mortes avant 8 h ou après le dernier cours. Sinon l'amplitude
+  // suit les créneaux paramétrés (édition du planning).
+  const { debut: HEURE_DEBUT, fin: HEURE_FIN } = useMemo(() => {
+    if (fit) {
+      const mins = seances
+        .flatMap((x) => [minutesDepuisMinuit(x.debut), minutesDepuisMinuit(x.fin)])
+        .filter((n) => Number.isFinite(n) && n > 0);
+      if (!mins.length) return { debut: 8, fin: 18 };
+      let d = Math.max(0, Math.floor(Math.min(...mins) / 60));
+      let f = Math.ceil(Math.max(...mins) / 60);
+      if (f - d < 5) f = Math.min(24, d + 5); // hauteur minimale lisible
+      return { debut: d, fin: f };
+    }
+    return bornesGrilleHoraire(creneaux);
+  }, [fit, seances, creneaux]);
 
   const heures = useMemo(() => {
     const out: number[] = [];
@@ -232,6 +245,12 @@ function GrilleHoraire({
   const hauteur = (HEURE_FIN - HEURE_DEBUT) * HEURE_PX;
   const dragId = useRef<string | null>(null);
   const [survol, setSurvol] = useState<string | null>(null);
+
+  // Trait « maintenant » sur la colonne du jour (si dans la plage affichée).
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const nowTop = (nowMin - HEURE_DEBUT * 60) * MINUTE_PX;
+  const showNow = nowMin >= HEURE_DEBUT * 60 && nowMin <= HEURE_FIN * 60;
 
   /**
    * Convertit une position verticale en heure de début.
@@ -309,8 +328,11 @@ function GrilleHoraire({
           {heures.slice(0, -1).map((h, i) => (
             <div
               key={h}
-              className="absolute end-2 -translate-y-1/2 text-[10px] font-medium tabular-nums text-muted-foreground"
-              style={{ top: i * HEURE_PX }}
+              className={cn(
+                "absolute end-2 text-[10px] font-medium tabular-nums text-muted-foreground",
+                i === 0 ? "top-0" : "-translate-y-1/2",
+              )}
+              style={{ top: i === 0 ? undefined : i * HEURE_PX }}
             >
               {String(h).padStart(2, "0")}:00
             </div>
@@ -359,18 +381,34 @@ function GrilleHoraire({
                 setSurvol(null);
               }}
             >
-              {/* Lignes horaires   repères visuels seulement */}
+              {/* Lignes horaires : trait plein à l'heure, pointillé léger à la demie. */}
               {heures.slice(0, -1).map((h, i) => (
-                <div
-                  key={h}
-                  className="pointer-events-none absolute inset-x-0 border-t border-brand/8"
-                  style={{ top: i * HEURE_PX }}
-                />
+                <div key={h} className="pointer-events-none">
+                  <div
+                    className="absolute inset-x-0 border-t border-brand/12"
+                    style={{ top: i * HEURE_PX }}
+                  />
+                  <div
+                    className="absolute inset-x-0 border-t border-dashed border-brand/[0.06]"
+                    style={{ top: i * HEURE_PX + HEURE_PX / 2 }}
+                  />
+                </div>
               ))}
 
+              {/* Trait « maintenant » sur la colonne du jour. */}
+              {estAujourdhui(j) && !chome && showNow ? (
+                <div
+                  className="pointer-events-none absolute inset-x-0 z-[5] border-t-2 border-alert/70"
+                  style={{ top: nowTop }}
+                >
+                  <span className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-alert" />
+                </div>
+              ) : null}
+
               {/* Bandes des créneaux paramétrés : cliquer en pose une séance
-                  aux heures officielles, plutôt qu'à une heure ronde arbitraire. */}
+                  aux heures officielles. Masquées en vue consultation (`fit`). */}
               {!chome &&
+                !fit &&
                 creneaux.map((c) => {
                   const top =
                     (minutesDepuisMinuit(c.debut) - HEURE_DEBUT * 60) *
@@ -454,6 +492,7 @@ export function VueJour(props: {
   onCreneauVide?: (date: string, debut: string) => void;
   jourChome?: LookupJourChome;
   creneaux?: readonly Creneau[];
+  fit?: boolean;
 }) {
   return <GrilleHoraire {...props} jours={[props.date]} />;
 }
@@ -468,6 +507,7 @@ export function VueSemaine(props: {
   onCreneauVide?: (date: string, debut: string) => void;
   jourChome?: LookupJourChome;
   creneaux?: readonly Creneau[];
+  fit?: boolean;
 }) {
   return <GrilleHoraire {...props} />;
 }
