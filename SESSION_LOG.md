@@ -11,6 +11,9 @@ Branched from `origin/main` at `b7f0314`. Commits (top = newest):
 
 | Commit | Summary |
 |---|---|
+| `7e30bf2` | fix(student): point existing links at the new per-section routes |
+| `6f1ac12` | feat(student): calendar has three views — Liste, Semaine (grid), Mois |
+| `dcd6428` | docs: add SESSION_LOG.md |
 | `a9b33c9` | fix(photo): WebP encoding + background re-sync of student photos |
 | `dcbc68d` | feat(student): week calendar as a readable table instead of a time-grid |
 | `e37c7c3` | chore(title): tab title → "ISTEPM Agadir — Gestion scolaire" |
@@ -40,11 +43,19 @@ shared `EspaceEtudiantView` (unknown section → `/scolarite`). "Profil" tab
 dropped (use Mon profil). Payment/enrolment statuses now show their French
 labels.
 
-**Calendar — student week view (`dcbc68d`)** — the drag-and-drop time-grid was
-too hard for students to read. The "Semaine" view is now a **table**
-(Jour · Horaire · Cours · Salle · Formateur), one row per session, click for
-detail. "Today" = teal dot + tinted row; the current session gets an "En cours"
-badge; finished sessions today are dimmed. "Mois" keeps the month grid.
+**Calendar — student views (`dcbc68d`, `6f1ac12`)** — the drag-and-drop
+time-grid was too hard for students to read. The student calendar now has a
+three-way toggle: **Liste** (default, a table: Jour · Horaire · Cours · Salle ·
+Formateur, one row per session, click for detail — "today" = teal dot + tinted
+row, current session gets an "En cours" badge, finished sessions dimmed),
+**Semaine** (the week grid, fit to occupied hours), **Mois** (month grid).
+
+**Link audit (`7e30bf2`)** — after the route split, every link into the student
+space was checked. The student home "Accès rapide" cards now open the matching
+section (they all pointed to the same page); "Mon profil" opens
+`/dashboard/mon-profil`. request-bell navigations were already staff-only and
+correct. The photo re-sync poll skips the etudiant role (`GET /etudiants` 404s
+for students).
 
 **Photo pipeline (`a9b33c9`)** — uploads are encoded **WebP** (q0.8, JPEG
 fallback) → ~half the data-URL size. The istpm store now re-syncs student photos
@@ -79,6 +90,26 @@ description.
   photo shows everywhere staff see that student.
 - `canAccess()` (`dashboard-i18n.tsx`): `COMMON_ROUTES` allowlist for
   `/dashboard/mon-profil`; `NAV_BY_ROLE.etudiant` lists the section sub-paths.
+
+### Compatibility review (origin/main `b7f0314` → HEAD)
+
+Full diff reviewed end-to-end for regressions:
+- **Backend** additive only — one new nullable column, one new endpoint, extra
+  field on existing auth responses. Existing routes/queries untouched.
+- **`canAccess` / `NAV_BY_ROLE`** — only widened (added the section sub-paths +
+  a `COMMON_ROUTES` allowlist). No role loses access to anything.
+- **Route tree** — `/dashboard/espace-etudiant` became an `<Outlet/>` container
+  with an index route (staff queue / student redirect) and a `$section` route.
+  Staff behaviour at the base path is unchanged.
+- **Sidebar** — the footer/rail avatar became a `<Link>` to Mon profil; no other
+  nav change for staff.
+- **Store** — photo overlay now matches by id *or* CNE; a 45 s / on-focus
+  re-sync was added (staff only, photoUrl only, swallows errors, never logs
+  out).
+- **Links audited** — student home cards fixed; request-bell left as is
+  (staff-only).
+- Verified: `tsc` clean (front + back), full `vite build`, 0 console errors
+  across roles, all student quick-links resolve, staff queue intact.
 
 ### Things to know
 
