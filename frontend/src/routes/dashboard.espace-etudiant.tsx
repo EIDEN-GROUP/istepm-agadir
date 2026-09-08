@@ -70,6 +70,27 @@ import {
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { Seance, Etudiant } from "@/lib/istpm-data";
+import {
+  STATUT_PAIEMENT_LABEL,
+  STATUT_ETUDIANT_LABEL,
+} from "@/lib/istpm-data";
+
+/** Libellé FR d'un statut de paiement, tolérant aux valeurs inconnues. */
+const libellePaiement = (v: unknown): string => {
+  const k = String(v ?? "").trim();
+  if (!k) return "—";
+  return (
+    (STATUT_PAIEMENT_LABEL as Record<string, string>)[k] ?? k
+  );
+};
+/** Libellé FR d'un statut d'étudiant. */
+const libelleStatutEtudiant = (v: unknown): string => {
+  const k = String(v ?? "").trim();
+  if (!k) return "—";
+  return (
+    (STATUT_ETUDIANT_LABEL as Record<string, string>)[k] ?? k
+  );
+};
 
 const STATUT_DEMANDE_TONE: Record<StudentRequest["statut"], "amber" | "blue" | "teal" | "red"> = {
   en_attente: "amber",
@@ -433,12 +454,7 @@ function EspaceEtudiantPage() {
               {prenom} {nom}
             </p>
             <p className="text-xs text-muted-foreground">
-              {String(profil?.cne ?? fallback?.etu.cne ?? "—")} ·{" "}
-              {String(
-                profil?.matricule ??
-                  (fallback?.etu as unknown as Record<string, string> | undefined)?.matricule ??
-                  "—",
-              )}
+              CNE {String(profil?.cne ?? fallback?.etu.cne ?? "—")}
             </p>
             <div className="flex flex-wrap gap-1.5">
               <span className={toneBadge("teal")}>
@@ -448,7 +464,7 @@ function EspaceEtudiantPage() {
                 {String(profil?.niveau ?? fallback?.etu.niveau ?? "—")}
               </span>
               <span className={toneBadge("neutral")}>
-                {String(profil?.statut ?? fallback?.etu.statut ?? "—")}
+                {libelleStatutEtudiant(profil?.statut ?? fallback?.etu.statut)}
               </span>
             </div>
           </div>
@@ -517,7 +533,7 @@ function EspaceEtudiantPage() {
           <DetailField label="Bulletins publiés" value={String(bulletins.length)} />
           <DetailField
             label="Statut de paiement"
-            value={String(profil?.paiement ?? fallback?.etu.paiement ?? "—")}
+            value={libellePaiement(profil?.paiement ?? fallback?.etu.paiement)}
           />
           <DetailField
             label="Reste à payer"
@@ -666,7 +682,7 @@ function EspaceEtudiantPage() {
           label="Reste à payer"
           value={`${String(profil?.resteAPayer ?? profil?.reste_a_payer ?? "—")} MAD`}
         />
-        <DetailField label="Statut" value={String(profil?.paiement ?? "—")} />
+        <DetailField label="Statut" value={libellePaiement(profil?.paiement)} />
       </DetailGrid>
       {paiements.length ? (
         <ul className="divide-y divide-brand/8">

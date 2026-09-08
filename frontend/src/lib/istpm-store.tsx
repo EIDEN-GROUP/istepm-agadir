@@ -602,20 +602,26 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         // la met à jour depuis son espace, elle doit se propager à toutes les
         // listes même si le store local a déjà des fiches (prefer garderait
         // l'ancienne). On superpose donc juste `photoUrl` par id.
-        const remotePhotoById = new Map(
-          remoteEtudiants.map((e) => [
-            e.id,
-            String(
-              (e as { photoUrl?: string }).photoUrl ??
-                (e as unknown as { photo_url?: string }).photo_url ??
-                "",
-            ),
-          ]),
-        );
+        // Les identifiants locaux (démo) et serveur diffèrent : on indexe la
+        // photo distante par id ET par CNE pour la retrouver quel que soit le
+        // référentiel de la liste locale.
+        const remotePhotoByKey = new Map<string, string>();
+        for (const e of remoteEtudiants) {
+          const url = String(
+            (e as { photoUrl?: string }).photoUrl ??
+              (e as unknown as { photo_url?: string }).photo_url ??
+              "",
+          ).trim();
+          if (!url) continue;
+          if (e.id) remotePhotoByKey.set(String(e.id), url);
+          if (e.cne) remotePhotoByKey.set(`cne:${String(e.cne)}`, url);
+        }
         const mergeEtudiants = (local: Etudiant[]): Etudiant[] => {
           if (local.length === 0) return remoteEtudiants;
           return local.map((e) => {
-            const remotePhoto = remotePhotoById.get(e.id);
+            const remotePhoto =
+              remotePhotoByKey.get(e.id) ??
+              (e.cne ? remotePhotoByKey.get(`cne:${e.cne}`) : undefined);
             return remotePhoto && remotePhoto !== e.photoUrl
               ? { ...e, photoUrl: remotePhoto }
               : e;

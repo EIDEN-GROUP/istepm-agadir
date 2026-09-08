@@ -8,6 +8,8 @@ export interface AuthUserPayload {
   email: string;
   name: string;
   role: "directeur" | "enseignant" | "responsable" | "etudiant";
+  /** Absent du JWT (trop volumineux) : renseigné par `authenticate` depuis la BDD. */
+  photoUrl?: string;
 }
 
 declare module "@fastify/jwt" {
@@ -34,6 +36,7 @@ export async function authenticate(
         email: users.email,
         name: users.name,
         role: users.role,
+        photoUrl: users.photoUrl,
       })
       .from(users)
       .where(eq(users.id, payload.id))
@@ -46,6 +49,7 @@ export async function authenticate(
       email: user.email,
       name: user.name,
       role: user.role as AuthUserPayload["role"],
+      photoUrl: user.photoUrl ?? "",
     };
   } catch {
     return reply.status(401).send({ error: "Token invalide ou expiré" });

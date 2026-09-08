@@ -1013,6 +1013,36 @@ export function updateStudentPhoto(photoUrl: string) {
   return api.put<{ photoUrl: string }>("/student/me/photo", { photoUrl });
 }
 
+export interface AuthMe {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  photoUrl?: string;
+}
+
+/** Compte courant, tel que renvoyé par le serveur (source de vérité). */
+export function fetchAuthMe() {
+  return api.get<AuthMe>("/auth/me");
+}
+
+export interface UpdateMyProfileInput {
+  email?: string;
+  /** Requis seulement pour changer l'email ou le mot de passe. */
+  currentPassword?: string;
+  newPassword?: string;
+  /** Photo : data:image/... ou URL http(s) ; "" pour retirer. */
+  photoUrl?: string;
+}
+
+/** Modification self-service du compte courant (email / mot de passe / photo). */
+export function updateMyProfile(input: UpdateMyProfileInput) {
+  return api.patch<{
+    token: string;
+    user: AuthMe;
+  }>("/auth/me", input);
+}
+
 export function fetchStudentCalendar(params?: { start?: string; end?: string }) {
   return api.get<StudentCalendar>("/student/calendar", params);
 }

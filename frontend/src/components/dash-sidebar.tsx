@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { ROLES, ROLE_META, SWITCHABLE_ROLES, useAuth } from "@/lib/auth";
 import { RequestBell } from "@/components/request-bell";
+import { PersonAvatar } from "@/components/person-avatar";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
 import { useIstpm } from "@/lib/istpm-store";
 import { toast } from "sonner";
@@ -486,10 +487,17 @@ function SidebarBody({
         )}
       >
         {collapsed ? null : (
-          <div className="flex items-center gap-2.5 rounded-xl bg-brand/5 px-2 py-2">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-dk text-sm font-semibold text-white ring-1 ring-brand/15">
-              {(user?.name || "A").slice(0, 1).toUpperCase()}
-            </span>
+          <Link
+            to="/dashboard/mon-profil"
+            onClick={onNavigate}
+            aria-label="Voir mon profil"
+            className="flex w-full items-center gap-2.5 rounded-xl bg-brand/5 px-2 py-2 text-start transition-colors hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-lt/60"
+          >
+            <PersonAvatar
+              name={user?.name || "Compte"}
+              photoUrl={user?.photoUrl}
+              size="sm"
+            />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xs font-semibold text-foreground">
                 {user?.name}
@@ -498,7 +506,7 @@ function SidebarBody({
                 {user ? ROLE_META[user.role].label : null}
               </span>
             </span>
-          </div>
+          </Link>
         )}
 
         <RoleSwitcher collapsed={collapsed} />
@@ -717,13 +725,27 @@ function IconRail({
             <FlyoutPill>{t.shell.logout}</FlyoutPill>
           </RailFlyout>
         </div>
-        <span
-          aria-hidden
-          className="mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-ink to-brand-dk text-xs font-bold text-white ring-1 ring-white/10"
-          title={user?.name}
-        >
-          {(user?.name || "A").slice(0, 1).toUpperCase()}
-        </span>
+        <div className="group/rail relative flex justify-center">
+          <Link
+            to="/dashboard/mon-profil"
+            aria-label="Voir mon profil"
+            title={user?.name}
+            aria-current={
+              isActive(pathname, "/dashboard/mon-profil") ? "page" : undefined
+            }
+            className="mt-1 block shrink-0 rounded-full ring-1 ring-white/10 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 aria-[current=page]:ring-2 aria-[current=page]:ring-brand"
+          >
+            <PersonAvatar
+              name={user?.name || "Compte"}
+              photoUrl={user?.photoUrl}
+              size="md"
+              ring={false}
+            />
+          </Link>
+          <RailFlyout>
+            <FlyoutPill>Mon profil</FlyoutPill>
+          </RailFlyout>
+        </div>
       </div>
     </div>
   );

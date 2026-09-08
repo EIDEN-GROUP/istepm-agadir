@@ -155,9 +155,16 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
   etudiant: ["/dashboard", "/dashboard/espace-etudiant"],
 };
 
+/**
+ * Destinations ouvertes à tous les rôles connectés, hors menu de navigation
+ * (on y accède autrement — ex. la pastille profil du rail).
+ */
+const COMMON_ROUTES: readonly string[] = ["/dashboard/mon-profil"];
+
 /** Is this destination reachable by this role? Used to gate routes and links. */
 export function canAccess(role: UserRole | null, to: string): boolean {
   if (!role) return false;
+  if (COMMON_ROUTES.includes(to)) return true;
   return NAV_BY_ROLE[role].includes(to);
 }
 

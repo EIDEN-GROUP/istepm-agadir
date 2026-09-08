@@ -28,6 +28,7 @@ export type UserResult = {
   email: string;
   name: string;
   role: string;
+  photoUrl: string;
   createdAt: Date;
 };
 
@@ -37,6 +38,7 @@ function toUserResult(row: typeof users.$inferSelect): UserResult {
     email: row.email,
     name: row.name,
     role: row.role,
+    photoUrl: row.photoUrl ?? "",
     createdAt: row.createdAt,
   };
 }
@@ -141,4 +143,45 @@ export async function updateUser(
 export async function deleteUser(id: string) {
   const db = getDb();
   await db.delete(users).where(eq(users.id, id));
+}
+
+/**
+ * Mise à jour self-service d'un compte : l'utilisateur ne peut changer que son
+ * email et son mot de passe (jamais son nom ni son rôle). L'appelant a déjà
+ * vérifié le mot de passe actuel et l'unicité de l'email.
+ */
+export async function updateSelfProfile(
+  id: string,
+  data: { email?: string; newPassword?: string; photoUrl?: string },
+): Promise<UserResult | null> {
+  const db = getDb();
+  const values: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.email !== undefined) values.email = data.email;
+  if (data.photoUrl !== undefined) values.photoUrl = data.photoUrl;
+  if (data.newPassword !== undefined)
+    values.passwordHash = await hashPassword(data.newPassword);
+  const [updated] = await db
+    .update(users)
+    .set(values)
+    .where(eq(users.id, id))
+    .returning();
+  if (!updated) return null;
+  // La fiche formateur porte une copie de l'email (affichage / rapprochement) :
+  // on la garde synchrone quand c'est un enseignant lié.
+  if (data.email !== undefined && updated.role === "enseignant") {
+    await db
+      .update(formateurs)
+      .set({ email: data.email })
+      .where(eq(formateurs.userId, id));
+  }
+  // La photo d'un étudiant doit apparaître partout dans l'app (listes, bulletins,
+  // paiements, stages…) : ces écrans lisent `etudiants.photo_url`. On y recopie
+  // donc la photo du compte, comme le fait déjà PUT /student/me/photo.
+  if (data.photoUrl !== undefined && updated.role === "etudiant") {
+    await db
+      .update(etudiants)
+      .set({ photoUrl: data.photoUrl })
+      .where(eq(etudiants.userId, id));
+  }
+  return toUserResult(updated);
 }

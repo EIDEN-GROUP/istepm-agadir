@@ -100,6 +100,8 @@ type AuthUser = {
   email: string;
   name: string;
   role: UserRole;
+  /** Photo de profil (URL http(s) ou data:image). Vide = pastille initiales. */
+  photoUrl?: string;
 };
 
 type AuthCtx = {
@@ -109,6 +111,8 @@ type AuthCtx = {
   login: (email: string, password: string) => Promise<void>;
   setRole: (role: UserRole) => void;
   logout: () => void;
+  /** Applique un compte mis à jour (email/nom) + jeton renvoyés par l'API. */
+  applyAccountUpdate: (token: string, patch: Partial<AuthUser>) => void;
   selectedFormateurId: string | null;
   setSelectedFormateurId: (id: string | null) => void;
 };
@@ -120,6 +124,7 @@ const Ctx = createContext<AuthCtx>({
   login: async () => {},
   setRole: () => {},
   logout: () => {},
+  applyAccountUpdate: () => {},
   selectedFormateurId: null,
   setSelectedFormateurId: () => {},
 });
@@ -209,10 +214,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const data = await res.json();
       const token: string = data.token;
-      const backendUser: { id: string; email: string; name: string; role: string } = data.user;
+      const backendUser: { id: string; email: string; name: string; role: string; photoUrl?: string } = data.user;
       const mappedRole = mapBackendRole(backendUser.role);
       const authUser: AuthUser = {
         id: backendUser.id,
+        photoUrl: backendUser.photoUrl ?? "",
         email: backendUser.email,
         name: backendUser.name,
         role: mappedRole,
@@ -226,6 +232,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setRole = useCallback(
     (next: UserRole) => persistRole(next),
     [persistRole],
+  );
+
+  const applyAccountUpdate = useCallback(
+    (token: string, patch: Partial<AuthUser>) => {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      }
+      setUserState((prev) => {
+        const base = prev ?? (role ? userFor(role) : null);
+        if (!base) return prev;
+        const next = { ...base, ...patch };
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(next));
+        }
+        return next;
+      });
+    },
+    [role],
   );
 
   const logout = useCallback(() => {
@@ -253,6 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         setRole,
         logout,
+        applyAccountUpdate,
         selectedFormateurId,
         setSelectedFormateurId: persistSelectedFormateur,
       }}

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { etudiants } from "@/db/schema/etudiants";
+import { users } from "@/db/schema/users";
 import { formateurs } from "@/db/schema/formateurs";
 import { stages } from "@/db/schema/stages";
 import { seances } from "@/db/schema/seances";
@@ -103,6 +104,9 @@ export async function studentRoutes(app: FastifyInstance) {
     const etudiant = await resolveEtudiant(db, request.user.id);
     if (!etudiant) return reply.status(404).send({ error: "Fiche étudiant introuvable pour ce compte" });
     const [updated] = await db.update(etudiants).set({ photoUrl: url }).where(eq(etudiants.id, etudiant.id)).returning();
+    // Garde la photo du compte synchrone : l'avatar du rail et la page profil
+    // lisent `users.photo_url`.
+    await db.update(users).set({ photoUrl: url, updatedAt: new Date() }).where(eq(users.id, request.user.id));
     return { photoUrl: updated.photoUrl };
   });
 
