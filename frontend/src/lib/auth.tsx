@@ -188,6 +188,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
+  // La photo de profil vit côté serveur (`users.photo_url`) mais pas dans le
+  // JWT ni dans les identités fabriquées par `userFor` / le sélecteur de rôle.
+  // À chaque (re)montage et à chaque changement de rôle, on la ré-hydrate
+  // depuis `/auth/me` — mais seulement quand on agit sous son propre rôle
+  // (jeton). En impersonation d'un autre rôle, on retombe sur les initiales.
+  useEffect(() => {
+    if (!role || typeof window === "undefined") return;
+    const token = window.localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) return;
+        const me: { role?: string; photoUrl?: string } = await res.json();
+        const own = me.role ? mapBackendRole(me.role) === role : false;
+        const url = own ? (me.photoUrl ?? "") : "";
+        setUserState((prev) => {
+          if (!prev || prev.photoUrl === url) return prev;
+          const next = { ...prev, photoUrl: url };
+          try {
+            window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(next));
+          } catch {
+            /* quota / private mode */
+          }
+          return next;
+        });
+      } catch {
+        /* hors ligne : on garde la photo locale */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
+
   const persistRole = useCallback((next: UserRole, userData?: AuthUser) => {
     window.localStorage.setItem(ROLE_STORAGE_KEY, next);
     setRoleState(next);
