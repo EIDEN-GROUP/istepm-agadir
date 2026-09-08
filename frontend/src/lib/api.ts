@@ -2,6 +2,11 @@ import { getStoredToken } from "@/lib/auth";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
+/** Base URL accessor for call sites that can't use the fetch wrapper (SSE streams). */
+export function getApiBaseUrl() {
+  return API_BASE;
+}
+
 type RequestOptions = {
   method?: string;
   body?: unknown;

@@ -5,7 +5,9 @@ import { cn } from "@/lib/utils";
 import { softCard } from "@/lib/dash-ui";
 import {
   analyzeIntent,
+  analyzeIntentStream,
   confirmAction,
+  type AnalyzeResult,
   type ChatMessage,
   type ProposedAction,
 } from "@/lib/istpm-api";
@@ -252,12 +254,31 @@ export function AiChatFloating() {
     setLoading(true);
 
     try {
-      const result = await analyzeIntent(updated);
-
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: result.reasoning },
-      ]);
+      // Prefer SSE streaming: tokens render progressively and slow LLM
+      // backends can't trip the 30s fetch timeout. Falls back to the
+      // one-shot endpoint when streaming is unavailable.
+      let result: AnalyzeResult;
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      try {
+        const streamed = await analyzeIntentStream(updated, (t) => {
+          setMessages((prev) => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            next[next.length - 1] = { ...last, content: last.content + t };
+            return next;
+          });
+        });
+        result = streamed;
+      } catch {
+        const legacy = await analyzeIntent(updated);
+        result = legacy;
+      }
+      // Authoritative full text (identical to the streamed tokens).
+      setMessages((prev) => {
+        const next = [...prev];
+        next[next.length - 1] = { role: "assistant", content: result.reasoning };
+        return next;
+      });
 
       if (result.proposedActions.length > 0) {
         const allRead = result.proposedActions.every(
@@ -302,13 +323,19 @@ export function AiChatFloating() {
         : msg.includes("502") || msg.includes("Bad Gateway")
         ? "\n\n💡 Le serveur IA a rencontré une erreur. Veuillez réessayer."
         : "";
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: `❌ Désolé, je n'ai pas pu analyser votre demande : ${msg}${hint}`,
-        },
-      ]);
+      setMessages((prev) => {
+        // Drop the empty streaming placeholder so only the error shows.
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last && last.role === "assistant" && last.content === "") next.pop();
+        return [
+          ...next,
+          {
+            role: "assistant",
+            content: `❌ Désolé, je n'ai pas pu analyser votre demande : ${msg}${hint}`,
+          },
+        ];
+      });
     } finally {
       setLoading(false);
     }

@@ -2,8 +2,35 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authenticate } from "@/middleware/auth";
 import { getToolDefinitions } from "@/lib/agent/actions";
-import { analyzeIntent } from "@/lib/agent/llm";
+import { analyzeIntent, analyzeIntentStream } from "@/lib/agent/llm";
 import { executeAction, executeBatch } from "@/lib/agent/executor";
+
+function agentErrorMessage(err: unknown): string {
+  let msg = "Erreur de communication avec l'IA";
+  if (err instanceof Error) {
+    if ("status" in err) {
+      const status = (err as { status?: unknown }).status;
+      if (status === 401) {
+        msg = "Clé API IA invalide. Vérifiez AI_API_KEY dans le fichier .env.";
+      } else if (status === 403) {
+        msg = "Accès refusé par l'API IA. Vérifiez que votre clé AI_API_KEY est valide et a accès au modèle AI_MODEL configuré.";
+      } else if (status === 404) {
+        msg = "Le modèle d'IA est introuvable. Vérifiez AI_MODEL dans le fichier .env.";
+      } else if (status === 429) {
+        msg = "L'API IA a limité le débit. Veuillez réessayer dans quelques instants.";
+      } else {
+        msg = `L'API IA a répondu avec une erreur (statut ${String(status)}). Vérifiez votre configuration .env.`;
+      }
+    } else if ((err as { code?: string }).code === "ECONNREFUSED" || (err as { code?: string }).code === "ENOTFOUND") {
+      msg = "Impossible de contacter l'API IA. Vérifiez AI_BASE_URL dans le fichier .env.";
+    } else if (err.message.includes("timed out") || err.message.includes("timeout")) {
+      msg = "L'API IA a mis trop de temps à répondre. Veuillez réessayer.";
+    } else {
+      msg = err.message;
+    }
+  }
+  return msg;
+}
 
 async function withRetry<T>(
   fn: () => Promise<T>,
@@ -60,31 +87,47 @@ export async function agentRoutes(app: FastifyInstance) {
       );
       return result;
     } catch (err) {
-      let msg = "Erreur de communication avec l'IA";
-      if (err instanceof Error) {
-        if ("status" in err) {
-          const status = (err as any).status;
-          if (status === 401) {
-            msg = "Clé API IA invalide. Vérifiez AI_API_KEY dans le fichier .env.";
-          } else if (status === 403) {
-            msg = "Accès refusé par l'API IA. Vérifiez que votre clé AI_API_KEY est valide et a accès au modèle AI_MODEL configuré.";
-          } else if (status === 404) {
-            msg = "Le modèle d'IA est introuvable. Vérifiez AI_MODEL dans le fichier .env.";
-          } else if (status === 429) {
-            msg = "L'API IA a limité le débit. Veuillez réessayer dans quelques instants.";
-          } else {
-            msg = `L'API IA a répondu avec une erreur (statut ${status}). Vérifiez votre configuration .env.`;
-          }
-        } else if ((err as any).code === "ECONNREFUSED" || (err as any).code === "ENOTFOUND") {
-          msg = "Impossible de contacter l'API IA. Vérifiez AI_BASE_URL dans le fichier .env.";
-        } else if (err.message.includes("timed out") || err.message.includes("timeout")) {
-          msg = "L'API IA a mis trop de temps à répondre. Veuillez réessayer.";
-        } else {
-          msg = err.message;
-        }
-      }
+      const msg = agentErrorMessage(err);
       request.log.error(err, "Agent analyze failed");
       return reply.status(502).send({ error: msg });
+    }
+  });
+
+  // SSE streaming variant: forwards LLM tokens as they arrive so slow
+  // backends don't hit client timeouts. Events: `token` {t}, `done`
+  // (full AnalyzeResult), `error` {error}. Heartbeat comments keep
+  // proxies from buffering or closing idle connections.
+  app.post("/analyze/stream", { preHandler: [authenticate] }, async (request, reply) => {
+    const input = analyzeSchema.parse(request.body);
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    let closed = false;
+    request.raw.on("close", () => {
+      closed = true;
+    });
+    const send = (event: string, data: string) => {
+      if (!closed) raw.write(`event: ${event}\ndata: ${data}\n\n`);
+    };
+    const heartbeat = setInterval(() => {
+      if (!closed) raw.write(": ping\n\n");
+    }, 15000);
+    try {
+      const result = await analyzeIntentStream(input.messages, toolDefinitions, (t) =>
+        send("token", JSON.stringify({ t })),
+      );
+      send("done", JSON.stringify(result));
+    } catch (err) {
+      request.log.error(err, "Agent analyze stream failed");
+      send("error", JSON.stringify({ error: agentErrorMessage(err) }));
+    } finally {
+      clearInterval(heartbeat);
+      if (!closed) raw.end();
     }
   });
 

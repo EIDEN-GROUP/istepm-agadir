@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, getApiBaseUrl } from "@/lib/api";
 import { sanitizeFilename } from "@/lib/filename";
 import { getStoredToken } from "@/lib/auth";
 import type {
@@ -792,6 +792,117 @@ export interface AnalyzeResult {
 
 export function analyzeIntent(messages: ChatMessage[]) {
   return api.post<AnalyzeResult>("/agent/analyze", { messages });
+}
+
+const STREAM_OVERALL_TIMEOUT = 300000; // 5 min hard cap per stream
+const STREAM_IDLE_TIMEOUT = 60000; // abort only if no chunk arrives for 60s
+
+/**
+ * SSE variant of analyzeIntent: renders tokens progressively via onToken
+ * and resolves with the full AnalyzeResult on the `done` event. Uses a
+ * sliding idle timeout (not a fixed one) so slow LLM backends can't trip
+ * the regular 30s fetch cutoff as long as tokens keep flowing.
+ */
+export async function analyzeIntentStream(
+  messages: ChatMessage[],
+  onToken: (token: string) => void,
+): Promise<AnalyzeResult> {
+  const token = getStoredToken();
+  const controller = new AbortController();
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  const overallTimer = setTimeout(() => controller.abort(), STREAM_OVERALL_TIMEOUT);
+  const clearTimers = () => {
+    clearTimeout(overallTimer);
+    if (idleTimer) clearTimeout(idleTimer);
+  };
+  const poke = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT);
+  };
+  const abortErr = () =>
+    new Error("La requête a pris trop de temps. Vérifiez que le serveur est accessible.");
+
+  let res: Response;
+  try {
+    poke();
+    res = await fetch(`${getApiBaseUrl()}/agent/analyze/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ messages }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimers();
+    if (err instanceof Error && err.name === "AbortError") throw abortErr();
+    throw new Error("Impossible de contacter le serveur. Vérifiez votre connexion.");
+  }
+
+  if (res.status === 401) {
+    clearTimers();
+    throw new Error("Non authentifié");
+  }
+  if (!res.ok || !res.body) {
+    clearTimers();
+    let msg = `Erreur ${res.status}`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      msg = data.error ?? msg;
+    } catch {
+      /* keep default */
+    }
+    throw new Error(msg);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let reasoning = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      poke(); // a chunk arrived → the stream is alive, reset idle timer
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() ?? "";
+      for (const frame of frames) {
+        let event = "message";
+        const dataLines: string[] = [];
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event:")) event = line.slice(6).trim();
+          else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
+          // ": ..." heartbeat comments are ignored
+        }
+        if (dataLines.length === 0) continue;
+        const raw = dataLines.join("\n");
+        if (event === "token") {
+          const t = (JSON.parse(raw) as { t: string }).t;
+          reasoning += t;
+          onToken(t);
+        } else if (event === "done") {
+          const result = JSON.parse(raw) as AnalyzeResult;
+          clearTimers();
+          return {
+            reasoning: result.reasoning || reasoning,
+            proposedActions: result.proposedActions ?? [],
+          };
+        } else if (event === "error") {
+          throw new Error((JSON.parse(raw) as { error?: string }).error ?? "Erreur IA");
+        }
+      }
+    }
+  } catch (err) {
+    clearTimers();
+    if (err instanceof Error && err.name === "AbortError") throw abortErr();
+    throw err;
+  } finally {
+    clearTimers();
+    reader.releaseLock();
+  }
+  throw new Error("Le flux IA s'est interrompu avant la fin. Veuillez réessayer.");
 }
 
 export function confirmAction(actionName: string, params: Record<string, unknown>) {
