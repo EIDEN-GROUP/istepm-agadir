@@ -240,7 +240,7 @@ function MonProfilPage() {
     mutationFn: (photoUrl: string) => updateMyProfile({ photoUrl }),
     onSuccess: (res) => {
       applyAccountUpdate(res.token, { photoUrl: res.user.photoUrl ?? "" });
-      toast.success("Photo mise à jour.");
+      toast.success(res.user.photoUrl ? "Photo mise à jour." : "Photo retirée.");
     },
     onError: (e) =>
       toast.error(e instanceof Error ? e.message : "Échec de l'envoi."),
@@ -335,6 +335,16 @@ function MonProfilPage() {
                 e.target.value = "";
               }}
             />
+            {photoUrl ? (
+              <button
+                type="button"
+                onClick={() => photoMut.mutate("")}
+                disabled={photoMut.isPending}
+                className="mt-2 block w-full text-center text-[11px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-alert-dk hover:underline disabled:opacity-50"
+              >
+                Retirer la photo
+              </button>
+            ) : null}
           </div>
 
           <div className="min-w-0 flex-1 space-y-5">
