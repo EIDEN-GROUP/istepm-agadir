@@ -73,7 +73,8 @@ export async function emailRoutes(app: FastifyInstance) {
     const mailOptions: nodemailer.SendMailOptions = {
       from: env.FROM_EMAIL,
       to: input.to,
-      subject: input.subject,
+      // Anti header-injection : le sujet ne doit jamais contenir de retour ligne.
+      subject: input.subject.replace(/[\r\n]+/g, " "),
       html,
       text,
     };
@@ -218,49 +219,70 @@ export async function emailRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/send-demo", async (request) => {
-    // Public endpoint (no auth required) for the landing page
-    const input = z
-      .object({
-        visitor: sendSchema,
-        admin: sendSchema,
-      })
-      .parse(request.body);
+  app.post(
+    "/send-demo",
+    { config: { rateLimit: { max: 5, timeWindow: "1 hour" } } },
+    async (request) => {
+      // Endpoint public (page de contact) : gabarit FIXE côté serveur.
+      // Aucun HTML/sujet/destinataire libre n'est accepté (anti-relais SMTP).
+      const input = z
+        .object({
+          name: z.string().trim().min(1).max(100),
+          phone: z.string().trim().min(1).max(30),
+          email: z.string().email().optional(),
+          message: z.string().trim().max(2000).optional().default(""),
+        })
+        .parse(request.body);
 
-    const env = getEnv();
-    const transporter = getTransporter();
+      const env = getEnv();
+      const transporter = getTransporter();
 
-    if (!transporter) {
-      return { ok: false, error: "SMTP non configuré" };
-    }
+      if (!transporter) {
+        return { ok: false, error: "SMTP non configuré" };
+      }
 
-    try {
-      await Promise.all([
-        transporter.sendMail({
+      const esc = (s: string) =>
+        s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      const bodyHtml =
+        `<p><strong>Nom :</strong> ${esc(input.name)}</p>` +
+        `<p><strong>Téléphone :</strong> ${esc(input.phone)}</p>` +
+        (input.email ? `<p><strong>E-mail :</strong> ${esc(input.email)}</p>` : "") +
+        (input.message ? `<p><strong>Message :</strong><br>${esc(input.message).replace(/\n/g, "<br>")}</p>` : "");
+      const bodyText =
+        `Nom : ${input.name}\nTéléphone : ${input.phone}\n` +
+        (input.email ? `E-mail : ${input.email}\n` : "") +
+        (input.message ? `Message : ${input.message}\n` : "");
+
+      try {
+        await transporter.sendMail({
           from: env.FROM_EMAIL,
-          to: input.visitor.to,
-          subject: input.visitor.subject,
-          html: input.visitor.html,
-          text: input.visitor.text,
-        }),
-        transporter.sendMail({
-          from: env.FROM_EMAIL,
-          to: input.admin.to,
-          subject: input.admin.subject,
-          html: input.admin.html,
-          text: input.admin.text,
-          replyTo: input.visitor.to,
-        }),
-      ]);
+          to: env.ADMIN_EMAIL,
+          subject: "Demande de démo — ISTPM",
+          html: bodyHtml,
+          text: bodyText,
+          replyTo: input.email,
+        });
+        await logEmail(env.ADMIN_EMAIL, "Demande de démo — ISTPM", "demo", "sent");
 
-      return { ok: true };
-    } catch (err) {
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : "Erreur inconnue",
-      };
-    }
-  });
+        if (input.email) {
+          await transporter.sendMail({
+            from: env.FROM_EMAIL,
+            to: input.email,
+            subject: "Demande bien reçue — ISTPM Agadir",
+            html: `<p>Bonjour ${esc(input.name)},</p><p>Nous avons bien reçu votre demande de démonstration. Notre équipe vous recontactera très vite.</p>`,
+            text: `Bonjour ${input.name},\n\nNous avons bien reçu votre demande de démonstration. Notre équipe vous recontactera très vite.`,
+          });
+        }
+
+        return { ok: true };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : "Erreur inconnue",
+        };
+      }
+    },
+  );
 
   app.get("/logs", { preHandler: [authenticate] }, async () => {
     const db = getDb();

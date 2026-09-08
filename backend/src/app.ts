@@ -70,6 +70,19 @@ export async function buildApp() {
     timeWindow: "1 minute",
   });
 
+  // Defense in depth: security headers on every response (the SPA's nginx
+  // sets its own; HSTS/CSP for the public domain belong at eiden-nginx).
+  app.addHook("onRequest", async (_request, reply) => {
+    reply.header("X-Content-Type-Options", "nosniff");
+    reply.header("X-Frame-Options", "DENY");
+    reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    reply.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    reply.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+    // Honored by browsers only over HTTPS (i.e. via eiden-nginx, which is how
+    // the domain is served); ignored on direct plain-HTTP access.
+    reply.header("Strict-Transport-Security", "max-age=63072000");
+  });
+
   // Ensure MinIO bucket exists (non-blocking; app works without it)
   ensureBucket().catch(() => {});
 

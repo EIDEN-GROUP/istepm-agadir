@@ -8,6 +8,8 @@ import { notesEtudiant } from "@/db/schema/notes-etudiant";
 import { historiquePaiements } from "@/db/schema/historique-paiements";
 import { stages } from "@/db/schema/stages";
 import { bulletins } from "@/db/schema/bulletins";
+import { ownEtudiantId, teacherScope, etudiantInScope } from "@/lib/scope";
+import { escCsvCell as escCsv } from "@/lib/csv";
 import { eq, desc, sql, or, and, inArray } from "drizzle-orm";
 
 const etudiantSchema = z.object({
@@ -25,16 +27,17 @@ const etudiantSchema = z.object({
   email: z.string().optional().default(""),
   dateNaissance: z.string().optional().default(""),
   ville: z.string().optional().default(""),
-  // URL courte OU data:image/... (base64) : le front réduit l'image avant envoi.
-  photoUrl: z.string().max(1_500_000).optional().default(""),
-  userId: z.string().uuid().nullable().optional(),
+  photoUrl: z.string().max(2000).optional().default(""),
+  // NOTE (sécurité) : la liaison de compte (userId) ne passe jamais par ici —
+  // inscription/invitation avec CNE (voir services/auth.ts, routes/invitations.ts).
   fraisMensuels: z.number().optional().default(0),
   resteAPayer: z.number().optional().default(0),
   paiementsMensuels: z.record(z.string(), z.enum(["paye", "en_attente", "retard", "impaye"])).optional(),
 });
 
 export async function etudiantRoutes(app: FastifyInstance) {
-  app.get("/export/csv", { preHandler: [authenticate] }, async (request, reply) => {
+  app.get("/export/csv", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    request.log.info({ by: request.user.id }, "Export CSV étudiants");
     const db = getDb();
     const query = request.query as {
       ids?: string;
@@ -102,14 +105,6 @@ export async function etudiantRoutes(app: FastifyInstance) {
       "telephone", "email", "dateNaissance", "ville", "fraisMensuels",
     ];
 
-    const escCsv = (v: string) => {
-      const s = String(v ?? "");
-      if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
-        return `"${s.replace(/"/g, '""')}"`;
-      }
-      return s;
-    };
-
     const headerLine = headers.join(",");
     const dataLines = rows.map((r) =>
       headers
@@ -127,7 +122,11 @@ export async function etudiantRoutes(app: FastifyInstance) {
     return reply.send(csv);
   });
 
-  app.get("/", { preHandler: [authenticate] }, async (request) => {
+  app.get("/", { preHandler: [authenticate] }, async (request, reply) => {
+    // Les comptes étudiants passent par /api/student/me (fiche unique).
+    if (request.user.role === "etudiant") {
+      return reply.status(404).send({ error: "Introuvable" });
+    }
     const db = getDb();
     const query = request.query as {
       search?: string;
@@ -275,6 +274,17 @@ export async function etudiantRoutes(app: FastifyInstance) {
       .limit(1);
     if (!etudiant) return reply.status(404).send({ error: "Étudiant introuvable" });
 
+    // Autorisation objet (404 volontaire pour ne pas révéler l'existence).
+    if (request.user.role === "etudiant") {
+      const own = await ownEtudiantId(request.user.id);
+      if (own !== etudiant.id) return reply.status(404).send({ error: "Étudiant introuvable" });
+    } else if (request.user.role === "enseignant") {
+      const scope = await teacherScope(request.user.id);
+      if (!scope || !etudiantInScope(etudiant, scope)) {
+        return reply.status(404).send({ error: "Étudiant introuvable" });
+      }
+    }
+
     const notes = await db
       .select()
       .from(notesEtudiant)
@@ -333,8 +343,10 @@ export async function etudiantRoutes(app: FastifyInstance) {
       return etudiant;
     } catch (err) {
       request.log.error(err, "Échec création étudiant");
-      const msg = err instanceof Error ? err.message : "Erreur inconnue";
-      return reply.status(500).send({ error: `Échec création étudiant : ${msg}` });
+      if (err instanceof Error && "code" in err && (err as { code?: string }).code === "23505") {
+        return reply.status(409).send({ error: "Un étudiant avec ce CNE existe déjà" });
+      }
+      return reply.status(500).send({ error: "Échec création étudiant" });
     }
   });
 
@@ -398,6 +410,16 @@ export async function etudiantRoutes(app: FastifyInstance) {
         .where(eq(etudiants.id, id))
         .limit(1);
       if (!etudiant) return reply.status(404).send({ error: "Étudiant introuvable" });
+
+      if (request.user.role === "etudiant") {
+        const own = await ownEtudiantId(request.user.id);
+        if (own !== etudiant.id) return reply.status(404).send({ error: "Étudiant introuvable" });
+      } else if (request.user.role === "enseignant") {
+        const scope = await teacherScope(request.user.id);
+        if (!scope || !etudiantInScope(etudiant, scope)) {
+          return reply.status(404).send({ error: "Étudiant introuvable" });
+        }
+      }
 
       const NIVEAUX = [
         "S1", "S2", "S3", "S4", "S5", "S6",

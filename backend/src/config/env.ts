@@ -44,7 +44,7 @@ const envSchema = z.object({
     .default("postgres://postgres:postgres@localhost:5432/school_crm"),
 
   JWT_SECRET: z.string().default("change-me-in-production"),
-  JWT_EXPIRES_IN: z.string().default("7d"),
+  JWT_EXPIRES_IN: z.string().default("12h"),
 
   REDIS_URL: z.string().default("redis://localhost:6379"),
 
@@ -68,7 +68,18 @@ const envSchema = z.object({
   N8N_WEBHOOK_URL: z.string().default(""),
   N8N_WEBHOOK_SECRET: z.string().default(""),
 
-  CORS_ORIGIN: z.string().default("http://localhost:5173"),
+  CORS_ORIGIN: z
+    .string()
+    .default("http://localhost:5173")
+    .refine(
+      (v) =>
+        v
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .every((s) => s !== "*" && /^(https:\/\/|http:\/\/localhost([/:]|$))/.test(s)),
+      { message: "CORS_ORIGIN must not contain '*' and must be https:// or http://localhost" },
+    ),
 
   /** Public frontend base URL for invitation links. Defaults to first CORS origin. */
   FRONTEND_URL: z.string().default(""),
@@ -92,6 +103,17 @@ export function getEnv(): Env {
     if (!result.success) {
       console.error("Invalid environment variables:", result.error.flatten());
       process.exit(1);
+    }
+    // Fail closed: never boot production with predictable secrets.
+    if (result.data.NODE_ENV === "production") {
+      if (result.data.JWT_SECRET.length < 32 || result.data.JWT_SECRET.includes("change-me")) {
+        console.error("FATAL: JWT_SECRET must be a strong random value (32+ chars) in production.");
+        process.exit(1);
+      }
+      if (result.data.ADMIN_API_KEY.length < 16 || result.data.ADMIN_API_KEY.includes("change-me")) {
+        console.error("FATAL: ADMIN_API_KEY must be set to a strong random value in production.");
+        process.exit(1);
+      }
     }
     _env = result.data;
   }

@@ -34,7 +34,7 @@ function cleanStageInput<T extends Record<string, unknown>>(input: T): T {
 }
 
 export async function stageRoutes(app: FastifyInstance) {
-  app.get("/", { preHandler: [authenticate] }, async (request) => {
+  app.get("/", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request) => {
     const db = getDb();
     const query = request.query as {
       filiere?: string;
@@ -72,7 +72,7 @@ export async function stageRoutes(app: FastifyInstance) {
     return result;
   });
 
-  app.get("/:id", { preHandler: [authenticate] }, async (request, reply) => {
+  app.get("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [stage] = await db

@@ -4,6 +4,7 @@ import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { notesEtudiant } from "@/db/schema/notes-etudiant";
 import { etudiants } from "@/db/schema/etudiants";
+import { teacherScope, etudiantInScope } from "@/lib/scope";
 import { eq, and } from "drizzle-orm";
 
 const createNoteSchema = z.object({
@@ -44,9 +45,22 @@ export async function noteRoutes(app: FastifyInstance) {
   app.post(
     "/",
     { preHandler: [authenticate, requireRole("directeur", "enseignant", "responsable")] },
-    async (request) => {
+    async (request, reply) => {
       const input = createNoteSchema.parse(request.body);
       const db = getDb();
+
+      // Un enseignant ne note que les étudiants de sa portée.
+      if (request.user.role === "enseignant") {
+        const [target] = await db
+          .select({ groupe: etudiants.groupe, filiere: etudiants.filiere })
+          .from(etudiants)
+          .where(eq(etudiants.id, input.etudiantId))
+          .limit(1);
+        const scope = await teacherScope(request.user.id);
+        if (!target || !scope || !etudiantInScope(target, scope)) {
+          return reply.status(404).send({ error: "Étudiant introuvable" });
+        }
+      }
 
       const [existing] = await db
         .select()
@@ -93,7 +107,7 @@ export async function noteRoutes(app: FastifyInstance) {
 
   app.delete(
     "/:id",
-    { preHandler: [authenticate, requireRole("directeur", "enseignant", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();

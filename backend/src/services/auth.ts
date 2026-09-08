@@ -6,7 +6,7 @@ import { etudiants } from "@/db/schema/etudiants";
 import { eq } from "drizzle-orm";
 import { getEnv } from "@/config/env";
 
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12;
 
 export type CreateUserInput = {
   email: string;

@@ -19,6 +19,9 @@ COPY --from=base /app/node_modules ./node_modules
 COPY package*.json ./
 COPY drizzle.config.ts ./
 COPY migrations ./migrations
+# Run as non-root: /app is read-only at runtime (logs go to stdout).
+RUN chown -R node:node /app
+USER node
 EXPOSE 3000
 CMD ["node", "--import", "tsx/esm", "dist/index.js"]
 

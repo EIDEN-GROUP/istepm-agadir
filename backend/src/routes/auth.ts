@@ -17,10 +17,9 @@ const loginSchema = z.object({
   email: z.string().email("Email invalide"),
   password: z.string().min(1, "Mot de passe requis"),
 });
-
 const createUserSchema = z.object({
   email: z.string().email("Email invalide"),
-  password: z.string().min(6, "Mot de passe trop court"),
+  password: z.string().min(8, "Mot de passe trop court (8 caractères min)"),
   name: z.string().min(1, "Nom requis"),
   role: z
     .enum(["directeur", "enseignant", "responsable", "etudiant"])
@@ -35,7 +34,7 @@ const createUserSchema = z.object({
 
 const updateUserSchema = z.object({
   name: z.string().optional(),
-  password: z.string().min(6).optional(),
+  password: z.string().min(8, "Mot de passe trop court (8 caractères min)").optional(),
 });
 
 const ROLES_ENUM = ["directeur", "enseignant", "responsable", "etudiant"] as const;
@@ -44,14 +43,18 @@ const assignRoleSchema = z.object({
 });
 
 export async function authRoutes(app: FastifyInstance) {
-  app.post("/login", async (request, reply) => {
-    const input = loginSchema.parse(request.body);
-    const user = await login(input.email, input.password);
-    if (!user) {
-      return reply
-        .status(401)
-        .send({ error: "Email ou mot de passe incorrect" });
-    }
+  app.post(
+    "/login",
+    { config: { rateLimit: { max: 15, timeWindow: "15 minutes" } } },
+    async (request, reply) => {
+      const input = loginSchema.parse(request.body);
+      const user = await login(input.email, input.password);
+      if (!user) {
+        request.log.warn({ email: input.email, ip: request.ip }, "Échec connexion");
+        return reply
+          .status(401)
+          .send({ error: "Email ou mot de passe incorrect" });
+      }
     const token = app.jwt.sign({
       id: user.id,
       email: user.email,
@@ -79,7 +82,7 @@ export async function authRoutes(app: FastifyInstance) {
     },
   );
 
-  app.get("/users", { preHandler: [authenticate] }, async () => {
+  app.get("/users", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async () => {
     return listAllUsers();
   });
 

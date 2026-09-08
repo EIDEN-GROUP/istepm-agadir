@@ -85,38 +85,52 @@ export async function invitationRoutes(app: FastifyInstance) {
   );
 
   // Vérifier un lien (public, pour afficher la page de définition).
-  app.get("/verify", async (request) => {
-    const { token } = request.query as { token?: string };
-    if (!token) return { valid: false };
-    const found = await verifyInvite(token);
-    if (!found) return { valid: false };
-    return { valid: true, ...found };
-  });
+  app.get(
+    "/verify",
+    { config: { rateLimit: { max: 30, timeWindow: "15 minutes" } } },
+    async (request) => {
+      const { token } = request.query as { token?: string };
+      if (!token) return { valid: false };
+      const found = await verifyInvite(token);
+      if (!found) return { valid: false };
+      return { valid: true, ...found };
+    },
+  );
 
   // Accepter : définit le mot de passe (usage unique, 30 min), connecte directement.
-  app.post("/accept", async (request, reply) => {
-    const input = z
-      .object({
-        token: z.string().min(1, "Lien manquant"),
-        password: z.string().min(6, "Mot de passe trop court (6 caractères min)"),
-      })
-      .parse(request.body);
-    const result = await acceptInvite(input.token, input.password);
-    if (!result.ok) return reply.status(400).send({ error: result.error });
-    const token = app.jwt.sign({
-      id: result.user.id,
-      email: result.user.email,
-      name: result.user.name,
-      role: result.user.role as InvitationRole,
-    });
-    return { token, user: result.user };
-  });
+  app.post(
+    "/accept",
+    { config: { rateLimit: { max: 10, timeWindow: "15 minutes" } } },
+    async (request, reply) => {
+      const input = z
+        .object({
+          token: z.string().min(1, "Lien manquant"),
+          password: z.string().min(8, "Mot de passe trop court (8 caractères min)"),
+        })
+        .parse(request.body);
+      const result = await acceptInvite(input.token, input.password);
+      if (!result.ok) return reply.status(400).send({ error: result.error });
+      reply.header("Cache-Control", "no-store");
+    reply.header("Cache-Control", "no-store");
+      const token = app.jwt.sign({
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+        role: result.user.role as InvitationRole,
+      });
+      return { token, user: result.user };
+    },
+  );
 
   // Auto-renvoi public (lien expiré / non reçu). Réponse identique dans tous
   // les cas pour ne pas révéler les e-mails enregistrés.
-  app.post("/renvoyer", async (request) => {
-    const input = z.object({ email: z.string().email("Email invalide") }).parse(request.body);
-    await resendInviteByEmail(input.email);
-    return { ok: true };
-  });
+  app.post(
+    "/renvoyer",
+    { config: { rateLimit: { max: 10, timeWindow: "15 minutes" } } },
+    async (request) => {
+      const input = z.object({ email: z.string().email("Email invalide") }).parse(request.body);
+      await resendInviteByEmail(input.email);
+      return { ok: true };
+    },
+  );
 }

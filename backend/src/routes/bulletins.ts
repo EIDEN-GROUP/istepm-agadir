@@ -4,7 +4,8 @@ import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { bulletins } from "@/db/schema/bulletins";
 import { notesEtudiant } from "@/db/schema/notes-etudiant";
-import { eq, desc, sql } from "drizzle-orm";
+import { ownEtudiantId, teacherScope } from "@/lib/scope";
+import { eq, desc, sql, and, inArray } from "drizzle-orm";
 
 const bulletinSchema = z.object({
   etudiantId: z.string().uuid(),
@@ -31,8 +32,21 @@ const bulletinUpdateSchema = z.object({
 });
 
 export async function bulletinRoutes(app: FastifyInstance) {
-  app.get("/", { preHandler: [authenticate] }, async (request) => {
+  app.get("/", { preHandler: [authenticate] }, async (request, reply) => {
     const db = getDb();
+    if (request.user.role === "etudiant") {
+      const own = await ownEtudiantId(request.user.id);
+      if (!own) return [];
+      return db.select().from(bulletins).where(eq(bulletins.etudiantId, own)).orderBy(desc(bulletins.createdAt));
+    }
+    const scopeConditions = [];
+    if (request.user.role === "enseignant") {
+      const scope = await teacherScope(request.user.id);
+      if (!scope) return [];
+      const niveaux = [...new Set(scope.groupes.map((g) => g.split("-")[0]))];
+      if (niveaux.length) scopeConditions.push(inArray(bulletins.niveau, niveaux));
+      if (scope.departement) scopeConditions.push(eq(bulletins.filiere, scope.departement));
+    }
     const query = request.query as {
       filiere?: string;
       niveau?: string;
@@ -63,6 +77,10 @@ export async function bulletinRoutes(app: FastifyInstance) {
       result = result.where(
         sql`${bulletins.prenom} ILIKE ${q} OR ${bulletins.nom} ILIKE ${q} OR ${bulletins.cne} ILIKE ${q}`,
       );
+    }
+
+    for (const cond of scopeConditions) {
+      result = result.where(cond);
     }
 
     const rows = await result;
@@ -169,7 +187,21 @@ export async function bulletinRoutes(app: FastifyInstance) {
         .set({ statut: "publie" })
         .where(eq(bulletins.id, id))
         .returning();
-      if (!bulletin) return reply.status(404).send({ error: "Bulletin introuvable" });
+    if (!bulletin) return reply.status(404).send({ error: "Bulletin introuvable" });
+    if (request.user.role === "etudiant") {
+      const own = await ownEtudiantId(request.user.id);
+      if (!own || bulletin.etudiantId !== own) {
+        return reply.status(404).send({ error: "Bulletin introuvable" });
+      }
+    } else if (request.user.role === "enseignant") {
+      const scope = await teacherScope(request.user.id);
+      const niveaux = scope ? [...new Set(scope.groupes.map((g) => g.split("-")[0]))] : [];
+      const inScope =
+        scope &&
+        (niveaux.length === 0 || niveaux.includes(bulletin.niveau)) &&
+        (!scope.departement || scope.departement === bulletin.filiere);
+      if (!inScope) return reply.status(404).send({ error: "Bulletin introuvable" });
+    }
       return bulletin;
     },
   );

@@ -6,7 +6,7 @@ import { formateurs } from "@/db/schema/formateurs";
 import { eq, desc, asc, sql, or } from "drizzle-orm";
 
 const formateurSchema = z.object({
-  userId: z.string().optional(),
+  // NOTE (sécurité) : la liaison de compte (userId) ne passe jamais par ici.
   matricule: z.string().optional().default(""),
   cin: z.string().optional().default(""),
   prenom: z.string().min(1, "Prénom requis"),
@@ -21,7 +21,7 @@ const formateurSchema = z.object({
 });
 
 export async function formateurRoutes(app: FastifyInstance) {
-  app.get("/", { preHandler: [authenticate] }, async (request) => {
+  app.get("/", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request) => {
     const db = getDb();
     const query = request.query as {
       search?: string;
@@ -75,7 +75,7 @@ export async function formateurRoutes(app: FastifyInstance) {
     return formateur;
   });
 
-  app.get("/:id", { preHandler: [authenticate] }, async (request, reply) => {
+  app.get("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [formateur] = await db

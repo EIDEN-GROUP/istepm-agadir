@@ -38,6 +38,10 @@ export async function settingsRoutes(app: FastifyInstance) {
 
   app.put("/:key", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const { key } = request.params as { key: string };
+    // Clés internes uniquement : bloque l'écrasement de clés arbitraires.
+    if (!/^[a-z0-9_]{1,64}$/.test(key)) {
+      return reply.status(400).send({ error: "Clé de paramètre invalide" });
+    }
     const { value } = settingSchema.parse(request.body);
     const db = getDb();
     const [existing] = await db
@@ -433,25 +437,28 @@ export async function settingsRoutes(app: FastifyInstance) {
     return db.select().from(modules).orderBy(asc(modules.nom));
   });
 
-  app.post("/modules", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  const moduleSchema = z.object({
+    nom: z.string().trim().min(1, "Le nom du module est obligatoire.").max(150),
+    filiere: z.string().trim().min(1, "La filière est obligatoire.").max(150),
+    code: z.string().trim().max(30).nullable().optional(),
+    description: z.string().trim().max(2000).nullable().optional(),
+    volumeHoraire: z.number().int().min(0).max(1000).nullable().optional(),
+    coefficient: z.union([z.number(), z.string()]).nullable().optional(),
+  });
+
+  app.post("/modules", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     await ensureModulesTableAndSeed();
-    const body = request.body as any;
-    if (!body || !body.filiere || typeof body.filiere !== "string" || !body.filiere.trim()) {
-      return reply.status(400).send({ error: "La filière est obligatoire." });
-    }
-    if (!body.nom || typeof body.nom !== "string" || !body.nom.trim()) {
-      return reply.status(400).send({ error: "Le nom du module est obligatoire." });
-    }
+    const body = moduleSchema.parse(request.body);
     const db = getDb();
     const [mod] = await db
       .insert(modules)
       .values({
-        nom: body.nom.trim(),
-        filiere: body.filiere.trim(),
+        nom: body.nom,
+        filiere: body.filiere,
         code: body.code ?? null,
         description: body.description ?? null,
-        volumeHoraire: body.volumeHoraire ? Number(body.volumeHoraire) : null,
-        coefficient: body.coefficient ? String(body.coefficient) : null,
+        volumeHoraire: body.volumeHoraire ?? null,
+        coefficient: body.coefficient != null ? String(body.coefficient) : null,
       })
       .returning();
     return mod;
@@ -460,23 +467,17 @@ export async function settingsRoutes(app: FastifyInstance) {
   app.put("/modules/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     await ensureModulesTableAndSeed();
     const { id } = request.params as { id: string };
-    const body = request.body as any;
-    if (!body || !body.filiere || typeof body.filiere !== "string" || !body.filiere.trim()) {
-      return reply.status(400).send({ error: "La filière est obligatoire." });
-    }
-    if (!body.nom || typeof body.nom !== "string" || !body.nom.trim()) {
-      return reply.status(400).send({ error: "Le nom du module est obligatoire." });
-    }
+    const body = moduleSchema.parse(request.body);
     const db = getDb();
     const [updated] = await db
       .update(modules)
       .set({
-        nom: body.nom.trim(),
-        filiere: body.filiere.trim(),
+        nom: body.nom,
+        filiere: body.filiere,
         code: body.code ?? null,
         description: body.description ?? null,
-        volumeHoraire: body.volumeHoraire ? Number(body.volumeHoraire) : null,
-        coefficient: body.coefficient ? String(body.coefficient) : null,
+        volumeHoraire: body.volumeHoraire ?? null,
+        coefficient: body.coefficient != null ? String(body.coefficient) : null,
         updatedAt: new Date(),
       })
       .where(eq(modules.id, id))

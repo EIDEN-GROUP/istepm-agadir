@@ -49,6 +49,32 @@ function isValidMime(mime: string): boolean {
   return allowed.includes(mime);
 }
 
+/**
+ * Détecte le vrai type par octets magiques (le `mime` déclaré par le client
+ * ne fait pas foi : un HTML/JS déguisé en PDF deviendrait du stored-XSS).
+ * Retourne le MIME vérifié ou `null`.
+ */
+function detectMime(buffer: Buffer, declared: string): string | null {
+  const pdf = buffer.length >= 5 && buffer.subarray(0, 5).toString("ascii") === "%PDF-";
+  const zip = buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04;
+  const ole = buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
+  if (declared === "application/pdf") return pdf ? declared : null;
+  if (declared === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    if (!zip) return null;
+    // DOCX = ZIP contenant [Content_Types].xml (rejette les ZIP quelconques).
+    const head = buffer.subarray(0, Math.min(buffer.length, 65536)).toString("binary");
+    return head.includes("[Content_Types].xml") ? declared : null;
+  }
+  if (declared === "application/msword") return ole ? declared : null;
+  return null;
+}
+
+/** Nom sûr pour l'en-tête Content-Disposition (anti injection d'en-tête). */
+function safeDownloadName(nom: string): string {
+  const clean = nom.replace(/[\r\n"]+/g, "").trim().slice(0, 120) || "document";
+  return `attachment; filename="${clean}"; filename*=UTF-8''${encodeURIComponent(clean)}`;
+}
+
 const saveNotesSchema = z.object({
   saisies: z.array(saisieNoteSchema).min(1),
 });
@@ -197,6 +223,11 @@ export async function examenRoutes(app: FastifyInstance) {
           .send({ error: "Type de fichier non accepté. Formats acceptés : PDF, DOC, DOCX" });
       }
 
+      // Limite pré-décodage (base64 ≈ +33 %) contre les payloads mémoire.
+      if (content.length > 14 * 1024 * 1024) {
+        return reply.status(400).send({ error: "Fichier trop volumineux (max 10 Mo)" });
+      }
+
       // Decode base64 → Buffer
       const buffer = Buffer.from(content, "base64");
       const maxSize = 10 * 1024 * 1024;
@@ -204,13 +235,21 @@ export async function examenRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Fichier trop volumineux (max 10 Mo)" });
       }
 
+      // Le contenu doit correspondre au type déclaré (anti stored-XSS).
+      const verifiedMime = detectMime(buffer, mime);
+      if (!verifiedMime) {
+        return reply
+          .status(400)
+          .send({ error: "Le contenu du fichier ne correspond pas à son type déclaré" });
+      }
+
       // Remove old document from MinIO if it exists
       if (examen.documentId) {
         await deleteDocument(examen.documentId).catch(() => {});
       }
 
-      // Upload new document to MinIO
-      const { objectKey, size } = await uploadDocument(buffer, nom, mime);
+      // Upload new document to MinIO (MIME vérifié, pas déclaré).
+      const { objectKey, size } = await uploadDocument(buffer, nom, verifiedMime);
 
       // Update DB with document metadata
       const [updated] = await db
@@ -219,7 +258,7 @@ export async function examenRoutes(app: FastifyInstance) {
           documentId: objectKey,
           documentNom: nom,
           documentTaille: size,
-          documentMime: mime,
+          documentMime: verifiedMime,
           documentUploadedAt: new Date().toISOString(),
         })
         .where(eq(examens.id, id))
@@ -229,10 +268,10 @@ export async function examenRoutes(app: FastifyInstance) {
     },
   );
 
-  /** Download the document for an examen. */
+  /** Download the document for an examen (staff only — sujets confidentiels). */
   app.get(
     "/:id/document",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();
@@ -250,7 +289,8 @@ export async function examenRoutes(app: FastifyInstance) {
 
       return reply
         .header("Content-Type", examen.documentMime ?? "application/octet-stream")
-        .header("Content-Disposition", `attachment; filename="${examen.documentNom ?? "document"}"`)
+        .header("X-Content-Type-Options", "nosniff")
+        .header("Content-Disposition", safeDownloadName(examen.documentNom ?? "document"))
         .send(data);
     },
   );
