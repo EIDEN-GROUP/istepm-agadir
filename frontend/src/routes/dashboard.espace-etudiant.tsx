@@ -58,7 +58,7 @@ import {
   SelectField,
   FullWidth,
 } from "@/components/dash-form";
-import { VueSemaine, VueMois, type VueCalendrier } from "@/components/calendar-views";
+import { VueMois, type VueCalendrier } from "@/components/calendar-views";
 import {
   Dialog,
   DialogContent,
@@ -410,15 +410,90 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
         </span>
       </div>
       {vue === "semaine" ? (
-        <VueSemaine
-          jours={joursSemaine}
-          seances={seances}
-          nomProf={nomProf}
-          canDrag={false}
-          fit
-          onOpen={(s) => setDetailSeance(s)}
-          onDrop={() => {}}
-        />
+        (() => {
+          const now = new Date();
+          const nowMin = now.getHours() * 60 + now.getMinutes();
+          const todayIso = isoLocal(now);
+          const toMin = (t: unknown) => {
+            const [h, m] = String(t ?? "").split(":").map(Number);
+            return Number.isFinite(h) ? h * 60 + (m || 0) : -1;
+          };
+          const lignes = [...seancesSemaine].sort(
+            (a, b) =>
+              String(a.date).localeCompare(String(b.date)) ||
+              String(a.debut).localeCompare(String(b.debut)),
+          );
+          return (
+            <DataTable
+              minWidth="min-w-[720px]"
+              isEmpty={lignes.length === 0}
+              empty="Aucun cours prévu cette semaine."
+              head={
+                <>
+                  <th>Jour</th>
+                  <th>Horaire</th>
+                  <th>Cours</th>
+                  <th>Salle</th>
+                  <th>Formateur</th>
+                </>
+              }
+            >
+              {lignes.map((s, i) => {
+                const iso = String(s.date);
+                const estAuj = iso === todayIso;
+                const enCours =
+                  estAuj && toMin(s.debut) <= nowMin && nowMin < toMin(s.fin);
+                const passee =
+                  estAuj && toMin(s.fin) > 0 && nowMin >= toMin(s.fin);
+                const d = new Date(`${iso}T00:00:00`);
+                return (
+                  <tr
+                    key={String(s.id ?? `${iso}-${s.debut}-${i}`)}
+                    onClick={() => setDetailSeance(s)}
+                    className={cn(
+                      tableRow,
+                      "cursor-pointer",
+                      estAuj && "bg-brand/5",
+                      passee && "opacity-55",
+                    )}
+                  >
+                    <td className="whitespace-nowrap font-medium capitalize">
+                      <span className="flex items-center gap-1.5">
+                        {estAuj ? (
+                          <span
+                            aria-hidden
+                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand"
+                          />
+                        ) : null}
+                        {d.toLocaleDateString("fr-FR", {
+                          weekday: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap tabular-nums text-muted-foreground">
+                      {String(s.debut)}–{String(s.fin)}
+                    </td>
+                    <td className={cn("font-medium", cellTruncate)}>
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate">{s.module}</span>
+                        {enCours ? (
+                          <span className="shrink-0 rounded-full bg-brand px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                            En cours
+                          </span>
+                        ) : null}
+                      </span>
+                    </td>
+                    <td className="text-muted-foreground">{s.salle || "—"}</td>
+                    <td className={cn("text-muted-foreground", cellTruncate)}>
+                      {nomProf(s.professeurId)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </DataTable>
+          );
+        })()
       ) : (
         <VueMois
           mois={ancre}
