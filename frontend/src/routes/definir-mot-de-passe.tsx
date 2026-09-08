@@ -8,7 +8,16 @@ import { cn } from "@/lib/utils";
 
 function readToken(): string {
   if (typeof window === "undefined") return "";
-  return new URLSearchParams(window.location.search).get("token") ?? "";
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token") ?? "";
+  // Le token ne doit pas traîner dans l'URL (historique, Referer) :
+  // on le lit une fois puis on nettoie l'adresse.
+  if (token) {
+    params.delete("token");
+    const clean = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
+    window.history.replaceState({}, "", clean);
+  }
+  return token;
 }
 
 /**
@@ -39,8 +48,8 @@ function DefinirMotDePassePage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
-      setError("Mot de passe trop court (6 caractères min)");
+    if (password.length < 8) {
+      setError("Mot de passe trop court (8 caractères min)");
       return;
     }
     if (password !== confirm) {
@@ -200,7 +209,7 @@ function DefinirMotDePassePage() {
                   type={showPw ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="6 caractères minimum"
+                  placeholder="8 caractères minimum"
                   autoComplete="new-password"
                   autoFocus
                   className={cn(fieldClass, "pe-11")}

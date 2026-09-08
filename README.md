@@ -268,3 +268,16 @@ See `frontend/STRUCTURE.md` and `backend/STRUCTURE.md` for detailed file-by-file
 - `STUDENT_WORKSPACE.md`   spec + API contract of the student workspace
 - `TASK_NOTES.md`   decisions, VPS commands, test account, manual QA checklist
 - `DEAD_CODE.md`   unused/legacy code inventory (listed, NOT removed)
+- `SECURITY.md`   security audit findings + applied remediations + required secrets
+
+## Security
+
+- Roles enforced server-side (`etudiant` sees only own records; teachers scoped to
+  their groups; exports and user admin reserved to direction). The UI role switcher
+  is a demo convenience, not a boundary.
+- Login/invitations/demo endpoints are rate-limited; JWT 12h default (24h in prod);
+  passwords min 8 chars, bcrypt cost 12.
+- Production refuses to boot with default `JWT_SECRET`/`ADMIN_API_KEY` — set strong
+  values plus `GRAFANA_PASSWORD` and (recommended) `BACKUP_ENCRYPTION_KEY` in
+  `.env.production`. Run `sudo ./scripts/harden-firewall.sh` once on the VPS so
+  ports 3003/3004 stay localhost-only behind eiden-nginx.

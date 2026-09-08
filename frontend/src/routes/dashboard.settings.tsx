@@ -991,6 +991,10 @@ function NewUserForm({
   const handleCreate = async () => {
     if (!name.trim() || !email.trim()) return;
     if (mode === "password" && !password.trim()) return;
+    if (mode === "password" && password.trim().length < 8) {
+      toast.error("Mot de passe trop court (8 caractères min)");
+      return;
+    }
     setLoading(true);
 
     if (mode === "invite") {

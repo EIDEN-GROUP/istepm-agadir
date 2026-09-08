@@ -33,6 +33,10 @@ jobs:
       - run: npm test
         continue-on-error: true
 
+      - name: Audit dependencies (high+ reported, non-blocking)
+        run: npm audit --omit=dev --audit-level=high || echo "::warning::npm audit found high/critical vulnerabilities — see SECURITY.md"
+        continue-on-error: true
+
       - run: npm run build
 
       - run: test -f dist/index.js
@@ -54,6 +58,10 @@ jobs:
       - run: npm ci
 
       - run: npm run lint
+        continue-on-error: true
+
+      - name: Audit dependencies (high+ reported, non-blocking)
+        run: npm audit --omit=dev --audit-level=high || echo "::warning::npm audit found high/critical vulnerabilities — see SECURITY.md"
         continue-on-error: true
 
       - run: npm run build

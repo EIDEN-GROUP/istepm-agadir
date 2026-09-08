@@ -610,7 +610,16 @@ const escapeHtml = (s: string) =>
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+/** N'intègre que les data-URL d'image valides (anti breakout d'attribut). */
+function safeLogo(logoDataUrl: string | null): string {
+  if (!logoDataUrl) return "";
+  return /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(logoDataUrl)
+    ? logoDataUrl
+    : "";
+}
 
 export function buildStageEmailHtml(
   s: Stage,
@@ -620,8 +629,9 @@ export function buildStageEmailHtml(
   const title = KIND_TITLE[kind];
   const sections = stageSections(s, kind);
 
-  const logoCell = logoDataUrl
-    ? `<img src="${logoDataUrl}" width="46" height="40" alt="ISTEPM Agadir" style="display:block;border:0;" />`
+  const logo = safeLogo(logoDataUrl);
+  const logoCell = logo
+    ? `<img src="${logo}" width="46" height="40" alt="ISTEPM Agadir" style="display:block;border:0;" />`
     : `<span style="font:700 20px/1 Arial,Helvetica,sans-serif;color:${BRAND.teal};">ISTEPM</span>`;
 
   const rowsHtml = sections

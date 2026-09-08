@@ -4,6 +4,7 @@ import { Eye, FileDown, Send, Pencil, SendHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { escapeHtml } from "@/lib/escape-html";
 import { getStamp } from "@/lib/stamp";
 import { useIstpm, mentionFor, decisionFor } from "@/lib/istpm-store";
 import {
@@ -79,7 +80,7 @@ function printBulletin(b: Bulletin, groupe?: string) {
   const rows = b.notes
     .map(
       (n) =>
-        `<tr><td>${n.module}</td><td class="r">${n.note.toFixed(2)}</td><td class="r">${n.coef}</td><td class="r">${n.credits}</td></tr>`,
+        `<tr><td>${escapeHtml(n.module)}</td><td class="r">${n.note.toFixed(2)}</td><td class="r">${n.coef}</td><td class="r">${n.credits}</td></tr>`,
     )
     .join("");
 
@@ -95,18 +96,20 @@ function printBulletin(b: Bulletin, groupe?: string) {
   const calcTableRows = calcRows
     .map(
       (r) =>
-        `<tr><td>${r.label}</td><td class="r">${r.note.toFixed(2)}</td><td class="r">${r.coef}</td><td class="r">${(r.note * r.coef).toFixed(2)}</td></tr>`,
+        `<tr><td>${escapeHtml(r.label)}</td><td class="r">${r.note.toFixed(2)}</td><td class="r">${r.coef}</td><td class="r">${(r.note * r.coef).toFixed(2)}</td></tr>`,
     )
     .join("");
 
   // Cachet officiel (téléversé dans les Paramètres par le directeur).
+  // N'intègre que les data-URL d'image valides (anti "breakout d'attribut).
   const stamp = getStamp();
-  const cachet = stamp
-    ? `<div class="cachet"><img src="${stamp}" alt="Cachet de l'établissement"><div class="lbl">Cachet de l'établissement</div></div>`
+  const safeStamp = stamp && /^data:image\/(png|jpeg|webp);base64,/.test(stamp) ? stamp : "";
+  const cachet = safeStamp
+    ? `<div class="cachet"><img src="${safeStamp}" alt="Cachet de l'établissement"><div class="lbl">Cachet de l'établissement</div></div>`
     : "";
 
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
-<title>Bulletin   ${b.prenom} ${b.nom}</title>
+<title>Bulletin   ${escapeHtml(b.prenom)} ${escapeHtml(b.nom)}</title>
 <style>
   body{font-family:system-ui,sans-serif;color:#123b3a;margin:40px;}
   h1{color:#029994;font-size:20px;margin:0 0 4px;}
@@ -133,11 +136,11 @@ function printBulletin(b: Bulletin, groupe?: string) {
 <h1>ISTEPM Agadir    Bulletin de notes</h1>
 <div class="sub">Institut spécialisé des techniques paramédicales</div>
 <div class="sum">
-  <div><span>Étudiant</span><strong>${b.prenom} ${b.nom}</strong></div>
-  <div><span>CNE</span><strong>${b.cne}</strong></div>
-  <div><span>Filière</span><strong>${b.filiere}</strong></div>
-  ${groupe ? `<div><span>Groupe</span><strong>${groupe}</strong></div>` : ""}
-  <div><span>Niveau / session</span><strong>${b.niveau}   session ${b.session}</strong></div>
+  <div><span>Étudiant</span><strong>${escapeHtml(b.prenom)} ${escapeHtml(b.nom)}</strong></div>
+  <div><span>CNE</span><strong>${escapeHtml(b.cne)}</strong></div>
+  <div><span>Filière</span><strong>${escapeHtml(b.filiere)}</strong></div>
+  ${groupe ? `<div><span>Groupe</span><strong>${escapeHtml(groupe)}</strong></div>` : ""}
+  <div><span>Niveau / session</span><strong>${escapeHtml(b.niveau)}   session ${escapeHtml(b.session)}</strong></div>
 </div>
 <table><thead><tr><th>Module</th><th class="r">Note</th><th class="r">Coef.</th><th class="r">Crédits</th></tr></thead>
 <tbody>${rows}
@@ -145,8 +148,8 @@ function printBulletin(b: Bulletin, groupe?: string) {
 </tbody></table>
 <div class="sum">
   <div><span>Moyenne générale</span><strong>${b.moyenne.toFixed(2)} / 20</strong></div>
-  <div><span>Mention</span><strong>${b.mention}</strong></div>
-  <div><span>Décision</span><strong>${b.decision}</strong></div>
+  <div><span>Mention</span><strong>${escapeHtml(b.mention)}</strong></div>
+  <div><span>Décision</span><strong>${escapeHtml(b.decision)}</strong></div>
 </div>
 <div class="calc">
   <h2>Méthode de calcul de la moyenne</h2>
@@ -167,6 +170,8 @@ ${cachet}
 
   const frame = document.createElement("iframe");
   frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+  // Bac à sable : le contenu imprimé n'a besoin d'aucun script.
+  frame.setAttribute("sandbox", "allow-modals allow-print");
   frame.srcdoc = html;
   frame.onload = () => {
     frame.contentWindow?.focus();

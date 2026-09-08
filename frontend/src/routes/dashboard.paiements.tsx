@@ -39,6 +39,7 @@ import {
   softInput,
   labelClass,
 } from "@/lib/dash-ui";
+import { sanitizeFilename } from "@/lib/filename";
 import {
   PageHeader,
   FilterPanel,
@@ -841,7 +842,7 @@ function HistoriquePaiementsDialog({
                               const url = URL.createObjectURL(blob);
                               const a = document.createElement("a");
                               a.href = url;
-                              a.download = `recu-${etudiant.nom.toLowerCase()}-${m.mois.replace(/\s+/g, "-")}.pdf`;
+                              a.download = sanitizeFilename(`recu-${etudiant.nom}-${m.mois}`, ".pdf");
                               document.body.appendChild(a);
                               a.click();
                               a.remove();

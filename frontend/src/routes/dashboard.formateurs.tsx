@@ -31,6 +31,7 @@ import {
   cellTruncate,
   rowActions,
 } from "@/lib/dash-ui";
+import { escCsvCell } from "@/lib/csv";
 import {
   PageHeader,
   FilterPanel,
@@ -194,7 +195,7 @@ function FormateursPage() {
     const entetes = colonnesImportFormateurs.map((c) => c.label);
     const csv = [entetes, ...lignes]
       .map((r) =>
-        r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","),
+        r.map((v) => escCsvCell(v)).join(","),
       )
       .join("\n");
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
@@ -625,6 +626,8 @@ function FormateurForm({
     if (!f.departement) next.departement = "Département obligatoire";
     if (isNew && f.acces === "password" && !f.password.trim())
       next.password = "Mot de passe requis";
+    else if (isNew && f.acces === "password" && f.password.trim().length < 8)
+      next.password = "8 caractères min";
     if (isNew && f.acces === "invite" && !f.email.trim())
       next.email = "E-mail requis pour envoyer l'invitation";
     else if (f.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email))

@@ -12,6 +12,7 @@ import {
   Percent,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { escCsvCell } from "@/lib/csv";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
 import {
   softCard,
@@ -108,7 +109,7 @@ function DashboardFamilles() {
     ];
     const header = cols.join(",");
     const body = clients
-      .map((c) => cols.map((col) => `"${(c as any)[col] ?? ""}"`).join(","))
+      .map((c) => cols.map((col) => escCsvCell((c as any)[col])).join(","))
       .join("\n");
     const blob = new Blob(["\ufeff" + header + "\n" + body], {
       type: "text/csv;charset=utf-8;",

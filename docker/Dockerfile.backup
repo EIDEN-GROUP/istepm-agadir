@@ -4,8 +4,8 @@
 
 FROM postgres:16-alpine
 
-# Install cron and bash
-RUN apk add --no-cache bash dcron
+# Install cron, bash and gpg (backup encryption)
+RUN apk add --no-cache bash dcron gnupg
 
 # Copy backup script
 COPY scripts/backup-db.sh /usr/local/bin/backup-db.sh

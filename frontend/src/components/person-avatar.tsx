@@ -36,7 +36,14 @@ export function PersonAvatar({
 }) {
   const [broken, setBroken] = useState(false);
   const url = (photoUrl ?? "").trim();
-  const showPhoto = url !== "" && !broken;
+  // Schémas autorisés uniquement : https, data:image (jpeg/png/webp) et blob.
+  // Le reste (javascript:, data:text/html, …) retombe sur les initiales.
+  const showPhoto =
+    url !== "" &&
+    !broken &&
+    (/^https:\/\//i.test(url) ||
+      /^data:image\/(png|jpeg|webp);base64,/i.test(url) ||
+      /^blob:/i.test(url));
 
   const base = cn(
     SIZES[size],

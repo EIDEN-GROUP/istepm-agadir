@@ -79,7 +79,7 @@ export function SupportButton() {
               <a
                 href={waHref}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 onClick={() => setOpen(false)}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_30px_-14px_rgba(37,211,102,0.8)] transition hover:brightness-105"
               >

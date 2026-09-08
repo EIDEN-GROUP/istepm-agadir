@@ -54,6 +54,7 @@ import {
   dashTooltip,
   renderPieLabel,
 } from "@/lib/dash-ui";
+import { sanitizeFilename } from "@/lib/filename";
 import {
   PageHeader,
   FilterPanel,
@@ -107,7 +108,7 @@ async function downloadStageDoc(s: Stage, kind: "convention" | "rapport") {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${kind}-${s.nom.toLowerCase()}-${s.cne}.pdf`;
+  a.download = sanitizeFilename(`${kind}-${s.nom}-${s.cne}`, ".pdf");
   document.body.appendChild(a);
   a.click();
   a.remove();

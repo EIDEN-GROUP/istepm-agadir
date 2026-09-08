@@ -251,6 +251,8 @@ function DocumentPreview({
               <iframe
                 src={url}
                 title={doc.nom}
+                // Bac à sable : un document déposé ne doit jamais exécuter de script.
+                sandbox=""
                 className="h-[55vh] w-full rounded-2xl border border-brand/12"
               />
             ) : (

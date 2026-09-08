@@ -222,10 +222,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
-    window.localStorage.removeItem(ROLE_STORAGE_KEY);
-    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-    window.localStorage.removeItem(USER_STORAGE_KEY);
-    window.localStorage.removeItem(FORMATEUR_STORAGE_KEY);
+    // Purge TOUTES les clés applicatives (snapshot CRM, chat IA, cachet…),
+    // pas seulement la session : évite les résidus sur poste partagé.
+    if (typeof window !== "undefined") {
+      const doomed: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i += 1) {
+        const k = window.localStorage.key(i);
+        if (k && k.startsWith("istpm-")) doomed.push(k);
+      }
+      for (const k of doomed) window.localStorage.removeItem(k);
+    }
     setRoleState(null);
     setUserState(null);
     setSelectedFormateurId(null);

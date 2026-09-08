@@ -67,6 +67,7 @@ import {
   toneBadge,
   dialogSurface,
 } from "@/lib/dash-ui";
+import { escCsvCell } from "@/lib/csv";
 import {
   PageHeader,
   FilterPanel,
@@ -375,7 +376,7 @@ const [importOpen, setImportOpen] = useState(false);
           s.semestre,
           s.anneeUniversitaire,
         ]
-          .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
+          .map((v) => escCsvCell(v))
           .join(","),
       );
     // BOM pour qu'Excel lise correctement les entêtes accentuées.
@@ -400,7 +401,7 @@ const [importOpen, setImportOpen] = useState(false);
     const csv = [
       entetes.join(","),
       ...exemples.map((r) =>
-        r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","),
+        r.map((v) => escCsvCell(v)).join(","),
       ),
     ].join("\n");
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });

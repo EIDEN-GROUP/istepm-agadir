@@ -14,6 +14,7 @@ set -euo pipefail
 #   DB_USER         (default: postgres)
 #   BACKUP_DIR      (default: /backups)
 #   RETENTION_DAYS  (default: 30)
+#   BACKUP_ENCRYPTION_KEY (optional — if set, AES-256 encrypts the dump with gpg)
 
 # ── Config ───────────────────────────────────────────────────
 DB_HOST="${DB_HOST:-postgres}"
@@ -49,10 +50,25 @@ else
   exit 1
 fi
 
+# ── Encrypt at rest (AES-256) when a key is provided ──────────
+# The passphrase travels over a pipe, never on the process command line.
+BACKUP_EXT=".sql.gz"
+if [ -n "${BACKUP_ENCRYPTION_KEY:-}" ]; then
+  printf '%s' "$BACKUP_ENCRYPTION_KEY" | gpg --batch --yes --passphrase-fd 0 \
+    --symmetric --cipher-algo AES256 -o "${FILENAME}.gpg" "$FILENAME"
+  rm -f "$FILENAME"
+  FILENAME="${FILENAME}.gpg"
+  BACKUP_EXT=".sql.gz.gpg"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ Backup encrypted: $FILENAME"
+else
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] ⚠ BACKUP_ENCRYPTION_KEY unset — backup stored UNENCRYPTED"
+fi
+chmod 600 "$FILENAME"
+
 # ── Remove backups older than retention period ──────────────
-find "$BACKUP_DIR" -name "${DB_NAME}_*.sql.gz" -mtime +"${RETENTION_DAYS}" -delete
+find "$BACKUP_DIR" -name "${DB_NAME}_*.sql.gz*" -mtime +"${RETENTION_DAYS}" -delete
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ Old backups cleaned (retention: ${RETENTION_DAYS} days)"
 
 # ── Create a symlink to the latest backup ───────────────────
-ln -sf "$FILENAME" "${BACKUP_DIR}/${DB_NAME}_latest.sql.gz"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ Symlink updated: ${DB_NAME}_latest.sql.gz"
+ln -sf "$FILENAME" "${BACKUP_DIR}/${DB_NAME}_latest${BACKUP_EXT}"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ Symlink updated: ${DB_NAME}_latest${BACKUP_EXT} ($FILENAME)"

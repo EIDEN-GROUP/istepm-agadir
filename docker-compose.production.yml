@@ -33,10 +33,12 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -69,10 +71,12 @@ services:
   minio-init:
     image: minio/mc:latest
     restart: no
+    # Credentials via env (MC_HOST alias), never on the process command line.
+    environment:
+      MC_HOST_local: http://${MINIO_ACCESS_KEY}:${MINIO_SECRET_KEY}@minio:9000
     entrypoint: >
       sh -c "
-      until mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}; do sleep 2; done &&
-      mc mb local/school-crm --ignore-existing &&
+      until mc mb local/school-crm --ignore-existing >/dev/null 2>&1; do sleep 2; done &&
       echo 'MinIO bucket ready'
       "
     networks:
@@ -83,6 +87,10 @@ services:
 
   frontend:
     image: ghcr.io/eiden-group/istepm-agadir/school-crm-frontend:latest
+    # NOTE: published on all interfaces so eiden-nginx (host) can proxy them.
+    # Restrict with the host firewall (one-time, on the VPS):
+    #   sudo ./scripts/harden-firewall.sh
+    # Do not expose these ports publicly.
     ports:
       - target: 80
         published: 3003
@@ -316,7 +324,7 @@ services:
     image: grafana/grafana:11.5
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
       GF_INSTALL_PLUGINS: grafana-piechart-panel
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_SERVER_ROOT_URL: https://monitor.${DOMAIN}

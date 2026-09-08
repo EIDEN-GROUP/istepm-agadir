@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { sanitizeFilename } from "@/lib/filename";
 import { getStoredToken } from "@/lib/auth";
 import type {
   Etudiant,
@@ -175,7 +176,13 @@ export async function downloadExamenDocumentApi(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename;
+  // Extension d'origine conservée si autorisée, nom assaini dans tous les cas.
+  const extMatch = filename.match(/\.(pdf|docx?)$/i);
+  const ext = (extMatch?.[1].toLowerCase() === "doc" ? ".doc" : extMatch?.[1].toLowerCase() === "docx" ? ".docx" : ".pdf") as
+    | ".pdf"
+    | ".doc"
+    | ".docx";
+  a.download = sanitizeFilename(filename.replace(/\.[^.]+$/, ""), ext);
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -705,7 +712,7 @@ export function createInvitation(data: {
 }
 
 export function verifyInvitation(token: string) {
-  return api.get<{ valid: boolean; email?: string; name?: string; role?: string }>(
+  return api.post<{ valid: boolean; email?: string; name?: string; role?: string }>(
     "/auth/invitations/verify",
     { token },
   );
