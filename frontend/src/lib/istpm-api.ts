@@ -930,7 +930,6 @@ export const CATALOGUE_DEMANDES: { titre: string; description: string }[] = [
   { titre: "Relevé de notes", description: "Je souhaite obtenir mon relevé de notes du semestre." },
   { titre: "Convention de stage", description: "Je souhaite obtenir / renouveler ma convention de stage." },
   { titre: "Changement de groupe", description: "Je souhaite demander un changement de groupe. Motif : " },
-  { titre: "Justificatif d'absence", description: "Je souhaite justifier mon absence du " },
   { titre: "Relevé de paiement / reçu", description: "Je souhaite obtenir un reçu / relevé de mes paiements." },
   { titre: "Lettre de recommandation", description: "Je souhaite obtenir une lettre de recommandation." },
   { titre: "Duplicata carte étudiant", description: "Je souhaite obtenir un duplicata de ma carte d'étudiant (perte / vol)." },

@@ -12,6 +12,13 @@ export type UserRole = "directeur" | "enseignant" | "responsable" | "etudiant";
 
 export const ROLES: UserRole[] = ["directeur", "enseignant", "responsable", "etudiant"];
 
+/**
+ * Rôles proposés dans le sélecteur de profil (démo).
+ * `etudiant` en est exclu : l'espace étudiant n'est accessible que via une
+ * vraie connexion (le rôle reste valide pour les sessions existantes).
+ */
+export const SWITCHABLE_ROLES: UserRole[] = ["directeur", "enseignant", "responsable"];
+
 export const ROLE_META: Record<
   UserRole,
   { label: string; short: string; description: string }

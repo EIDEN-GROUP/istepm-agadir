@@ -24,7 +24,7 @@ import {
   UserCog,
   RotateCcw,
 } from "lucide-react";
-import { ROLES, ROLE_META, useAuth } from "@/lib/auth";
+import { ROLES, ROLE_META, SWITCHABLE_ROLES, useAuth } from "@/lib/auth";
 import { RequestBell } from "@/components/request-bell";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
 import { useIstpm } from "@/lib/istpm-store";
@@ -320,7 +320,7 @@ function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
               Changer de formateur…
             </div>
           ) : null}
-          {ROLES.map((r) => (
+          {SWITCHABLE_ROLES.map((r) => (
             <SelectItem key={r} value={r} className="text-xs">
               {ROLE_META[r].label}
             </SelectItem>
