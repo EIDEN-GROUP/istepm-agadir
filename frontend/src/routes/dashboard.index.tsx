@@ -1354,12 +1354,12 @@ function DashboardEtudiant() {
   }, [store.formateurs]);
 
   const liens: { to: string; label: string; icon: ComponentType<LucideProps>; hint: string }[] = [
-    { to: "/dashboard/espace-etudiant", label: "Mon profil", icon: Users, hint: "Identité, coordonnées, cursus" },
-    { to: "/dashboard/espace-etudiant", label: "Scolarité", icon: GraduationCap, hint: "Enseignants, notes, présence" },
-    { to: "/dashboard/espace-etudiant", label: "Mon stage", icon: Building2, hint: "Structure, période, encadrant" },
-    { to: "/dashboard/espace-etudiant", label: "Calendrier", icon: CalendarRange, hint: "Emploi du temps" },
-    { to: "/dashboard/espace-etudiant", label: "Paiements", icon: Wallet, hint: "Scolarité, reste à payer" },
-    { to: "/dashboard/espace-etudiant", label: "Demandes", icon: PenLine, hint: "Attestations, réclamations" },
+    { to: "/dashboard/mon-profil", label: "Mon profil", icon: Users, hint: "Identité, coordonnées, cursus" },
+    { to: "/dashboard/espace-etudiant/scolarite", label: "Scolarité", icon: GraduationCap, hint: "Enseignants, notes, présence" },
+    { to: "/dashboard/espace-etudiant/stage", label: "Mon stage", icon: Building2, hint: "Structure, période, encadrant" },
+    { to: "/dashboard/espace-etudiant/calendrier", label: "Calendrier", icon: CalendarRange, hint: "Emploi du temps" },
+    { to: "/dashboard/espace-etudiant/paiements", label: "Paiements", icon: Wallet, hint: "Scolarité, reste à payer" },
+    { to: "/dashboard/espace-etudiant/demandes", label: "Demandes", icon: PenLine, hint: "Attestations, réclamations" },
   ];
 
   return (

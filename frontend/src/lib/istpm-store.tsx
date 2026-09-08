@@ -128,7 +128,7 @@ import {
   updateSeance as apiUpdateSeance,
   deleteSeance as apiDeleteSeance,
 } from "@/lib/istpm-api";
-import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
+import { useAuth, getStoredRole, DEMO_FORMATEUR_ID } from "@/lib/auth";
 
 /* ------------------------------------------------------------------ */
 /*  Persistance                                                        */
@@ -669,6 +669,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     let last = 0;
     const resyncPhotos = async () => {
       if (stop || Date.now() - last < 30_000) return;
+      // Réservé au staff : `GET /etudiants` répond 404 pour un étudiant.
+      if (getStoredRole() === "etudiant") return;
       if (typeof document !== "undefined" && document.visibilityState === "hidden")
         return;
       last = Date.now();
