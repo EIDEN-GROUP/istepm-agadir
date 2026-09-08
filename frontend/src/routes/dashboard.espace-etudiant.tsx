@@ -1,10 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
   Camera,
-  GraduationCap,
   Stethoscope,
   CalendarDays,
   FileText,
@@ -12,10 +11,9 @@ import {
   ClipboardCheck,
   Inbox,
   RefreshCw,
-  UserRound,
   BadgeCheck,
 } from "lucide-react";
-import { DashTabs, DashTabPanel, type DashTab } from "@/components/dash-tabs";
+import { DashTabPanel } from "@/components/dash-tabs";
 import { PersonAvatar } from "@/components/person-avatar";
 import { downscaleImage } from "@/lib/image";
 import { toast } from "sonner";
@@ -114,17 +112,45 @@ function mondayOf(d: Date) {
   return x;
 }
 
-function EspaceEtudiantPage() {
+/**
+ * Sections de l'espace étudiant, dans l'ordre où elles apparaissent dans le
+ * rail latéral. « Profil » n'y figure plus : il vit sur /dashboard/mon-profil.
+ * L'index dans `tabBodies` est décalé de 1 (profil y reste en position 0).
+ */
+export const SECTION_KEYS = [
+  "scolarite",
+  "stage",
+  "calendrier",
+  "paiements",
+  "demandes",
+] as const;
+export type EspaceSection = (typeof SECTION_KEYS)[number];
+
+/**
+ * Vue de l'espace étudiant. `section` vient du chemin
+ * (`/dashboard/espace-etudiant/<section>`) ; sans section (base), on retombe
+ * sur Scolarité pour l'étudiant, et le staff voit sa file de demandes.
+ */
+export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
   const { role } = useAuth();
   const qc = useQueryClient();
   const store = useIstpm();
   const isStaff = role === "directeur" || role === "responsable";
-  const [tab, setTab] = useState(0);
+
+  const sectionIdx = section ? SECTION_KEYS.indexOf(section) : -1;
+  // Position dans `tabBodies` (profil = 0) ; défaut = Scolarité.
+  const wantTab = sectionIdx >= 0 ? sectionIdx + 1 : 1;
+
+  const [tab, setTab] = useState(wantTab);
   const [dir, setDir] = useState(0);
-  const goTab = (i: number) => {
-    setDir(i > tab ? 1 : -1);
-    setTab(i);
-  };
+  // Changer de section change le chemin : on recale l'affichage.
+  useEffect(() => {
+    if (wantTab !== tab) {
+      setDir(wantTab > tab ? 1 : -1);
+      setTab(wantTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantTab]);
   const [vue, setVue] = useState<VueCalendrier>("semaine");
   const [ancre, setAncre] = useState(() => new Date());
   const [demandeOpen, setDemandeOpen] = useState(false);
@@ -313,20 +339,6 @@ function EspaceEtudiantPage() {
     ? (notes.reduce((s, n) => s + n.note, 0) / notes.length).toFixed(2)
     : null;
   const nbATraiter = (allReqQuery.data ?? []).filter((d) => d.statut === "en_attente").length;
-
-  const tabs: DashTab[] = [
-    { label: "Profil", short: "Profil", icon: UserRound },
-    { label: "Scolarité", short: "Cours", icon: GraduationCap },
-    { label: "Stage", short: "Stage", icon: Stethoscope },
-    { label: "Calendrier", short: "Agenda", icon: CalendarDays },
-    { label: "Paiements", short: "Paiements", icon: Wallet },
-    {
-      label: "Demandes",
-      short: "Demandes",
-      icon: ClipboardCheck,
-      badge: isStaff ? nbATraiter : (notifQ.data?.unread ?? 0),
-    },
-  ];
 
   const decalerAncre = (pas: number) =>
     setAncre((d) => {
@@ -809,9 +821,6 @@ function EspaceEtudiantPage() {
             </p>
           ) : null}
 
-          <div className="sticky top-2 z-20 flex">
-            <DashTabs tabs={tabs} active={tab} onChange={goTab} />
-          </div>
           <DashTabPanel key={tab} index={tab} direction={dir}>
             {tabBodies[tab]}
           </DashTabPanel>
@@ -1254,6 +1263,11 @@ function StaffRequestsView({
   );
 }
 
+/**
+ * Route « conteneur » : elle n'affiche que la sous-route active
+ *   · index  → file des demandes (staff) / redirection (étudiant)
+ *   · $section → une section de l'espace étudiant
+ */
 export const Route = createFileRoute("/dashboard/espace-etudiant")({
-  component: EspaceEtudiantPage,
+  component: () => <Outlet />,
 });

@@ -20,7 +20,6 @@ import {
   CreditCard,
   Settings,
   Inbox,
-  IdCard,
 } from "lucide-react";
 import type { UserRole } from "@/lib/auth";
 import type { NavEntry, NavGroup, NavItem } from "@/components/dash-sidebar";
@@ -151,8 +150,17 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
     "/dashboard/espace-etudiant",
     "/dashboard/settings",
   ],
-  // L'étudiant ne voit que son tableau de bord et son espace personnel.
-  etudiant: ["/dashboard", "/dashboard/espace-etudiant"],
+  // L'étudiant ne voit que son tableau de bord et son espace personnel
+  // (découpé en sections, chacune sur son chemin).
+  etudiant: [
+    "/dashboard",
+    "/dashboard/espace-etudiant",
+    "/dashboard/espace-etudiant/scolarite",
+    "/dashboard/espace-etudiant/stage",
+    "/dashboard/espace-etudiant/calendrier",
+    "/dashboard/espace-etudiant/paiements",
+    "/dashboard/espace-etudiant/demandes",
+  ],
 };
 
 /**
@@ -226,12 +234,49 @@ export function useDashboardNav(role: UserRole | null) {
         Users,
       ),
       item("/dashboard/stages", t.nav.stages, t.navShort.stages, Stethoscope),
-      item(
-        "/dashboard/espace-etudiant",
-        role === "etudiant" ? "Mon espace" : "Demandes étudiants",
-        role === "etudiant" ? "Espace" : "Demandes",
-        role === "etudiant" ? IdCard : Inbox,
-      ),
+      // L'étudiant a une entrée de rail par section (pas de menu déroulant) ;
+      // le staff n'a que « Demandes étudiants ».
+      ...(role === "etudiant"
+        ? [
+            item(
+              "/dashboard/espace-etudiant/scolarite",
+              "Scolarité",
+              "Cours",
+              GraduationCap,
+            ),
+            item(
+              "/dashboard/espace-etudiant/stage",
+              "Stage",
+              "Stage",
+              Stethoscope,
+            ),
+            item(
+              "/dashboard/espace-etudiant/calendrier",
+              "Calendrier",
+              "Agenda",
+              CalendarDays,
+            ),
+            item(
+              "/dashboard/espace-etudiant/paiements",
+              "Paiements",
+              "Paiements",
+              CreditCard,
+            ),
+            item(
+              "/dashboard/espace-etudiant/demandes",
+              "Demandes",
+              "Demandes",
+              Inbox,
+            ),
+          ]
+        : [
+            item(
+              "/dashboard/espace-etudiant",
+              "Demandes étudiants",
+              "Demandes",
+              Inbox,
+            ),
+          ]),
       item(
         "/dashboard/paiements",
         t.nav.paiements,
