@@ -72,7 +72,6 @@ Pure Vite + React SPA. No SSR. TanStack Router file-based routing with auth guar
 `M:\plan\istepm\STUDENT_WORKSPACE.md`.
 
 ### Comptes & invitations
-
 - Nouvelle inscription / Nouveau formateur : case « Invitation par e-mail »
   (défaut) → fiche + compte créés, l'utilisateur définit son mot de passe via un
   lien à usage unique valable 30 minutes (`/definir-mot-de-passe?token=…`).
@@ -221,6 +220,7 @@ Set the `ADMIN_API_KEY` environment variable on the backend and provide it to th
 | `MINIO_SECRET_KEY` | `minioadmin` | MinIO password |
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
 | `ADMIN_API_KEY` |   | API key for multi-product Admin API access |
+| `FEATURE_TICKETS_API_KEY` |   | Dedicated key for the BMS feature-tickets feed (`GET /api/feature-tickets/feed`); empty = feed answers 503 |
 | `SMTP_HOST` |   | SMTP server (email) |
 | `WHATSAPP_PHONE_NUMBER_ID` |   | WhatsApp Cloud API |
 | `N8N_WEBHOOK_URL` |   | n8n automation webhook |

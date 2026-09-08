@@ -16,6 +16,13 @@ export interface ActionDefinition {
   params: ActionParam[];
 }
 
+/**
+ * Rôles autorisés à créer des tickets de fonctionnalité via l'assistant.
+ * Un seul endroit à modifier pour élargir (ex. ajouter "responsable") :
+ * l'executor ET la route l'appliquent.
+ */
+export const TICKET_ALLOWED_ROLES = ["directeur"] as const;
+
 const ACTIONS: ActionDefinition[] = [
   // ── Dashboard ──────────────────────────────────────────────────────
   {
@@ -929,6 +936,22 @@ const ACTIONS: ActionDefinition[] = [
     params: [
       { name: "start", type: "string", description: "Date début (YYYY-MM-DD)" },
       { name: "end", type: "string", description: "Date fin (YYYY-MM-DD)" },
+    ],
+  },
+
+  // ── Tickets ────────────────────────────────────────────────────────
+  {
+    name: "create_feature_ticket",
+    description:
+      "Créer un ticket de demande de fonctionnalité : à utiliser dès que l'utilisateur demande une fonctionnalité nouvelle ou une évolution (ex. « ajoute… », « il faudrait… », « on veut pouvoir… »). Le ticket est enregistré puis visible dans le BMS. Toujours confirmer le titre et la description avec l'utilisateur avant l'envoi.",
+    method: "POST",
+    path: "/api/feature-tickets",
+    category: "Tickets",
+    requiredRoles: [...TICKET_ALLOWED_ROLES],
+    params: [
+      { name: "title", type: "string", description: "Titre court de la fonctionnalité demandée", required: true },
+      { name: "description", type: "string", description: "Détail du besoin exprimé par l'utilisateur" },
+      { name: "priority", type: "string", description: "Priorité perçue", enum: ["low", "medium", "high"] },
     ],
   },
 ];

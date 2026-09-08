@@ -86,6 +86,9 @@ const envSchema = z.object({
 
   ADMIN_API_KEY: z.string().default("superadmin-secret-key-change-me"),
 
+  /** Clé dédiée au flux tickets lu par le BMS (rotation indépendante). */
+  FEATURE_TICKETS_API_KEY: z.string().default(""),
+
   AI_API_KEY: z.string().default(""),
   AI_BASE_URL: z.string().default("https://integrate.api.nvidia.com/v1"),
   AI_MODEL: z.string().default("meta/llama-3.1-8b-instruct"),
