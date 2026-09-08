@@ -1596,7 +1596,7 @@ function SettingsPage() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
-            className="grid gap-4 lg:grid-cols-2"
+            className="gap-4 lg:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid"
           >
             {autorisees
               .filter((id) => META[id].groupe === nomGroupe)
