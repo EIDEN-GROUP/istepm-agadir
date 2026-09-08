@@ -134,6 +134,13 @@
       "when": 1785880000000,
       "tag": "0018_feature_tickets",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785970000000,
+      "tag": "0019_feature_ticket_resolution",
+      "breakpoints": true
     }
   ]
 }

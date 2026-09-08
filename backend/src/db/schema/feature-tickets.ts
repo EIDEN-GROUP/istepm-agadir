@@ -13,6 +13,9 @@ export const featureTickets = pgTable("feature_tickets", {
   description: text("description").notNull().default(""),
   priority: text("priority").notNull().default("medium"),
   status: text("status").notNull().default("open"),
+  /** Verdict renvoyé par le BMS (DONE/REJECT + motif) via /inbox. */
+  resolution: text("resolution").notNull().default(""),
+  resolvedAt: timestamp("resolved_at"),
   requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
   requestedName: text("requested_name").notNull().default(""),
   requestedEmail: text("requested_email").notNull().default(""),
