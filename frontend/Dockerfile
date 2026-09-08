@@ -9,10 +9,11 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Copy the built frontend assets
 COPY dist /usr/share/nginx/html
 
-# Run as non-root: nginx writes pid to /tmp and caches/logs to chowned dirs.
-RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
-USER nginx
+# NOTE: a non-root attempt (USER nginx + pid /tmp/nginx.pid) was reverted —
+# it crashed on boot (duplicate "pid" directive vs base nginx.conf, and port
+# 80 can't bind without CAP_NET_BIND_SERVICE). Proper fix needs listen 8080
+# + compose target 8080. Kept root until then (matches pre-hardening image).
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "pid /tmp/nginx.pid; daemon off;"]
+CMD ["nginx", "-g", "daemon off;"]
