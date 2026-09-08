@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback, type FormEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Loader2, Check, Ban, Sparkles } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Check, Ban, History, Plus, Trash2, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { softCard } from "@/lib/dash-ui";
+import { MiniMarkdown } from "@/lib/markdown-mini";
 import {
   analyzeIntent,
   analyzeIntentStream,
@@ -142,13 +143,17 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
     >
       <div
         className={cn(
-          "max-w-[88%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+          "max-w-[88%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
           isUser
-            ? "bg-brand text-white"
+            ? "whitespace-pre-wrap bg-brand text-white"
             : "bg-muted/70 text-foreground",
         )}
       >
-        {msg.content}
+        {isUser || !msg.content ? (
+          <span className="whitespace-pre-wrap">{msg.content}</span>
+        ) : (
+          <MiniMarkdown text={msg.content} />
+        )}
       </div>
     </motion.div>
   );
@@ -185,30 +190,85 @@ function FloatingButton({ onClick, open }: { onClick: () => void; open: boolean 
 }
 
 const CHAT_STORAGE_KEY = "istpm-ai-chat";
+const CONVOS_STORAGE_KEY = "istpm-ai-convos";
+const ACTIVE_CONVO_KEY = "istpm-ai-active-convo";
+const MAX_STORED_CONVOS = 20;
+const MAX_STORED_MESSAGES = 100;
+/** Messages envoyés à l'API par appel (le contexte reste complet en pratique). */
+const MAX_SENT_MESSAGES = 60;
 
-function loadChatHistory(): ChatMessage[] {
-  try {
-    const saved = localStorage.getItem(CHAT_STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch { /* ignore */ }
-  return [
-    {
-      role: "assistant",
-      content:
-        "Bonjour ! Je suis votre assistant IA. Je peux vous aider à gérer les étudiants, formateurs, examens, bulletins, stages, paiements et plus encore. Que souhaitez-vous faire ?",
-    },
-  ];
+type Convo = {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  updatedAt: number;
+};
+
+const GREETING =
+  "Bonjour ! Je suis votre assistant IA. Je peux vous aider à gérer les étudiants, formateurs, examens, bulletins, stages, paiements et plus encore. Que souhaitez-vous faire ?";
+
+function uid(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
-function saveChatHistory(messages: ChatMessage[]) {
+function titleFor(messages: ChatMessage[]): string {
+  const first = messages.find((m) => m.role === "user");
+  if (!first) return "Nouvelle conversation";
+  const t = first.content.trim().replace(/\s+/g, " ");
+  return t.length > 42 ? `${t.slice(0, 42)}…` : t;
+}
+
+function readConvos(): { convos: Convo[]; activeId: string } {
   try {
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+    const raw = localStorage.getItem(CONVOS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Convo[];
+      if (Array.isArray(parsed) && parsed.length) {
+        const convos = parsed.filter((c) => c && Array.isArray(c.messages));
+        const stored = localStorage.getItem(ACTIVE_CONVO_KEY);
+        const activeId = convos.some((c) => c.id === stored) ? (stored as string) : convos[0].id;
+        return { convos, activeId };
+      }
+    }
+  } catch { /* ignore */ }
+  // Migration unique depuis l'ancien fil seul.
+  let legacy: ChatMessage[] = [];
+  try {
+    const saved = localStorage.getItem(CHAT_STORAGE_KEY);
+    if (saved) legacy = JSON.parse(saved);
+  } catch { /* ignore */ }
+  const hasUserMsg = Array.isArray(legacy) && legacy.some((m) => m?.role === "user");
+  const messages = hasUserMsg ? legacy.slice(-MAX_STORED_MESSAGES) : [{ role: "assistant", content: GREETING } as ChatMessage];
+  const convo: Convo = { id: uid("cv"), title: titleFor(messages), messages, updatedAt: Date.now() };
+  try {
+    localStorage.setItem(CONVOS_STORAGE_KEY, JSON.stringify([convo]));
+    localStorage.setItem(ACTIVE_CONVO_KEY, convo.id);
+    localStorage.removeItem(CHAT_STORAGE_KEY);
+  } catch { /* ignore */ }
+  return { convos: [convo], activeId: convo.id };
+}
+
+function persistConvos(convos: Convo[], activeId: string) {
+  try {
+    localStorage.setItem(CONVOS_STORAGE_KEY, JSON.stringify(convos));
+    localStorage.setItem(ACTIVE_CONVO_KEY, activeId);
   } catch { /* ignore */ }
 }
 
 export function AiChatFloating() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>(loadChatHistory);
+  const [showHistory, setShowHistory] = useState(false);
+  const [boot] = useState(readConvos);
+  const [convos, setConvos] = useState<Convo[]>(boot.convos);
+  const [activeId, setActiveId] = useState<string>(boot.activeId);
+  const [messagesState, setMessagesState] = useState<ChatMessage[]>(
+    () =>
+      boot.convos.find((c) => c.id === boot.activeId)?.messages ?? [
+        { role: "assistant", content: GREETING },
+      ],
+  );
+  const messagesRef = useRef<ChatMessage[]>(messagesState);
+  const messages = messagesState;
   const [pendingActions, setPendingActions] = useState<ProposedAction[]>([]);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
@@ -216,15 +276,96 @@ export function AiChatFloating() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Écriture unique : met à jour le fil visible ET la conversation active
+  // (titre auto, horodatage, plafonds, persistance). Toutes les écritures
+  // passent par ici, sous forme valeur ou fonction comme useState.
+  const setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>> = (u) => {
+    const prev = messagesRef.current;
+    const next = (typeof u === "function"
+      ? (u as (p: ChatMessage[]) => ChatMessage[])(prev)
+      : u
+    ).slice(-MAX_STORED_MESSAGES);
+    messagesRef.current = next;
+    setMessagesState(next);
+    setConvos((prevConvos) => {
+      const mapped = prevConvos.map((c) =>
+        c.id === activeId
+          ? { ...c, title: titleFor(next), messages: next, updatedAt: Date.now() }
+          : c,
+      );
+      const byDate = [...mapped].sort((a, b) => b.updatedAt - a.updatedAt);
+      const kept = byDate.slice(0, MAX_STORED_CONVOS);
+      const finalKept = kept.some((c) => c.id === activeId)
+        ? kept
+        : [...kept.slice(0, MAX_STORED_CONVOS - 1), mapped.find((c) => c.id === activeId)!];
+      persistConvos(finalKept, activeId);
+      return finalKept;
+    });
+  };
+
+  const selectConvo = (id: string) => {
+    const target = convos.find((c) => c.id === id);
+    if (!target) return;
+    messagesRef.current = target.messages;
+    setMessagesState(target.messages);
+    setActiveId(id);
+    setPendingActions([]);
+    setShowHistory(false);
+    persistConvos(convos, id);
+  };
+
+  const newConvo = () => {
+    const fresh: Convo = {
+      id: uid("cv"),
+      title: "Nouvelle conversation",
+      messages: [{ role: "assistant", content: GREETING }],
+      updatedAt: Date.now(),
+    };
+    const next = [fresh, ...convos].slice(0, MAX_STORED_CONVOS);
+    messagesRef.current = fresh.messages;
+    setMessagesState(fresh.messages);
+    setConvos(next);
+    setActiveId(fresh.id);
+    setPendingActions([]);
+    setShowHistory(false);
+    persistConvos(next, fresh.id);
+  };
+
+  const deleteConvo = (id: string) => {
+    const next = convos.filter((c) => c.id !== id);
+    if (id !== activeId) {
+      setConvos(next);
+      persistConvos(next, activeId);
+      return;
+    }
+    if (!next.length) {
+      const fresh: Convo = {
+        id: uid("cv"),
+        title: "Nouvelle conversation",
+        messages: [{ role: "assistant", content: GREETING }],
+        updatedAt: Date.now(),
+      };
+      messagesRef.current = fresh.messages;
+      setMessagesState(fresh.messages);
+      setConvos([fresh]);
+      setActiveId(fresh.id);
+      persistConvos([fresh], fresh.id);
+      return;
+    }
+    const sorted = [...next].sort((a, b) => b.updatedAt - a.updatedAt);
+    messagesRef.current = sorted[0].messages;
+    setMessagesState(sorted[0].messages);
+    setConvos(sorted);
+    setActiveId(sorted[0].id);
+    persistConvos(sorted, sorted[0].id);
+    setPendingActions([]);
+  };
+
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   useEffect(() => scrollToBottom(), [messages, pendingActions, loading, scrollToBottom]);
-
-  useEffect(() => {
-    saveChatHistory(messages);
-  }, [messages]);
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
@@ -252,6 +393,8 @@ export function AiChatFloating() {
     const updated = [...messages, userMsg];
     setMessages(updated);
     setLoading(true);
+    // Contexte envoyé à l'IA : tout l'historique de la conversation active.
+    const forApi = updated.slice(-MAX_SENT_MESSAGES);
 
     try {
       // Prefer SSE streaming: tokens render progressively and slow LLM
@@ -260,7 +403,7 @@ export function AiChatFloating() {
       let result: AnalyzeResult;
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
       try {
-        const streamed = await analyzeIntentStream(updated, (t) => {
+        const streamed = await analyzeIntentStream(forApi, (t) => {
           setMessages((prev) => {
             const next = [...prev];
             const last = next[next.length - 1];
@@ -270,7 +413,7 @@ export function AiChatFloating() {
         });
         result = streamed;
       } catch {
-        const legacy = await analyzeIntent(updated);
+        const legacy = await analyzeIntent(forApi);
         result = legacy;
       }
       // Authoritative full text (identical to the streamed tokens).
@@ -393,16 +536,107 @@ export function AiChatFloating() {
             )}
             style={{ height: 560, maxHeight: "calc(100vh - 8rem)" }}
           >
-            <div className="flex shrink-0 items-center gap-3 border-b border-brand/12 bg-gradient-to-r from-brand to-brand-dk px-5 py-4 text-white">
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-white/20">
-                <Sparkles className="h-4 w-4" />
-              </span>
+            <div className="flex shrink-0 items-center gap-2 border-b border-brand/12 bg-gradient-to-r from-brand to-brand-dk px-4 py-4 text-white">
+              <button
+                type="button"
+                onClick={() => setShowHistory((v) => !v)}
+                aria-label="Historique des conversations"
+                title="Historique des conversations"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 transition hover:bg-white/30"
+              >
+                <History className="h-4 w-4" />
+              </button>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold">Assistant IA</p>
-                <p className="text-[10px] opacity-80">Cmd+K pour ouvrir/fermer</p>
+                <p className="truncate text-[10px] opacity-80">
+                  {convos.find((c) => c.id === activeId)?.title ?? "Conversation"}
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={newConvo}
+                aria-label="Nouvelle conversation"
+                title="Nouvelle conversation"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 transition hover:bg-white/30"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
 
+            <div className="relative min-h-0 flex-1">
+              <AnimatePresence>
+                {showHistory && (
+                  <motion.aside
+                    initial={{ x: "-100%" }}
+                    animate={{ x: 0 }}
+                    exit={{ x: "-100%" }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    className="absolute inset-y-0 start-0 z-10 flex w-[270px] max-w-[85%] flex-col border-e border-brand/12 bg-card shadow-xl"
+                  >
+                    <div className="flex shrink-0 items-center justify-between px-4 py-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Conversations ({convos.length})
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowHistory(false)}
+                        aria-label="Fermer l'historique"
+                        className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-brand/10"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
+                      {[...convos]
+                        .sort((a, b) => b.updatedAt - a.updatedAt)
+                        .map((c) => {
+                          const active = c.id === activeId;
+                          return (
+                            <div
+                              key={c.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => selectConvo(c.id)}
+                              onKeyDown={(e) => e.key === "Enter" && selectConvo(c.id)}
+                              className={cn(
+                                "group flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-start transition",
+                                active
+                                  ? "bg-brand/10 ring-1 ring-inset ring-brand/25"
+                                  : "hover:bg-brand/5",
+                              )}
+                            >
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[13px] font-semibold text-foreground">
+                                  {c.title}
+                                </span>
+                                <span className="block text-[10px] text-muted-foreground">
+                                  {new Date(c.updatedAt).toLocaleDateString("fr-FR", {
+                                    day: "numeric",
+                                    month: "short",
+                                  })}{" "}
+                                  · {c.messages.length} message{c.messages.length > 1 ? "s" : ""}
+                                </span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteConvo(c.id);
+                                }}
+                                aria-label={`Supprimer « ${c.title} »`}
+                                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-alert/10 hover:text-alert-dk focus:opacity-100"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </motion.aside>
+                )}
+              </AnimatePresence>
+
+              <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-4 py-4">
               {messages.map((msg, i) => (
                 <MessageBubble key={i} msg={msg} />
@@ -463,6 +697,8 @@ export function AiChatFloating() {
                 )}
               </button>
             </form>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -5,7 +5,7 @@ import { getDb } from "@/db";
 import { featureTickets } from "@/db/schema/feature-tickets";
 import { TICKET_ALLOWED_ROLES } from "@/lib/agent/actions";
 import { getEnv } from "@/config/env";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, count, ne } from "drizzle-orm";
 
 const createTicketSchema = z.object({
   title: z.string().trim().min(3, "Titre trop court (3 caractères min)").max(150),
@@ -55,8 +55,8 @@ export async function featureTicketRoutes(app: FastifyInstance) {
       const db = getDb();
       const normTitle = input.title.trim().replace(/\s+/g, " ");
 
-      // Anti-doublon : même demandeur + même titre (24 h) → renvoie l'existant
-      // plutôt que de créer/spammer un doublon (et un double toast côté BMS).
+      // Anti-doublon : même demandeur + même titre, ticket encore ouvert (24 h).
+      // Un ticket déjà tranché (done/rejected) ne bloque pas un nouveau dépôt.
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const [existing] = await db
         .select()
@@ -64,6 +64,7 @@ export async function featureTicketRoutes(app: FastifyInstance) {
         .where(
           and(
             eq(featureTickets.requestedBy, request.user.id),
+            eq(featureTickets.status, "open"),
             sql`lower(${featureTickets.title}) = lower(${normTitle})`,
             sql`${featureTickets.createdAt} >= ${since.toISOString()}`,
           ),
@@ -169,6 +170,7 @@ export async function featureTicketRoutes(app: FastifyInstance) {
           resolution: input.description,
           resolvedAt: new Date(),
           updatedAt: new Date(),
+          vuParDemandeur: false,
         })
         .where(eq(featureTickets.id, verdict.id))
         .returning({ id: featureTickets.id, title: featureTickets.title, status: featureTickets.status });
@@ -178,4 +180,61 @@ export async function featureTicketRoutes(app: FastifyInstance) {
       return { ok: true, ticket: updated };
     },
   );
+
+  // Notifications du demandeur : verdicts BMS non encore vus.
+  app.get("/notifications", { preHandler: [authenticate] }, async (request) => {
+    const db = getDb();
+    const visibles = and(
+      eq(featureTickets.requestedBy, request.user.id),
+      ne(featureTickets.status, "open"),
+    );
+    const [total, items] = await Promise.all([
+      db
+        .select({ n: count() })
+        .from(featureTickets)
+        .where(and(visibles, eq(featureTickets.vuParDemandeur, false))),
+      db
+        .select({
+          id: featureTickets.id,
+          titre: featureTickets.title,
+          statut: featureTickets.status,
+          reponse: featureTickets.resolution,
+          luParDemandeur: featureTickets.vuParDemandeur,
+          updatedAt: featureTickets.updatedAt,
+        })
+        .from(featureTickets)
+        .where(visibles)
+        .orderBy(desc(featureTickets.updatedAt))
+        .limit(10),
+    ]);
+    return { unread: Number(total[0]?.n ?? 0), items };
+  });
+
+  // Tout marquer comme lu.
+  app.post("/notifications/lu", { preHandler: [authenticate] }, async (request) => {
+    const db = getDb();
+    const lues = await db
+      .update(featureTickets)
+      .set({ vuParDemandeur: true })
+      .where(and(eq(featureTickets.requestedBy, request.user.id), eq(featureTickets.vuParDemandeur, false)))
+      .returning({ id: featureTickets.id });
+    return { ok: true, lues: lues.length };
+  });
+
+  // Marquer UN verdict comme lu (reste visible, sans badge).
+  app.post("/notifications/:id/lu", { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const db = getDb();
+    const where =
+      request.user.role === "directeur"
+        ? eq(featureTickets.id, id)
+        : and(eq(featureTickets.id, id), eq(featureTickets.requestedBy, request.user.id));
+    const [updated] = await db
+      .update(featureTickets)
+      .set({ vuParDemandeur: true })
+      .where(where)
+      .returning({ id: featureTickets.id });
+    if (!updated) return reply.status(404).send({ error: "Notification introuvable" });
+    return { ok: true };
+  });
 }

@@ -954,6 +954,16 @@ const ACTIONS: ActionDefinition[] = [
       { name: "priority", type: "string", description: "Priorité perçue", enum: ["low", "medium", "high"] },
     ],
   },
+  {
+    name: "list_feature_tickets",
+    description:
+      "Lister les tickets de demande de fonctionnalité avec leur statut (open, done, rejected) et la réponse éventuelle, pour répondre aux questions d'avancement comme « où en est mon ticket ? » ou « qu'est-ce qui a été refusé et pourquoi ? ».",
+    method: "GET",
+    path: "/api/feature-tickets",
+    category: "Tickets",
+    requiredRoles: [...TICKET_ALLOWED_ROLES],
+    params: [],
+  },
 ];
 
 export default ACTIONS;

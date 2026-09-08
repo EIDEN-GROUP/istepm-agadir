@@ -747,6 +747,33 @@ export function revokeInvitation(userId: string) {
   return api.delete<{ ok: boolean }>(`/auth/invitations/${userId}`);
 }
 
+/* ------------------------------------------------------------------ */
+/*  Tickets de fonctionnalité — notifications du demandeur             */
+/* ------------------------------------------------------------------ */
+
+export interface TicketNotification {
+  id: string;
+  titre: string;
+  statut: string;
+  reponse: string;
+  luParDemandeur: boolean;
+  updatedAt: string;
+}
+
+export function fetchFeatureTicketNotifications() {
+  return api.get<{ unread: number; items: TicketNotification[] }>(
+    "/api/feature-tickets/notifications",
+  );
+}
+
+export function markFeatureTicketNotificationsRead() {
+  return api.post<{ ok: boolean; lues: number }>("/api/feature-tickets/notifications/lu");
+}
+
+export function markFeatureTicketNotificationRead(id: string) {
+  return api.post<{ ok: boolean }>(`/api/feature-tickets/notifications/${id}/lu`);
+}
+
 /** L'envoi d'e-mails est-il configuré côté backend ? */
 export function fetchSmtpStatus() {
   return api.get<{ configured: boolean }>("/auth/invitations/smtp");

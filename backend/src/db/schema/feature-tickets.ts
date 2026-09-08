@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, boolean, timestamp } from "drizzle-orm/pg-core";
 import { users } from "./users";
 
 /**
@@ -16,6 +16,8 @@ export const featureTickets = pgTable("feature_tickets", {
   /** Verdict renvoyé par le BMS (DONE/REJECT + motif) via /inbox. */
   resolution: text("resolution").notNull().default(""),
   resolvedAt: timestamp("resolved_at"),
+  /** Faux dès qu'un verdict arrive → cloche du demandeur. */
+  vuParDemandeur: boolean("vu_par_demandeur").notNull().default(true),
   requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
   requestedName: text("requested_name").notNull().default(""),
   requestedEmail: text("requested_email").notNull().default(""),
