@@ -1,7 +1,8 @@
 /**
  * Réduit une image à un carré `taille`×`taille` (recadrage centré) et la renvoie
- * en data URL JPEG. Garde l'envoi léger (~40–90 Ko) quelle que soit la
- * résolution source — utilisé pour les photos d'identité étudiant.
+ * en data URL **WebP** (repli JPEG si le navigateur ne sait pas encoder le WebP).
+ * WebP divise ~par deux le poids par rapport au JPEG (~15–40 Ko), ce qui garde
+ * la photo d'identité bien en-dessous des limites d'envoi et de stockage.
  */
 export function downscaleImage(file: File, taille = 512): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -27,7 +28,14 @@ export function downscaleImage(file: File, taille = 512): Promise<string> {
         taille,
         taille,
       );
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
+      // `toDataURL` renvoie du PNG si le type demandé n'est pas supporté :
+      // on ne garde le WebP que s'il a réellement été produit.
+      const webp = canvas.toDataURL("image/webp", 0.8);
+      resolve(
+        webp.startsWith("data:image/webp")
+          ? webp
+          : canvas.toDataURL("image/jpeg", 0.85),
+      );
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);

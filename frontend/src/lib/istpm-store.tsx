@@ -659,6 +659,66 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Re-synchronise les photos d'identité étudiant en tâche de fond : la
+  // synchro principale ne tourne qu'au montage, donc une photo téléversée
+  // depuis l'espace étudiant n'apparaissait côté staff qu'après un rechargement
+  // complet. On la ré-applique quand l'onglet redevient actif et toutes les
+  // ~45 s. Léger : un seul GET, on ne touche que `photoUrl`.
+  useEffect(() => {
+    let stop = false;
+    let last = 0;
+    const resyncPhotos = async () => {
+      if (stop || Date.now() - last < 30_000) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden")
+        return;
+      last = Date.now();
+      try {
+        const rows = (await apiFetchEtudiants()) as Record<string, unknown>[];
+        const byKey = new Map<string, string>();
+        for (const r of rows) {
+          const url = String(
+            (r as { photoUrl?: string }).photoUrl ??
+              (r as { photo_url?: string }).photo_url ??
+              "",
+          ).trim();
+          if (!url) continue;
+          if (r.id) byKey.set(String(r.id), url);
+          if (r.cne) byKey.set(`cne:${String(r.cne)}`, url);
+        }
+        if (!byKey.size || stop) return;
+        setSnap((s) => {
+          let changed = false;
+          const etudiants = s.etudiants.map((e) => {
+            const u =
+              byKey.get(e.id) ?? (e.cne ? byKey.get(`cne:${e.cne}`) : undefined);
+            if (u && u !== e.photoUrl) {
+              changed = true;
+              return { ...e, photoUrl: u };
+            }
+            return e;
+          });
+          return changed ? { ...s, etudiants } : s;
+        });
+      } catch {
+        /* hors ligne : on garde ce qu'on a */
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void resyncPhotos();
+    };
+    const onFocus = () => void resyncPhotos();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    const id = window.setInterval(() => void resyncPhotos(), 45_000);
+    return () => {
+      stop = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Skip the write triggered by the initial state, which would only rewrite
   // what was just read.
   const hydrated = useRef(false);
