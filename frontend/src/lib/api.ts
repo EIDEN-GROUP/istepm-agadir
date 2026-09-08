@@ -35,11 +35,14 @@ async function request<T>(
     res = await fetch(`${url}${queryParams}`, {
       method: options.method ?? "GET",
       headers: {
-        "Content-Type": "application/json",
+        // Content-Type uniquement quand il y a un corps : Fastify rejette
+        // ("Body cannot be empty...") un POST JSON sans contenu (ex. marquer
+        // une notification comme lue/effacée).
+        ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: controller.signal,
     });
   } catch (err) {
