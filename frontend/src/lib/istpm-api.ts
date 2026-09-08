@@ -762,16 +762,16 @@ export interface TicketNotification {
 
 export function fetchFeatureTicketNotifications() {
   return api.get<{ unread: number; items: TicketNotification[] }>(
-    "/api/feature-tickets/notifications",
+    "/feature-tickets/notifications",
   );
 }
 
 export function markFeatureTicketNotificationsRead() {
-  return api.post<{ ok: boolean; lues: number }>("/api/feature-tickets/notifications/lu");
+  return api.post<{ ok: boolean; lues: number }>("/feature-tickets/notifications/lu");
 }
 
 export function markFeatureTicketNotificationRead(id: string) {
-  return api.post<{ ok: boolean }>(`/api/feature-tickets/notifications/${id}/lu`);
+  return api.post<{ ok: boolean }>(`/feature-tickets/notifications/${id}/lu`);
 }
 
 /** L'envoi d'e-mails est-il configuré côté backend ? */
