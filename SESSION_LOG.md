@@ -11,6 +11,10 @@ Branched from `origin/main` at `b7f0314`. Commits (top = newest):
 
 | Commit | Summary |
 |---|---|
+| `4778c93` | feat(photo): student photos are managed by the affaires estudiantines only |
+| `d375f9e` | fix(profile): Mon profil read-only when impersonating via the role switcher |
+| `dbcd684` | fix(profile): staff/director photo persists across reload / role switch |
+| `f2215c7` | feat(profile): "Retirer la photo" |
 | `7e30bf2` | fix(student): point existing links at the new per-section routes |
 | `6f1ac12` | feat(student): calendar has three views — Liste, Semaine (grid), Mois |
 | `dcd6428` | docs: add SESSION_LOG.md |
@@ -90,6 +94,34 @@ description.
   photo shows everywhere staff see that student.
 - `canAccess()` (`dashboard-i18n.tsx`): `COMMON_ROUTES` allowlist for
   `/dashboard/mon-profil`; `NAV_BY_ROLE.etudiant` lists the section sub-paths.
+
+**Profile-photo model, finalised (`f2215c7` → `4778c93`)** — after several
+rounds of feedback:
+- **Staff / directeur:** own photo, editable on Mon profil, now **persists**
+  across reload and role switch (AuthProvider re-hydrates `photoUrl` from
+  `GET /auth/me` on mount / role change, only when acting under one's own
+  role). "Retirer la photo" clears it.
+- **Role switcher = impersonation, not login.** The JWT stays the logged-in
+  person's, so editing "as another role" hit the wrong account. Mon profil is
+  now **read-only while impersonating** (`impersonating` flag from auth
+  context) with a banner explaining why.
+- **Students never manage their own photo.** `PATCH /auth/me` rejects
+  `photoUrl` for `etudiant` (403); `PUT /student/me/photo` always 403s. The
+  responsable / directeur set it from the Étudiants edit form
+  (`PUT /etudiants/:id`), which now also copies the photo onto the linked
+  user account so it shows in the student's space. Mon profil shows it
+  read-only.
+- Photo encoding is WebP (`a9b33c9`); staff screens re-sync student photos on
+  tab focus / ~45 s.
+
+### VPS incident (2026-09-08)
+
+The `deploy` job failed with `no space left on device` — the VPS disk was
+**100% full** (build cache + old images had piled up). Freed ~15 GB with
+`docker builder prune -af` + `docker container prune -f` +
+`docker image prune -af` (no `--volumes` — every database / volume untouched,
+every running container left alone). Disk 100% → 73%. Re-ran the deploy job,
+green. If it recurs: same three prunes, then re-run the job.
 
 ### Compatibility review (origin/main `b7f0314` → HEAD)
 
