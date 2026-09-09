@@ -108,6 +108,12 @@ type AuthCtx = {
   user: AuthUser | null;
   role: UserRole | null;
   loading: boolean;
+  /**
+   * Le rôle affiché n'est pas celui du compte connecté (sélecteur de rôle en
+   * mode démo) : la fiche profil est alors en lecture seule — toute
+   * modification s'appliquerait au vrai compte, pas au rôle consulté.
+   */
+  impersonating: boolean;
   login: (email: string, password: string) => Promise<void>;
   setRole: (role: UserRole) => void;
   logout: () => void;
@@ -121,6 +127,7 @@ const Ctx = createContext<AuthCtx>({
   user: null,
   role: null,
   loading: true,
+  impersonating: false,
   login: async () => {},
   setRole: () => {},
   logout: () => {},
@@ -141,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return null;
     return window.localStorage.getItem(FORMATEUR_STORAGE_KEY);
   });
+  const [impersonating, setImpersonating] = useState(false);
 
   const persistSelectedFormateur = useCallback((id: string | null) => {
     setSelectedFormateurId(id);
@@ -206,6 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!res.ok || cancelled) return;
         const me: { role?: string; photoUrl?: string } = await res.json();
         const own = me.role ? mapBackendRole(me.role) === role : false;
+        setImpersonating(!own);
         const url = own ? (me.photoUrl ?? "") : "";
         setUserState((prev) => {
           if (!prev || prev.photoUrl === url) return prev;
@@ -303,6 +312,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setRoleState(null);
     setUserState(null);
+    setImpersonating(false);
     setSelectedFormateurId(null);
   }, []);
 
@@ -312,6 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         role,
         loading,
+        impersonating,
         login,
         setRole,
         logout,

@@ -215,7 +215,8 @@ function EditCard({ onDone }: { onDone: () => void }) {
 /* ------------------------------------------------------------------ */
 
 function MonProfilPage() {
-  const { user, selectedFormateurId, applyAccountUpdate } = useAuth();
+  const { user, selectedFormateurId, applyAccountUpdate, impersonating } =
+    useAuth();
   const { formateurs } = useIstpm();
   const [editing, setEditing] = useState(false);
   const photoInput = useRef<HTMLInputElement>(null);
@@ -290,7 +291,7 @@ function MonProfilPage() {
         eyebrow="Mon compte"
         title="Mon profil"
         actions={
-          !editing ? (
+          !editing && !impersonating ? (
             <button
               type="button"
               onClick={() => setEditing(true)}
@@ -303,15 +304,28 @@ function MonProfilPage() {
         }
       />
 
+      {impersonating ? (
+        <p className="flex items-start gap-2 rounded-2xl border border-amber-300/50 bg-amber-50 px-4 py-2.5 text-xs leading-relaxed text-amber-800">
+          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Vous consultez l'application en tant que{" "}
+          <strong>{roleMeta.label}</strong> via le sélecteur de rôle. Ce n'est
+          pas votre compte : la fiche est en lecture seule. Pour modifier un
+          profil, connectez-vous avec le compte concerné.
+        </p>
+      ) : null}
+
       {/* Fiche identité */}
       <section className={cn(softCard, "p-6")}>
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
           <div className="relative shrink-0 self-center sm:self-start">
             <button
               type="button"
-              onClick={() => photoInput.current?.click()}
-              title="Changer ma photo"
-              className="group relative block h-28 w-28 overflow-hidden rounded-2xl ring-2 ring-inset ring-brand/20 transition hover:ring-brand/45"
+              onClick={() =>
+                impersonating ? undefined : photoInput.current?.click()
+              }
+              disabled={impersonating}
+              title={impersonating ? undefined : "Changer ma photo"}
+              className="group relative block h-28 w-28 overflow-hidden rounded-2xl ring-2 ring-inset ring-brand/20 transition hover:ring-brand/45 disabled:cursor-default disabled:hover:ring-brand/20"
             >
               <PersonAvatar
                 name={user.name}
@@ -320,10 +334,12 @@ function MonProfilPage() {
                 ring={false}
                 className="h-28 w-28 rounded-2xl"
               />
-              <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/45 py-1 text-[10px] font-semibold text-white opacity-90 group-hover:opacity-100">
-                <Camera className="h-3 w-3" />
-                {photoMut.isPending ? "…" : "Photo"}
-              </span>
+              {!impersonating ? (
+                <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/45 py-1 text-[10px] font-semibold text-white opacity-90 group-hover:opacity-100">
+                  <Camera className="h-3 w-3" />
+                  {photoMut.isPending ? "…" : "Photo"}
+                </span>
+              ) : null}
             </button>
             <input
               ref={photoInput}
@@ -335,7 +351,7 @@ function MonProfilPage() {
                 e.target.value = "";
               }}
             />
-            {photoUrl ? (
+            {photoUrl && !impersonating ? (
               <button
                 type="button"
                 onClick={() => photoMut.mutate("")}
