@@ -1,53 +1,48 @@
 /**
  * Cachet / tampon officiel de l'établissement.
  *
- * Le directeur téléverse une image (PNG/JPEG) depuis les Paramètres ; elle est
- * mémorisée localement (localStorage, cohérent avec le store « local-first »)
- * puis apposée sur tous les documents PDF générés — bulletins, conventions et
- * rapports de stage.
+ * Source unique : la base (`settings.stamp_image`, via l'API) — aucun
+ * localStorage. Le cachet est chargé depuis le serveur (`useStamp`, cache
+ * React Query partagé) et persisté via (`saveStampImage` / `clearStampImage`),
+ * donc identique sur tous les postes. Il est apposé sur tous les documents
+ * PDF générés — bulletins, conventions, rapports de stage et reçus.
  *
- * Le cachet est redimensionné à l'upload (max 600 px) pour rester sous la
- * limite de stockage du navigateur, et conservé en PNG afin de préserver la
- * transparence pour l'aperçu et le bulletin HTML.
+ * Le cachet est redimensionné à l'upload (max 600 px) et conservé en PNG afin
+ * de préserver la transparence pour l'aperçu et le bulletin HTML.
  */
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchSettings, updateSetting } from "@/lib/istpm-api";
 
-const STAMP_KEY = "istpm:stamp";
-const EVT = "istpm:stamp-changed";
-
-/** Cachet courant (data URL) ou `null` si aucun n'a été téléversé. */
-export function getStamp(): string | null {
-  try {
-    return localStorage.getItem(STAMP_KEY);
-  } catch {
-    return null;
-  }
+/** Lit le cachet depuis le serveur (`null` si aucun téléversé). */
+export async function fetchStampImage(): Promise<string | null> {
+  const data = await fetchSettings();
+  const v = data.stamp_image;
+  return typeof v === "string" && v ? v : null;
 }
 
-/** Enregistre (ou efface, avec `null`) le cachet et notifie les abonnés. */
-export function setStamp(dataUrl: string | null): void {
-  try {
-    if (dataUrl) localStorage.setItem(STAMP_KEY, dataUrl);
-    else localStorage.removeItem(STAMP_KEY);
-  } catch {
-    /* quota dépassé ou navigation privée — on ignore silencieusement */
-  }
-  window.dispatchEvent(new CustomEvent(EVT));
-}
-
-/** Hook réactif : renvoie le cachet courant et se met à jour à chaque changement. */
+/** Hook réactif : renvoie le cachet serveur (`null` en chargement/absent). */
 export function useStamp(): string | null {
-  const [stamp, setLocal] = useState<string | null>(() => getStamp());
-  useEffect(() => {
-    const sync = () => setLocal(getStamp());
-    window.addEventListener(EVT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(EVT, sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
-  return stamp;
+  const q = useQuery({
+    queryKey: ["stamp"],
+    queryFn: fetchStampImage,
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
+  return q.data ?? null;
+}
+
+/** Persiste le cachet côté serveur (puis rafraîchit via `invalidateStamp`). */
+export function saveStampImage(dataUrl: string) {
+  return updateSetting("stamp_image", dataUrl);
+}
+
+/**
+ * Efface le cachet côté serveur.
+ * `settings.value` est `jsonb NOT NULL` : on écrit une chaîne vide plutôt
+ * qu'un `null` que la colonne refuserait.
+ */
+export function clearStampImage() {
+  return updateSetting("stamp_image", "");
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -61,7 +56,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 /**
  * Lit un fichier image, le redimensionne (côté le plus long ≤ `maxDim`) et
- * renvoie une data URL PNG prête à être stockée comme cachet.
+ * renvoie une data URL PNG prête à être envoyée au serveur comme cachet.
  */
 export async function prepareStampFromFile(
   file: File,

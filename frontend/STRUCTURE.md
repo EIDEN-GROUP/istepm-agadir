@@ -17,9 +17,8 @@ frontend/
 │   ├── lib/
 │   │   ├── api.ts                  # Fetch wrapper with JWT injection
 │   │   ├── auth.tsx                # Auth context (login/logout/session)
-│   │   ├── dash-ui.tsx             # Shared dashboard style tokens
-│   │   ├── dashboard-mirror-data.ts # Static mock data (legacy)
-│   │   ├── database-types.ts       # Shared TS interfaces
+ │   │   ├── dash-ui.tsx             # Shared dashboard style tokens
+ │   │   ├── database-types.ts       # Shared TS interfaces (legacy Supabase, non importé)
 │   │   ├── dashboard-i18n.tsx      # i18n context (FR/AR) for dashboard
 │   │   └── utils.ts                # cn(), formatters…
 │   ├── locales/

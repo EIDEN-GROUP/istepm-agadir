@@ -34,11 +34,53 @@ export function enrichSeance(row: typeof seances.$inferSelect) {
   };
 }
 
+function minutesDepuisMinuit(hhmm: string): number {
+  const [h = "0", m = "0"] = hhmm.split(":");
+  return Number(h) * 60 + Number(m);
+}
+
+/**
+ * Conflit de ressources (professeur / salle / groupe) sur le même jour.
+ * Le front affiche l'avertissement et peut forcer avec `?force=1`
+ * (« Enregistrer malgré le conflit »).
+ */
+async function trouverConflit(
+  db: ReturnType<typeof getDb>,
+  c: { date: string; debut: string; fin: string; professeurId: string; salle: string; groupe: string },
+  ignorerId?: string,
+) {
+  const rows = await db.select().from(seances).where(eq(seances.date, c.date));
+  const debut = minutesDepuisMinuit(c.debut);
+  const fin = minutesDepuisMinuit(c.fin);
+  for (const s of rows) {
+    if (s.id === ignorerId) continue;
+    const d = minutesDepuisMinuit(s.debut);
+    const f = minutesDepuisMinuit(s.fin);
+    if (fin <= d || debut >= f) continue;
+    if (c.professeurId && s.professeurId === c.professeurId)
+      return { type: "professeur", seance: enrichSeance(s) };
+    if (c.salle && s.salle === c.salle) return { type: "salle", seance: enrichSeance(s) };
+    if (c.groupe && s.groupe === c.groupe) return { type: "groupe", seance: enrichSeance(s) };
+  }
+  return null;
+}
+
 export async function seanceRoutes(app: FastifyInstance) {
-  app.get("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.get("/", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request) => {
     const query = request.query as { start?: string; end?: string; professeurId?: string; date?: string };
     const db = getDb();
     const conditions = [];
+    if (request.user.role === "enseignant") {
+      // Périmètre du compte : uniquement les séances de la fiche liée.
+      // Sans fiche liée, rien (jamais tout l'établissement).
+      const [fiche] = await db
+        .select({ id: formateurs.id })
+        .from(formateurs)
+        .where(eq(formateurs.userId, request.user.id))
+        .limit(1);
+      if (!fiche) return [];
+      conditions.push(eq(seances.professeurId, fiche.id));
+    }
     if (query.start) conditions.push(gte(seances.date, query.start));
     if (query.end) conditions.push(lte(seances.date, query.end));
     if (query.professeurId) conditions.push(eq(seances.professeurId, query.professeurId));
@@ -67,9 +109,14 @@ export async function seanceRoutes(app: FastifyInstance) {
     return enrichSeance(seance);
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const input = createSeanceSchema.parse(request.body);
     const db = getDb();
+    const query = request.query as { force?: string };
+    if (query.force !== "1") {
+      const conflit = await trouverConflit(db, input);
+      if (conflit) return reply.status(409).send({ error: "Conflit de ressource", conflit });
+    }
     const [seance] = await db.insert(seances).values(input).returning();
     return enrichSeance(seance);
   });
@@ -90,6 +137,23 @@ export async function seanceRoutes(app: FastifyInstance) {
     const db = getDb();
     const [existing] = await db.select().from(seances).where(eq(seances.id, id)).limit(1);
     if (!existing) return reply.status(404).send({ error: "Séance introuvable" });
+    const merged = { ...existing, ...input };
+    const query = request.query as { force?: string };
+    if (query.force !== "1" && (input.date !== undefined || input.debut !== undefined || input.fin !== undefined || input.professeurId !== undefined || input.salle !== undefined || input.groupe !== undefined)) {
+      const conflit = await trouverConflit(
+        db,
+        {
+          date: merged.date,
+          debut: merged.debut,
+          fin: merged.fin,
+          professeurId: merged.professeurId ?? "",
+          salle: merged.salle ?? "",
+          groupe: merged.groupe ?? "",
+        },
+        id,
+      );
+      if (conflit) return reply.status(409).send({ error: "Conflit de ressource", conflit });
+    }
     const [updated] = await db
       .update(seances)
       .set({ ...input, updatedAt: new Date() })

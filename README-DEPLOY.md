@@ -450,7 +450,7 @@ Before going live, verify each item:
 ### Application
 
 - [ ] Database migrations have been run
-- [ ] Seed data loaded (optional: `npm run seed`)
+- [ ] Demo dataset loaded if needed (`M:\plan\sql-istepm\`, psql in order)
 - [ ] Admin user created (`node backend/scripts/create-admin.mjs`)
 - [ ] BullMQ worker starts and connects (verify in logs)
 - [ ] Frontend SPA loads and can reach the API

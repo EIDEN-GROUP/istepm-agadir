@@ -28,11 +28,11 @@ const updateMensuelSchema = z.object({
   notes: z.string().optional(),
 });
 
-let recuCounter = Date.now();
-
-function genererRecu(): string {
-  recuCounter++;
-  return `R-${recuCounter.toString(36).toUpperCase()}`;
+/** Reçu unique et persistant (séquence DB — survit aux redémarrages). */
+async function genererRecu(db: ReturnType<typeof getDb>): Promise<string> {
+  const res = await db.execute(sql`SELECT nextval('recu_seq') AS n`);
+  const n = Number((res.rows as unknown as { n: string }[])[0]?.n ?? Date.now());
+  return `R-${n.toString(36).toUpperCase()}`;
 }
 
 export async function paiementIstpmRoutes(app: FastifyInstance) {
@@ -84,7 +84,7 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
 
     const fraisMensuels = Math.round(Number(etudiant.fraisAnnuels) / 10);
     const dateStr = input.date ?? new Date().toISOString().split("T")[0];
-    const recu = input.recu || genererRecu();
+    const recu = input.recu || (await genererRecu(db));
 
     const result: Array<{ mois: string; statut: string }> = [];
 

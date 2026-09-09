@@ -16,6 +16,7 @@ import { DashTabPanel } from "@/components/dash-tabs";
 import { PersonAvatar } from "@/components/person-avatar";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { ApiError } from "@/lib/api";
 import { useIstpm } from "@/lib/istpm-store";
 import {
   fetchStudentMe,
@@ -209,31 +210,16 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
     }
   }, [isStaff, notifQ.data, reqQuery.data, luMut]);
 
-  /* ----- Repli démo : backend indisponible ou compte non lié ----- */
-  const fallback = useMemo(() => {
-    if (meQuery.data || isStaff) return null;
-    const etu = store.etudiants[0] ?? null;
-    if (!etu) return null;
-    const enseignants = store.formateurs.filter((f) => {
-      const sameFiliere = !f.departement || f.departement === etu.filiere;
-      const groupes = f.groupes ?? [];
-      return (
-        sameFiliere &&
-        (groupes.length === 0 ||
-          groupes.some((g) => g === etu.groupe || g.split("-")[0] === etu.niveau || g === etu.niveau))
-      );
-    });
-    const stages = store.stages.filter((s) => s.etudiantId === etu.id);
-    return { etu, enseignants, stages };
-  }, [meQuery.data, store.etudiants, store.formateurs, store.stages, isStaff]);
-
   const me = meQuery.data;
+  // Source unique : la fiche servie par le backend (`GET /student/me`).
+  // Sans fiche liée, les champs restent vides et l'état vide ci-dessous
+  // s'affiche — jamais de données d'un autre étudiant.
   const profil = me?.etudiant as unknown as Record<string, string> | undefined;
-  const prenom = String(profil?.prenom ?? fallback?.etu.prenom ?? "");
-  const nom = String(profil?.nom ?? fallback?.etu.nom ?? "");
+  const prenom = String(profil?.prenom ?? "");
+  const nom = String(profil?.nom ?? "");
   const photoUrl = String(profil?.photoUrl ?? (profil as unknown as Record<string, string> | undefined)?.photo_url ?? "");
-  const enseignants = (me?.enseignants as unknown as Record<string, string>[] | undefined) ?? (fallback?.enseignants as unknown as Record<string, string>[] | undefined) ?? [];
-  const stages = (me?.stages as unknown as Record<string, string>[] | undefined) ?? (fallback?.stages as unknown as Record<string, string>[] | undefined) ?? [];
+  const enseignants = (me?.enseignants as unknown as Record<string, string>[] | undefined) ?? [];
+  const stages = (me?.stages as unknown as Record<string, string>[] | undefined) ?? [];
   const stageEnCours = (me?.stageEnCours as unknown as Record<string, string> | null | undefined) ?? stages.find((s) => ["en_cours", "convention_signee", "soutenance"].includes(String(s.statut))) ?? null;
   const notes = (me?.notes as unknown as { module: string; note: number }[] | undefined) ?? [];
   const bulletins = (me?.bulletins as unknown as Record<string, string | number>[] | undefined) ?? [];
@@ -241,18 +227,9 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
   const demandes: StudentRequest[] = reqQuery.data ?? [];
 
   const seances: Seance[] = useMemo(() => {
-    const remote = (calQuery.data?.seances as unknown as Seance[] | undefined) ?? [];
-    if (remote.length) return remote;
-    // Repli : séances du store filtrées au groupe de l'étudiant.
-    const groupe = String(profil?.groupe ?? fallback?.etu.groupe ?? "");
-    const niveau = String(profil?.niveau ?? fallback?.etu.niveau ?? "");
-    const filiere = String(profil?.filiere ?? fallback?.etu.filiere ?? "");
-    return store.seances.filter((s) => {
-      if (filiere && s.filiere && s.filiere !== filiere) return false;
-      if (!s.groupe) return true;
-      return s.groupe === groupe || s.groupe.split("-")[0] === niveau || s.groupe === niveau;
-    });
-  }, [calQuery.data, store.seances, profil, fallback]);
+    // Source unique : le calendrier servi par le backend. Sans réponse, vide.
+    return (calQuery.data?.seances as unknown as Seance[] | undefined) ?? [];
+  }, [calQuery.data]);
 
   const nomProf = useMemo(() => {
     const map = new Map(store.formateurs.map((f) => [f.id, `${f.prenom} ${f.nom}`]));
@@ -306,7 +283,10 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
   });
 
   const loading = meQuery.isLoading;
-  const backendDown = meQuery.isError && !fallback;
+  // 404 = compte sans fiche liée ; autre erreur = backend injoignable.
+  const errStatut =
+    meQuery.error instanceof ApiError ? meQuery.error.status : null;
+  const backendDown = meQuery.isError && errStatut !== 404;
 
   const moyenne = notes.length
     ? (notes.reduce((s, n) => s + n.note, 0) / notes.length).toFixed(2)
@@ -513,17 +493,17 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
               {prenom} {nom}
             </p>
             <p className="text-xs text-muted-foreground">
-              CNE {String(profil?.cne ?? fallback?.etu.cne ?? "—")}
+              CNE {String(profil?.cne ?? "—")}
             </p>
             <div className="flex flex-wrap gap-1.5">
               <span className={toneBadge("teal")}>
-                {String(profil?.filiere ?? fallback?.etu.filiere ?? "—")}
+                {String(profil?.filiere ?? "—")}
               </span>
               <span className={toneBadge("blue")}>
-                {String(profil?.niveau ?? fallback?.etu.niveau ?? "—")}
+                {String(profil?.niveau ?? "—")}
               </span>
               <span className={toneBadge("neutral")}>
-                {libelleStatutEtudiant(profil?.statut ?? fallback?.etu.statut)}
+                {libelleStatutEtudiant(profil?.statut)}
               </span>
             </div>
           </div>
@@ -537,27 +517,15 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
           <DetailGrid>
             <DetailField
               label="Téléphone"
-              value={String(
-                profil?.telephone ??
-                  (fallback?.etu as unknown as Record<string, string> | undefined)?.telephone ??
-                  "—",
-              )}
+              value={String(profil?.telephone ?? "—")}
             />
             <DetailField
               label="Email"
-              value={String(
-                profil?.email ??
-                  (fallback?.etu as unknown as Record<string, string> | undefined)?.email ??
-                  "—",
-              )}
+              value={String(profil?.email ?? "—")}
             />
             <DetailField
               label="Ville"
-              value={String(
-                profil?.ville ??
-                  (fallback?.etu as unknown as Record<string, string> | undefined)?.ville ??
-                  "—",
-              )}
+              value={String(profil?.ville ?? "—")}
             />
             <DetailField
               label="Naissance"
@@ -571,14 +539,10 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
         </DetailSection>
         <DetailSection title="Cursus">
           <DetailGrid>
-            <DetailField label="Groupe" value={String(profil?.groupe ?? fallback?.etu.groupe ?? "—")} />
+            <DetailField label="Groupe" value={String(profil?.groupe ?? "—")} />
             <DetailField
               label="Année"
-              value={String(
-                profil?.annee ??
-                  (fallback?.etu as unknown as Record<string, string> | undefined)?.annee ??
-                  "—",
-              )}
+              value={String(profil?.annee ?? "—")}
             />
           </DetailGrid>
         </DetailSection>
@@ -591,7 +555,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
           <DetailField label="Bulletins publiés" value={String(bulletins.length)} />
           <DetailField
             label="Statut de paiement"
-            value={libellePaiement(profil?.paiement ?? fallback?.etu.paiement)}
+            value={libellePaiement(profil?.paiement)}
           />
           <DetailField
             label="Reste à payer"
@@ -848,29 +812,27 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
         <div className={cn(softCard, "p-10 text-center text-sm text-muted-foreground")}>
           Chargement de votre espace…
         </div>
-      ) : backendDown ? (
+      ) : meQuery.isError ? (
         <div className={cn(softCard, "space-y-3 p-6 text-center")}>
           <Inbox className="mx-auto h-8 w-8 text-muted-foreground" />
-          <p className="text-sm font-semibold">Aucune fiche étudiant liée à ce compte.</p>
+          <p className="text-sm font-semibold">
+            {backendDown
+              ? "Serveur injoignable."
+              : "Aucune fiche étudiant liée à ce compte."}
+          </p>
           <p className="text-xs text-muted-foreground">
-            Demandez au secrétariat de lier votre compte (email / CNE) puis rechargez.
+            {backendDown
+              ? "Vérifiez votre connexion puis réessayez."
+              : "Demandez au secrétariat de lier votre compte (email / CNE) puis rechargez."}
           </p>
           <button className={ghostPill} onClick={() => meQuery.refetch()}>
             <RefreshCw className="h-3.5 w-3.5" /> Réessayer
           </button>
         </div>
       ) : (
-        <>
-          {meQuery.isError && fallback ? (
-            <p className="rounded-2xl border border-amber-300/50 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
-              Mode démo — backend injoignable, données locales affichées.
-            </p>
-          ) : null}
-
-          <DashTabPanel key={tab} index={tab} direction={dir}>
-            {tabBodies[tab]}
-          </DashTabPanel>
-        </>
+        <DashTabPanel key={tab} index={tab} direction={dir}>
+          {tabBodies[tab]}
+        </DashTabPanel>
       )}
 
       <DemandeModal

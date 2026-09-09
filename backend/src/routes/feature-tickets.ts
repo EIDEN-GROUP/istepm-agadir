@@ -46,10 +46,15 @@ function parseVerdict(title: string): { status: "done" | "rejected"; id: string 
 }
 
 export async function featureTicketRoutes(app: FastifyInstance) {
-  // Crée un ticket (via assistant IA, après confirmation explicite).
+  // Crée un ticket (via assistant IA, création immédiate sans confirmation :
+  // l'IA annonce la prise en charge et prévient du verdict dans le chat).
+  // Limite d'écriture : 30/min (l'anti-doublon absorbe les doubles envois).
   app.post(
     "/",
-    { preHandler: [authenticate, requireRole(...TICKET_ALLOWED_ROLES)] },
+    {
+      preHandler: [authenticate, requireRole(...TICKET_ALLOWED_ROLES)],
+      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+    },
     async (request, reply) => {
       const input = createTicketSchema.parse(request.body);
       const db = getDb();

@@ -889,31 +889,6 @@ const ACTIONS: ActionDefinition[] = [
     ],
   },
 
-  // ── Reminders ──────────────────────────────────────────────────────
-  {
-    name: "list_reminders",
-    description: "Lister les rappels",
-    method: "GET",
-    path: "/api/reminders",
-    category: "Rappels",
-    requiredRoles: [],
-    params: [],
-  },
-  {
-    name: "create_reminder",
-    description: "Créer un rappel",
-    method: "POST",
-    path: "/api/reminders",
-    category: "Rappels",
-    requiredRoles: ["directeur", "responsable"],
-    params: [
-      { name: "title", type: "string", description: "Titre", required: true },
-      { name: "remindAt", type: "string", description: "Date et heure du rappel (ISO)", required: true },
-      { name: "message", type: "string", description: "Message" },
-      { name: "method", type: "string", description: "Méthode", enum: ["in_app", "email"] },
-    ],
-  },
-
   // ── Teacher ────────────────────────────────────────────────────────
   {
     name: "get_teacher_dashboard",
@@ -943,21 +918,21 @@ const ACTIONS: ActionDefinition[] = [
   {
     name: "create_feature_ticket",
     description:
-      "Créer un ticket de demande de fonctionnalité : à utiliser dès que l'utilisateur demande une fonctionnalité nouvelle ou une évolution (ex. « ajoute… », « il faudrait… », « on veut pouvoir… »). Le ticket est enregistré puis visible dans le BMS. Toujours confirmer le titre et la description avec l'utilisateur avant l'envoi.",
+      "Crée IMMÉDIATEMENT un ticket de demande de fonctionnalité dès que l'utilisateur demande une fonctionnalité nouvelle ou une évolution (ex. « ajoute… », « il faudrait… », « on veut pouvoir… », « ce serait bien de… »). Ne demande JAMAIS de confirmation : déduis un titre court et explicite (5 caractères minimum) et une description fidèle de la demande, priorité medium sauf urgence exprimée (high). Le ticket est enregistré puis réalisé ; l'utilisateur est prévenu automatiquement du résultat.",
     method: "POST",
     path: "/api/feature-tickets",
     category: "Tickets",
     requiredRoles: [...TICKET_ALLOWED_ROLES],
     params: [
-      { name: "title", type: "string", description: "Titre court de la fonctionnalité demandée", required: true },
-      { name: "description", type: "string", description: "Détail du besoin exprimé par l'utilisateur" },
-      { name: "priority", type: "string", description: "Priorité perçue", enum: ["low", "medium", "high"] },
+      { name: "title", type: "string", description: "Titre court et explicite de la fonctionnalité demandée (5 caractères minimum, sans guillemets)", required: true },
+      { name: "description", type: "string", description: "Détail du besoin, repris des mots de l'utilisateur" },
+      { name: "priority", type: "string", description: "Priorité perçue : high si blocage/urgence exprimée, sinon medium", enum: ["low", "medium", "high"] },
     ],
   },
   {
     name: "list_feature_tickets",
     description:
-      "Lister les tickets de demande de fonctionnalité avec leur statut (open, done, rejected) et la réponse éventuelle, pour répondre aux questions d'avancement comme « où en est mon ticket ? » ou « qu'est-ce qui a été refusé et pourquoi ? ».",
+      "Lister les tickets de demande de fonctionnalité avec leur statut (open, done, rejected) et le motif éventuel (resolution), pour répondre aux questions d'avancement comme « où en est mon ticket ? », « c'est prêt ? » ou « pourquoi ça a été refusé ? ».",
     method: "GET",
     path: "/api/feature-tickets",
     category: "Tickets",

@@ -39,3 +39,4 @@ export { modules } from "./modules";
 export { groupConfigs } from "./groupConfigs";
 export { studentRequests } from "./student-requests";
 export { featureTickets } from "./feature-tickets";
+export { aiConversations } from "./ai-conversations";

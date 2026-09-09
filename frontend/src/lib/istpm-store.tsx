@@ -1,14 +1,12 @@
 /**
- * Mutable, frontend-only data store for the ISTPM CRM.
+ * Store de données ISTPM — source unique : le backend.
  *
- * `istpm-data.ts` provides the immutable seed (sample records + reference
- * lists). This provider copies that seed into React state so the UI can
- * actually create, edit and delete records, and recomputes every dashboard
- * aggregate from the live state   so adding a student immediately moves the
- * KPIs, the donut and the "à traiter" counters.
- *
- * There is no backend: state lives in memory and is mirrored to localStorage
- * so a refresh keeps your edits. `reset()` restores the pristine sample data.
+ * Chaque collection est chargée depuis l'API au montage (`refresh()`), et
+ * chaque écriture attend la réponse serveur avant d'être appliquée : aucun
+ * contenu de démonstration, aucun miroir localStorage, aucune écriture
+ * fantôme. Les agrégats (dashboard, financier, répartitions) sont dérivés
+ * des lignes serveur. En cas d'échec réseau, `syncFailed` permet d'afficher
+ * un bandeau explicite au lieu de données inventées.
  */
 import {
   createContext,
@@ -22,55 +20,30 @@ import {
 } from "react";
 import { toast } from "sonner";
 import {
-  ETUDIANTS,
-  FORMATEURS,
-  EXAMENS,
-  BULLETINS,
-  STAGES,
-  ACTIVITE_RECENTE,
-  FILIERES,
-  NIVEAUX,
-  REUSSITE_FILIERE,
   FILIERE_COURT,
   type Etudiant,
+  type Filiere,
   type Formateur,
   type GroupConfig,
   type Examen,
   type Bulletin,
   type Stage,
-  type ActiviteItem,
   type Seance,
-  SEANCES,
-  genererSeances,
-  bornesAnneeUniversitaire,
-  joursChomes,
-  CRENEAUX_LABELS,
   parseCreneaux,
   type Creneau,
   minutesDepuisMinuit,
   ajouterMinutes,
-  STRUCTURES_ACCUEIL,
-  DEFAULT_MODULES,
-  DEFAULT_GROUP_CONFIGS,
   type ModuleRecord,
   type LignePaiement,
   type NoteModule,
   type PaiementLigne,
   type StatutPaiement,
   type PaiementMensuel,
-  getAcademicYearMonths,
-  getCurrentAcademicYear,
   type Mention,
   type Decision,
   type ExamDocument,
   type StructureAccueil,
 } from "@/lib/istpm-data";
-import {
-  deleteDoc,
-  ensureSeedDocuments,
-  putDoc,
-  MAX_DOC_SIZE,
-} from "@/lib/doc-store";
 import {
   fetchEtudiants as apiFetchEtudiants,
   createEtudiant as apiCreateEtudiant,
@@ -95,21 +68,20 @@ import {
   uploadExamenDocumentApi,
   deleteExamenDocumentApi,
   fetchBulletins as apiFetchBulletins,
-  createBulletin as apiCreateBulletin,
   updateBulletin as apiUpdateBulletin,
-  deleteBulletin as apiDeleteBulletin,
   publierBulletinApi,
   publierTousBulletinsApi,
   fetchStages as apiFetchStages,
   createStage as apiCreateStage,
   updateStage as apiUpdateStage,
   deleteStage as apiDeleteStage,
-  validerStageApi,
   createPaiementsMensuels as apiCreatePaiementsMensuels,
   updatePaiementMensuel as apiUpdatePaiementMensuel,
+  fetchPaiementsMensuels as apiFetchPaiementsMensuels,
   createNote as apiCreateNote,
   deleteNote as apiDeleteNote,
   createFiliereApi,
+  fetchFilieres as apiFetchFilieres,
   deleteFiliereApi,
   createStructureApi,
   updateStructureApi,
@@ -117,6 +89,8 @@ import {
   fetchStructuresApi as apiFetchStructures,
   fetchStageServicesApi as apiFetchStageServices,
   createStageServiceApi as apiCreateStageService,
+  updateStageServiceApi as apiUpdateStageService,
+  deleteStageServiceApi as apiDeleteStageService,
   fetchModulesApi,
   createModuleApi,
   updateModuleApi,
@@ -127,16 +101,25 @@ import {
   createSeance as apiCreateSeance,
   updateSeance as apiUpdateSeance,
   deleteSeance as apiDeleteSeance,
+  fetchHolidays as apiFetchHolidays,
+  fetchVacations as apiFetchVacations,
+  fetchExceptions as apiFetchExceptions,
+  openAttendanceSession as apiOpenAttendanceSession,
+  fetchAttendanceSession as apiFetchAttendanceSession,
+  closeAttendanceSession as apiCloseAttendanceSession,
+  fetchSeanceAttendance as apiFetchSeanceAttendance,
+  saveAttendanceBulk as apiSaveAttendanceBulk,
+  type PaiementMensuelApi,
+  type HolidayRow,
+  type VacationRow,
+  type CalendarExceptionRow,
+  type AttendanceEntry,
 } from "@/lib/istpm-api";
-import { useAuth, getStoredRole, DEMO_FORMATEUR_ID } from "@/lib/auth";
+import { useAuth, getStoredRole } from "@/lib/auth";
 
 /* ------------------------------------------------------------------ */
-/*  Persistance                                                        */
+/*  Instantané (toujours issu du serveur, jamais de démonstration)      */
 /* ------------------------------------------------------------------ */
-
-/** Bump when the record shape changes: stored data on an old version is
- *  discarded rather than loaded into a UI that no longer understands it. */
-const STORAGE_KEY = "istpm-data-v9";
 
 type Snapshot = {
   etudiants: Etudiant[];
@@ -144,7 +127,6 @@ type Snapshot = {
   examens: Examen[];
   bulletins: Bulletin[];
   stages: Stage[];
-  activite: ActiviteItem[];
   seances: Seance[];
   filieres: string[];
   structuresAccueil: StructureAccueil[];
@@ -154,165 +136,32 @@ type Snapshot = {
   groupConfigs: GroupConfig[];
   /** Créneaux horaires, au format libellé des Paramètres (« 08:30 – 10:00 »). */
   creneaux: string[];
+  /** Jours chômés (fériés + vacances + exceptions) issus de l'API. */
+  joursChomes: { date: string; nom: string; type: "ferie" | "vacances" }[];
 };
 
-function seedModules(): ModuleRecord[] {
-  return DEFAULT_MODULES.map((m, i) => ({ id: `mod-seed-${i}`, ...m }));
-}
-
-/**
- * Génère un suivi mensuel de démonstration pour un étudiant dont aucun paiement
- * n'a encore été saisi, afin que la liste montre tous les statuts possibles
- * (payé / en attente / en retard / impayé). Le profil de chaque étudiant découle
- * de son statut de paiement d'origine (`e.paiement`), ce qui répartit
- * naturellement les statuts sur toute la promotion.
- */
-function genererRecordsDemo(e: Etudiant): PaiementMensuel[] {
-  const mois = getAcademicYearMonths(getCurrentAcademicYear());
-  const du = e.fraisMensuels;
-
-  // Statut de chaque mois selon le profil de l'étudiant (indice 0 = septembre).
-  const statutParMois = (i: number): StatutPaiement => {
-    switch (e.paiement) {
-      case "paye":
-        return "paye";
-      case "en_attente":
-        return i < 6 ? "paye" : "en_attente";
-      case "retard":
-        return i < 4 ? "paye" : i < 6 ? "retard" : "impaye";
-      case "impaye":
-      default:
-        return i < 2 ? "paye" : "impaye";
-    }
+/** Collections vides : l'unique source est le backend (`refresh()` au montage). */
+function emptySnapshot(): Snapshot {
+  return {
+    etudiants: [],
+    formateurs: [],
+    examens: [],
+    bulletins: [],
+    stages: [],
+    seances: [],
+    filieres: [],
+    structuresAccueil: [],
+    servicesStage: [],
+    modules: [],
+    groupConfigs: [],
+    creneaux: [],
+    joursChomes: [],
   };
-
-  return mois.map((m, i) => {
-    const statut = statutParMois(i);
-    // Mois calendaire pour une date de règlement plausible (sept→déc = année de
-    // début, jan→juin = année suivante).
-    const [, annee = ""] = m.split(" ");
-    const moisCal = i < 4 ? i + 9 : i - 3;
-    return {
-      id: `pm-${e.id}-${i}`,
-      etudiantId: e.id,
-      mois: m,
-      montantDu: du,
-      montantPaye: statut === "paye" ? du : 0,
-      datePaiement:
-        statut === "paye"
-          ? `${annee}-${String(moisCal).padStart(2, "0")}-05`
-          : "",
-      mode: "Espèces" as const,
-      recu: statut === "paye" ? `R-${e.id}-${i}` : "",
-      statut,
-      notes: "",
-    };
-  });
-}
-
-function seed(): Snapshot {
-  // Deep clone so edits never mutate the imported seed arrays.
-  return structuredClone({
-    etudiants: ETUDIANTS.map((e) => ({
-      ...e,
-      paiementsMensuelsRecords: (e as any).paiementsMensuelsRecords?.length
-        ? (e as any).paiementsMensuelsRecords
-        : genererRecordsDemo(e),
-    })),
-    formateurs: FORMATEURS,
-    examens: EXAMENS,
-    bulletins: BULLETINS,
-    stages: STAGES,
-    activite: ACTIVITE_RECENTE,
-    seances: SEANCES,
-    filieres: [...FILIERES],
-    structuresAccueil: structuredClone(STRUCTURES_ACCUEIL),
-    servicesStage: [...new Set(STAGES.map((s) => (s.service ?? "").trim()).filter(Boolean))],
-    modules: seedModules(),
-    groupConfigs: structuredClone(DEFAULT_GROUP_CONFIGS),
-    creneaux: [...CRENEAUX_LABELS],
-  }) as Snapshot;
-}
-
-function load(): Snapshot {
-  if (typeof window === "undefined") return seed();
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seed();
-    const parsed = JSON.parse(raw) as Snapshot;
-    // Guard against a truncated or hand-edited payload.
-    if (!Array.isArray(parsed?.etudiants)) return seed();
-
-    // Backfill fields added after this snapshot was persisted.
-    if (!Array.isArray(parsed.modules)) parsed.modules = seedModules();
-    if (!Array.isArray((parsed as Snapshot).servicesStage)) {
-      const stagesArr = Array.isArray(parsed.stages) ? parsed.stages : [];
-      (parsed as Snapshot).servicesStage = [...new Set(stagesArr.map((s) => ((s as Stage).service ?? "").trim()).filter(Boolean))];
-    }
-    if (!Array.isArray(parsed.groupConfigs)) parsed.groupConfigs = structuredClone(DEFAULT_GROUP_CONFIGS);
-    if (!Array.isArray(parsed.creneaux) || !parsed.creneaux.length)
-      parsed.creneaux = [...CRENEAUX_LABELS];
-    for (const e of parsed.etudiants) {
-      // Suivi mensuel de démonstration si aucun paiement n'a encore été saisi,
-      // pour que tous les statuts soient visibles dans la liste.
-      if (
-        !Array.isArray(e.paiementsMensuelsRecords) ||
-        e.paiementsMensuelsRecords.length === 0
-      ) {
-        e.paiementsMensuelsRecords = genererRecordsDemo(e);
-      }
-    }
-
-    // Réaligne le planning sur l'année universitaire courante.
-    //
-    // Les séances du gabarit ("se-0-…", "se-1-…") sont figées à la date de
-    // sauvegarde : un instantané écrit sous l'ancien générateur ne couvrait que
-    // deux semaines autour du jour de consultation, éventuellement hors année
-    // scolaire. On les régénère dès qu'elles ne correspondent plus à l'année en
-    // cours ; les séances créées à la main (autres ids) sont conservées.
-    const anneeCourante = getCurrentAcademicYear();
-    const seedSeances = parsed.seances?.filter((s) => /^se-\d+-\d+$/.test(s.id)) ?? [];
-    const { debut, fin } = bornesAnneeUniversitaire(anneeCourante);
-    const chomes = joursChomes(anneeCourante);
-    // Un instantané est périmé s'il déborde de l'année scolaire ou s'il place
-    // encore des cours sur un jour férié ou de vacances.
-    const couvreAnnee =
-      seedSeances.length > 0 &&
-      seedSeances.every((s) => {
-        const d = new Date(s.date);
-        return d >= debut && d <= fin && !chomes.has(s.date);
-      });
-    if (!couvreAnnee) {
-      const surMesure = (parsed.seances ?? []).filter(
-        (s) => !/^se-\d+-\d+$/.test(s.id),
-      );
-      parsed.seances = [...genererSeances(anneeCourante), ...surMesure];
-    }
-
-    return parsed;
-  } catch {
-    return seed();
-  }
 }
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
-
-let counter = 0;
-/** Collision-free id for records created during this session. */
-function uid(prefix: string) {
-  counter += 1;
-  return `${prefix}-${Date.now().toString(36)}${counter}`;
-}
-
-function isUUID(s: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-}
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /** Moyenne pondérée par coefficient, arrondie au centième. */
 export function moyennePonderee(notes: NoteModule[]): number {
@@ -334,6 +183,196 @@ export function decisionFor(moy: number, notes: NoteModule[]): Decision {
   const echecs = notes.filter((n) => n.note < 10).length;
   if (echecs === 0) return "Admis";
   return echecs <= 1 ? "Admis avec dette" : "Rattrapage";
+}
+
+/* ------------------------------------------------------------------ */
+/*  Normalisation des lignes serveur (numeric → number, valeurs sûres)  */
+/* ------------------------------------------------------------------ */
+
+function num(v: unknown, fallback = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normNoteModule(n: Record<string, unknown>): NoteModule {
+  return {
+    id: String(n.id ?? ""),
+    module: String(n.module ?? ""),
+    note: num(n.note),
+    coef: num(n.coef, 1),
+    credits: num(n.credits),
+    examen: (n.examen as string) || undefined,
+  };
+}
+
+function normPaiementRecord(r: PaiementMensuelApi): PaiementMensuel {
+  const mode = ["Espèces", "Virement", "Carte", "Chèque"].includes(String(r.mode))
+    ? (r.mode as PaiementMensuel["mode"])
+    : "Espèces";
+  const statut = (["paye", "en_attente", "retard", "impaye"] as const).includes(
+    r.statut as PaiementMensuel["statut"],
+  )
+    ? (r.statut as PaiementMensuel["statut"])
+    : "en_attente";
+  return {
+    id: String(r.id),
+    etudiantId: String(r.etudiantId),
+    mois: String(r.mois ?? ""),
+    montantDu: num(r.montantDu),
+    montantPaye: num(r.montantPaye),
+    datePaiement: String(r.datePaiement ?? ""),
+    mode,
+    recu: String(r.recu ?? ""),
+    statut,
+    notes: String(r.notes ?? ""),
+  };
+}
+
+function historiqueDepuisRecords(records: PaiementMensuel[]): LignePaiement[] {
+  return records.map((r) => ({
+    id: r.id,
+    date: r.datePaiement,
+    montant: r.montantPaye,
+    mode: r.mode as LignePaiement["mode"],
+    periode: r.mois,
+    recu: r.recu,
+    statut: r.statut as LignePaiement["statut"],
+    mois: r.mois,
+  }));
+}
+
+/** Statut global déduit des lignes canoniques (jamais inventé). */
+function statutPaiementGlobal(statuts: StatutPaiement[]): StatutPaiement {
+  if (statuts.length > 0 && statuts.every((s) => s === "paye")) return "paye";
+  if (statuts.some((s) => s === "retard")) return "retard";
+  if (statuts.some((s) => s === "impaye")) return "impaye";
+  return "en_attente";
+}
+
+function normEtudiant(raw: Record<string, unknown>, records: PaiementMensuel[]): Etudiant {
+  const notes = Array.isArray(raw.notes)
+    ? (raw.notes as Record<string, unknown>[]).map(normNoteModule)
+    : [];
+  const histo = Array.isArray(raw.historique) ? raw.historique as Record<string, unknown>[] : [];
+  const historique: LignePaiement[] = histo.length
+    ? histo.map((h) => ({
+        id: String(h.id ?? ""),
+        date: String(h.date ?? ""),
+        montant: num(h.montant),
+        mode: String(h.mode ?? "") as LignePaiement["mode"],
+        periode: String(h.periode ?? h.mois ?? ""),
+        recu: String(h.recu ?? ""),
+        statut: String(h.statut ?? "") as LignePaiement["statut"],
+        mois: h.mois !== undefined ? String(h.mois) : "",
+      }))
+    : historiqueDepuisRecords(records);
+  return {
+    id: String(raw.id ?? ""),
+    cne: String(raw.cne ?? ""),
+    matricule: String(raw.matricule ?? ""),
+    prenom: String(raw.prenom ?? ""),
+    nom: String(raw.nom ?? ""),
+    filiere: String(raw.filiere ?? ""),
+    niveau: String(raw.niveau ?? ""),
+    annee: String(raw.annee ?? ""),
+    groupe: String(raw.groupe ?? ""),
+    statut: String(raw.statut ?? "inscrit"),
+    paiement: String(raw.paiement ?? "en_attente"),
+    moyenne: num(raw.moyenne),
+    telephone: String(raw.telephone ?? ""),
+    email: String(raw.email ?? ""),
+    dateNaissance: String(raw.dateNaissance ?? raw.date_naissance ?? ""),
+    ville: String(raw.ville ?? ""),
+    photoUrl: String(raw.photoUrl ?? (raw as { photo_url?: string }).photo_url ?? ""),
+    fraisMensuels: num(raw.fraisMensuels ?? Math.round(num(raw.fraisAnnuels) / 10)),
+    notes,
+    historique,
+    paiementsMensuels: (raw.paiementsMensuels ?? {}) as Etudiant["paiementsMensuels"],
+    paiementsMensuelsRecords: records,
+    archived: raw.archived === true,
+    stageEnCours: (raw.stageEnCours as string | undefined) ?? undefined,
+  } as Etudiant;
+}
+
+function normStage(raw: Record<string, unknown>): Stage {
+  return {
+    ...(raw as unknown as Stage),
+    id: String(raw.id ?? ""),
+    noteSoutenance: raw.noteSoutenance == null || raw.noteSoutenance === "" ? undefined : num(raw.noteSoutenance),
+  } as Stage;
+}
+
+function normExamen(raw: Record<string, unknown>): Examen {
+  const doc = raw.document as Record<string, unknown> | null | undefined;
+  return {
+    ...(raw as unknown as Examen),
+    id: String(raw.id ?? ""),
+    duree: num(raw.duree, 120),
+    etudiantsConvoques: num(raw.etudiantsConvoques),
+    document: doc
+      ? {
+          id: String(doc.id ?? ""),
+          nom: String(doc.nom ?? ""),
+          taille: num(doc.taille),
+          mime: String(doc.mime ?? ""),
+          uploadedAt: String(doc.uploadedAt ?? ""),
+        }
+      : undefined,
+  } as Examen;
+}
+
+function normBulletin(raw: Record<string, unknown>): Bulletin {
+  return {
+    ...(raw as unknown as Bulletin),
+    id: String(raw.id ?? ""),
+    moyenne: num(raw.moyenne),
+    evaluationClinique: num(raw.evaluationClinique),
+    notes: Array.isArray(raw.notes)
+      ? (raw.notes as Record<string, unknown>[]).map(normNoteModule)
+      : [],
+  } as Bulletin;
+}
+
+function normModule(raw: Record<string, unknown>): ModuleRecord {
+  return {
+    id: String(raw.id ?? ""),
+    nom: String(raw.nom ?? ""),
+    filiere: String(raw.filiere ?? ""),
+    code: (raw.code as string) ?? null,
+    description: (raw.description as string) ?? null,
+    volumeHoraire: raw.volumeHoraire == null ? null : num(raw.volumeHoraire),
+    coefficient: (raw.coefficient as string | number) ?? null,
+  } as ModuleRecord;
+}
+
+/** Jours chômés : fériés + vacances (plages éclatées) + exceptions. */
+function construireJoursChomes(
+  holidays: HolidayRow[],
+  vacations: VacationRow[],
+  exceptions: CalendarExceptionRow[],
+): Snapshot["joursChomes"] {
+  const out: Snapshot["joursChomes"] = [];
+  const seen = new Set<string>();
+  const push = (date: string, nom: string, type: "ferie" | "vacances") => {
+    const d = date.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || seen.has(d)) return;
+    seen.add(d);
+    out.push({ date: d, nom, type });
+  };
+  for (const h of holidays ?? []) push(String(h.date ?? ""), String(h.label ?? ""), "ferie");
+  for (const v of vacations ?? []) {
+    const debut = String(v.startDate ?? "").slice(0, 10);
+    const fin = String(v.endDate ?? "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(debut) || !/^\d{4}-\d{2}-\d{2}$/.test(fin)) continue;
+    // Itère en UTC pour éviter les décalages de fuseau, plafonné à 120 jours.
+    let t = Date.parse(`${debut}T00:00:00Z`);
+    const end = Date.parse(`${fin}T00:00:00Z`);
+    for (let i = 0; i < 120 && t <= end; i += 1, t += 86_400_000) {
+      push(new Date(t).toISOString().slice(0, 10), String(v.label ?? ""), "vacances");
+    }
+  }
+  for (const x of exceptions ?? []) push(String(x.date ?? ""), String(x.label ?? ""), "vacances");
+  return out;
 }
 
 /* ------------------------------------------------------------------ */
@@ -377,7 +416,6 @@ type IstpmCtx = {
   examens: Examen[];
   bulletins: Bulletin[];
   stages: Stage[];
-  activite: ActiviteItem[];
   seances: Seance[];
   filieres: string[];
   structuresAccueil: StructureAccueil[];
@@ -389,7 +427,15 @@ type IstpmCtx = {
   creneauxLabels: string[];
   /** Créneaux exploitables, triés par heure de début. */
   creneaux: Creneau[];
-  setCreneaux: (labels: string[]) => void;
+  setCreneaux: (labels: string[]) => Promise<void>;
+  /** Jours chômés issus de l'API (fériés + vacances + exceptions). */
+  joursChomes: { date: string; nom: string; type: "ferie" | "vacances" }[];
+  /** Chargement initial en cours. */
+  loading: boolean;
+  /** Dernier rafraîchissement en échec (backend injoignable) : afficher un bandeau, pas des données. */
+  syncFailed: boolean;
+  /** Recharge tout depuis le backend (remplace l'ancien `reset()` de démo). */
+  refresh: () => Promise<void>;
 
   /** Photo d'identité d'un étudiant, résolue par id ou par CNE (ou `undefined`). */
   photoDe: (cleOuCne: string | undefined | null) => string | undefined;
@@ -413,7 +459,7 @@ type IstpmCtx = {
   };
   repartitionFiliere: { name: string; filiere: string; value: number }[];
   repartitionNiveau: { name: string; value: number }[];
-  reussiteFiliere: typeof REUSSITE_FILIERE;
+  reussiteFiliere: { name: string; filiere: string; value: number }[];
   etudiantsARisque: Etudiant[];
   aRelancer: Etudiant[];
   aTraiter: {
@@ -422,38 +468,38 @@ type IstpmCtx = {
     stagesAValider: number;
   };
 
-  /* Actions */
-  addEtudiant: (data: NouvelEtudiant) => Etudiant;
-  updateEtudiant: (id: string, patch: Partial<Etudiant>) => void;
-  deleteEtudiant: (id: string) => void;
-  restoreEtudiant: (id: string) => void;
+  /* Actions (toutes attendent le serveur ; rejet = erreur à afficher) */
+  addEtudiant: (data: NouvelEtudiant) => Promise<Etudiant>;
+  updateEtudiant: (id: string, patch: Partial<Etudiant>) => Promise<Etudiant>;
+  deleteEtudiant: (id: string) => Promise<void>;
+  restoreEtudiant: (id: string) => Promise<void>;
 
-  addFormateur: (data: NouveauFormateur) => Formateur;
-  updateFormateur: (id: string, patch: Partial<Formateur>) => void;
-  deleteFormateur: (id: string) => void;
-  archiveFormateur: (id: string, groupReassignments: Array<{ groupName: string; targetFormateurId: string }>, filiereReassignment?: { targetFormateurId: string }) => void;
-  restoreFormateur: (id: string) => void;
+  addFormateur: (data: NouveauFormateur) => Promise<Formateur>;
+  updateFormateur: (id: string, patch: Partial<Formateur>) => Promise<Formateur>;
+  deleteFormateur: (id: string) => Promise<void>;
+  archiveFormateur: (id: string, groupReassignments: Array<{ groupName: string; targetFormateurId: string }>, filiereReassignment?: { targetFormateurId: string }) => Promise<void>;
+  restoreFormateur: (id: string) => Promise<void>;
 
-  addGroupConfig: (data: { name: string; semester: string; studentCount?: number }) => GroupConfig;
-  updateGroupConfig: (id: string, patch: { name?: string; semester?: string; studentCount?: number }) => void;
-  deleteGroupConfig: (id: string) => void;
+  addGroupConfig: (data: { name: string; semester: string; studentCount?: number }) => Promise<GroupConfig>;
+  updateGroupConfig: (id: string, patch: { name?: string; semester?: string; studentCount?: number }) => Promise<GroupConfig>;
+  deleteGroupConfig: (id: string) => Promise<void>;
 
   /** `createdBy` reçoit `auteurId`   l'auteur est toujours enregistré. */
-  addExamen: (data: NouvelExamen, auteurId: string) => Examen;
-  updateExamen: (id: string, patch: Partial<Examen>) => void;
-  deleteExamen: (id: string) => void;
-  saveNotesExamen: (examenId: string, saisies: SaisieNote[]) => number;
-  /** Dépose le sujet : le fichier va dans IndexedDB, les métadonnées ici. */
+  addExamen: (data: NouvelExamen, auteurId: string) => Promise<Examen>;
+  updateExamen: (id: string, patch: Partial<Examen>) => Promise<Examen>;
+  deleteExamen: (id: string) => Promise<void>;
+  saveNotesExamen: (examenId: string, saisies: SaisieNote[]) => Promise<number>;
+  /** Dépose le sujet sur le serveur (MinIO) ; l'aperçu relit le serveur. */
   attachDocument: (examenId: string, file: File) => Promise<void>;
   removeDocument: (examenId: string) => Promise<void>;
 
-  updateBulletin: (id: string, patch: Partial<Bulletin>) => void;
-  publierBulletin: (id: string) => void;
-  publierTousBulletins: () => number;
+  updateBulletin: (id: string, patch: Partial<Bulletin>) => Promise<void>;
+  publierBulletin: (id: string) => Promise<void>;
+  publierTousBulletins: () => Promise<number>;
 
-  addStage: (data: NouveauStage) => Stage;
-  updateStage: (id: string, patch: Partial<Stage>) => void;
-  deleteStage: (id: string) => void;
+  addStage: (data: NouveauStage) => Promise<Stage>;
+  updateStage: (id: string, patch: Partial<Stage>) => Promise<Stage>;
+  deleteStage: (id: string) => Promise<void>;
 
   payerMois: (
     etudiantId: string,
@@ -465,7 +511,7 @@ type IstpmCtx = {
       recu?: string;
       notes?: string;
     },
-  ) => void;
+  ) => Promise<void>;
 
   updatePaiementMensuel: (
     id: string,
@@ -478,186 +524,147 @@ type IstpmCtx = {
       statut: StatutPaiement;
       notes: string;
     }>,
-  ) => void;
+  ) => Promise<void>;
 
   /** Enregistre une note (module + examen) pour un étudiant et recalcule sa moyenne. */
-  addNote: (etudiantId: string, note: NoteModule) => void;
+  addNote: (etudiantId: string, note: NoteModule) => Promise<void>;
+  deleteNote: (id: string, etudiantId: string) => Promise<void>;
 
-  addFiliere: (nom: string) => void;
-  deleteFiliere: (nom: string) => void;
+  addFiliere: (nom: string) => Promise<void>;
+  deleteFiliere: (nom: string) => Promise<void>;
 
-  addStructureAccueil: (nom: string, capacite?: number) => void;
-  updateStructureAccueil: (oldName: string, body: { nouveauNom?: string; capacite?: number }) => void;
-  deleteStructureAccueil: (nom: string) => void;
+  addStructureAccueil: (nom: string, capacite?: number) => Promise<void>;
+  updateStructureAccueil: (oldName: string, body: { nouveauNom?: string; capacite?: number }) => Promise<void>;
+  deleteStructureAccueil: (nom: string) => Promise<void>;
 
   /** Persiste un service de stage libre (dropdown créable). */
-  addServiceStage: (nom: string) => void;
+  addServiceStage: (nom: string) => Promise<void>;
+  updateServiceStage: (nom: string, body: { nouveauNom?: string }) => Promise<void>;
+  deleteServiceStage: (nom: string) => Promise<void>;
 
-  addModule: (data: Omit<ModuleRecord, "id">) => void;
-  updateModule: (id: string, data: Omit<ModuleRecord, "id">) => void;
-  deleteModule: (id: string) => void;
+  addModule: (data: Omit<ModuleRecord, "id">) => Promise<ModuleRecord>;
+  updateModule: (id: string, data: Omit<ModuleRecord, "id">) => Promise<ModuleRecord>;
+  deleteModule: (id: string) => Promise<void>;
 
-  addSeance: (data: NouvelleSeance) => Seance;
-  updateSeance: (id: string, patch: Partial<Seance>) => void;
-  deleteSeance: (id: string) => void;
+  addSeance: (data: NouvelleSeance, force?: boolean) => Promise<Seance>;
+  updateSeance: (id: string, patch: Partial<Seance>, force?: boolean) => Promise<Seance>;
+  deleteSeance: (id: string) => Promise<void>;
   /** Glisser-déposer : conserve la durée, ne change que le départ. */
-  moveSeance: (id: string, date: string, debut: string) => void;
+  moveSeance: (id: string, date: string, debut: string, force?: boolean) => Promise<void>;
   conflitsSeance: (c: ConflitCandidate, ignorerId?: string) => Conflit[];
 
-  reset: () => void;
+  /* Appel en séance (roll-call) */
+  openSession: (seanceId: string) => Promise<{ id: string }>;
+  fetchSession: (seanceId: string) => Promise<{ id: string } | null>;
+  closeSession: (sessionId: string) => Promise<void>;
+  fetchPresences: (seanceId: string) => Promise<AttendanceEntry[]>;
+  savePresences: (seanceId: string, entries: AttendanceEntry[]) => Promise<void>;
 };
 
 const Ctx = createContext<IstpmCtx | null>(null);
 
 export function IstpmProvider({ children }: { children: ReactNode }) {
-  // Initialise straight from storage via lazy state rather than in an effect.
-  //
-  // The effect-based variant loses data: on the first commit the persist effect
-  // below runs with the *seed* still in state and overwrites the stored
-  // snapshot, and under StrictMode's double-invoked effects the subsequent read
-  // then loads that seed back. This is a client-only SPA with no SSR, so
-  // reading storage during render carries none of the hydration risk that makes
-  // the effect pattern worthwhile in the locale and role providers.
-  const [snap, setSnap] = useState<Snapshot>(load);
+  // Source unique : le backend. L'état démarre vide ; `refresh()` le remplit
+  // au montage. Aucun seed, aucun miroir localStorage.
+  const [snap, setSnap] = useState<Snapshot>(emptySnapshot);
+  const [loading, setLoading] = useState(true);
+  const [syncFailed, setSyncFailed] = useState(false);
+  // Miroir lecture pour les actions async (lecture avant `await`, sans écrire).
+  const snapRef = useRef(snap);
+  snapRef.current = snap;
 
-  // Crée les fichiers des sujets de démonstration absents d'IndexedDB, puis
-  // aligne la taille affichée sur celle du fichier réellement écrit.
-  useEffect(() => {
-    let cancelled = false;
-    ensureSeedDocuments(snap.examens).then((sizes) => {
-      if (cancelled || !Object.keys(sizes).length) return;
-      setSnap((s) => {
-        const stale = s.examens.some(
-          (x) => x.document && sizes[x.document.id] !== undefined
-            && sizes[x.document.id] !== x.document.taille,
-        );
-        if (!stale) return s;
-        return {
-          ...s,
-          examens: s.examens.map((x) =>
-            x.document && sizes[x.document.id] !== undefined
-              ? { ...x, document: { ...x.document, taille: sizes[x.document.id] } }
-              : x,
-          ),
-        };
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-    // Une seule passe au montage : les dépôts ultérieurs gèrent leur fichier.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Synchronisation serveur : remplacement intégral, jamais de fusion locale.
+  // Échec réseau = `syncFailed` (bandeau explicite), jamais de données inventées.
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setSyncFailed(false);
+    try {
+      const [
+        etudiantsRaw,
+        formateursRaw,
+        examensRaw,
+        bulletinsRaw,
+        stagesRaw,
+        seancesRaw,
+        structuresRaw,
+        servicesRaw,
+        reglages,
+        mensuelsRaw,
+        holidaysRaw,
+        vacationsRaw,
+        exceptionsRaw,
+        modulesRaw,
+        filieresRaw,
+        groupsRaw,
+      ] = await Promise.all([
+        apiFetchEtudiants(),
+        apiFetchFormateurs(),
+        apiFetchExamens(),
+        apiFetchBulletins(),
+        apiFetchStages(),
+        apiFetchSeances(),
+        apiFetchStructures(),
+        apiFetchStageServices(),
+        fetchSettings().catch(() => ({}) as Record<string, unknown>),
+        apiFetchPaiementsMensuels().catch(() => [] as PaiementMensuelApi[]),
+        apiFetchHolidays().catch(() => [] as HolidayRow[]),
+        apiFetchVacations().catch(() => [] as VacationRow[]),
+        apiFetchExceptions().catch(() => [] as CalendarExceptionRow[]),
+        fetchModulesApi().catch(() => [] as ModuleRecord[]),
+        apiFetchFilieres().catch(() => [] as string[]),
+        apiFetchGroupConfigs().catch(() => [] as GroupConfig[]),
+      ]);
 
-  // Sync from the backend API on mount   **localStorage/seed-first**.
-  //
-  // The store is the source of truth (see istpm-store-is-localstorage-first):
-  // a collection is only taken from the backend when the local one is *empty*,
-  // never replacing seed data or the user's optimistic edits. A blind replace
-  // was the root cause of two bugs: exams created here (which the backend
-  // rejects for the enseignant role, or never persists) vanished on refresh,
-  // and the rich per-formateur fields (createdBy / modules / groupes) were
-  // flattened, so switching teacher stopped changing what was shown.
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const [etudiants, formateurs, examens, bulletins, stages, seances, structures, servicesStageRemote, reglages] =
-          await Promise.all([
-            apiFetchEtudiants(),
-            apiFetchFormateurs(),
-            apiFetchExamens(),
-            apiFetchBulletins(),
-            apiFetchStages(),
-            apiFetchSeances(),
-            apiFetchStructures().catch(() => [] as string[]),
-            apiFetchStageServices().catch(() => [] as string[]),
-            fetchSettings().catch(() => ({}) as Record<string, unknown>),
-          ]);
-        if (!mounted) return;
-        // Keep local data when we already have some; only backfill empties.
-        const prefer = <T,>(local: T[], remote: T[]): T[] =>
-          local.length > 0 ? local : remote;
-        const enrichEtudiant = (raw: Record<string, unknown>): Etudiant => {
-          const e = raw as unknown as Etudiant;
-          if (!e.fraisMensuels && (raw as any).fraisAnnuels) {
-            (e as any).fraisMensuels = Math.round(Number((raw as any).fraisAnnuels) / 10);
-          }
-          const pm = (raw as any).paiementsMensuels;
-          if (pm && typeof pm === "object" && Object.keys(pm).length > 0) {
-            (e as any).paiementsMensuels = pm;
-          } else if (e.historique) {
-            const derived: Record<string, StatutPaiement> = {};
-            for (const h of e.historique) {
-              if (h.mois) derived[h.mois] = h.statut;
-            }
-            (e as any).paiementsMensuels = derived;
-          }
-          return e;
-        };
-        const remoteEtudiants = (etudiants as unknown as Record<string, unknown>[]).map(
-          enrichEtudiant,
-        );
-        // La photo d'identité fait toujours foi côté serveur : quand l'étudiant
-        // la met à jour depuis son espace, elle doit se propager à toutes les
-        // listes même si le store local a déjà des fiches (prefer garderait
-        // l'ancienne). On superpose donc juste `photoUrl` par id.
-        // Les identifiants locaux (démo) et serveur diffèrent : on indexe la
-        // photo distante par id ET par CNE pour la retrouver quel que soit le
-        // référentiel de la liste locale.
-        const remotePhotoByKey = new Map<string, string>();
-        for (const e of remoteEtudiants) {
-          const url = String(
-            (e as { photoUrl?: string }).photoUrl ??
-              (e as unknown as { photo_url?: string }).photo_url ??
-              "",
-          ).trim();
-          if (!url) continue;
-          if (e.id) remotePhotoByKey.set(String(e.id), url);
-          if (e.cne) remotePhotoByKey.set(`cne:${String(e.cne)}`, url);
-        }
-        const mergeEtudiants = (local: Etudiant[]): Etudiant[] => {
-          if (local.length === 0) return remoteEtudiants;
-          return local.map((e) => {
-            const remotePhoto =
-              remotePhotoByKey.get(e.id) ??
-              (e.cne ? remotePhotoByKey.get(`cne:${e.cne}`) : undefined);
-            return remotePhoto && remotePhoto !== e.photoUrl
-              ? { ...e, photoUrl: remotePhoto }
-              : e;
-          });
-        };
-        setSnap((s) => ({
-          ...s,
-          etudiants: mergeEtudiants(s.etudiants),
-          formateurs: prefer(s.formateurs, formateurs as Formateur[]),
-          examens: prefer(s.examens, examens as Examen[]),
-          bulletins: prefer(s.bulletins, bulletins as Bulletin[]),
-          stages: prefer(s.stages, stages as Stage[]),
-          seances: prefer(s.seances, seances as Seance[]),
-          structuresAccueil: (structures as StructureAccueil[])?.length
-            ? (structures as StructureAccueil[])
-            : s.structuresAccueil,
-          servicesStage: (servicesStageRemote as string[])?.length
-            ? (servicesStageRemote as string[])
-            : s.servicesStage.length
-              ? s.servicesStage
-              : [...new Set([...s.stages.map((st) => (st.service ?? "").trim()).filter(Boolean)])],
-          // Les créneaux paramétrés côté serveur font foi : ils pilotent la
-          // grille de l'emploi du temps sur tous les postes.
-          creneaux: Array.isArray(reglages.creneaux) && reglages.creneaux.length
-            ? (reglages.creneaux as string[])
-            : s.creneaux,
-        }));
-      } catch {
-        // Backend not available   keep localStorage data.
+      const recordsByEtudiant = new Map<string, PaiementMensuel[]>();
+      for (const r of mensuelsRaw as PaiementMensuelApi[]) {
+        const rec = normPaiementRecord(r);
+        const list = recordsByEtudiant.get(rec.etudiantId) ?? [];
+        list.push(rec);
+        recordsByEtudiant.set(rec.etudiantId, list);
       }
-    })();
-    return () => {
-      mounted = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+      const etudiants = (etudiantsRaw as unknown as Record<string, unknown>[]).map((raw) => {
+        const id = String(raw.id ?? "");
+        return normEtudiant(raw, recordsByEtudiant.get(id) ?? []);
+      });
+
+      setSnap({
+        etudiants,
+        formateurs: (formateursRaw as unknown as Record<string, unknown>[]).map((f) => ({
+          ...(f as unknown as Formateur),
+          id: String(f.id ?? ""),
+          notesSaisies: num((f as { notesSaisies?: unknown }).notesSaisies),
+          archived: (f as { archived?: unknown }).archived === true,
+        })),
+        examens: (examensRaw as unknown as Record<string, unknown>[]).map(normExamen),
+        bulletins: (bulletinsRaw as unknown as Record<string, unknown>[]).map(normBulletin),
+        stages: (stagesRaw as unknown as Record<string, unknown>[]).map(normStage),
+        seances: (seancesRaw as unknown as Record<string, unknown>[]).map((s) => ({
+          ...(s as unknown as Seance),
+          id: String(s.id ?? ""),
+        })),
+        filieres: (filieresRaw as string[]).map(String),
+        structuresAccueil: (structuresRaw as StructureAccueil[]) ?? [],
+        servicesStage: [...(servicesRaw as string[])].sort((a, b) => a.localeCompare(b)),
+        modules: (modulesRaw as unknown as Record<string, unknown>[]).map(normModule),
+        groupConfigs: (groupsRaw as GroupConfig[]) ?? [],
+        creneaux: Array.isArray(reglages.creneaux) ? (reglages.creneaux as string[]) : [],
+        joursChomes: construireJoursChomes(
+          holidaysRaw as HolidayRow[],
+          vacationsRaw as VacationRow[],
+          exceptionsRaw as CalendarExceptionRow[],
+        ),
+      });
+    } catch {
+      setSyncFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   // Re-synchronise les photos d'identité étudiant en tâche de fond : la
   // synchro principale ne tourne qu'au montage, donc une photo téléversée
@@ -721,128 +728,93 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Skip the write triggered by the initial state, which would only rewrite
-  // what was just read.
-  const hydrated = useRef(false);
-  useEffect(() => {
-    if (!hydrated.current) {
-      hydrated.current = true;
-      return;
-    }
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snap));
-    } catch {
-      // Quota exceeded or private mode: keep working in memory.
-    }
-  }, [snap]);
-
-  /** Prepend an entry to the "activité récente" feed. */
-  const log = useCallback((type: ActiviteItem["type"], texte: string) => {
-    setSnap((s) => ({
-      ...s,
-      activite: [{ type, texte, date: today() }, ...s.activite].slice(0, 30),
-    }));
-  }, []);
-
   /* ---------------- Étudiants ---------------- */
 
   const addEtudiant = useCallback(
-    (data: NouvelEtudiant) => {
-      const etudiant: Etudiant = {
-        ...data,
-        id: uid("et"),
-        moyenne: 0,
-        notes: [],
-        historique: [],
-        paiementsMensuels: {},
-        paiementsMensuelsRecords: [],
-        archived: false,
-      };
-      apiCreateEtudiant(data as unknown as Record<string, unknown>).catch(() => {});
+    async (data: NouvelEtudiant) => {
+      const saved = await apiCreateEtudiant(data as unknown as Record<string, unknown>);
+      const etudiant = normEtudiant(saved as unknown as Record<string, unknown>, []);
       setSnap((s) => ({ ...s, etudiants: [etudiant, ...s.etudiants] }));
-      log(
-        "inscription",
-        `Nouvelle inscription   ${etudiant.prenom} ${etudiant.nom} (${etudiant.filiere}, ${etudiant.niveau})`,
-      );
       return etudiant;
     },
-    [log],
-  );
-
-  const updateEtudiant = useCallback(
-    (id: string, patch: Partial<Etudiant>) => {
-      apiUpdateEtudiant(id, patch as unknown as Record<string, unknown>).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        etudiants: s.etudiants.map((e) =>
-          e.id === id ? { ...e, ...patch } : e,
-        ),
-      }));
-    },
     [],
   );
 
-  const deleteEtudiant = useCallback(
-    (id: string) => {
-      apiDeleteEtudiant(id).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        etudiants: s.etudiants.map((e) => (e.id === id ? { ...e, archived: true } : e)),
-      }));
-    },
-    [],
-  );
+  const updateEtudiant = useCallback(async (id: string, patch: Partial<Etudiant>) => {
+    const saved = await apiUpdateEtudiant(id, patch as unknown as Record<string, unknown>);
+    const etudiant = normEtudiant(
+      { ...(saved as unknown as Record<string, unknown>), id },
+      [],
+    );
+    // Conserve les lignes de paiement/notes déjà chargées (le PUT ne les renvoie pas).
+    setSnap((s) => ({
+      ...s,
+      etudiants: s.etudiants.map((e) =>
+        e.id === id
+          ? {
+              ...etudiant,
+              notes: e.notes,
+              historique: e.historique,
+              paiementsMensuels: e.paiementsMensuels,
+              paiementsMensuelsRecords: e.paiementsMensuelsRecords,
+            }
+          : e,
+      ),
+    }));
+    return etudiant;
+  }, []);
 
-  const restoreEtudiant = useCallback(
-    (id: string) => {
-      apiRestoreEtudiant(id).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        etudiants: s.etudiants.map((e) => (e.id === id ? { ...e, archived: false } : e)),
-      }));
-    },
-    [],
-  );
+  const deleteEtudiant = useCallback(async (id: string) => {
+    await apiDeleteEtudiant(id);
+    setSnap((s) => ({
+      ...s,
+      etudiants: s.etudiants.map((e) => (e.id === id ? { ...e, archived: true } : e)),
+    }));
+  }, []);
+
+  const restoreEtudiant = useCallback(async (id: string) => {
+    await apiRestoreEtudiant(id);
+    setSnap((s) => ({
+      ...s,
+      etudiants: s.etudiants.map((e) => (e.id === id ? { ...e, archived: false } : e)),
+    }));
+  }, []);
 
   /* ---------------- Formateurs ---------------- */
 
-  const addFormateur = useCallback(
-    (data: NouveauFormateur) => {
-      const formateur: Formateur = { ...data, id: uid("fo"), notesSaisies: 0 };
-      apiCreateFormateur(data as unknown as Record<string, unknown>).catch(() => {});
-      setSnap((s) => ({ ...s, formateurs: [formateur, ...s.formateurs] }));
-      return formateur;
-    },
-    [],
-  );
+  const addFormateur = useCallback(async (data: NouveauFormateur) => {
+    const saved = await apiCreateFormateur(data as unknown as Record<string, unknown>);
+    const formateur = saved as unknown as Formateur;
+    setSnap((s) => ({ ...s, formateurs: [formateur, ...s.formateurs] }));
+    return formateur;
+  }, []);
 
-  const updateFormateur = useCallback(
-    (id: string, patch: Partial<Formateur>) => {
-      apiUpdateFormateur(id, patch as unknown as Record<string, unknown>).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        formateurs: s.formateurs.map((f) =>
-          f.id === id ? { ...f, ...patch } : f,
-        ),
-      }));
-    },
-    [],
-  );
+  const updateFormateur = useCallback(async (id: string, patch: Partial<Formateur>) => {
+    const saved = await apiUpdateFormateur(id, patch as unknown as Record<string, unknown>);
+    const formateur = saved as unknown as Formateur;
+    setSnap((s) => ({
+      ...s,
+      formateurs: s.formateurs.map((f) => (f.id === id ? formateur : f)),
+    }));
+    return formateur;
+  }, []);
 
-  const deleteFormateur = useCallback(
-    (id: string) => {
-      apiDeleteFormateur(id).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        formateurs: s.formateurs.filter((f) => f.id !== id),
-      }));
-    },
-    [],
-  );
+  const deleteFormateur = useCallback(async (id: string) => {
+    await apiDeleteFormateur(id);
+    setSnap((s) => ({
+      ...s,
+      formateurs: s.formateurs.filter((f) => f.id !== id),
+    }));
+  }, []);
 
   const archiveFormateur = useCallback(
-    (id: string, groupReassignments: Array<{ groupName: string; targetFormateurId: string }>, filiereReassignment?: { targetFormateurId: string }) => {
-      apiArchiveFormateur(id, { groupReassignments, filiereReassignment }).catch(() => {});
+    async (
+      id: string,
+      groupReassignments: Array<{ groupName: string; targetFormateurId: string }>,
+      filiereReassignment?: { targetFormateurId: string },
+    ) => {
+      // Le serveur réassigne dans la même transaction ; on miroite le résultat.
+      await apiArchiveFormateur(id, { groupReassignments, filiereReassignment });
       setSnap((s) => {
         let formateurs = s.formateurs.map((f) =>
           f.id === id ? { ...f, archived: true } : f,
@@ -869,25 +841,22 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const restoreFormateur = useCallback(
-    (id: string) => {
-      apiRestoreFormateur(id).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        formateurs: s.formateurs.map((f) =>
-          f.id === id ? { ...f, archived: false } : f,
-        ),
-      }));
-    },
-    [],
-  );
+  const restoreFormateur = useCallback(async (id: string) => {
+    await apiRestoreFormateur(id);
+    setSnap((s) => ({
+      ...s,
+      formateurs: s.formateurs.map((f) =>
+        f.id === id ? { ...f, archived: false } : f,
+      ),
+    }));
+  }, []);
 
   /* ---------------- Group Configs ---------------- */
 
   const addGroupConfig = useCallback(
-    (data: { name: string; semester: string; studentCount?: number }) => {
-      const config: GroupConfig = { id: `gc-${Date.now()}`, ...data, studentCount: data.studentCount ?? 0 };
-      apiCreateGroupConfig(data).catch(() => {});
+    async (data: { name: string; semester: string; studentCount?: number }) => {
+      const saved = await apiCreateGroupConfig(data);
+      const config = saved as unknown as GroupConfig;
       setSnap((s) => ({ ...s, groupConfigs: [...s.groupConfigs, config] }));
       return config;
     },
@@ -895,118 +864,77 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   );
 
   const updateGroupConfig = useCallback(
-    (id: string, patch: { name?: string; semester?: string; studentCount?: number }) => {
-      apiUpdateGroupConfig(id, patch).catch(() => {});
+    async (id: string, patch: { name?: string; semester?: string; studentCount?: number }) => {
+      const saved = await apiUpdateGroupConfig(id, patch);
+      const config = saved as unknown as GroupConfig;
       setSnap((s) => ({
         ...s,
-        groupConfigs: s.groupConfigs.map((g) =>
-          g.id === id ? { ...g, ...patch } : g,
-        ),
+        groupConfigs: s.groupConfigs.map((g) => (g.id === id ? config : g)),
       }));
+      return config;
     },
     [],
   );
 
-  const deleteGroupConfig = useCallback(
-    (id: string) => {
-      apiDeleteGroupConfig(id).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        groupConfigs: s.groupConfigs.filter((g) => g.id !== id),
-      }));
-    },
-    [],
-  );
+  const deleteGroupConfig = useCallback(async (id: string) => {
+    await apiDeleteGroupConfig(id);
+    setSnap((s) => ({
+      ...s,
+      groupConfigs: s.groupConfigs.filter((g) => g.id !== id),
+    }));
+  }, []);
 
   /* ---------------- Examens ---------------- */
 
-  const addExamen = useCallback((data: NouvelExamen, auteurId: string) => {
-    const examen: Examen = { ...data, id: uid("ex"), createdBy: auteurId };
-    apiCreateExamen(data as unknown as Record<string, unknown>).catch(() => {});
+  const addExamen = useCallback(async (data: NouvelExamen, auteurId: string) => {
+    const saved = await apiCreateExamen({ ...(data as unknown as Record<string, unknown>), createdBy: auteurId });
+    const examen = normExamen(saved as unknown as Record<string, unknown>);
     setSnap((s) => ({ ...s, examens: [examen, ...s.examens] }));
     return examen;
   }, []);
 
-  const updateExamen = useCallback(
-    (id: string, patch: Partial<Examen>) => {
-      apiUpdateExamen(id, patch as unknown as Record<string, unknown>).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        examens: s.examens.map((x) => (x.id === id ? { ...x, ...patch } : x)),
-      }));
-    },
-    [],
-  );
-
-  const deleteExamen = useCallback(
-    (id: string) => {
-      apiDeleteExamen(id).catch(() => {});
-      setSnap((s) => {
-        const doc = s.examens.find((x) => x.id === id)?.document;
-        if (doc) void deleteDoc(doc.id).catch(() => {});
-        return { ...s, examens: s.examens.filter((x) => x.id !== id) };
-      });
-    },
-    [],
-  );
-
-  const attachDocument = useCallback(async (examenId: string, file: File) => {
-    if (file.size > MAX_DOC_SIZE) {
-      throw new Error(
-        `Fichier trop volumineux (max ${Math.round(MAX_DOC_SIZE / 1024 / 1024)} Mo)`,
-      );
-    }
-    // Une clé neuve à chaque dépôt : remplacer un sujet n'écrase pas l'ancien
-    // fichier tant que le nouveau n'est pas écrit sans erreur.
-    const docId = uid("doc");
-    await putDoc(docId, file);
-
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    const detectedMime =
-      file.type ||
-      (ext === "pdf"
-        ? "application/pdf"
-        : ext === "doc"
-          ? "application/msword"
-          : ext === "docx"
-            ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            : "application/octet-stream");
-
-    const meta: ExamDocument = {
-      id: docId,
-      nom: file.name,
-      taille: file.size,
-      mime: detectedMime,
-      uploadedAt: today(),
-    };
-
-    setSnap((s) => {
-      const previous = s.examens.find((x) => x.id === examenId)?.document;
-      if (previous) void deleteDoc(previous.id).catch(() => {});
-      return {
-        ...s,
-        examens: s.examens.map((x) =>
-          x.id === examenId ? { ...x, document: meta } : x,
-        ),
-      };
-    });
+  const updateExamen = useCallback(async (id: string, patch: Partial<Examen>) => {
+    const saved = await apiUpdateExamen(id, patch as unknown as Record<string, unknown>);
+    const examen = normExamen(saved as unknown as Record<string, unknown>);
+    setSnap((s) => ({
+      ...s,
+      examens: s.examens.map((x) => (x.id === id ? examen : x)),
+    }));
+    return examen;
   }, []);
 
-  // L'id est lu sur l'instantané de rendu, pas dans l'updater : React peut
-  // rejouer un updater (StrictMode), une valeur capturée dedans n'est pas fiable.
-  const removeDocument = useCallback(
-    async (examenId: string) => {
-      const docId = snap.examens.find((x) => x.id === examenId)?.document?.id;
-      setSnap((s) => ({
-        ...s,
-        examens: s.examens.map((x) =>
-          x.id === examenId ? { ...x, document: undefined } : x,
-        ),
-      }));
-      if (docId) await deleteDoc(docId).catch(() => {});
-    },
-    [snap.examens],
-  );
+  const deleteExamen = useCallback(async (id: string) => {
+    await apiDeleteExamen(id);
+    setSnap((s) => ({ ...s, examens: s.examens.filter((x) => x.id !== id) }));
+  }, []);
+
+  const MAX_DOC_OCTETS = 10 * 1024 * 1024;
+
+  const attachDocument = useCallback(async (examenId: string, file: File) => {
+    if (file.size > MAX_DOC_OCTETS) {
+      throw new Error(
+        `Fichier trop volumineux (max ${Math.round(MAX_DOC_OCTETS / 1024 / 1024)} Mo)`,
+      );
+    }
+    // Le serveur persiste dans MinIO et renvoie les métadonnées canoniques.
+    const saved = await uploadExamenDocumentApi(examenId, file);
+    setSnap((s) => ({
+      ...s,
+      examens: s.examens.map((x) =>
+        x.id === examenId ? normExamen(saved as unknown as Record<string, unknown>) : x,
+      ),
+    }));
+  }, []);
+
+  const removeDocument = useCallback(async (examenId: string) => {
+    await deleteExamenDocumentApi(examenId);
+    setSnap((s) => ({
+      ...s,
+      examens: s.examens.map((x) =>
+        x.id === examenId ? { ...x, document: undefined } : x,
+      ),
+    }));
+  }, []);
 
   /**
    * Persist note entry for an exam.
@@ -1017,16 +945,17 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
    * formateurs. Returns how many students were recorded.
    */
   const saveNotesExamen = useCallback(
-    (examenId: string, saisies: SaisieNote[]) => {
+    async (examenId: string, saisies: SaisieNote[]) => {
       const retenues = saisies.filter(
         (s) => s.theorique !== undefined || s.pratique !== undefined,
       );
       if (!retenues.length) return 0;
 
-      saveNotesExamenApi(
+      // Le serveur enregistre et recalcule ; le miroir local suit après succès.
+      await saveNotesExamenApi(
         examenId,
         retenues.map((s) => ({ etudiantId: s.etudiantId, theorique: s.theorique, pratique: s.pratique })),
-      ).catch(() => {});
+      );
 
       setSnap((s) => {
         const examen = s.examens.find((x) => x.id === examenId);
@@ -1066,14 +995,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
               ? { ...f, notesSaisies: f.notesSaisies + retenues.length }
               : f;
           }),
-          activite: [
-            {
-              type: "note" as const,
-              texte: `Notes saisies   ${examen.module} (${examen.niveau}, ${examen.filiere})`,
-              date: today(),
-            },
-            ...s.activite,
-          ].slice(0, 30),
         };
       });
 
@@ -1084,35 +1005,29 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   /* ---------------- Bulletins ---------------- */
 
-  const updateBulletin = useCallback(
-    (id: string, patch: Partial<Bulletin>) => {
-      apiUpdateBulletin(id, patch as unknown as Record<string, unknown>).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        bulletins: s.bulletins.map((b) =>
-          b.id === id ? { ...b, ...patch } : b,
-        ),
-      }));
-    },
-    [],
-  );
+  const updateBulletin = useCallback(async (id: string, patch: Partial<Bulletin>) => {
+    await apiUpdateBulletin(id, patch as unknown as Record<string, unknown>);
+    setSnap((s) => ({
+      ...s,
+      bulletins: s.bulletins.map((b) =>
+        b.id === id ? { ...b, ...patch } : b,
+      ),
+    }));
+  }, []);
 
-  const publierBulletin = useCallback(
-    (id: string) => {
-      publierBulletinApi(id).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        bulletins: s.bulletins.map((b) =>
-          b.id === id ? { ...b, statut: "publie" as const } : b,
-        ),
-      }));
-    },
-    [],
-  );
+  const publierBulletin = useCallback(async (id: string) => {
+    await publierBulletinApi(id);
+    setSnap((s) => ({
+      ...s,
+      bulletins: s.bulletins.map((b) =>
+        b.id === id ? { ...b, statut: "publie" as const } : b,
+      ),
+    }));
+  }, []);
 
-  const publierTousBulletins = useCallback(() => {
+  const publierTousBulletins = useCallback(async () => {
     const count = snap.bulletins.filter((b) => b.statut !== "publie").length;
-    publierTousBulletinsApi().catch(() => {});
+    await publierTousBulletinsApi();
     setSnap((s) => ({
       ...s,
       bulletins: s.bulletins.map((b) => ({ ...b, statut: "publie" as const })),
@@ -1122,36 +1037,56 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   /* ---------------- Stages ---------------- */
 
-  const addStage = useCallback((data: NouveauStage) => {
-    const stage: Stage = { ...data, id: uid("st") };
-    apiCreateStage(data as unknown as Record<string, unknown>).catch(() => {});
+  const addStage = useCallback(async (data: NouveauStage) => {
+    const saved = await apiCreateStage(data as unknown as Record<string, unknown>);
+    const stage = normStage(saved as unknown as Record<string, unknown>);
     setSnap((s) => ({ ...s, stages: [stage, ...s.stages] }));
     return stage;
   }, []);
 
-  const updateStage = useCallback(
-    (id: string, patch: Partial<Stage>) => {
-      apiUpdateStage(id, patch as unknown as Record<string, unknown>).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        stages: s.stages.map((st) => (st.id === id ? { ...st, ...patch } : st)),
-      }));
-    },
-    [],
-  );
+  const updateStage = useCallback(async (id: string, patch: Partial<Stage>) => {
+    const saved = await apiUpdateStage(id, patch as unknown as Record<string, unknown>);
+    const stage = normStage({ ...(saved as unknown as Record<string, unknown>), id });
+    setSnap((s) => ({
+      ...s,
+      stages: s.stages.map((st) => (st.id === id ? stage : st)),
+    }));
+    return stage;
+  }, []);
 
-  const deleteStage = useCallback(
-    (id: string) => {
-      apiDeleteStage(id).catch(() => {});
-      setSnap((s) => ({ ...s, stages: s.stages.filter((st) => st.id !== id) }));
-    },
-    [],
-  );
+  const deleteStage = useCallback(async (id: string) => {
+    await apiDeleteStage(id);
+    setSnap((s) => ({ ...s, stages: s.stages.filter((st) => st.id !== id) }));
+  }, []);
 
   /* ---------------- Paiements mensuels ---------------- */
 
+  /** Recharge les lignes canoniques et reconstruit fiches + statuts. */
+  const refreshPaiements = useCallback(async () => {
+    const rows = (await apiFetchPaiementsMensuels()) as PaiementMensuelApi[];
+    const byEtudiant = new Map<string, PaiementMensuel[]>();
+    for (const r of rows) {
+      const rec = normPaiementRecord(r);
+      const list = byEtudiant.get(rec.etudiantId) ?? [];
+      list.push(rec);
+      byEtudiant.set(rec.etudiantId, list);
+    }
+    setSnap((s) => ({
+      ...s,
+      etudiants: s.etudiants.map((e) => {
+        const records = byEtudiant.get(e.id) ?? [];
+        return {
+          ...e,
+          paiementsMensuelsRecords: records,
+          historique: e.historique.length ? e.historique : historiqueDepuisRecords(records),
+          paiement: statutPaiementGlobal(records.map((r) => r.statut)),
+        };
+      }),
+    }));
+  }, []);
+
   const payerMois = useCallback(
-    (
+    async (
       etudiantId: string,
       mois: string[],
       details: {
@@ -1162,102 +1097,22 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         notes?: string;
       },
     ) => {
-      const applyLocalUpdate = () => {
-          setSnap((s) => {
-            const etudiant = s.etudiants.find((e) => e.id === etudiantId);
-            if (!etudiant) return s;
-
-            const montantParMois = Math.round(details.montant / mois.length);
-            const newRecords = [...etudiant.paiementsMensuelsRecords];
-
-            for (const m of mois) {
-              const existing = newRecords.find((r) => r.mois === m);
-              if (existing) {
-                const nouveauPaye = existing.montantPaye + montantParMois;
-                const nouveauStatut: StatutPaiement =
-                  nouveauPaye >= etudiant.fraisMensuels ? "paye" : "en_attente";
-                Object.assign(existing, {
-                  montantPaye: nouveauPaye,
-                  datePaiement: details.date,
-                  mode: details.mode,
-                  recu: details.recu ?? existing.recu,
-                  statut: nouveauStatut,
-                  notes: details.notes ?? existing.notes,
-                });
-              } else {
-                const nouveauStatut: StatutPaiement =
-                  montantParMois >= etudiant.fraisMensuels ? "paye" : "en_attente";
-                newRecords.push({
-                  id: `tmp-${crypto.randomUUID()}`,
-                  etudiantId,
-                  mois: m,
-                  montantDu: etudiant.fraisMensuels,
-                  montantPaye: montantParMois,
-                  datePaiement: details.date,
-                  mode: details.mode,
-                  recu: details.recu ?? "",
-                  statut: nouveauStatut,
-                  notes: details.notes ?? "",
-                });
-              }
-            }
-
-            const allPaye = newRecords.length > 0 && newRecords.every((r) => r.statut === "paye");
-            const hasRetard = newRecords.some((r) => r.statut === "retard");
-            const hasImpaye = newRecords.some((r) => r.statut === "impaye");
-            const overallStatut: StatutPaiement = allPaye
-              ? "paye"
-              : hasRetard
-                ? "retard"
-                : hasImpaye
-                  ? "impaye"
-                  : "en_attente";
-
-            return {
-              ...s,
-              etudiants: s.etudiants.map((e) =>
-                e.id !== etudiantId
-                  ? e
-                  : {
-                      ...e,
-                      paiement: overallStatut,
-                      paiementsMensuelsRecords: newRecords,
-                    },
-              ),
-              activite: [
-                {
-                  type: "paiement" as const,
-                  texte: `Paiement reçu   ${etudiant.prenom} ${etudiant.nom}, ${details.montant.toLocaleString("fr-FR")} MAD`,
-                  date: today(),
-                },
-                ...s.activite,
-              ].slice(0, 30),
-            };
-          });
-        };
-      if (isUUID(etudiantId)) {
-        apiCreatePaiementsMensuels({
-          etudiantId,
-          mois,
-          montant: details.montant,
-          mode: details.mode,
-          date: details.date,
-          recu: details.recu,
-          notes: details.notes,
-        })
-          .then(() => applyLocalUpdate())
-          .catch(() => {
-            toast.error("Erreur lors de l'enregistrement du paiement");
-          });
-      } else {
-        applyLocalUpdate();
-      }
+      await apiCreatePaiementsMensuels({
+        etudiantId,
+        mois,
+        montant: details.montant,
+        mode: details.mode,
+        date: details.date,
+        recu: details.recu,
+        notes: details.notes,
+      });
+      await refreshPaiements();
     },
-    [],
+    [refreshPaiements],
   );
 
   const updatePaiementMensuel = useCallback(
-    (
+    async (
       id: string,
       etudiantId: string,
       patch: Partial<{
@@ -1269,40 +1124,11 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         notes: string;
       }>,
     ) => {
-      if (isUUID(id)) {
-        apiUpdatePaiementMensuel(id, patch).catch(() => {});
-      }
-      setSnap((s) => {
-        const updatedRecords = s.etudiants
-          .find((e) => e.id === etudiantId)
-          ?.paiementsMensuelsRecords.map((r) =>
-            r.id === id ? { ...r, ...patch } : r,
-          ) ?? [];
-        const allPaye = updatedRecords.length > 0 && updatedRecords.every((r) => r.statut === "paye");
-        const hasRetard = updatedRecords.some((r) => r.statut === "retard");
-        const hasImpaye = updatedRecords.some((r) => r.statut === "impaye");
-        const overallStatut: StatutPaiement = allPaye
-          ? "paye"
-          : hasRetard
-            ? "retard"
-            : hasImpaye
-              ? "impaye"
-              : "en_attente";
-        return {
-          ...s,
-          etudiants: s.etudiants.map((e) =>
-            e.id === etudiantId
-              ? {
-                  ...e,
-                  paiement: overallStatut,
-                  paiementsMensuelsRecords: updatedRecords,
-                }
-              : e,
-          ),
-        };
-      });
+      await apiUpdatePaiementMensuel(id, patch);
+      await refreshPaiements();
+      void etudiantId;
     },
-    [],
+    [refreshPaiements],
   );
 
   /**
@@ -1312,25 +1138,32 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
    * La moyenne pondérée de l'étudiant est recalculée à chaque saisie.
    */
   const addNote = useCallback(
-    (etudiantId: string, note: NoteModule) => {
-      apiCreateNote({
+    async (etudiantId: string, note: NoteModule) => {
+      // Le serveur renvoie la ligne créée : son `id` canonique est repris
+      // tel quel (un id local empêcherait toute suppression ultérieure).
+      const created = (await apiCreateNote({
         etudiantId,
         module: note.module,
         note: note.note,
         coef: note.coef,
         credits: note.credits,
         examen: note.examen,
-      }).catch(() => {});
+      })) as unknown as {
+        id?: string;
+        note?: string | number;
+        coef?: string | number;
+        credits?: string | number;
+      };
 
       setSnap((s) => {
         const etudiant = s.etudiants.find((e) => e.id === etudiantId);
         if (!etudiant) return s;
         const saved: NoteModule = {
-          id: note.id ?? crypto.randomUUID(),
+          id: String(created.id ?? note.id ?? crypto.randomUUID()),
           module: note.module,
-          note: note.note,
-          coef: note.coef,
-          credits: note.credits,
+          note: Number(created.note ?? note.note),
+          coef: Number(created.coef ?? note.coef),
+          credits: Number(created.credits ?? note.credits),
           examen: note.examen,
         };
         const existante = etudiant.notes.find((n) => n.module === saved.module);
@@ -1346,29 +1179,38 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
               ? { ...e, notes, moyenne: moyennePonderee(notes) }
               : e,
           ),
-          activite: [
-            {
-              type: "note" as const,
-              texte: `Note saisie   ${note.module} : ${note.note.toFixed(2)}/20 (${etudiant.prenom} ${etudiant.nom})`,
-              date: today(),
-            },
-            ...s.activite,
-          ].slice(0, 30),
         };
       });
     },
     [],
   );
 
+  const deleteNote = useCallback(async (id: string, etudiantId: string) => {
+    await apiDeleteNote(id);
+    setSnap((s) => {
+      const etudiant = s.etudiants.find((e) => e.id === etudiantId);
+      if (!etudiant) return s;
+      const notes = etudiant.notes.filter(
+        (n) => n.id !== id && !(n.module === id),
+      );
+      return {
+        ...s,
+        etudiants: s.etudiants.map((e) =>
+          e.id === etudiantId ? { ...e, notes, moyenne: moyennePonderee(notes) } : e,
+        ),
+      };
+    });
+  }, []);
+
   /* ---------------- Créneaux horaires ---------------- */
 
   /**
    * Les créneaux vivent dans le store (et non dans l'état local de la page
    * Paramètres) : l'emploi du temps en dérive sa grille horaire, il doit donc
-   * voir la même valeur. La synchronisation serveur reste best-effort.
+   * voir la même valeur.
    */
-  const setCreneaux = useCallback((labels: string[]) => {
-    updateSetting("creneaux", labels).catch(() => {});
+  const setCreneaux = useCallback(async (labels: string[]) => {
+    await updateSetting("creneaux", labels);
     setSnap((s) => ({ ...s, creneaux: labels }));
   }, []);
 
@@ -1377,170 +1219,132 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [snap.creneaux],
   );
 
-  const addFiliere = useCallback(
-    (nom: string) => {
-      createFiliereApi(nom).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        filieres: s.filieres.includes(nom) ? s.filieres : [...s.filieres, nom],
-      }));
-    },
-    [],
-  );
+  const addFiliere = useCallback(async (nom: string) => {
+    const clean = nom.trim();
+    if (!clean) return;
+    const { filieres } = await createFiliereApi(clean);
+    setSnap((s) => ({ ...s, filieres }));
+  }, []);
 
-  const deleteFiliere = useCallback(
-    (nom: string) => {
-      deleteFiliereApi(nom).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        filieres: s.filieres.filter((f) => f !== nom),
-      }));
-    },
-    [],
-  );
+  const deleteFiliere = useCallback(async (nom: string) => {
+    const { filieres } = await deleteFiliereApi(nom);
+    setSnap((s) => ({ ...s, filieres }));
+  }, []);
 
   /* ---------------- Structures d'accueil ---------------- */
 
-  const addStructureAccueil = useCallback(
-    (nom: string, capacite = 5) => {
-      const clean = nom.trim().replace(/\s+/g, " ");
-      if (!clean) return;
-      createStructureApi(clean, capacite).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        structuresAccueil: s.structuresAccueil.some((st) => st.nom.toLowerCase() === clean.toLowerCase())
-          ? s.structuresAccueil
-          : [...s.structuresAccueil, { nom: clean, capacite }],
-      }));
-    },
-    [],
-  );
-
-  const updateStructureAccueil = useCallback(
-    (oldName: string, body: { nouveauNom?: string; capacite?: number }) => {
-      updateStructureApi(oldName, body).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        structuresAccueil: s.structuresAccueil.map((st) =>
-          st.nom === oldName
-            ? { nom: body.nouveauNom ?? st.nom, capacite: body.capacite ?? st.capacite }
-            : st,
-        ),
-      }));
-    },
-    [],
-  );
-
-  const deleteStructureAccueil = useCallback(
-    (nom: string) => {
-      deleteStructureApi(nom).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        structuresAccueil: s.structuresAccueil.filter((st) => st.nom !== nom),
-      }));
-    },
-    [],
-  );
-
-  const addServiceStage = useCallback((nom: string) => {
+  const addStructureAccueil = useCallback(async (nom: string, capacite = 5) => {
     const clean = nom.trim().replace(/\s+/g, " ");
     if (!clean) return;
-    apiCreateStageService(clean).catch(() => {});
-    setSnap((s) => ({
-      ...s,
-      servicesStage: s.servicesStage.some((x) => x.toLowerCase() === clean.toLowerCase())
-        ? s.servicesStage
-        : [...s.servicesStage, clean].sort((a, b) => a.localeCompare(b)),
-    }));
+    const { structures } = await createStructureApi(clean, capacite);
+    setSnap((s) => ({ ...s, structuresAccueil: structures }));
+  }, []);
+
+  const updateStructureAccueil = useCallback(
+    async (oldName: string, body: { nouveauNom?: string; capacite?: number }) => {
+      const { structures } = await updateStructureApi(oldName, body);
+      setSnap((s) => ({ ...s, structuresAccueil: structures }));
+    },
+    [],
+  );
+
+  const deleteStructureAccueil = useCallback(async (nom: string) => {
+    const { structures } = await deleteStructureApi(nom);
+    setSnap((s) => ({ ...s, structuresAccueil: structures }));
+  }, []);
+
+  const addServiceStage = useCallback(async (nom: string) => {
+    const clean = nom.trim().replace(/\s+/g, " ");
+    if (!clean) return;
+    const { services } = await apiCreateStageService(clean);
+    setSnap((s) => ({ ...s, servicesStage: services }));
+  }, []);
+
+  const updateServiceStage = useCallback(async (nom: string, body: { nouveauNom?: string }) => {
+    const { services } = await apiUpdateStageService(nom, body);
+    setSnap((s) => ({ ...s, servicesStage: services }));
+  }, []);
+
+  const deleteServiceStage = useCallback(async (nom: string) => {
+    const { services } = await apiDeleteStageService(nom);
+    setSnap((s) => ({ ...s, servicesStage: services }));
   }, []);
 
   /* ---------------- Modules ---------------- */
 
-  // Hydrate depuis le backend quand une session existe ; en mode démo la
-  // requête échoue (401) et l'on conserve le jeu local (localStorage).
+  // Hydrate depuis le backend : le diagnostique modules vit sur le serveur
+  // (voir `refresh()`), ce passage ne fait que rafraîchir en tâche de fond.
   useEffect(() => {
     fetchModulesApi()
       .then((rows) => {
         if (Array.isArray(rows) && rows.length) {
-          setSnap((s) => ({ ...s, modules: rows as ModuleRecord[] }));
+          setSnap((s) => ({ ...s, modules: (rows as unknown as Record<string, unknown>[]).map(normModule) }));
         }
       })
       .catch(() => {});
   }, []);
 
-  const addModule = useCallback((data: Omit<ModuleRecord, "id">) => {
-    const tempId = uid("mod");
-    setSnap((s) => ({ ...s, modules: [...s.modules, { ...data, id: tempId }] }));
-    // Best-effort : réconcilie l'id serveur si la requête aboutit.
-    createModuleApi(data)
-      .then((saved) => {
-        setSnap((s) => ({
-          ...s,
-          modules: s.modules.map((m) => (m.id === tempId ? (saved as ModuleRecord) : m)),
-        }));
-      })
-      .catch(() => {});
+  const addModule = useCallback(async (data: Omit<ModuleRecord, "id">) => {
+    const saved = await createModuleApi(data);
+    const module = normModule(saved as unknown as Record<string, unknown>);
+    setSnap((s) => ({ ...s, modules: [...s.modules, module] }));
+    return module;
   }, []);
 
-  const updateModule = useCallback(
-    (id: string, data: Omit<ModuleRecord, "id">) => {
-      setSnap((s) => ({
-        ...s,
-        modules: s.modules.map((m) => (m.id === id ? { ...m, ...data, id } : m)),
-      }));
-      updateModuleApi(id, data).catch(() => {});
-    },
-    [],
-  );
+  const updateModule = useCallback(async (id: string, data: Omit<ModuleRecord, "id">) => {
+    const saved = await updateModuleApi(id, data);
+    const module = normModule(saved as unknown as Record<string, unknown>);
+    setSnap((s) => ({
+      ...s,
+      modules: s.modules.map((m) => (m.id === id ? module : m)),
+    }));
+    return module;
+  }, []);
 
-  const deleteModule = useCallback((id: string) => {
+  const deleteModule = useCallback(async (id: string) => {
+    await deleteModuleApi(id);
     setSnap((s) => ({ ...s, modules: s.modules.filter((m) => m.id !== id) }));
-    deleteModuleApi(id).catch(() => {});
   }, []);
-
   /* ---------------- Planning ---------------- */
 
-  const addSeance = useCallback((data: NouvelleSeance) => {
-    const seance: Seance = { ...data, id: uid("se") };
-    apiCreateSeance(data as unknown as Record<string, unknown>).catch(() => {});
+  const addSeance = useCallback(async (data: NouvelleSeance, force = false) => {
+    const saved = await apiCreateSeance(data as unknown as Record<string, unknown>, force);
+    const seance = { ...(saved as unknown as Seance), id: String((saved as { id?: unknown })?.id ?? "") };
     setSnap((s) => ({ ...s, seances: [...s.seances, seance] }));
     return seance;
   }, []);
 
-  const updateSeance = useCallback(
-    (id: string, patch: Partial<Seance>) => {
-      apiUpdateSeance(id, patch as unknown as Record<string, unknown>).catch(() => {});
-      setSnap((s) => ({
-        ...s,
-        seances: s.seances.map((x) => (x.id === id ? { ...x, ...patch } : x)),
-      }));
-    },
-    [],
-  );
+  const updateSeance = useCallback(async (id: string, patch: Partial<Seance>, force = false) => {
+    const saved = await apiUpdateSeance(id, patch as unknown as Record<string, unknown>, force);
+    const seance = { ...(saved as unknown as Seance), id };
+    setSnap((s) => ({
+      ...s,
+      seances: s.seances.map((x) => (x.id === id ? seance : x)),
+    }));
+    return seance;
+  }, []);
 
-  const deleteSeance = useCallback(
-    (id: string) => {
-      apiDeleteSeance(id).catch(() => {});
-      setSnap((s) => ({ ...s, seances: s.seances.filter((x) => x.id !== id) }));
-    },
-    [],
-  );
+  const deleteSeance = useCallback(async (id: string) => {
+    await apiDeleteSeance(id);
+    setSnap((s) => ({ ...s, seances: s.seances.filter((x) => x.id !== id) }));
+  }, []);
 
   /** Déplacement par glisser-déposer : nouvelle date et/ou nouvel horaire. */
-  const moveSeance = useCallback(
-    (id: string, date: string, debut: string) =>
-      setSnap((s) => ({
-        ...s,
-        seances: s.seances.map((x) => {
-          if (x.id !== id) return x;
-          // La durée est préservée : on ne déplace que le point de départ.
-          const duree = minutesDepuisMinuit(x.fin) - minutesDepuisMinuit(x.debut);
-          return { ...x, date, debut, fin: ajouterMinutes(debut, duree) };
-        }),
-      })),
-    [],
-  );
-
+  const moveSeance = useCallback(async (id: string, date: string, debut: string, force = false) => {
+    const current = snapRef.current.seances.find((x) => x.id === id);
+    if (!current) return;
+    // La durée est préservée : on ne déplace que le point de départ.
+    const duree = minutesDepuisMinuit(current.fin) - minutesDepuisMinuit(current.debut);
+    const fin = ajouterMinutes(debut, duree);
+    // Le dépôt peut chevaucher : le serveur répond 409, la page affiche
+    // l'avertissement et propose de forcer (voir `handleDrop` du planning).
+    const saved = await apiUpdateSeance(id, { date, debut, fin } as unknown as Record<string, unknown>, force);
+    const seance = { ...(saved as unknown as Seance), id };
+    setSnap((s) => ({
+      ...s,
+      seances: s.seances.map((x) => (x.id === id ? seance : x)),
+    }));
+  }, []);
   /**
    * Conflits d'une séance projetée.
    *
@@ -1594,9 +1398,38 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [seancesParJour],
   );
 
-  const reset = useCallback(() => {
-    window.localStorage.removeItem(STORAGE_KEY);
-    setSnap(seed());
+  /* ---------------- Appel en séance (roll-call) ---------------- */
+
+  const openSession = useCallback(async (seanceId: string) => {
+    const session = await apiOpenAttendanceSession(seanceId);
+    return { id: String((session as { id?: unknown })?.id ?? "") };
+  }, []);
+
+  const fetchSession = useCallback(async (seanceId: string) => {
+    try {
+      const session = await apiFetchAttendanceSession(seanceId);
+      return { id: String((session as { id?: unknown })?.id ?? "") };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const closeSession = useCallback(async (sessionId: string) => {
+    await apiCloseAttendanceSession(sessionId);
+  }, []);
+
+  const fetchPresences = useCallback(async (seanceId: string) => {
+    const rows = (await apiFetchSeanceAttendance(seanceId)) as AttendanceEntry[];
+    return rows.map((r) => ({
+      etudiantId: String(r.etudiantId ?? ""),
+      present: r.present === true,
+      justifie: r.justifie === true,
+      note: String(r.note ?? ""),
+    }));
+  }, []);
+
+  const savePresences = useCallback(async (seanceId: string, entries: AttendanceEntry[]) => {
+    await apiSaveAttendanceBulk(seanceId, entries);
   }, []);
 
   /* ---------------- Dérivés ---------------- */
@@ -1702,21 +1535,34 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   }, [snap.etudiants, snap.formateurs, totalUnpaidMonths]);
 
   const repartitionFiliere = useMemo(
-    () =>
-      FILIERES.map((f) => ({
-        name: FILIERE_COURT[f],
-        filiere: f,
-        value: snap.etudiants.filter((e) => e.filiere === f).length,
-      })),
+    () => {
+      const counts = new Map<string, number>();
+      for (const e of snap.etudiants) {
+        const f = e.filiere || "Sans filière";
+        counts.set(f, (counts.get(f) ?? 0) + 1);
+      }
+      return [...counts.entries()]
+        .map(([filiere, value]) => ({
+          name: (FILIERE_COURT as Record<string, string>)[filiere] ?? filiere,
+          filiere,
+          value,
+        }))
+        .sort((a, b) => b.value - a.value);
+    },
     [snap.etudiants],
   );
 
   const repartitionNiveau = useMemo(
-    () =>
-      NIVEAUX.map((n) => ({
-        name: n,
-        value: snap.etudiants.filter((e) => e.niveau === n).length,
-      })),
+    () => {
+      const counts = new Map<string, number>();
+      for (const e of snap.etudiants) {
+        const n = e.niveau || "—";
+        counts.set(n, (counts.get(n) ?? 0) + 1);
+      }
+      return [...counts.entries()]
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
     [snap.etudiants],
   );
 
@@ -1752,20 +1598,23 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   );
 
   const reussiteFiliere = useMemo(
-    () =>
-      FILIERES.map((f) => {
-        const inscrits = snap.etudiants.filter(
-          (e) => e.filiere === f && e.moyenne > 0,
-        );
-        const reussite = inscrits.length
-          ? Math.round(
-              (inscrits.filter((e) => e.moyenne >= 10).length /
-                inscrits.length) *
-                100,
-            )
-          : 0;
-        return { name: FILIERE_COURT[f], filiere: f, value: reussite };
-      }),
+    () => {
+      const byFiliere = new Map<string, { inscrits: number; admis: number }>();
+      for (const e of snap.etudiants) {
+        if (!e.filiere || !(e.moyenne > 0)) continue;
+        const row = byFiliere.get(e.filiere) ?? { inscrits: 0, admis: 0 };
+        row.inscrits += 1;
+        if (e.moyenne >= 10) row.admis += 1;
+        byFiliere.set(e.filiere, row);
+      }
+      return [...byFiliere.entries()]
+        .map(([filiere, r]) => ({
+          name: (FILIERE_COURT as Record<string, string>)[filiere] ?? filiere,
+          filiere,
+          value: r.inscrits ? Math.round((r.admis / r.inscrits) * 100) : 0,
+        }))
+        .sort((a, b) => b.value - a.value);
+    },
     [snap.etudiants],
   );
 
@@ -1796,6 +1645,9 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     creneauxLabels: snap.creneaux,
     creneaux,
     setCreneaux,
+    loading,
+    syncFailed,
+    refresh,
     paiements,
     dashboard,
     financier,
@@ -1826,27 +1678,34 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     updateBulletin,
     publierBulletin,
     publierTousBulletins,
-addSeance,
+    addSeance,
     updateSeance,
     deleteSeance,
     moveSeance,
     conflitsSeance,
+    openSession,
+    closeSession,
+    fetchSession,
+    fetchPresences,
+    savePresences,
     addStage,
     updateStage,
     deleteStage,
     payerMois,
     updatePaiementMensuel,
     addNote,
+    deleteNote,
     addFiliere,
     deleteFiliere,
     addStructureAccueil,
     updateStructureAccueil,
     deleteStructureAccueil,
     addServiceStage,
+    updateServiceStage,
+    deleteServiceStage,
     addModule,
     updateModule,
     deleteModule,
-    reset,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -1861,20 +1720,22 @@ export function useIstpm() {
 /**
  * Formateur « courant » pour le rôle enseignant.
  *
- * Résolu depuis le référentiel **hydraté** (store), et non depuis le seed
- * statique : ainsi un formateur venu du backend (id UUID) est bien retrouvé.
- * Repli sur le formateur de démonstration puis sur le premier de la liste.
+ * Résolu depuis le référentiel **serveur** : d'abord la fiche liée au compte
+ * (`formateurs.user_id`), sinon la sélection manuelle du sélecteur, sinon la
+ * première fiche. Plus aucun identifiant de démonstration.
  */
 export function useCurrentFormateur(): Formateur | null {
   const { formateurs } = useIstpm();
-  const { selectedFormateurId } = useAuth();
+  const { user, selectedFormateurId } = useAuth();
   return useMemo(() => {
     if (formateurs.length === 0) return null;
-    const id = selectedFormateurId ?? DEMO_FORMATEUR_ID;
-    return (
-      formateurs.find((f) => f.id === id) ??
-      formateurs.find((f) => f.id === DEMO_FORMATEUR_ID) ??
-      formateurs[0]
-    );
-  }, [formateurs, selectedFormateurId]);
+    if (selectedFormateurId) {
+      return formateurs.find((f) => f.id === selectedFormateurId) ?? null;
+    }
+    if (user?.role === "enseignant" && user?.id) {
+      const liee = formateurs.find((f) => f.userId === user.id);
+      if (liee) return liee;
+    }
+    return formateurs[0];
+  }, [formateurs, selectedFormateurId, user]);
 }

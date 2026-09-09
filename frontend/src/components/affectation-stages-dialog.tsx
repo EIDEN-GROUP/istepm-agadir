@@ -116,7 +116,12 @@ export function AffectationStagesDialog({
   }, [stages]);
 
   // Groupes disponibles pour l'année + filière choisies.
-  const groupesDisponibles = useMemo(() => {
+  const filieresOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of etudiants) if (e.filiere) set.add(e.filiere);
+    for (const f of FILIERES) set.add(f);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [etudiants]);  const groupesDisponibles = useMemo(() => {
     if (!annee || !filiere) return [];
     const set = new Set<string>();
     for (const e of etudiants) {
@@ -330,11 +335,11 @@ export function AffectationStagesDialog({
               required
               value={filiere}
               onChange={(v) => {
-                setFiliere(v);
+                setFiliere(v as Filiere);
                 setGroupe("");
                 setAssign({});
               }}
-              options={FILIERES}
+              options={filieresOptions}
               placeholder="Choisir une filière…"
             />
           ) : null}

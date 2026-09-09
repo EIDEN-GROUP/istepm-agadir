@@ -10,9 +10,6 @@ import {
   markStudentNotificationRead,
   hideStudentNotification,
   fetchAllStudentRequests,
-  fetchFeatureTicketNotifications,
-  markFeatureTicketNotificationsRead,
-  markFeatureTicketNotificationRead,
 } from "@/lib/istpm-api";
 import {
   Dialog,
@@ -56,8 +53,8 @@ function fmtDateNotif(v: unknown): string {
  *   marque comme lue : elle **reste visible mais grisée**. Le bouton X **efface**
  *   la notification (cachée côté cloche, jamais supprimée en base).
  * - Direction/responsable : demandes `en_attente` ; clic → espace étudiant.
- * - Directeur : en plus, verdicts BMS sur ses tickets (section dédiée, clic =
- *   lu + motif déplié, sans X — c'est du suivi, pas du jetable).
+ * - Verdicts des tickets de fonctionnalité : annoncés par l'assistant IA dans
+ *   le chat (jamais ici).
  * - Compteur à zéro (et modale fermée) : rien n'est rendu, pas même le bouton.
  */
 export function RequestBell() {
@@ -69,7 +66,6 @@ export function RequestBell() {
 
   const isStudent = role === "etudiant";
   const isStaff = role === "directeur" || role === "responsable";
-  const isDirecteur = role === "directeur";
 
   const studentQ = useQuery({
     queryKey: ["student-notifications"],
@@ -85,18 +81,10 @@ export function RequestBell() {
     refetchInterval: 60_000,
     retry: false,
   });
-  const ticketQ = useQuery({
-    queryKey: ["feature-ticket-notifications"],
-    queryFn: fetchFeatureTicketNotifications,
-    enabled: isDirecteur,
-    refetchInterval: 60_000,
-    retry: false,
-  });
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["student-notifications"] });
     qc.invalidateQueries({ queryKey: ["student-requests"] });
-    qc.invalidateQueries({ queryKey: ["feature-ticket-notifications"] });
   };
   const onErr = (err: unknown) =>
     toast.error(err instanceof Error ? err.message : "Action impossible");
@@ -118,44 +106,14 @@ export function RequestBell() {
     },
     onError: onErr,
   });
-  const markTicketOne = useMutation({
-    mutationFn: markFeatureTicketNotificationRead,
-    onSuccess: refresh,
-    onError: onErr,
-  });
-  const markTicketAll = useMutation({
-    mutationFn: markFeatureTicketNotificationsRead,
-    onSuccess: refresh,
-    onError: onErr,
-  });
 
   if (!isStudent && !isStaff) return null;
 
-  const ticketUnread = isDirecteur ? (ticketQ.data?.unread ?? 0) : 0;
   const staffPending = !isStudent
     ? ((staffQ.data ?? []).filter((d) => d.statut === "en_attente").length ?? 0)
     : 0;
-  const unread = isStudent ? (studentQ.data?.unread ?? 0) : staffPending + ticketUnread;
+  const unread = isStudent ? (studentQ.data?.unread ?? 0) : staffPending;
   if (!unread && !open) return null;
-
-  const verdicts: BellItem[] = isDirecteur
-    ? [...(ticketQ.data?.items ?? [])]
-        .sort(
-          (a, b) =>
-            Number(a.luParDemandeur === true) - Number(b.luParDemandeur === true) ||
-            +new Date(String(b.updatedAt ?? 0)) - +new Date(String(a.updatedAt ?? 0)),
-        )
-        .map((n) => ({
-          id: `ticket:${String(n.id ?? "")}`,
-          title: String(n.titre ?? "Ticket"),
-          sub: String(n.reponse || "Statut mis à jour"),
-          detail: String(n.reponse || ""),
-          date: fmtDateNotif(n.updatedAt),
-          tone: (n.statut === "done" ? "teal" : "red") as Tone,
-          label: n.statut === "done" ? "Terminé" : "Rejeté",
-          lu: n.luParDemandeur === true,
-        }))
-    : [];
 
   const items: BellItem[] = isStudent
     ? [...(studentQ.data?.items ?? [])]
@@ -201,25 +159,13 @@ export function RequestBell() {
     }
   };
 
-  const openVerdict = (it: BellItem) => {
-    const rawId = it.id.replace(/^ticket:/, "");
-    if (!it.lu) markTicketOne.mutate(rawId);
-    setExpandedId((prev) => (prev === it.id ? null : it.id));
-  };
-
   return (
     <>
       {!unread ? null : (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label={
-            isStudent
-              ? "Réponses à mes demandes"
-              : isDirecteur && ticketUnread
-                ? "Demandes et tickets à traiter"
-                : "Demandes à traiter"
-          }
+          aria-label={isStudent ? "Réponses à mes demandes" : "Demandes à traiter"}
           className="relative grid h-9 w-9 place-items-center rounded-xl border border-brand/20 bg-card text-muted-foreground shadow-[var(--elevation-1)] transition hover:bg-brand/10 hover:text-brand-dk"
         >
           <Bell className="h-4 w-4" />
@@ -243,9 +189,7 @@ export function RequestBell() {
                 ? unread
                   ? `${unread} non lue${unread > 1 ? "s" : ""}`
                   : "Tout est à jour"
-                : isDirecteur && ticketUnread
-                  ? `${unread} nouveauté${unread > 1 ? "s" : ""} (dont ${ticketUnread} ticket${ticketUnread > 1 ? "s" : ""})`
-                  : `${unread} demande${unread > 1 ? "s" : ""} en attente`
+                : `${unread} demande${unread > 1 ? "s" : ""} en attente`
             }
             footer={
               isStudent ? (
@@ -259,78 +203,19 @@ export function RequestBell() {
                   {markAll.isPending ? "Marquage…" : "Tout marquer comme lu"}
                 </button>
               ) : (
-                <div className="space-y-1">
-                  {isDirecteur && ticketUnread ? (
-                    <button
-                      type="button"
-                      disabled={markTicketAll.isPending}
-                      onClick={() => markTicketAll.mutate()}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-brand-dk transition hover:bg-brand/10 disabled:opacity-50"
-                    >
-                      <CheckCheck className="h-3.5 w-3.5" />
-                      {markTicketAll.isPending ? "Marquage…" : "Marquer les verdicts comme lus"}
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpen(false);
-                      navigate({ to: "/dashboard/espace-etudiant" });
-                    }}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-brand-dk transition hover:bg-brand/10"
-                  >
-                    Ouvrir l'espace étudiant
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate({ to: "/dashboard/espace-etudiant" });
+                  }}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-brand-dk transition hover:bg-brand/10"
+                >
+                  Ouvrir l'espace étudiant
+                </button>
               )
             }
           >
-            {isDirecteur && verdicts.length ? (
-              <div className="mb-2">
-                <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Tickets traités par le BMS
-                </p>
-                <ul className="max-h-[30vh] divide-y divide-brand/8 overflow-y-auto rounded-xl border border-brand/10">
-                  {verdicts.map((it) => {
-                    const expanded = expandedId === it.id;
-                    return (
-                      <li key={it.id} className={cn(it.lu && "opacity-55 saturate-50")}>
-                        <div className="flex items-start gap-1 px-1 py-1">
-                          <button
-                            type="button"
-                            onClick={() => openVerdict(it)}
-                            className="min-w-0 flex-1 rounded-xl px-3 py-2 text-start transition hover:bg-brand/5"
-                          >
-                            <span className="flex items-center justify-between gap-2">
-                              <span className="flex min-w-0 items-center gap-1.5">
-                                {!it.lu ? (
-                                  <span className="h-2 w-2 shrink-0 rounded-full bg-med" aria-hidden />
-                                ) : null}
-                                <span className="truncate text-sm font-semibold text-foreground">
-                                  {it.title}
-                                </span>
-                              </span>
-                              <span className={cn(toneBadge(it.tone), "shrink-0")}>{it.label}</span>
-                            </span>
-                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                              {it.sub || "Voir le motif"}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground/70">{it.date}</span>
-                            {expanded ? (
-                              <span className="mt-2 block space-y-1.5 rounded-xl bg-muted/50 p-3">
-                                <span className="block text-xs text-muted-foreground">
-                                  Motif du BMS : {it.detail || "—"}
-                                </span>
-                              </span>
-                            ) : null}
-                          </button>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ) : null}
             {items.length ? (
               <ul className="max-h-[50vh] divide-y divide-brand/8 overflow-y-auto">
                 {items.map((it) => {

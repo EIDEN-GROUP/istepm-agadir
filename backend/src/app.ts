@@ -37,10 +37,10 @@ import { studentRoutes } from "@/routes/student";
 import { invitationRoutes } from "@/routes/invitations";
 import { userPreferenceRoutes } from "@/routes/user-preferences";
 import { attendanceRoutes } from "@/routes/attendance";
-import { reminderRoutes } from "@/routes/reminders";
 import { reportRoutes } from "@/routes/reports";
 import { noteRoutes } from "@/routes/notes";
 import { agentRoutes } from "@/routes/agent";
+import { aiConvoRoutes } from "@/routes/ai-convos";
 import { featureTicketRoutes } from "@/routes/feature-tickets";
 import { ensureBucket } from "@/lib/minio";
 
@@ -131,10 +131,10 @@ export async function buildApp() {
   await app.register(invitationRoutes, { prefix: "/api/auth/invitations" });
   await app.register(userPreferenceRoutes, { prefix: "/api/preferences" });
   await app.register(attendanceRoutes, { prefix: "/api/attendance" });
-  await app.register(reminderRoutes, { prefix: "/api/reminders" });
   await app.register(reportRoutes, { prefix: "/api/reports" });
   await app.register(noteRoutes, { prefix: "/api/notes" });
   await app.register(agentRoutes, { prefix: "/api/agent" });
+  await app.register(aiConvoRoutes, { prefix: "/api/ai" });
   await app.register(featureTicketRoutes, { prefix: "/api/feature-tickets" });
 
   return app;

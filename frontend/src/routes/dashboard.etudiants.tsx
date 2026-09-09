@@ -11,7 +11,6 @@ import { fetchStudentSemestres, exportEtudiantsCsv, createInvitation } from "@/l
 import {
   FILIERES,
   NIVEAUX,
-  ANNEES_UNIVERSITAIRES,
   STATUT_ETUDIANT_LABEL,
   STATUT_ETUDIANT_TONE,
   STATUT_PAIEMENT_LABEL,
@@ -82,8 +81,10 @@ const STATUTS_PAIEMENT: StatutPaiement[] = [
 ];
 
 function EtudiantsPage() {
-  const { role, selectedFormateurId } = useAuth();
-  const { etudiants, addEtudiant, updateEtudiant, deleteEtudiant, restoreEtudiant } = useIstpm();
+  const { role } = useAuth();
+  const { etudiants, filieres: filieresApi, addEtudiant, updateEtudiant, deleteEtudiant, restoreEtudiant } = useIstpm();
+  // Référentiel serveur, repli constant (jamais vide en pratique : amorcé en migration).
+  const filieresOptions = filieresApi.length ? filieresApi : [...FILIERES];
   // Teachers get a read-only view; student administration is the responsable's
   // and the directeur's job.
   const canEdit = role === "directeur" || role === "responsable";
@@ -131,11 +132,17 @@ function EtudiantsPage() {
     }
     return [...set].sort();
   }, [etudiants, filiere, niveau]);
-
   // Drop a group choice that no longer matches the filière/semestre.
   useEffect(() => {
     if (groupe !== ALL && !groupeOptions.includes(groupe)) setGroupe(ALL);
   }, [groupeOptions, groupe]);
+
+  // Années présentes dans les données (jamais de liste figée).
+  const anneesOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of etudiants) if (e.annee) set.add(e.annee);
+    return [...set].sort().reverse();
+  }, [etudiants]);
 
   // Pre-set scope filters for enseignant with assigned formateur. On garde le
   // semestre et le groupe sur « Tous » : la portée (filière + semestres
@@ -154,7 +161,9 @@ function EtudiantsPage() {
   // portée de formateur (filière verrouillée sur son département), on exige un
   // choix explicite de semestre et de groupe : la table reste masquée tant que
   // le formateur n'a pas sélectionné filière + semestre + groupe.
-  const noFormateur = isTeacher && !selectedFormateurId;
+  // Sans fiche liée au compte ni sélection, on invite à choisir un formateur
+  // dans le menu (le périmètre API reste dans tous les cas celui du compte).
+  const noFormateur = isTeacher && !currentFormateur;
   const needsSelection =
     isTeacher && !noFormateur && (filiere === ALL || niveau === ALL || groupe === ALL);
 
@@ -312,11 +321,11 @@ function EtudiantsPage() {
                   allLabel: "Tous les semestres",
                 },
                 {
-                  id: "anneeScolaire",
-                  label: "Année scolaire",
-                  value: anneeScolaire,
-                  onChange: setAnneeScolaire,
-                  options: ANNEES_UNIVERSITAIRES,
+                    id: "anneeScolaire",
+                    label: "Année scolaire",
+                    value: anneeScolaire,
+                    onChange: setAnneeScolaire,
+                    options: anneesOptions,
                   allLabel: "Toutes les années",
                 },
                 {
@@ -342,7 +351,7 @@ function EtudiantsPage() {
                   label: "Filière",
                   value: filiere,
                   onChange: setFiliere,
-                  options: FILIERES,
+                  options: filieresOptions,
                   allLabel: "Toutes les filières",
                 },
                 {
@@ -354,11 +363,11 @@ function EtudiantsPage() {
                   allLabel: isTeacher ? "Choisir un semestre" : "Tous les semestres",
                 },
                 {
-                  id: "anneeScolaire",
-                  label: "Année scolaire",
-                  value: anneeScolaire,
-                  onChange: setAnneeScolaire,
-                  options: ANNEES_UNIVERSITAIRES,
+                    id: "anneeScolaire",
+                    label: "Année scolaire",
+                    value: anneeScolaire,
+                    onChange: setAnneeScolaire,
+                    options: anneesOptions,
                   allLabel: "Toutes les années",
                 },
                 {
@@ -584,7 +593,15 @@ function EtudiantsPage() {
                     <button
                       className={e.archived ? iconButton : iconButtonDanger}
                       aria-label={e.archived ? "Restaurer" : "Archiver"}
-                      onClick={() => (e.archived ? restoreEtudiant(e.id) : setToDelete(e))}
+                      onClick={() => {
+                        if (e.archived) {
+                          void restoreEtudiant(e.id).catch((err) =>
+                            toast.error(err instanceof Error ? err.message : "Restauration impossible"),
+                          );
+                        } else {
+                          setToDelete(e);
+                        }
+                      }}
                     >
                       {e.archived ? (
                         <RotateCcw className="h-3.5 w-3.5" />
@@ -622,14 +639,24 @@ function EtudiantsPage() {
         <EtudiantForm
           key={editing?.id ?? "new"}
           initial={editing}
+          filieres={filieresOptions}
           onCancel={() => setFormOpen(false)}
-          onSubmit={async (data) => {
-            if (editing) {
-              updateEtudiant(editing.id, data);
-              toast.success(`Fiche mise à jour   ${data.prenom} ${data.nom}`);
+          onSubmit={async (data) => {            if (editing) {
+              try {
+                await updateEtudiant(editing.id, data);
+                toast.success(`Fiche mise à jour   ${data.prenom} ${data.nom}`);
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+                return;
+              }
             } else {
               const { invite, ...fiche } = data;
-              addEtudiant(fiche);
+              try {
+                await addEtudiant(fiche);
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Inscription impossible");
+                return;
+              }
               toast.success(`Étudiant inscrit   ${data.prenom} ${data.nom}`);
               if (invite && data.email) {
                 try {
@@ -665,10 +692,14 @@ function EtudiantsPage() {
             ? `${toDelete.prenom} ${toDelete.nom} (${toDelete.cne}) sera masqué des listes. Vous pourrez le restaurer à tout moment.`
             : ""
         }
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!toDelete) return;
-          deleteEtudiant(toDelete.id);
-          toast.success(`Étudiant archivé   ${toDelete.prenom} ${toDelete.nom}`);
+          try {
+            await deleteEtudiant(toDelete.id);
+            toast.success(`Étudiant archivé   ${toDelete.prenom} ${toDelete.nom}`);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Archivage impossible");
+          }
           setToDelete(null);
         }}
       />
@@ -756,10 +787,12 @@ type FormState = {
 
 function EtudiantForm({
   initial,
+  filieres,
   onSubmit,
   onCancel,
 }: {
   initial: Etudiant | null;
+  filieres: string[];
   onSubmit: (data: Omit<FormState, "fraisMensuels"> & {
     filiere: Filiere;
     niveau: Niveau;
@@ -938,8 +971,8 @@ function EtudiantForm({
           label="Filière"
           required
           value={f.filiere}
-          onChange={(v) => set("filiere", v)}
-          options={FILIERES}
+          onChange={(v) => set("filiere", v as Filiere)}
+          options={filieres}
           error={errors.filiere}
         />
       </FullWidth>
@@ -1049,51 +1082,6 @@ type SemestreResume = {
   resultat: "Admis" | "Rattrapage" | "Ajourné";
 };
 
-/** Petit hash déterministe à partir d'une chaîne (pour des données stables). */
-function hashStr(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
-}
-
-/**
- * Reconstitue un historique des semestres passés pour un étudiant.
- *
- * Le modèle de données ne conserve pas les relevés antérieurs : cet aperçu est
- * dérivé de façon déterministe du niveau courant et de la moyenne de l'étudiant,
- * pour illustrer la section « Historique des semestres ». Il devra être
- * remplacé par les relevés réels une fois exposés par le backend.
- */
-function historiqueSemestres(e: Etudiant): SemestreResume[] {
-  const idx = NIVEAUX.indexOf(e.niveau);
-  if (idx <= 0) return [];
-  const base = e.moyenne > 0 ? e.moyenne : 12;
-  const modulesTypes = [
-    "Sciences fondamentales",
-    "Enseignement clinique",
-    "Communication professionnelle",
-    "Travaux pratiques",
-  ];
-  const out: SemestreResume[] = [];
-  for (let i = 0; i < idx; i += 1) {
-    const semestre = NIVEAUX[i];
-    const modules = modulesTypes.map((module, j) => {
-      const seed = hashStr(`${e.cne}-${semestre}-${j}`);
-      const variation = ((seed % 60) - 25) / 10; // -2.5 … +3.4
-      const note = Math.min(19, Math.max(6, Math.round((base + variation) * 4) / 4));
-      return { module, note };
-    });
-    const moyenne =
-      Math.round(
-        (modules.reduce((s, m) => s + m.note, 0) / modules.length) * 100,
-      ) / 100;
-    const resultat =
-      moyenne >= 12 ? "Admis" : moyenne >= 10 ? "Rattrapage" : "Ajourné";
-    out.push({ semestre, modules, moyenne, resultat });
-  }
-  return out;
-}
-
 const RESULTAT_TONE = {
   Admis: "teal" as const,
   Rattrapage: "amber" as const,
@@ -1103,7 +1091,8 @@ const RESULTAT_TONE = {
 function EtudiantDetail({ e }: { e: Etudiant }) {
   const moisPayes = e.paiementsMensuelsRecords.filter((r) => r.statut === "paye").length;
   const moisTotal = e.paiementsMensuelsRecords.length || 10;
-  const [semestres, setSemestres] = useState<SemestreResume[]>(() => historiqueSemestres(e));
+  // Relevés réels servis par le backend ; en attendant la réponse, vide.
+  const [semestres, setSemestres] = useState<SemestreResume[]>([]);
   useEffect(() => {
     fetchStudentSemestres(e.id)
       .then((data) => setSemestres(data as SemestreResume[]))
@@ -1250,7 +1239,7 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
           </DetailTable>
         ) : (
           <DetailEmpty>
-            Aucun semestre antérieur   l'étudiant est en première période.
+            Aucun relevé antérieur enregistré pour cet étudiant.
           </DetailEmpty>
         )}
       </DetailSection>

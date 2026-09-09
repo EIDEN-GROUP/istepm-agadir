@@ -500,6 +500,84 @@ export function createStageServiceApi(nom: string) {
   return api.post<{ services: string[] }>("/settings/stage-services", { nom });
 }
 
+export function updateStageServiceApi(nom: string, body: { nouveauNom?: string }) {
+  return api.put<{ services: string[] }>(`/settings/stage-services/${encodeURIComponent(nom)}`, body);
+}
+
+export function deleteStageServiceApi(nom: string) {
+  return api.delete<{ services: string[] }>(`/settings/stage-services/${encodeURIComponent(nom)}`);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Jours chômés (fériés, vacances, exceptions)                        */
+/* ------------------------------------------------------------------ */
+
+export interface HolidayRow {
+  id: string;
+  date: string;
+  label: string;
+}
+
+export function fetchHolidays() {
+  return api.get<HolidayRow[]>("/holidays");
+}
+
+export interface VacationRow {
+  id: string;
+  startDate: string;
+  endDate: string;
+  label: string;
+}
+
+export function fetchVacations() {
+  return api.get<VacationRow[]>("/holidays/vacations");
+}
+
+export interface CalendarExceptionRow {
+  id: string;
+  date: string;
+  label: string;
+}
+
+export function fetchExceptions() {
+  return api.get<CalendarExceptionRow[]>("/holidays/exceptions");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Présences (appel en séance)                                        */
+/* ------------------------------------------------------------------ */
+
+export interface AttendanceEntry {
+  etudiantId: string;
+  present: boolean;
+  justifie?: boolean;
+  note?: string;
+}
+
+export function openAttendanceSession(seanceId: string) {
+  return api.post<{ id: string; seanceId: string; statut: string }>(`/attendance/session/open`, {
+    seanceId,
+  });
+}
+
+export function fetchAttendanceSession(seanceId: string) {
+  return api.get<{ id: string; seanceId: string; statut: string }>(
+    `/attendance/session/${seanceId}`,
+  );
+}
+
+export function closeAttendanceSession(sessionId: string) {
+  return api.post<Record<string, unknown>>(`/attendance/session/${sessionId}/close`);
+}
+
+export function fetchSeanceAttendance(seanceId: string) {
+  return api.get<AttendanceEntry[]>(`/attendance/seance/${seanceId}`);
+}
+
+export function saveAttendanceBulk(seanceId: string, entries: AttendanceEntry[]) {
+  return api.post<unknown>(`/attendance/bulk`, { seanceId, entries });
+}
+
 /* ------------------------------------------------------------------ */
 /*  Modules                                                           */
 /* ------------------------------------------------------------------ */
@@ -542,10 +620,6 @@ export function deleteModuleApi(id: string) {
   return api.delete<{ ok: boolean }>(`/settings/modules/${id}`);
 }
 
-export function resetSettings() {
-  return api.post<{ ok: boolean }>("/settings/reset");
-}
-
 /* ------------------------------------------------------------------ */
 /*  Seances                                                            */
 /* ------------------------------------------------------------------ */
@@ -554,12 +628,20 @@ export function fetchSeances(params?: { start?: string; end?: string; professeur
   return api.get<Record<string, unknown>[]>("/seances", params);
 }
 
-export function createSeance(data: Record<string, unknown>) {
-  return api.post<Record<string, unknown>>("/seances", data);
+export function createSeance(data: Record<string, unknown>, force = false) {
+  return api.post<Record<string, unknown>>(
+    "/seances",
+    data,
+    force ? { force: "1" } : undefined,
+  );
 }
 
-export function updateSeance(id: string, data: Record<string, unknown>) {
-  return api.put<Record<string, unknown>>(`/seances/${id}`, data);
+export function updateSeance(id: string, data: Record<string, unknown>, force = false) {
+  return api.put<Record<string, unknown>>(
+    `/seances/${id}`,
+    data,
+    force ? { force: "1" } : undefined,
+  );
 }
 
 export function deleteSeance(id: string) {
@@ -946,6 +1028,54 @@ export function executeBatchActions(
     "/agent/execute-batch",
     { actions },
   );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Conversations IA (persistées en base)                              */
+/* ------------------------------------------------------------------ */
+
+export interface AiConvoListItem {
+  id: string;
+  title: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface AiConvoFull {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  updatedAt: string;
+}
+
+export function fetchAiConvos() {
+  return api.get<{ convos: AiConvoListItem[]; activeId: string | null }>("/ai/convos");
+}
+
+export function fetchAiConvo(id: string) {
+  return api.get<{ convo: AiConvoFull }>(`/ai/convos/${id}`);
+}
+
+export function createAiConvo(data: { title?: string; messages?: ChatMessage[] }) {
+  return api.post<{ convo: AiConvoFull }>("/ai/convos", data);
+}
+
+export function saveAiConvo(id: string, data: { title?: string; messages?: ChatMessage[] }) {
+  return api.put<{ convo: AiConvoFull }>(`/ai/convos/${id}`, data);
+}
+
+export function deleteAiConvo(id: string) {
+  return api.delete<{ ok: boolean; activeId?: string | null }>(`/ai/convos/${id}`);
+}
+
+export function setActiveAiConvo(id: string) {
+  return api.post<{ ok: boolean; activeId: string }>("/ai/convos/active", { id });
+}
+
+export function importAiConvos(convos: { title?: string; messages: ChatMessage[] }[]) {
+  return api.post<{ ok: boolean; activeId: string | null; count: number }>("/ai/convos/import", {
+    convos,
+  });
 }
 
 export function fetchAgentActions() {

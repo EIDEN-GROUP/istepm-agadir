@@ -5,10 +5,10 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
+import { useStamp } from "@/lib/stamp";
 import { PersonAvatar } from "@/components/person-avatar";
 import { makePaiementDocPdf } from "@/lib/branded-doc";
 import {
-  ANNEES_UNIVERSITAIRES,
   FILIERES,
   NIVEAUX,
   ANNEES_ETUDE,
@@ -100,6 +100,12 @@ function resteDu(records: PaiementMensuel[]): number {
 function PaiementsPage() {
   const { role } = useAuth();
   const { etudiants, financier, aRelancer, payerMois, updatePaiementMensuel, photoDe } = useIstpm();
+  // Années présentes dans les fiches (jamais de liste figée).
+  const anneesOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of etudiants) if (e.annee) set.add(e.annee);
+    return [...set].sort().reverse();
+  }, [etudiants]);
   const canEdit = role === "directeur" || role === "responsable";
 
   const [search, setSearch] = useState("");
@@ -231,7 +237,7 @@ function PaiementsPage() {
           },
           {
             id: "anneeScolaire", label: "Année scolaire", value: anneeScolaire, onChange: setAnneeScolaire,
-            options: ANNEES_UNIVERSITAIRES, allLabel: "Toutes les années",
+            options: anneesOptions, allLabel: "Toutes les années",
           },
           {
             id: "statut", label: "Statut", value: statut, onChange: setStatut,
@@ -365,10 +371,14 @@ function PaiementsPage() {
         <EditPaiementDialog
           etudiant={editStudent}
           onClose={() => setEditStudent(null)}
-          onSave={(mois, details) => {
-            payerMois(editStudent.id, mois, details);
-            toast.success(`Paiement enregistré pour ${editStudent.prenom} ${editStudent.nom}`);
-            setEditStudent(null);
+          onSave={async (mois, details) => {
+            try {
+              await payerMois(editStudent.id, mois, details);
+              toast.success(`Paiement enregistré pour ${editStudent.prenom} ${editStudent.nom}`);
+              setEditStudent(null);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+            }
           }}
         />
       ) : null}
@@ -389,11 +399,15 @@ function PaiementsPage() {
           }}
           isNew
           etudiants={etudiants}
-          onNewPayment={(etudiantId, mois, details) => {
-            payerMois(etudiantId, mois, details);
+          onNewPayment={async (etudiantId, mois, details) => {
             const et = etudiants.find((e) => e.id === etudiantId);
-            toast.success(`Paiement enregistré pour ${et?.prenom} ${et?.nom}`);
-            setAddOpen(false);
+            try {
+              await payerMois(etudiantId, mois, details);
+              toast.success(`Paiement enregistré pour ${et?.prenom} ${et?.nom}`);
+              setAddOpen(false);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+            }
           }}
         />
       ) : null}
@@ -656,6 +670,8 @@ function HistoriquePaiementsDialog({
   onClose: () => void;
 }) {
   const { updatePaiementMensuel } = useIstpm();
+  // Cachet officiel servi par le backend, apposé sur les reçus PDF.
+  const stamp = useStamp();
   const academicYear = getCurrentAcademicYear();
   const months = useMemo(() => getAcademicYearMonths(academicYear), [academicYear]);
   const canEdit = useAuth().role === "directeur" || useAuth().role === "responsable";
@@ -687,7 +703,9 @@ function HistoriquePaiementsDialog({
   const saveStatut = (record: typeof monthData[0]) => {
     const existing = records.find((r) => r.mois === record.mois);
     if (existing) {
-      updatePaiementMensuel(existing.id, etudiant.id, { statut: editStatut });
+      void updatePaiementMensuel(existing.id, etudiant.id, { statut: editStatut }).catch((err) =>
+        toast.error(err instanceof Error ? err.message : "Enregistrement impossible"),
+      );
     }
     setEditingMois(null);
     toast.success(`Statut mis à jour pour ${record.mois}`);
@@ -828,17 +846,20 @@ function HistoriquePaiementsDialog({
                           type="button"
                           onClick={async () => {
                             try {
-                              const blob = await makePaiementDocPdf({
-                                prenom: etudiant.prenom,
-                                nom: etudiant.nom,
-                                cne: etudiant.cne,
-                                filiere: etudiant.filiere,
-                                mois: m.mois,
-                                montantDu: m.montantDu,
-                                montantPaye: m.montantPaye,
-                                datePaiement: m.datePaiement,
-                                statut: m.statut,
-                              });
+                              const blob = await makePaiementDocPdf(
+                                {
+                                  prenom: etudiant.prenom,
+                                  nom: etudiant.nom,
+                                  cne: etudiant.cne,
+                                  filiere: etudiant.filiere,
+                                  mois: m.mois,
+                                  montantDu: m.montantDu,
+                                  montantPaye: m.montantPaye,
+                                  datePaiement: m.datePaiement,
+                                  statut: m.statut,
+                                },
+                                stamp,
+                              );
                               const url = URL.createObjectURL(blob);
                               const a = document.createElement("a");
                               a.href = url;

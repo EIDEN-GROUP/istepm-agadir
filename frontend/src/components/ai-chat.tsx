@@ -1,7 +1,22 @@
 import { useState, useRef, useEffect, useCallback, type FormEvent } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
+import {
+  fetchAiConvos,
+  fetchAiConvo,
+  createAiConvo,
+  saveAiConvo,
+  deleteAiConvo,
+  setActiveAiConvo,
+  importAiConvos,
+  fetchFeatureTicketNotifications,
+  markFeatureTicketNotificationRead,
+  type TicketNotification,
+} from "@/lib/istpm-api";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Loader2, Check, Ban, History, Plus, Trash2, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { softCard } from "@/lib/dash-ui";
 import { MiniMarkdown } from "@/lib/markdown-mini";
 import {
@@ -15,6 +30,25 @@ import {
 
 function formatActionResult(actionName: string, data: unknown): string {
   const label = actionName.replace(/_/g, " ");
+
+  // Ticket de fonctionnalité : l'IA l'a créé d'elle-même, sans vérification.
+  // L'utilisateur doit avoir l'impression que l'IA s'en occupe personnellement.
+  if (actionName === "create_feature_ticket") {
+    const t = (data ?? {}) as {
+      ticket?: { title?: string; description?: string };
+      deduped?: boolean;
+    };
+    const title =
+      typeof t.ticket?.title === "string" && t.ticket.title.trim()
+        ? t.ticket.title.trim()
+        : "votre demande";
+    if (t.deduped) {
+      return `ℹ️ « ${title} » est déjà pris en compte — je vous préviendrai ici même dès que ce sera prêt.`;
+    }
+    const desc =
+      typeof t.ticket?.description === "string" ? t.ticket.description.trim() : "";
+    return `✅ C'est noté — je m'en occupe : « ${title} ».${desc ? `\n\n${desc}` : ""}\n\nJe vous préviendrai ici même dès que ce sera prêt.`;
+  }
 
   const sectionMap: Record<string, string> = {
     formateurs: "Formateurs",
@@ -54,6 +88,22 @@ function formatActionResult(actionName: string, data: unknown): string {
   }
 
   return `📋 **${label}**\n\nDonnée chargée avec succès. Pour plus de détails, consultez la section **${section}**.`;
+}
+
+/** Message d'annonce d'un verdict BMS, avec le motif dans les deux cas. */
+function formatVerdictMessage(n: TicketNotification): ChatMessage {
+  const title = n.titre?.trim() || "votre demande";
+  const motif = (n.reponse ?? "").trim();
+  if (n.statut === "done") {
+    return {
+      role: "assistant",
+      content: `✅ Bonne nouvelle — « ${title} » est disponible !${motif ? `\n\n${motif}` : ""}\n\nDites-moi si vous voulez un ajustement.`,
+    };
+  }
+  return {
+    role: "assistant",
+    content: `❌ « ${title} » n'a pas pu être retenu.${motif ? `\n\nMotif : ${motif}` : ""}\n\nDites-moi si vous voulez reformuler la demande autrement.`,
+  };
 }
 
 function LoadingDots() {
@@ -159,7 +209,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
   );
 }
 
-function FloatingButton({ onClick, open }: { onClick: () => void; open: boolean }) {
+function FloatingButton({ onClick, open, hasNews }: { onClick: () => void; open: boolean; hasNews: boolean }) {
   return (
     <motion.button
       type="button"
@@ -174,6 +224,14 @@ function FloatingButton({ onClick, open }: { onClick: () => void; open: boolean 
           : "bg-gradient-to-b from-brand to-brand-dk text-white",
       )}
     >
+      {hasNews && !open ? (
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4" aria-hidden>
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-alert opacity-60" />
+          <span className="relative inline-flex h-4 w-4 items-center justify-center rounded-full bg-alert text-[9px] font-bold text-white ring-2 ring-card">
+            !
+          </span>
+        </span>
+      ) : null}
       <AnimatePresence mode="wait">
         {open ? (
           <motion.span key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
@@ -189,27 +247,14 @@ function FloatingButton({ onClick, open }: { onClick: () => void; open: boolean 
   );
 }
 
-const CHAT_STORAGE_KEY = "istpm-ai-chat";
-const CONVOS_STORAGE_KEY = "istpm-ai-convos";
-const ACTIVE_CONVO_KEY = "istpm-ai-active-convo";
-const MAX_STORED_CONVOS = 20;
-const MAX_STORED_MESSAGES = 100;
+const LEGACY_CONVOS_KEY = "istpm-ai-convos";
+const LEGACY_ACTIVE_KEY = "istpm-ai-active-convo";
+const LEGACY_CHAT_KEY = "istpm-ai-chat";
 /** Messages envoyés à l'API par appel (le contexte reste complet en pratique). */
 const MAX_SENT_MESSAGES = 60;
 
-type Convo = {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  updatedAt: number;
-};
-
 const GREETING =
   "Bonjour ! Je suis votre assistant IA. Je peux vous aider à gérer les étudiants, formateurs, examens, bulletins, stages, paiements et plus encore. Que souhaitez-vous faire ?";
-
-function uid(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
-}
 
 function titleFor(messages: ChatMessage[]): string {
   const first = messages.find((m) => m.role === "user");
@@ -218,55 +263,58 @@ function titleFor(messages: ChatMessage[]): string {
   return t.length > 42 ? `${t.slice(0, 42)}…` : t;
 }
 
-function readConvos(): { convos: Convo[]; activeId: string } {
+type LegacyImport = { title?: string; messages: ChatMessage[] };
+
+/** Lit l'ancien stockage local (une fois, pour migration vers la base). */
+function readLegacyLocal(): LegacyImport[] | null {
+  const clean = (arr: unknown): ChatMessage[] =>
+    (Array.isArray(arr) ? arr : [])
+      .filter(
+        (m): m is ChatMessage =>
+          !!m &&
+          (m.role === "user" || m.role === "assistant") &&
+          typeof m.content === "string",
+      )
+      .map((m) => ({ role: m.role, content: m.content }));
   try {
-    const raw = localStorage.getItem(CONVOS_STORAGE_KEY);
+    const raw = localStorage.getItem(LEGACY_CONVOS_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as Convo[];
-      if (Array.isArray(parsed) && parsed.length) {
-        const convos = parsed.filter((c) => c && Array.isArray(c.messages));
-        const stored = localStorage.getItem(ACTIVE_CONVO_KEY);
-        const activeId = convos.some((c) => c.id === stored) ? (stored as string) : convos[0].id;
-        return { convos, activeId };
+      const parsed = JSON.parse(raw) as { title?: string; messages?: unknown }[];
+      if (Array.isArray(parsed)) {
+        const convos = parsed
+          .map((c) => ({
+            title: typeof c?.title === "string" ? c.title : undefined,
+            messages: clean(c?.messages),
+          }))
+          .filter((c) => c.messages.some((m) => m.role === "user"));
+        if (convos.length) return convos;
       }
     }
+    const single = localStorage.getItem(LEGACY_CHAT_KEY);
+    if (single) {
+      const messages = clean(JSON.parse(single));
+      if (messages.some((m) => m.role === "user")) return [{ messages }];
+    }
   } catch { /* ignore */ }
-  // Migration unique depuis l'ancien fil seul.
-  let legacy: ChatMessage[] = [];
-  try {
-    const saved = localStorage.getItem(CHAT_STORAGE_KEY);
-    if (saved) legacy = JSON.parse(saved);
-  } catch { /* ignore */ }
-  const hasUserMsg = Array.isArray(legacy) && legacy.some((m) => m?.role === "user");
-  const messages = hasUserMsg ? legacy.slice(-MAX_STORED_MESSAGES) : [{ role: "assistant", content: GREETING } as ChatMessage];
-  const convo: Convo = { id: uid("cv"), title: titleFor(messages), messages, updatedAt: Date.now() };
-  try {
-    localStorage.setItem(CONVOS_STORAGE_KEY, JSON.stringify([convo]));
-    localStorage.setItem(ACTIVE_CONVO_KEY, convo.id);
-    localStorage.removeItem(CHAT_STORAGE_KEY);
-  } catch { /* ignore */ }
-  return { convos: [convo], activeId: convo.id };
+  return null;
 }
 
-function persistConvos(convos: Convo[], activeId: string) {
+function clearLegacyLocal() {
   try {
-    localStorage.setItem(CONVOS_STORAGE_KEY, JSON.stringify(convos));
-    localStorage.setItem(ACTIVE_CONVO_KEY, activeId);
+    localStorage.removeItem(LEGACY_CONVOS_KEY);
+    localStorage.removeItem(LEGACY_ACTIVE_KEY);
+    localStorage.removeItem(LEGACY_CHAT_KEY);
   } catch { /* ignore */ }
 }
 
 export function AiChatFloating() {
+  const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [boot] = useState(readConvos);
-  const [convos, setConvos] = useState<Convo[]>(boot.convos);
-  const [activeId, setActiveId] = useState<string>(boot.activeId);
-  const [messagesState, setMessagesState] = useState<ChatMessage[]>(
-    () =>
-      boot.convos.find((c) => c.id === boot.activeId)?.messages ?? [
-        { role: "assistant", content: GREETING },
-      ],
-  );
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [messagesState, setMessagesState] = useState<ChatMessage[]>([
+    { role: "assistant", content: GREETING },
+  ]);
   const messagesRef = useRef<ChatMessage[]>(messagesState);
   const messages = messagesState;
   const [pendingActions, setPendingActions] = useState<ProposedAction[]>([]);
@@ -275,90 +323,203 @@ export function AiChatFloating() {
   const [executing, setExecuting] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const importedRef = useRef(false);
 
-  // Écriture unique : met à jour le fil visible ET la conversation active
-  // (titre auto, horodatage, plafonds, persistance). Toutes les écritures
-  // passent par ici, sous forme valeur ou fonction comme useState.
+  // Source de vérité serveur : liste légère + active.
+  const listQ = useQuery({
+    queryKey: ["ai-convos"],
+    queryFn: fetchAiConvos,
+    retry: false,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+  const convos = listQ.data?.convos ?? [];
+
+  // Adopte l'active du serveur au premier chargement.
+  useEffect(() => {
+    if (activeId === null && listQ.data) {
+      setActiveId(listQ.data.activeId);
+    }
+  }, [listQ.data, activeId]);
+
+  // Détail de l'active (propriété vérifiée côté serveur).
+  const detailQ = useQuery({
+    queryKey: ["ai-convo", activeId],
+    queryFn: () => fetchAiConvo(activeId as string),
+    enabled: !!activeId,
+    retry: false,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+  useEffect(() => {
+    if (!detailQ.data) return;
+    messagesRef.current = detailQ.data.convo.messages;
+    setMessagesState(detailQ.data.convo.messages);
+    setPendingActions([]);
+  }, [detailQ.data]);
+
+  // Migration unique de l'ancien stockage local vers la base.
+  useEffect(() => {
+    if (importedRef.current || !listQ.data || listQ.isError) return;
+    const local = readLegacyLocal();
+    if (!local) return;
+    if (listQ.data.convos.length) {
+      clearLegacyLocal();
+      return;
+    }
+    importedRef.current = true;
+    importAiConvos(local)
+      .then((r) => {
+        clearLegacyLocal();
+        qc.invalidateQueries({ queryKey: ["ai-convos"] });
+        if (r.activeId) setActiveId(r.activeId);
+      })
+      .catch(() => {
+        importedRef.current = false;
+      });
+  }, [listQ.data, listQ.isError, qc]);
+
+  // Écriture locale uniquement (rapide) ; la persistance serveur est explicite
+  // via saveNow aux points stables (jamais pendant le streaming token à token).
   const setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>> = (u) => {
     const prev = messagesRef.current;
-    const next = (typeof u === "function"
-      ? (u as (p: ChatMessage[]) => ChatMessage[])(prev)
-      : u
-    ).slice(-MAX_STORED_MESSAGES);
+    const next = typeof u === "function" ? (u as (p: ChatMessage[]) => ChatMessage[])(prev) : u;
     messagesRef.current = next;
     setMessagesState(next);
-    setConvos((prevConvos) => {
-      const mapped = prevConvos.map((c) =>
-        c.id === activeId
-          ? { ...c, title: titleFor(next), messages: next, updatedAt: Date.now() }
-          : c,
-      );
-      const byDate = [...mapped].sort((a, b) => b.updatedAt - a.updatedAt);
-      const kept = byDate.slice(0, MAX_STORED_CONVOS);
-      const finalKept = kept.some((c) => c.id === activeId)
-        ? kept
-        : [...kept.slice(0, MAX_STORED_CONVOS - 1), mapped.find((c) => c.id === activeId)!];
-      persistConvos(finalKept, activeId);
-      return finalKept;
-    });
   };
 
+  const saveMut = useMutation({
+    mutationFn: ({ id, next }: { id: string; next: ChatMessage[] }) =>
+      saveAiConvo(id, { title: titleFor(next), messages: next.slice(-100) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ai-convos"] });
+    },
+    onError: () => toast.error("Historique non sauvegardé"),
+  });
+  const saveNow = (id: string | null, next: ChatMessage[]) => {
+    if (!id) return;
+    saveMut.mutate({ id, next });
+  };
+
+  // Verdicts BMS → annoncés par l'IA elle-même dans la conversation active.
+  // Remplace la section verdicts de la cloche : l'utilisateur apprend le
+  // résultat (terminé + motif / rejeté + motif) ici, avec son historique.
+  const { role: userRole } = useAuth();
+  const announcedRef = useRef<Set<string>>(new Set());
+  const announcingRef = useRef(false);
+  const ticketQ = useQuery({
+    queryKey: ["feature-ticket-notifications"],
+    queryFn: fetchFeatureTicketNotifications,
+    enabled: userRole === "directeur",
+    refetchInterval: 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const ticketUnread = ticketQ.data?.unread ?? 0;
+
+  useEffect(() => {
+    const items = ticketQ.data?.items ?? [];
+    // Acquittements restés en échec : le serveur dit encore non lu alors que
+    // c'est déjà annoncé → on réessaie sans réannoncer.
+    const retryAck = items.filter((n) => !n.luParDemandeur && announcedRef.current.has(n.id));
+    if (retryAck.length && !announcingRef.current) {
+      (async () => {
+        for (const n of retryAck) {
+          try {
+            await markFeatureTicketNotificationRead(n.id);
+          } catch { /* prochain passage */ }
+        }
+        qc.invalidateQueries({ queryKey: ["feature-ticket-notifications"] });
+      })();
+    }
+    const fresh = items.filter((n) => !n.luParDemandeur && !announcedRef.current.has(n.id));
+    if (!fresh.length || announcingRef.current || detailQ.isLoading || detailQ.isError) return;
+    announcingRef.current = true;
+    (async () => {
+      try {
+        let convoId = activeId;
+        if (!convoId) {
+          // Première annonce sans conversation : on en ouvre une dédiée.
+          const created = await createAiConvo({
+            title: "Suivi des demandes",
+            messages: [{ role: "assistant", content: GREETING }],
+          });
+          convoId = created.convo.id;
+          setActiveId(convoId);
+          messagesRef.current = created.convo.messages;
+          setMessagesState(created.convo.messages);
+          qc.invalidateQueries({ queryKey: ["ai-convos"] });
+        }
+        const next = [...messagesRef.current, ...fresh.map(formatVerdictMessage)];
+        setMessages(next);
+        // Persistance d'abord : en cas d'échec on réessaie au prochain passage
+        // (rien n'est marqué comme lu).
+        const prevTitle = (listQ.data?.convos ?? []).find((c) => c.id === convoId)?.title;
+        const computed = titleFor(next);
+        await saveAiConvo(convoId, {
+          title: computed === "Nouvelle conversation" ? (prevTitle ?? "Suivi des demandes") : computed,
+          messages: next.slice(-100),
+        });
+        qc.invalidateQueries({ queryKey: ["ai-convos"] });
+        for (const n of fresh) {
+          announcedRef.current.add(n.id);
+          try {
+            await markFeatureTicketNotificationRead(n.id);
+          } catch { /* réessayé implicitement : le serveur reste non lu */ }
+        }
+        qc.invalidateQueries({ queryKey: ["feature-ticket-notifications"] });
+      } catch {
+        // Silence : le sondage suivant réessaiera (aucun marquage effectué).
+      } finally {
+        announcingRef.current = false;
+      }
+    })();
+  }, [ticketQ.data, activeId, detailQ.isLoading, listQ.data, qc]);
+  const [creating, setCreating] = useState(false);
+
   const selectConvo = (id: string) => {
-    const target = convos.find((c) => c.id === id);
-    if (!target) return;
-    messagesRef.current = target.messages;
-    setMessagesState(target.messages);
+    if (loading || id === activeId) return;
     setActiveId(id);
+    setMessages([]);
     setPendingActions([]);
     setShowHistory(false);
-    persistConvos(convos, id);
+    setActiveAiConvo(id)
+      .then(() => qc.invalidateQueries({ queryKey: ["ai-convos"] }))
+      .catch(() => toast.error("Sélection impossible"));
   };
 
   const newConvo = () => {
-    const fresh: Convo = {
-      id: uid("cv"),
-      title: "Nouvelle conversation",
-      messages: [{ role: "assistant", content: GREETING }],
-      updatedAt: Date.now(),
-    };
-    const next = [fresh, ...convos].slice(0, MAX_STORED_CONVOS);
-    messagesRef.current = fresh.messages;
-    setMessagesState(fresh.messages);
-    setConvos(next);
-    setActiveId(fresh.id);
-    setPendingActions([]);
-    setShowHistory(false);
-    persistConvos(next, fresh.id);
+    if (loading || creating) return;
+    setCreating(true);
+    createAiConvo({ title: "Nouvelle conversation", messages: [{ role: "assistant", content: GREETING }] })
+      .then((r) => {
+        qc.invalidateQueries({ queryKey: ["ai-convos"] });
+        setActiveId(r.convo.id);
+        setMessages(r.convo.messages);
+        setPendingActions([]);
+        setShowHistory(false);
+      })
+      .catch((err) => toast.error(err instanceof Error ? err.message : "Création impossible"))
+      .finally(() => setCreating(false));
   };
 
   const deleteConvo = (id: string) => {
-    const next = convos.filter((c) => c.id !== id);
-    if (id !== activeId) {
-      setConvos(next);
-      persistConvos(next, activeId);
-      return;
-    }
-    if (!next.length) {
-      const fresh: Convo = {
-        id: uid("cv"),
-        title: "Nouvelle conversation",
-        messages: [{ role: "assistant", content: GREETING }],
-        updatedAt: Date.now(),
-      };
-      messagesRef.current = fresh.messages;
-      setMessagesState(fresh.messages);
-      setConvos([fresh]);
-      setActiveId(fresh.id);
-      persistConvos([fresh], fresh.id);
-      return;
-    }
-    const sorted = [...next].sort((a, b) => b.updatedAt - a.updatedAt);
-    messagesRef.current = sorted[0].messages;
-    setMessagesState(sorted[0].messages);
-    setConvos(sorted);
-    setActiveId(sorted[0].id);
-    persistConvos(sorted, sorted[0].id);
-    setPendingActions([]);
+    if (loading) return;
+    deleteAiConvo(id)
+      .then((r) => {
+        qc.invalidateQueries({ queryKey: ["ai-convos"] });
+        if (id === activeId) {
+          if (r.activeId) {
+            setActiveId(r.activeId);
+            setMessages([]);
+          } else {
+            newConvo();
+            return;
+          }
+        }
+        setPendingActions([]);
+      })
+      .catch((err) => toast.error(err instanceof Error ? err.message : "Suppression impossible"));
   };
 
   const scrollToBottom = useCallback(() => {
@@ -422,38 +583,45 @@ export function AiChatFloating() {
         next[next.length - 1] = { role: "assistant", content: result.reasoning };
         return next;
       });
+      saveNow(activeId, messagesRef.current);
 
       if (result.proposedActions.length > 0) {
-        const allRead = result.proposedActions.every(
-          (a) => a.actionName.startsWith("get_") || a.actionName.startsWith("list_"),
-        );
+        // Exécution immédiate, sans vérification : les lectures ET la création
+        // de ticket (l'IA annonce elle-même la prise en charge). Tout le reste
+        // passe par Accepter/Refuser.
+        const isAuto = (a: ProposedAction) =>
+          a.actionName.startsWith("get_") ||
+          a.actionName.startsWith("list_") ||
+          a.actionName === "create_feature_ticket";
+        const auto = result.proposedActions.filter(isAuto);
+        const manual = result.proposedActions.filter((a) => !isAuto(a));
 
-        if (allRead) {
-          for (const action of result.proposedActions) {
-            setExecuting(action.actionName);
-            try {
-              const res = await confirmAction(action.actionName, action.params);
-              setMessages((prev) => [
-                ...prev,
-                {
-                  role: "assistant",
-                  content: formatActionResult(action.actionName, res.data),
-                },
-              ]);
-            } catch (err) {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  role: "assistant",
-                  content: `❌ Erreur pour **${action.actionName.replace(/_/g, " ")}** : ${err instanceof Error ? err.message : "Erreur inconnue"}`,
-                },
-              ]);
-            }
+        for (const action of auto) {
+          setExecuting(action.actionName);
+          try {
+            const res = await confirmAction(action.actionName, action.params);
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: formatActionResult(action.actionName, res.data),
+              },
+            ]);
+          } catch (err) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: `❌ Erreur pour **${action.actionName.replace(/_/g, " ")}** : ${err instanceof Error ? err.message : "Erreur inconnue"}`,
+              },
+            ]);
           }
-          setExecuting(null);
-        } else {
-          setPendingActions(result.proposedActions);
         }
+        setExecuting(null);
+        if (manual.length > 0) {
+          setPendingActions(manual);
+        }
+        saveNow(activeId, messagesRef.current);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur inconnue";
@@ -479,6 +647,7 @@ export function AiChatFloating() {
           },
         ];
       });
+      saveNow(activeId, messagesRef.current);
     } finally {
       setLoading(false);
     }
@@ -495,6 +664,7 @@ export function AiChatFloating() {
           content: `✅ **${action.actionName.replace(/_/g, " ")}** exécutée avec succès.\n\n${formatActionResult(action.actionName, res.data)}`,
         },
       ]);
+      saveNow(activeId, messagesRef.current);
       setPendingActions([]);
     } catch (err) {
       setMessages((prev) => [
@@ -504,6 +674,7 @@ export function AiChatFloating() {
           content: `❌ Erreur lors de l'exécution de **${action.actionName.replace(/_/g, " ")}** :\n${err instanceof Error ? err.message : "Erreur inconnue"}`,
         },
       ]);
+      saveNow(activeId, messagesRef.current);
     } finally {
       setExecuting(null);
     }
@@ -518,11 +689,12 @@ export function AiChatFloating() {
         content: `✋ Action **${action.actionName.replace(/_/g, " ")}** annulée.`,
       },
     ]);
+    saveNow(activeId, messagesRef.current);
   }
 
   return (
     <>
-      <FloatingButton onClick={() => setOpen((o) => !o)} open={open} />
+      <FloatingButton onClick={() => setOpen((o) => !o)} open={open} hasNews={ticketUnread > 0} />
       <AnimatePresence>
         {open && (
           <motion.div
@@ -549,7 +721,7 @@ export function AiChatFloating() {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold">Assistant IA</p>
                 <p className="truncate text-[10px] opacity-80">
-                  {convos.find((c) => c.id === activeId)?.title ?? "Conversation"}
+                  {(listQ.data?.convos ?? []).find((c) => c.id === activeId)?.title ?? "Conversation"}
                 </p>
               </div>
               <button
@@ -575,7 +747,7 @@ export function AiChatFloating() {
                   >
                     <div className="flex shrink-0 items-center justify-between px-4 py-3">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Conversations ({convos.length})
+                        Conversations ({listQ.data?.convos.length ?? 0})
                       </p>
                       <button
                         type="button"
@@ -587,9 +759,23 @@ export function AiChatFloating() {
                       </button>
                     </div>
                     <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
-                      {[...convos]
-                        .sort((a, b) => b.updatedAt - a.updatedAt)
-                        .map((c) => {
+                      {listQ.isLoading ? (
+                        <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                          Chargement de l'historique…
+                        </p>
+                      ) : listQ.isError ? (
+                        <div className="px-3 py-6 text-center">
+                          <p className="text-xs text-muted-foreground">Historique indisponible.</p>
+                          <button
+                            type="button"
+                            onClick={() => listQ.refetch()}
+                            className="mt-2 text-xs font-semibold text-brand-dk hover:underline"
+                          >
+                            Réessayer
+                          </button>
+                        </div>
+                      ) : (
+                        (listQ.data?.convos ?? []).map((c) => {
                           const active = c.id === activeId;
                           return (
                             <div
@@ -614,7 +800,7 @@ export function AiChatFloating() {
                                     day: "numeric",
                                     month: "short",
                                   })}{" "}
-                                  · {c.messages.length} message{c.messages.length > 1 ? "s" : ""}
+                                  · {c.messageCount} message{c.messageCount > 1 ? "s" : ""}
                                 </span>
                               </span>
                               <button
@@ -630,7 +816,8 @@ export function AiChatFloating() {
                               </button>
                             </div>
                           );
-                        })}
+                        })
+                      )}
                     </div>
                   </motion.aside>
                 )}
@@ -638,6 +825,14 @@ export function AiChatFloating() {
 
               <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-4 py-4">
+              {detailQ.isLoading && !messages.length ? (
+                <div className="flex justify-start">
+                  <div className="flex items-center gap-3 rounded-2xl bg-muted/70 px-4 py-3">
+                    <LoadingDots />
+                    <span className="text-xs text-muted-foreground">Chargement de la conversation...</span>
+                  </div>
+                </div>
+              ) : null}
               {messages.map((msg, i) => (
                 <MessageBubble key={i} msg={msg} />
               ))}

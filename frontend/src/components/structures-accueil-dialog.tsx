@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Building2, Plus, Trash2, Save } from "lucide-react";
 import { useIstpm } from "@/lib/istpm-store";
@@ -48,6 +48,12 @@ export function StructuresAccueilDialog({
   const [nouveauNom, setNouveauNom] = useState("");
   const [nouvelleCapacite, setNouvelleCapacite] = useState(5);
 
+  // Le serveur fait foi : toute modification confirmée realigne les lignes.
+  // Les brouillons de capacité locaux survivent tant que le store ne bouge pas.
+  useEffect(() => {
+    setRows(structuresAccueil.map(normalize));
+  }, [structuresAccueil]);
+
   const occupation = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of stages) {
@@ -74,7 +80,7 @@ export function StructuresAccueilDialog({
     });
   }, [rows, structuresAccueil]);
 
-  const saveCapacites = () => {
+  const saveCapacites = async () => {
     const store = structuresAccueil.reduce(
       (acc, s) => {
         acc[s.nom] = s.capacite;
@@ -82,23 +88,30 @@ export function StructuresAccueilDialog({
       },
       {} as Record<string, number>,
     );
-    for (const r of rows) {
-      const stored = store[r.nom];
-      if (stored !== undefined && stored !== r.capacite) {
-        updateStructureAccueil(r.nom, { capacite: r.capacite });
+    try {
+      for (const r of rows) {
+        const stored = store[r.nom];
+        if (stored !== undefined && stored !== r.capacite) {
+          await updateStructureAccueil(r.nom, { capacite: r.capacite });
+        }
       }
+      toast.success("Capacités enregistrées");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
     }
-    toast.success("Capacités enregistrées");
   };
 
-  const removeRow = (i: number) => {
+  const removeRow = async (i: number) => {
     const r = rows[i];
-    deleteStructureAccueil(r.nom);
-    setRows((prev) => prev.filter((_, j) => j !== i));
-    toast.success(`Supprimée · ${r.nom}`);
+    try {
+      await deleteStructureAccueil(r.nom);
+      toast.success(`Supprimée · ${r.nom}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Suppression impossible");
+    }
   };
 
-  const addRow = () => {
+  const addRow = async () => {
     const nom = nouveauNom.trim();
     if (!nom) return;
     if (rows.some((r) => r.nom === nom)) {
@@ -106,15 +119,14 @@ export function StructuresAccueilDialog({
       return;
     }
     const cap = Math.max(1, nouvelleCapacite || 1);
-    addStructureAccueil(nom, cap);
-    setRows((prev) =>
-      [...prev, { nom, capacite: cap }].sort((a, b) =>
-        a.nom.localeCompare(b.nom),
-      ),
-    );
-    setNouveauNom("");
-    setNouvelleCapacite(5);
-    toast.success(`Ajoutée · ${nom}`);
+    try {
+      await addStructureAccueil(nom, cap);
+      setNouveauNom("");
+      setNouvelleCapacite(5);
+      toast.success(`Ajoutée · ${nom}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Ajout impossible");
+    }
   };
 
   return (

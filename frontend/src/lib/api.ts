@@ -16,6 +16,16 @@ type RequestOptions = {
 
 const FETCH_TIMEOUT = 30000;
 
+/** Erreur API avec statut HTTP (permet de distinguer 404/409/429…). */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestOptions = {},
@@ -61,7 +71,7 @@ async function request<T>(
   }
 
   if (res.status === 401) {
-    throw new Error("Non authentifié");
+    throw new ApiError("Non authentifié", 401);
   }
 
   if (res.status === 204) {
@@ -71,7 +81,7 @@ async function request<T>(
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.error ?? `Erreur ${res.status}`);
+    throw new ApiError(data.error ?? `Erreur ${res.status}`, res.status);
   }
 
   return data as T;
@@ -81,11 +91,11 @@ export const api = {
   get: <T>(path: string, params?: Record<string, string | undefined>) =>
     request<T>(path, { params }),
 
-  post: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: "POST", body }),
+  post: <T>(path: string, body?: unknown, params?: Record<string, string | undefined>) =>
+    request<T>(path, { method: "POST", body, params }),
 
-  put: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: "PUT", body }),
+  put: <T>(path: string, body?: unknown, params?: Record<string, string | undefined>) =>
+    request<T>(path, { method: "PUT", body, params }),
 
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "PATCH", body }),

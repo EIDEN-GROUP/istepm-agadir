@@ -45,7 +45,6 @@ import {
   STATUT_EXAMEN_LABEL,
   TYPE_EXAMEN_LABEL,
   minutesDepuisMinuit,
-  SALLES,
 } from "@/lib/istpm-data";
 import { PersonAvatar } from "@/components/person-avatar";
 import {
@@ -627,10 +626,50 @@ const ACTIVITE_ICON: Record<ActiviteItem["type"], typeof UserPlus> = {
 };
 
 function ActiviteFeed() {
-  const { activite } = useIstpm();
+  // Fil dérivé des lignes serveur (jamais de session seule) : derniers examens
+  // notés, derniers stages, derniers paiements — triés par date décroissante.
+  const { examens, stages, etudiants } = useIstpm();
+  const items: ActiviteItem[] = useMemo(() => {
+    const out: ActiviteItem[] = [];
+    for (const x of examens) {
+      if (x.statut !== "notes_saisies" || !x.date) continue;
+      out.push({
+        type: "note",
+        texte: `Notes saisies — ${x.module} (${x.classe})`,
+        date: x.date,
+      });
+    }
+    for (const s of stages) {
+      if (!s.debut) continue;
+      out.push({
+        type: "inscription",
+        texte: `Stage — ${s.prenom} ${s.nom} · ${s.structure}`,
+        date: s.debut,
+      });
+    }
+    const nomParId = new Map(etudiants.map((e) => [e.id, `${e.prenom} ${e.nom}`]));
+    for (const e of etudiants) {
+      for (const r of e.paiementsMensuelsRecords ?? []) {
+        if (r.statut !== "paye" || !r.datePaiement) continue;
+        out.push({
+          type: "paiement",
+          texte: `Paiement reçu — ${r.montantPaye.toLocaleString("fr-FR")} MAD (${nomParId.get(r.etudiantId) ?? "étudiant"})`,
+          date: r.datePaiement.slice(0, 10),
+        });
+      }
+    }
+    return out.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 8);
+  }, [examens, stages, etudiants]);
+  if (!items.length) {
+    return (
+      <div className={cn(softCard, "px-5 py-10 text-center text-sm text-muted-foreground")}>
+        Aucune activité récente.
+      </div>
+    );
+  }
   return (
     <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
-      {activite.slice(0, 8).map((a, i) => {
+      {items.map((a, i) => {
         const Icon = ACTIVITE_ICON[a.type];
         return (
           <motion.div
@@ -1221,6 +1260,12 @@ function DashboardResponsable() {
   const { formateurs, seances, aTraiter, dashboard } = useIstpm();
   const seancesAujourdhui = useMemo(() => seances.filter((s) => s.date === today), [seances]);
   const sallesOccupees = useMemo(() => [...new Set(seancesAujourdhui.map((s) => s.salle))], [seancesAujourdhui]);
+  // Parc de salles connu : celles du planning (jamais de chiffre inventé).
+  const sallesConnues = useMemo(
+    () => [...new Set(seances.map((s) => s.salle))].filter(Boolean),
+    [seances],
+  );
+  const sallesLibres = Math.max(0, sallesConnues.length - sallesOccupees.length);
   const conflits = useMemo(() => conflitsGlobaux(seances), [seances]);
   const chargeFormateurs = useMemo(() => formateurs.filter((f) => f.statut !== "en_conge").map((f) => ({ id: f.id, nom: `${f.prenom} ${f.nom}`, seances: seances.filter((s) => s.professeurId === f.id).length })).sort((a, b) => b.seances - a.seances), [formateurs, seances]);
   const occupationSalles = useMemo(() => { const s = [...new Set(seances.map((x) => x.salle))].sort(); return s.map((salle) => ({ salle, seancesCount: seances.filter((x) => x.salle === salle).length, aujourdhui: seancesAujourdhui.filter((x) => x.salle === salle).length })); }, [seances, seancesAujourdhui]);
@@ -1236,7 +1281,7 @@ function DashboardResponsable() {
 
   return (
     <>
-      <DashHero chips={[{ label: "Séances ajd", value: seancesAujourdhui.length }, { label: "Salles libres", value: SALLES.length - sallesOccupees.length }, { label: "Conflits", value: conflits.length }]} />
+      <DashHero chips={[{ label: "Séances ajd", value: seancesAujourdhui.length }, { label: "Salles libres", value: sallesLibres }, { label: "Conflits", value: conflits.length }]} />
       <DashWorkspace tabs={SUPERVISOR_TABS} tab={tab} onChange={setTab} direction={direction}>
         {tab === 0 ? (
           <div className="space-y-6">
@@ -1244,7 +1289,7 @@ function DashboardResponsable() {
               <KpiCard label="Séances aujourd&rsquo;hui" value={seancesAujourdhui.length} icon={Calendar} accent />
               <KpiCard label="Formateurs actifs" value={dashboard.formateursActifs} hint={`sur ${formateurs.length} total`} tone="blue" icon={GraduationCap} />
               <KpiCard label="Salles occupées" value={sallesOccupees.length} icon={MapPin} />
-              <KpiCard label="Salles disponibles" value={SALLES.length - sallesOccupees.length} tone={SALLES.length - sallesOccupees.length > 3 ? "teal" : "amber"} icon={Building2} />
+              <KpiCard label="Salles disponibles" value={sallesLibres} tone={sallesLibres > 3 ? "teal" : "amber"} icon={Building2} />
               <KpiCard label="Conflits" value={conflits.length} tone={conflits.length ? "red" : "teal"} icon={AlertCircle} />
               <KpiCard label="Stages À  valider" value={aTraiter.stagesAValider} tone="amber" icon={BookOpen} />
             </KpiGrid>
@@ -1327,8 +1372,7 @@ function DashboardEtudiant() {
   const reqQ = useQuery({ queryKey: ["student-requests"], queryFn: fetchStudentRequests, retry: false });
   const notifQ = useQuery({ queryKey: ["student-notifications"], queryFn: fetchStudentNotifications, retry: false });
 
-  const fb = !meQ.data ? (store.etudiants[0] ?? null) : null;
-  const p = (meQ.data?.etudiant ?? fb ?? {}) as Record<string, unknown>;
+  const p = (meQ.data?.etudiant ?? {}) as Record<string, unknown>;
   const s = (k: string, k2?: string) => String(p[k] ?? (k2 ? p[k2] : "") ?? "");
   const prenom = s("prenom") || (user?.name?.split(" ")[0] ?? "");
   const nom = s("nom");

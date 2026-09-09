@@ -9,6 +9,7 @@ import {
   Lock,
   AlertTriangle,
   CalendarDays,
+  ClipboardCheck,
   MapPin,
   Users,
   User,
@@ -21,7 +22,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth, DEMO_FORMATEUR_ID, getStoredRole } from "@/lib/auth";
+import { useAuth, getStoredRole } from "@/lib/auth";
 import { canAccess } from "@/lib/dashboard-i18n";
 import {
   useIstpm,
@@ -30,16 +31,12 @@ import {
   type ConflitCandidate,
 } from "@/lib/istpm-store";
 import {
-  SALLES,
-  GROUPES,
   NIVEAUX,
   FILIERES,
   CRENEAUX,
-  ANNEES_UNIVERSITAIRES,
   ANNEES_ETUDE,
   anneeEtude,
   bornesAnneeUniversitaire,
-  joursChomes,
   TYPE_SEANCE_LABEL,
   couleurSeance,
   lundiDeLaSemaine,
@@ -47,6 +44,7 @@ import {
   minutesDepuisMinuit,
   ajouterMinutes,
   fmtDate,
+  type Creneau,
   type Seance,
   type TypeSeance,
   type Niveau,
@@ -59,6 +57,7 @@ import {
   VueMois,
   type VueCalendrier,
 } from "@/components/calendar-views";
+import { AppelSeanceDialog } from "@/components/appel-seance-dialog";
 import {
   softCard,
   primaryPill,
@@ -68,6 +67,7 @@ import {
   dialogSurface,
 } from "@/lib/dash-ui";
 import { escCsvCell } from "@/lib/csv";
+import { ApiError } from "@/lib/api";
 import {
   PageHeader,
   FilterPanel,
@@ -134,6 +134,12 @@ function PlanningPage() {
     moveSeance,
     conflitsSeance,
     creneaux,
+    joursChomes: joursChomesApi,
+    groupConfigs,
+    filieres: filieresApi,
+    loading: storeLoading,
+    syncFailed,
+    refresh,
   } = useIstpm();
 
   // La direction et le responsable des affaires estudiantines organisent les
@@ -146,8 +152,34 @@ function PlanningPage() {
   // L'année scolaire court de septembre à juin : juillet et août sont hors
   // calendrier et ne doivent jamais s'afficher.
   const bornes = useMemo(() => bornesAnneeUniversitaire(), []);
-  // Fêtes nationales, fêtes religieuses et vacances scolaires : jours sans cours.
-  const chomes = useMemo(() => joursChomes(), []);
+  // Fêtes, vacances et exceptions : jours sans cours (source : API).
+  const chomes = useMemo(() => {
+    const m = new Map<string, { nom: string; type: "ferie" | "vacances" }>();
+    for (const j of joursChomesApi) m.set(j.date, { nom: j.nom, type: j.type });
+    return m;
+  }, [joursChomesApi]);
+  // Listes serveurs d'abord, complétées par les valeurs déjà en base
+  // (jamais de référentiel figé : le serveur fait foi).
+  const groupesOptions = useMemo(
+    () =>
+      [...new Set([...groupConfigs.map((g) => g.name), ...seances.map((s) => s.groupe)])]
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
+    [groupConfigs, seances],
+  );
+  const sallesOptions = useMemo(
+    () =>
+      [...new Set(seances.map((s) => s.salle))]
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
+    [seances],
+  );
+  const filieresOptions = filieresApi.length ? filieresApi : [...FILIERES];
+  const anneesOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of seances) if (s.anneeUniversitaire) set.add(s.anneeUniversitaire);
+    return [...set].sort().reverse();
+  }, [seances]);
   const jourChome = useCallback(
     (iso: string) => chomes.get(iso) ?? null,
     [chomes],
@@ -172,6 +204,7 @@ function PlanningPage() {
   const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
 
   const [detail, setDetail] = useState<Seance | null>(null);
+  const [appel, setAppel] = useState<Seance | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Seance | null>(null);
   const [prefill, setPrefill] = useState<{ date: string; debut: string } | null>(
@@ -188,7 +221,7 @@ const [importOpen, setImportOpen] = useState(false);
   }, [formateurs]);
 
   /** L'enseignant ne voit que ses propres séances. */
-  const moiId = moiFormateur?.id ?? DEMO_FORMATEUR_ID;
+  const moiId = moiFormateur?.id ?? "";
   const visibles = useMemo(
     () =>
       estEnseignant
@@ -281,7 +314,7 @@ const [importOpen, setImportOpen] = useState(false);
     setFormOpen(true);
   };
 
-  const handleDrop = (id: string, date: string, debut: string) => {
+  const handleDrop = async (id: string, date: string, debut: string) => {
     const s = seances.find((x) => x.id === id);
     if (!s) return;
     // Un jour chômé n'accueille pas de séance : le dépôt est refusé, pas
@@ -308,7 +341,16 @@ const [importOpen, setImportOpen] = useState(false);
       id,
     );
 
-    moveSeance(id, date, debut);
+    try {
+      // Conflits déjà signalés localement : on force (le serveur garde-fou
+      // reste actif pour les courses, auquel cas on ré-aligne).
+      await moveSeance(id, date, debut, conflits.length > 0);
+    } catch (err) {
+      // Conflit détecté côté serveur (course) ou autre refus : on ré-aligne.
+      await refresh().catch(() => {});
+      toast.error(err instanceof Error ? err.message : "Déplacement impossible");
+      return;
+    }
 
     if (conflits.length) {
       toast.warning(
@@ -477,7 +519,7 @@ const [importOpen, setImportOpen] = useState(false);
             label: "Groupe",
             value: groupe,
             onChange: setGroupe,
-            options: GROUPES,
+            options: groupesOptions,
             allLabel: "Tous les groupes",
           },
           {
@@ -485,7 +527,7 @@ const [importOpen, setImportOpen] = useState(false);
             label: "Salle",
             value: salle,
             onChange: setSalle,
-            options: SALLES,
+            options: sallesOptions,
             allLabel: "Toutes les salles",
           },
           {
@@ -509,7 +551,7 @@ const [importOpen, setImportOpen] = useState(false);
             label: "Année scolaire",
             value: anneeScolaire,
             onChange: setAnneeScolaire,
-            options: ANNEES_UNIVERSITAIRES,
+            options: anneesOptions,
             allLabel: "Toutes les années",
           },
         ]}
@@ -727,10 +769,18 @@ const [importOpen, setImportOpen] = useState(false);
                 setDetail(null);
                 setToDelete(s);
               }}
+              onAppel={(s) => {
+                setDetail(null);
+                setAppel(s);
+              }}
             />
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {appel ? (
+        <AppelSeanceDialog seance={appel} onClose={() => setAppel(null)} />
+      ) : null}
 
       {formOpen && canEdit ? (
         <SeanceForm
@@ -738,18 +788,36 @@ const [importOpen, setImportOpen] = useState(false);
           initial={editing}
           prefill={prefill}
           formateurs={formateurs}
+          filieres={filieresOptions}
+          groupes={groupesOptions}
+          salles={sallesOptions}
+          annees={anneesOptions}
+          creneaux={creneaux}
           verifierConflits={conflitsSeance}
           nomProf={nomProf}
           onCancel={() => setFormOpen(false)}
-          onSubmit={(data) => {
-            if (editing) {
-              updateSeance(editing.id, data);
-              toast.success(`Séance mise à jour   ${data.module}`);
-            } else {
-              addSeance(data);
-              toast.success(`Séance créée   ${data.module}`);
+          onSubmit={async (data) => {
+            const save = (force: boolean) =>
+              editing ? updateSeance(editing.id, data, force) : addSeance(data, force);
+            try {
+              await save(false);
+              toast.success(editing ? `Séance mise à jour   ${data.module}` : `Séance créée   ${data.module}`);
+              setFormOpen(false);
+            } catch (err) {
+              if (err instanceof ApiError && err.status === 409) {
+                // Conflit confirmé côté serveur : l'utilisateur a déjà vu
+                // l'avertissement (« malgré le conflit »), on force.
+                try {
+                  await save(true);
+                  toast.warning(`Séance enregistrée malgré le conflit   ${data.module}`);
+                  setFormOpen(false);
+                } catch (err2) {
+                  toast.error(err2 instanceof Error ? err2.message : "Enregistrement impossible");
+                }
+                return;
+              }
+              toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
             }
-            setFormOpen(false);
           }}
         />
       ) : null}
@@ -758,11 +826,25 @@ const [importOpen, setImportOpen] = useState(false);
         open={importOpen}
         onOpenChange={setImportOpen}
         formateurs={formateurs}
-        onImport={(seances) => {
-          seances.forEach((s) => addSeance(s));
-          setImportOpen(false);
-          toast.success(`${seances.length} séance(s) importée(s)`);
-        }}
+          onImport={async (seances) => {
+            let ok = 0;
+            const echecs: string[] = [];
+            for (const s of seances) {
+              try {
+                await addSeance(s);
+                ok++;
+              } catch {
+                echecs.push(s.module);
+              }
+            }
+            setImportOpen(false);
+            if (ok) toast.success(`${ok} séance(s) importée(s)`);
+            if (echecs.length) {
+              toast.error(
+                `${echecs.length} ligne(s) rejetée(s) : ${echecs.slice(0, 3).join(", ")}${echecs.length > 3 ? "…" : ""}`,
+              );
+            }
+          }}
       />
 
       <ConfirmDialog
@@ -774,10 +856,14 @@ const [importOpen, setImportOpen] = useState(false);
             ? `« ${toDelete.module} » du ${fmtDate(toDelete.date)} à ${toDelete.debut} (${toDelete.groupe}) sera retirée du planning.`
             : ""
         }
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!toDelete) return;
-          deleteSeance(toDelete.id);
-          toast.success(`Séance supprimée   ${toDelete.module}`);
+          try {
+            await deleteSeance(toDelete.id);
+            toast.success(`Séance supprimée   ${toDelete.module}`);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Suppression impossible");
+          }
           setToDelete(null);
         }}
       />
@@ -794,6 +880,7 @@ function SeanceDetail({
   canEdit,
   onEdit,
   onDelete,
+  onAppel,
 }: {
   seance: Seance;
   nomProf: (id: string) => string;
@@ -801,6 +888,7 @@ function SeanceDetail({
   canEdit: boolean;
   onEdit: (s: Seance) => void;
   onDelete: (s: Seance) => void;
+  onAppel: (s: Seance) => void;
 }) {
   const c = couleurSeance(seance.module);
   return (
@@ -827,6 +915,12 @@ function SeanceDetail({
       footer={
         canEdit && (
           <div className="flex items-center justify-end gap-2">
+            <button
+              className={cn(ghostPill, "gap-1.5")}
+              onClick={() => onAppel(seance)}
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" /> Appel
+            </button>
             <button
               className={cn(ghostPill, "gap-1.5")}
               onClick={() => onEdit(seance)}
@@ -921,6 +1015,11 @@ function SeanceForm({
   initial,
   prefill,
   formateurs,
+  filieres,
+  groupes,
+  salles,
+  annees,
+  creneaux: creneauxProp,
   verifierConflits,
   nomProf,
   onSubmit,
@@ -929,11 +1028,21 @@ function SeanceForm({
   initial: Seance | null;
   prefill: { date: string; debut: string } | null;
   formateurs: Formateur[];
+  filieres: string[];
+  groupes: string[];
+  salles: string[];
+  annees: string[];
+  creneaux: Creneau[];
   verifierConflits: (c: ConflitCandidate, ignorerId?: string) => Conflit[];
   nomProf: (id: string) => string;
   onSubmit: (data: Omit<Seance, "id">) => void;
   onCancel: () => void;
 }) {
+  const anneeDe = (iso: string) => {
+    const y = Number(iso.slice(0, 4));
+    return Number.isFinite(y) && y > 2000 ? `${y}/${y + 1}` : "";
+  };
+  const premierCreneau = creneauxProp[0]?.debut ?? CRENEAUX[0].debut;
   const [f, setF] = useState(() => ({
     module: initial?.module ?? "",
     professeurId: initial?.professeurId ?? "",
@@ -941,9 +1050,9 @@ function SeanceForm({
     groupe: initial?.groupe ?? "",
     salle: initial?.salle ?? "",
     date: initial?.date ?? prefill?.date ?? isoDate(new Date()),
-    debut: initial?.debut ?? prefill?.debut ?? CRENEAUX[0].debut,
-    fin: initial?.fin ?? ajouterMinutes(prefill?.debut ?? CRENEAUX[0].debut, 90),
-    anneeUniversitaire: initial?.anneeUniversitaire ?? "2025/2026",
+    debut: initial?.debut ?? prefill?.debut ?? premierCreneau,
+    fin: initial?.fin ?? ajouterMinutes(prefill?.debut ?? premierCreneau, 90),
+    anneeUniversitaire: initial?.anneeUniversitaire ?? anneeDe(prefill?.date ?? isoDate(new Date())),
     semestre: (initial?.semestre ?? "") as Niveau | "",
     type: (initial?.type ?? "cours") as TypeSeance,
     notes: initial?.notes ?? "",
@@ -1085,8 +1194,8 @@ function SeanceForm({
           label="Filière (département)"
           required
           value={f.filiere}
-          onChange={(v) => set("filiere", v)}
-          options={FILIERES}
+          onChange={(v) => set("filiere", v as Filiere)}
+          options={filieres}
           error={errors.filiere}
         />
       </FullWidth>
@@ -1095,7 +1204,7 @@ function SeanceForm({
         required
         value={f.groupe}
         onChange={(v) => set("groupe", v)}
-        options={GROUPES}
+        options={groupes}
         error={errors.groupe}
       />
       <SelectField
@@ -1103,7 +1212,7 @@ function SeanceForm({
         required
         value={f.salle}
         onChange={(v) => set("salle", v)}
-        options={SALLES}
+        options={salles}
         error={errors.salle}
       />
       <SelectField
@@ -1118,7 +1227,7 @@ function SeanceForm({
         label="Année universitaire"
         value={f.anneeUniversitaire}
         onChange={(v) => set("anneeUniversitaire", v)}
-        options={ANNEES_UNIVERSITAIRES}
+        options={annees}
       />
       <TextField
         label="Date"
@@ -1320,6 +1429,7 @@ function validerLigne(
   ligne: Record<string, string>,
   mapping: Map<string, string>,
   formateurs: Formateur[],
+  filieresConnues: string[],
 ): { ok: true; seance: Omit<Seance, "id"> } | { ok: false; erreurs: string[] } {
   const erreurs: string[] = [];
   const get = (col: string) => (ligne[mapping.get(col) ?? ""] ?? "").trim();
@@ -1368,13 +1478,14 @@ function validerLigne(
   }
 
   let filiere = filiereRaw;
-  if (filiere && !FILIERES.includes(filiere as any)) {
+  if (filiere && !filieresConnues.includes(filiere)) {
     erreurs.push(`Filière inconnue: "${filiere}"`);
   }
   if (!filiere && professeurId) {
     const f = formateurs.find((p) => p.id === professeurId);
     if (f) filiere = f.departement;
   }
+  if (!filiere) erreurs.push("Filière manquante");
 
   let type: TypeSeance = "cours";
   if (typeRaw) {
@@ -1401,7 +1512,12 @@ function validerLigne(
   }
   if (!semestre) erreurs.push("Semestre manquant (non déduit du groupe)");
 
-  const anneeUniversitaire = anneeRaw || "2025/2026";
+  const anneeUniversitaire =
+    /^\d{4}\/\d{4}$/.test(anneeRaw)
+      ? anneeRaw
+      : date.slice(0, 4)
+        ? `${date.slice(0, 4)}/${Number(date.slice(0, 4)) + 1}`
+        : "";
 
   if (erreurs.length > 0) return { ok: false, erreurs };
 
@@ -1410,7 +1526,7 @@ function validerLigne(
     seance: {
       module,
       professeurId,
-      filiere: (filiere || FILIERES[0]) as Filiere,
+      filiere: filiere as Filiere,
       groupe,
       salle,
       date,
@@ -1445,6 +1561,10 @@ function ImportCsvDialog({
   >([]);
   const [fichier, setFichier] = useState<string>("");
   const [etape, setEtape] = useState<"upload" | "mapper" | "resultat">("upload");
+  // Référentiel serveur, repli constant si l'API est vide (jamais en pratique :
+  // la migration 0023 amorce les filières).
+  const { filieres: filieresApi } = useIstpm();
+  const filieresConnues = filieresApi.length ? filieresApi : [...FILIERES];
 
   const reset = () => {
     setRaw([]);
@@ -1490,7 +1610,7 @@ function ImportCsvDialog({
       setMapping(auto);
 
       // Validate with current mapping
-      const res = cols.map((l) => validerLigne(l, auto, formateurs));
+      const res = cols.map((l) => validerLigne(l, auto, formateurs, filieresConnues));
       setResultats(res);
       setEtape("mapper");
     };
@@ -1512,7 +1632,7 @@ function ImportCsvDialog({
     if (source) next.set(colCible, source);
     else next.delete(colCible);
     setMapping(next);
-    const res = lignes.map((l) => validerLigne(l, next, formateurs));
+    const res = lignes.map((l) => validerLigne(l, next, formateurs, filieresConnues));
     setResultats(res);
   };
 

@@ -6,18 +6,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { FORMATEURS } from "@/lib/istpm-data";
 
 export type UserRole = "directeur" | "enseignant" | "responsable" | "etudiant";
 
 export const ROLES: UserRole[] = ["directeur", "enseignant", "responsable", "etudiant"];
-
-/**
- * Rôles proposés dans le sélecteur de profil (démo).
- * `etudiant` en est exclu : l'espace étudiant n'est accessible que via une
- * vraie connexion (le rôle reste valide pour les sessions existantes).
- */
-export const SWITCHABLE_ROLES: UserRole[] = ["directeur", "enseignant", "responsable"];
 
 export const ROLE_META: Record<
   UserRole,
@@ -45,26 +37,10 @@ export const ROLE_META: Record<
   },
 };
 
-export const DEMO_FORMATEUR_ID = "fo-1";
-
-const demoFormateur = FORMATEURS.find((f) => f.id === DEMO_FORMATEUR_ID);
-
-const ROLE_USER: Record<UserRole, { name: string; email: string }> = {
-  directeur: { name: "Dr. Youssef Benali", email: "direction@istpm-agadir.ma" },
-  enseignant: {
-    name: demoFormateur
-      ? `${demoFormateur.prenom} ${demoFormateur.nom}`
-      : "Formateur",
-    email: demoFormateur?.email ?? "formateur@istpm-agadir.ma",
-  },
-  responsable: { name: "M. Rachid El Ouafi", email: "scolarite@istpm-agadir.ma" },
-  etudiant: { name: "Étudiant ISTPM", email: "etudiant@istpm-agadir.ma" },
-};
-
+export const FORMATEUR_STORAGE_KEY = "istpm-selected-formateur";
 const ROLE_STORAGE_KEY = "istpm-role";
 const TOKEN_STORAGE_KEY = "istpm-token";
 const USER_STORAGE_KEY = "istpm-user";
-export const FORMATEUR_STORAGE_KEY = "istpm-selected-formateur";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
@@ -109,18 +85,17 @@ type AuthCtx = {
   role: UserRole | null;
   loading: boolean;
   /**
-   * Le rôle affiché n'est pas celui du compte connecté (sélecteur de rôle en
-   * mode démo) : la fiche profil est alors en lecture seule — toute
-   * modification s'appliquerait au vrai compte, pas au rôle consulté.
+   * Le rôle affiché n'est pas celui du compte connecté : la fiche profil est
+   * alors en lecture seule — toute modification s'appliquerait au vrai compte,
+   * pas au rôle consulté.
    */
   impersonating: boolean;
   login: (email: string, password: string) => Promise<void>;
-  setRole: (role: UserRole) => void;
   logout: () => void;
   /** Applique un compte mis à jour (email/nom) + jeton renvoyés par l'API. */
   applyAccountUpdate: (token: string, patch: Partial<AuthUser>) => void;
   selectedFormateurId: string | null;
-  setSelectedFormateurId: (id: string | null) => void;
+  setSelectedFormateurId: (id: string | null, meta?: { name: string; email: string }) => void;
 };
 
 const Ctx = createContext<AuthCtx>({
@@ -129,15 +104,22 @@ const Ctx = createContext<AuthCtx>({
   loading: true,
   impersonating: false,
   login: async () => {},
-  setRole: () => {},
   logout: () => {},
   applyAccountUpdate: () => {},
   selectedFormateurId: null,
   setSelectedFormateurId: () => {},
 });
 
+const ROLE_LABEL: Record<UserRole, string> = {
+  directeur: "Directeur",
+  enseignant: "Enseignant",
+  responsable: "Responsable",
+  etudiant: "Étudiant",
+};
+
 function userFor(role: UserRole): AuthUser {
-  return { id: role, role, ...ROLE_USER[role] };
+  // Identité de repli (hydratation sans profil) : le vrai profil vient du login.
+  return { id: role, role, name: ROLE_LABEL[role], email: "" };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -150,23 +132,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [impersonating, setImpersonating] = useState(false);
 
-  const persistSelectedFormateur = useCallback((id: string | null) => {
-    setSelectedFormateurId(id);
-    if (typeof window !== "undefined") {
-      if (id) window.localStorage.setItem(FORMATEUR_STORAGE_KEY, id);
-      else window.localStorage.removeItem(FORMATEUR_STORAGE_KEY);
-    }
-    // Choosing a specific formateur switches the session to that teacher's
-    // identity, so the greeting, sidebar and avatar reflect who was picked —
-    // not the generic demo formateur.
-    if (id) {
-      const fo = FORMATEURS.find((f) => f.id === id);
-      if (fo) {
+  /**
+   * Mémorise le formateur consulté (filtre d'affichage pour un enseignant).
+   * N'accorde aucun droit : l'API applique toujours le périmètre du compte
+   * connecté. `meta` (nom/e-mail) vient de la fiche déjà chargée, jamais d'un
+   * jeu local.
+   */
+  const persistSelectedFormateur = useCallback(
+    (id: string | null, meta?: { name: string; email: string }) => {
+      setSelectedFormateurId(id);
+      if (typeof window !== "undefined") {
+        if (id) window.localStorage.setItem(FORMATEUR_STORAGE_KEY, id);
+        else window.localStorage.removeItem(FORMATEUR_STORAGE_KEY);
+      }
+      if (id) {
         const authUser: AuthUser = {
-          id: fo.id,
+          id,
           role: "enseignant",
-          name: `${fo.prenom} ${fo.nom}`,
-          email: fo.email,
+          name: meta?.name ?? "Enseignant",
+          email: meta?.email ?? "",
         };
         if (typeof window !== "undefined") {
           window.localStorage.setItem(ROLE_STORAGE_KEY, "enseignant");
@@ -175,8 +159,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRoleState("enseignant");
         setUserState(authUser);
       }
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     const stored = readStoredRole();
@@ -271,13 +256,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: mappedRole,
       };
       window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      window.localStorage.removeItem(FORMATEUR_STORAGE_KEY);
+      setSelectedFormateurId(null);
       persistRole(mappedRole, authUser);
     },
-    [persistRole],
-  );
-
-  const setRole = useCallback(
-    (next: UserRole) => persistRole(next),
     [persistRole],
   );
 
@@ -300,8 +282,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
-    // Purge TOUTES les clés applicatives (snapshot CRM, chat IA, cachet…),
-    // pas seulement la session : évite les résidus sur poste partagé.
+    // Purge les clés applicatives (session, préférence formateur) : évite les
+    // résidus sur poste partagé. `gestio-locale` (langue) est conservée, sans
+    // donnée personnelle.
     if (typeof window !== "undefined") {
       const doomed: string[] = [];
       for (let i = 0; i < window.localStorage.length; i += 1) {
@@ -309,6 +292,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (k && k.startsWith("istpm-")) doomed.push(k);
       }
       for (const k of doomed) window.localStorage.removeItem(k);
+      document.cookie = "sidebar_state=; path=/; max-age=0";
     }
     setRoleState(null);
     setUserState(null);
@@ -324,7 +308,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         impersonating,
         login,
-        setRole,
         logout,
         applyAccountUpdate,
         selectedFormateurId,

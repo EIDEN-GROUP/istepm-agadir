@@ -73,9 +73,10 @@ const STATUTS: StatutFormateur[] = ["permanent", "vacataire", "en_conge"];
 
 function FormateursPage() {
   const { role } = useAuth();
-  const { formateurs, modules, addFormateur, updateFormateur, deleteFormateur } =
+  const { formateurs, modules, filieres: filieresApi, addFormateur, updateFormateur, deleteFormateur } =
     useIstpm();
   const canEdit = role === "directeur" || role === "responsable";
+  const filieresOptions = filieresApi.length ? filieresApi : [...FILIERES];
 
   /** Options du sélecteur : registre des modules (Paramètres › Modules),
    *  complété par les modules déjà affectés à un formateur pour ne perdre
@@ -153,7 +154,7 @@ function FormateursPage() {
     else if (!matchLabelFormateur(values.grade, GRADE_VALUES, GRADE_LABEL))
       errs.push(`Grade « ${values.grade} » invalide`);
     if (!values.departement) errs.push("Département requis");
-    else if (!FILIERES.includes(values.departement as Filiere))
+    else if (!filieresOptions.includes(values.departement as Filiere))
       errs.push(`Département « ${values.departement} » invalide`);
     if (!values.modules) errs.push("Modules requis");
     if (!values.statut) errs.push("Statut requis");
@@ -162,8 +163,9 @@ function FormateursPage() {
     return errs;
   };
 
-  const handleImportFormateurs = (rows: Record<string, string>[]) => {
+  const handleImportFormateurs = async (rows: Record<string, string>[]) => {
     let compteur = 0;
+    const echecs: string[] = [];
     for (const r of rows) {
       const grade = matchLabelFormateur(r.grade, GRADE_VALUES, GRADE_LABEL) ?? "PES";
       const statut = matchLabelFormateur(r.statut, STATUT_FORMATEUR_VALUES, STATUT_FORMATEUR_LABEL) ?? "permanent";
@@ -180,10 +182,15 @@ function FormateursPage() {
         telephone: r.telephone ?? "",
         email: r.email ?? "",
       };
-      addFormateur(nouveau);
-      compteur++;
+      try {
+        await addFormateur(nouveau);
+        compteur++;
+      } catch {
+        echecs.push(`${r.prenom} ${r.nom}`.trim() || r.matricule);
+      }
     }
-    toast.success(`${compteur} formateur(s) importé(s)`);
+    if (compteur) toast.success(`${compteur} formateur(s) importé(s)`);
+    if (echecs.length) toast.error(`${echecs.length} ligne(s) rejetée(s) : ${echecs.slice(0, 3).join(", ")}${echecs.length > 3 ? "…" : ""}`);
   };
 
   /** Sérialise une liste de lignes (déjà ordonnées comme `colonnesImportFormateurs`)
@@ -233,8 +240,8 @@ function FormateursPage() {
   /** Télécharge un modèle CSV d'exemple (entêtes + lignes types) pour l'import. */
   const exportExempleFormateursCsv = () => {
     const exemples: (string | number)[][] = [
-      ["PR-2025-001", "AB123456", "Yassine", "El Amrani", "PES", FILIERES[0], "Anatomie, Physiologie", "S3-G1, S3-G2", "Permanent", "0612345678", "y.elamrani@istpm.ma"],
-      ["PR-2025-002", "CD789012", "Salma", "Benali", "Vacataire", FILIERES[0], "Pharmacologie", "S5-G1", "Vacataire", "0698765432", "s.benali@istpm.ma"],
+      ["PR-2025-001", "AB123456", "Prénom", "Nom", "PES", FILIERES[0], "Anatomie, Physiologie", "S3-G1, S3-G2", "Permanent", "0612345678", "prenom.nom@exemple.ma"],
+      ["PR-2025-002", "CD789012", "Prénom2", "Nom2", "Vacataire", FILIERES[0], "Pharmacologie", "S5-G1", "Vacataire", "0698765432", "prenom2.nom2@exemple.ma"],
     ];
     telechargerCsvFormateurs(exemples, "formateurs-import-exemple.csv");
     toast.success("Modèle CSV d'exemple téléchargé");
@@ -490,15 +497,26 @@ function FormateursPage() {
           key={editing?.id ?? "new"}
           initial={editing}
           modulesDisponibles={modulesDisponibles}
+          filieres={filieresOptions}
           onCancel={() => setFormOpen(false)}
     onSubmit={async (data) => {
       if (editing) {
         const { acces: _acces, ...patch } = data;
-        updateFormateur(editing.id, patch);
-        toast.success(`Fiche mise à jour   ${data.prenom} ${data.nom}`);
+        try {
+          await updateFormateur(editing.id, patch);
+          toast.success(`Fiche mise à jour   ${data.prenom} ${data.nom}`);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+          return;
+        }
       } else if (data.acces === "invite" && data.email) {
         const { acces: _acces, password: _pw, ...fiche } = data;
-        addFormateur(fiche);
+        try {
+          await addFormateur(fiche);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Ajout impossible");
+          return;
+        }
         toast.success(`Formateur ajouté   ${data.prenom} ${data.nom}`);
         try {
           const inv = await createInvitation({
@@ -524,8 +542,13 @@ function FormateursPage() {
             role: "enseignant",
           }).catch(() => {});
         }
-        addFormateur(data);
-        toast.success(`Formateur ajouté   ${data.prenom} ${data.nom}`);
+        try {
+          await addFormateur(data);
+          toast.success(`Formateur ajouté   ${data.prenom} ${data.nom}`);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Ajout impossible");
+          return;
+        }
       }
       setFormOpen(false);
     }}
@@ -541,12 +564,16 @@ function FormateursPage() {
             ? `${toDelete.prenom} ${toDelete.nom} (${toDelete.matricule}) sera retiré du corps enseignant. Cette action est irréversible.`
             : ""
         }
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!toDelete) return;
-          deleteFormateur(toDelete.id);
-          toast.success(
-            `Formateur supprimé   ${toDelete.prenom} ${toDelete.nom}`,
-          );
+          try {
+            await deleteFormateur(toDelete.id);
+            toast.success(
+              `Formateur supprimé   ${toDelete.prenom} ${toDelete.nom}`,
+            );
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Suppression impossible");
+          }
           setToDelete(null);
         }}
       />
@@ -571,6 +598,7 @@ function FormateurForm({
   onSubmit,
   onCancel,
   modulesDisponibles,
+  filieres,
 }: {
   initial: Formateur | null;
   onSubmit: (data: {
@@ -590,6 +618,7 @@ function FormateurForm({
   }) => void;
   onCancel: () => void;
   modulesDisponibles: string[];
+  filieres: string[];
 }) {
   const [f, setF] = useState(() => ({
     matricule:
@@ -704,8 +733,8 @@ function FormateurForm({
           label="Département / filière"
           required
           value={f.departement}
-          onChange={(v) => set("departement", v)}
-          options={FILIERES}
+          onChange={(v) => set("departement", v as Filiere)}
+          options={filieres}
           error={errors.departement}
         />
       </FullWidth>

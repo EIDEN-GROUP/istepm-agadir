@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
   Trash2,
-  RotateCcw,
   Save,
   Users,
   ShieldCheck,
@@ -30,10 +30,7 @@ import { toast } from "sonner";
 import { useAuth, ROLE_META, type UserRole } from "@/lib/auth";
 import {
   NIVEAUX,
-  SALLES,
   FILIERES,
-  CRENEAUX,
-  ANNEES_UNIVERSITAIRES,
   TYPE_EXAMEN_LABEL,
   fmtMAD,
   type ModuleRecord,
@@ -41,13 +38,12 @@ import {
   type StructureAccueil,
 } from "@/lib/istpm-data";
 import { useIstpm } from "@/lib/istpm-store";
-import { useStamp, setStamp, prepareStampFromFile } from "@/lib/stamp";
+import { useStamp, saveStampImage, clearStampImage, prepareStampFromFile } from "@/lib/stamp";
 import {
   fetchSettings,
   updateSetting,
   createFiliereApi,
   deleteFiliereApi,
-  resetSettings,
   fetchRoles,
   createRole,
   updateRole,
@@ -221,13 +217,35 @@ function Carte({
 
 /**
  * Cachet officiel : téléversement d'une image apposée sur tous les PDF générés.
- * Réservé au directeur (la section n'est listée que pour ce rôle) et stockée
- * localement via `@/lib/stamp`.
+ * Réservé au directeur (la section n'est listée que pour ce rôle).
+ * Source unique : le serveur (`settings.stamp_image`) — jamais de localStorage.
  */
 function StampSection() {
   const stamp = useStamp();
+  const qc = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
+
+  // La persistance serveur est explicite : un échec doit être visible, sinon
+  // le cachet ne survit pas à un changement de poste ou de navigateur.
+  const saveMut = useMutation({
+    mutationFn: saveStampImage,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["stamp"] });
+      toast.success("Cachet enregistré — il sera apposé sur tous les PDF");
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Enregistrement impossible"),
+  });
+  const clearMut = useMutation({
+    mutationFn: clearStampImage,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["stamp"] });
+      toast.success("Cachet supprimé");
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Suppression impossible"),
+  });
+  const busy = saveMut.isPending || clearMut.isPending;
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
@@ -235,28 +253,14 @@ function StampSection() {
       toast.error("Veuillez choisir une image (PNG, JPG…)");
       return;
     }
-    setBusy(true);
     let dataUrl: string;
     try {
       dataUrl = await prepareStampFromFile(file);
     } catch {
       toast.error("Impossible de lire cette image");
-      setBusy(false);
       return;
     }
-    setStamp(dataUrl);
-    // La persistance serveur est explicite : un échec doit être visible, sinon
-    // le cachet ne survit pas à un changement de poste ou de navigateur.
-    try {
-      await updateSetting("stamp_image", dataUrl);
-      toast.success("Cachet enregistré — il sera apposé sur tous les PDF");
-    } catch {
-      toast.error(
-        "Cachet appliqué localement, mais la sauvegarde sur le serveur a échoué",
-      );
-    } finally {
-      setBusy(false);
-    }
+    saveMut.mutate(dataUrl);
   };
 
   return (
@@ -308,18 +312,8 @@ function StampSection() {
               <button
                 type="button"
                 className={cn(ghostPill, "h-9 gap-1.5 px-4 text-sm text-alert")}
-                onClick={() => {
-                  setStamp(null);
-                  // `settings.value` est `jsonb NOT NULL` : on efface avec une
-                  // chaîne vide plutôt qu'un `null` que la colonne refuserait.
-                  updateSetting("stamp_image", "")
-                    .then(() => toast.success("Cachet supprimé"))
-                    .catch(() =>
-                      toast.error(
-                        "Cachet retiré localement, mais la suppression sur le serveur a échoué",
-                      ),
-                    );
-                }}
+                disabled={busy}
+                onClick={() => clearMut.mutate()}
               >
                 <Trash2 className="h-4 w-4" /> Supprimer
               </button>
@@ -329,6 +323,12 @@ function StampSection() {
       </div>
     </Carte>
   );
+}
+
+/** Retire une clé d'un objet (brouillons de capacité). */
+function omitKey<T extends Record<string, unknown>>(obj: T, key: string): T {
+  const { [key]: _dropped, ...rest } = obj;
+  return rest as T;
 }
 
 /** Liste éditable de libellés simples (salles, groupes, années…). */
@@ -559,7 +559,7 @@ function ModulesSection({ filieres }: { filieres: string[] }) {
     setDialogOpen(true);
   };
 
-  const submit = () => {
+  const submit = async () => {
     const next: typeof errors = {};
     if (!form.nom.trim()) next.nom = "Nom du module obligatoire";
     if (!form.filiere.trim()) next.filiere = "La filière est obligatoire";
@@ -576,21 +576,35 @@ function ModulesSection({ filieres }: { filieres: string[] }) {
     };
 
     if (editing) {
-      updateModule(editing.id, payload);
-      toast.success("Module mis à jour");
+      try {
+        await updateModule(editing.id, payload);
+        toast.success("Module mis à jour");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+        return;
+      }
     } else {
-      addModule(payload);
-      toast.success(`Module ajouté   ${payload.nom}`);
+      try {
+        await addModule(payload);
+        toast.success(`Module ajouté   ${payload.nom}`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Ajout impossible");
+        return;
+      }
     }
     setDialogOpen(false);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!toDelete) return;
     const t = toDelete;
     setToDelete(null);
-    deleteModule(t.id);
-    toast.success(`Module supprimé   ${t.nom}`);
+    try {
+      await deleteModule(t.id);
+      toast.success(`Module supprimé   ${t.nom}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Suppression impossible");
+    }
   };
 
   const noFilieres = filieres.length === 0;
@@ -1172,35 +1186,49 @@ function GroupesSection() {
     setDialogOpen(true);
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!form.name.trim()) {
       setErrors({ name: "Nom du groupe obligatoire" });
       return;
     }
     if (editing) {
-      updateGroupConfig(editing.id, {
-        name: form.name.trim(),
-        semester: form.semester,
-        studentCount: Number(form.studentCount) || 0,
-      });
-      toast.success("Groupe mis à jour");
+      try {
+        await updateGroupConfig(editing.id, {
+          name: form.name.trim(),
+          semester: form.semester,
+          studentCount: Number(form.studentCount) || 0,
+        });
+        toast.success("Groupe mis à jour");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+        return;
+      }
     } else {
-      addGroupConfig({
-        name: form.name.trim(),
-        semester: form.semester,
-        studentCount: Number(form.studentCount) || 0,
-      });
-      toast.success(`Groupe ajouté   ${form.name.trim()}`);
+      try {
+        await addGroupConfig({
+          name: form.name.trim(),
+          semester: form.semester,
+          studentCount: Number(form.studentCount) || 0,
+        });
+        toast.success(`Groupe ajouté   ${form.name.trim()}`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Ajout impossible");
+        return;
+      }
     }
     setDialogOpen(false);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!toDelete) return;
     const t = toDelete;
     setToDelete(null);
-    deleteGroupConfig(t.id);
-    toast.success(`Groupe supprimé   ${t.name}`);
+    try {
+      await deleteGroupConfig(t.id);
+      toast.success(`Groupe supprimé   ${t.name}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Suppression impossible");
+    }
   };
 
   return (
@@ -1266,7 +1294,9 @@ function GroupesSection() {
                     value={g.studentCount}
                     onChange={(e) => {
                       const v = Math.max(0, parseInt(e.target.value) || 0);
-                      updateGroupConfig(g.id, { studentCount: v });
+                      void updateGroupConfig(g.id, { studentCount: v }).catch((err) =>
+                        toast.error(err instanceof Error ? err.message : "Enregistrement impossible"),
+                      );
                     }}
                     className={cn(softInput, "h-7 w-16 text-center text-xs")}
                   />
@@ -1354,6 +1384,8 @@ function SettingsPage() {
     formateurs,
     examens,
     filieres,
+    addFiliere,
+    deleteFiliere,
     structuresAccueil,
     groupConfigs,
     addGroupConfig,
@@ -1362,7 +1394,6 @@ function SettingsPage() {
     addStructureAccueil,
     updateStructureAccueil,
     deleteStructureAccueil,
-    reset,
     // Les créneaux ne sont pas un état local de cette page : l'emploi du temps
     // en dérive sa grille horaire, ils vivent donc dans le store partagé.
     creneauxLabels: creneaux,
@@ -1373,18 +1404,31 @@ function SettingsPage() {
   const peut = (id: SectionId) => autorisees.includes(id);
 
   /* État local des réglages   non persisté côté serveur. */
-  const [annees, setAnnees] = useState<string[]>([...ANNEES_UNIVERSITAIRES]);
+  const [annees, setAnnees] = useState<string[]>([]);
   const [semestres, setSemestres] = useState<string[]>([...NIVEAUX]);
-  const [salles, setSalles] = useState<string[]>([...SALLES]);
-  const [listeFilieres, setListeFilieres] = useState<string[]>([...filieres]);
-  const [listeStructures, setListeStructures] = useState<StructureAccueil[]>(
-    structuresAccueil.map((s) => (typeof s === "string" ? { nom: s, capacite: 5 } : s)),
-  );
+  const [salles, setSalles] = useState<string[]>([]);
   const [nouvelleStructure, setNouvelleStructure] = useState("");
+  /** Brouillons de capacité (nom → capacité) ; le store serveur fait foi. */
+  const [brouillonsCap, setBrouillonsCap] = useState<Record<string, number>>({});
+
+  const ajouterStructure = async () => {
+    const nom = nouvelleStructure.trim();
+    if (!nom) return;
+    if (structuresAccueil.some((s) => s.nom.toLowerCase() === nom.toLowerCase())) {
+      toast.error("Cette structure existe déjà");
+      return;
+    }
+    try {
+      await addStructureAccueil(nom, 5);
+      setNouvelleStructure("");
+      toast.success(`Ajoutée   ${nom}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Ajout impossible");
+    }
+  };
   const [typesExamen, setTypesExamen] = useState<string[]>(
     Object.values(TYPE_EXAMEN_LABEL),
   );
-  const [resetOpen, setResetOpen] = useState(false);
   const [activeGroup, setActiveGroup] = useState(0);
 
   const [institut, setInstitut] = useState({
@@ -1414,8 +1458,6 @@ function SettingsPage() {
   });
 
   /* --------- API sync --------- */
-  const filieresRef = useRef(listeFilieres);
-  filieresRef.current = listeFilieres;
 
   useEffect(() => {
     fetchSettings()
@@ -1459,10 +1501,7 @@ function SettingsPage() {
           setBulletin((p) => ({ ...p, seuilAdmission: data.bulletin_seuilAdmission as string }));
         if (typeof data.bulletin_creditsSemestre === "string")
           setBulletin((p) => ({ ...p, creditsSemestre: data.bulletin_creditsSemestre as string }));
-        // Le cachet est stocké en base : on réhydrate le cache local afin qu'il
-        // suive l'utilisateur d'un poste ou d'un navigateur à l'autre.
-        if (typeof data.stamp_image === "string" && data.stamp_image)
-          setStamp(data.stamp_image);
+        // Le cachet se charge depuis le serveur via `useStamp` (aucun cache local).
       })
       .catch(() => {});
   }, []);
@@ -1479,6 +1518,13 @@ function SettingsPage() {
   const [smtpOk, setSmtpOk] = useState<boolean | null>(null);
   const [resentInfo, setResentInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean; emailError?: string | null } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "role" | "user"; id: string; name: string } | null>(null);
+
+  /** Sauvegarde best-effort VISIBLE : l'échec est toasté au lieu d'être tu. */
+  const persistSetting = (key: string, value: unknown) => {
+    updateSetting(key, value).catch((err) =>
+      toast.error(err instanceof Error ? err.message : "Enregistrement impossible"),
+    );
+  };
 
   const reloadPendingInvites = () => {
     fetchPendingInvites().then(setPendingInvites).catch(() => {});
@@ -1607,36 +1653,6 @@ function SettingsPage() {
         );
       })()}
 
-      {/* Données de démonstration   accessible aux deux rôles */}
-      {/* <section className={cn(softCard, "p-5")}>
-        <h3 className="font-display text-sm font-bold tracking-tight text-foreground">
-          Données de démonstration
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Les modifications sont sauvegardées sur le serveur.
-          Réinitialiser efface toutes les données et restaure les valeurs par défaut.
-        </p>
-        <button
-          onClick={() => setResetOpen(true)}
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-alert/25 bg-card px-5 py-2.5 text-sm font-medium text-alert transition hover:bg-alert/10"
-        >
-          <RotateCcw className="h-4 w-4" /> Réinitialiser les données
-        </button>
-      </section> */}
-
-      <ConfirmDialog
-        open={resetOpen}
-        onOpenChange={setResetOpen}
-        title="Réinitialiser les données ?"
-        message="Toutes les créations, modifications et suppressions effectuées seront perdues, et le jeu de démonstration d'origine sera restauré."
-        confirmLabel="Réinitialiser"
-        onConfirm={() => {
-          resetSettings().catch(() => {});
-          reset();
-          toast.success("Données réinitialisées");
-        }}
-      />
-
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}
@@ -1670,7 +1686,7 @@ function SettingsPage() {
           <Carte id="annees">
             <ListeEditable
               valeurs={annees}
-              onChange={(v) => { setAnnees(v); updateSetting("annees_universitaires", v).catch(() => {}); }}
+              onChange={(v) => { setAnnees(v); persistSetting("annees_universitaires", v); }}
               placeholder="2026/2027"
             />
           </Carte>
@@ -1681,7 +1697,7 @@ function SettingsPage() {
           <Carte id="semestres">
             <ListeEditable
               valeurs={semestres}
-              onChange={(v) => { setSemestres(v); updateSetting("semestres", v).catch(() => {}); }}
+              onChange={(v) => { setSemestres(v); persistSetting("semestres", v); }}
               placeholder="S7"
             />
           </Carte>
@@ -1695,7 +1711,7 @@ function SettingsPage() {
           <Carte id="salles">
             <ListeEditable
               valeurs={salles}
-              onChange={(v) => { setSalles(v); updateSetting("salles", v).catch(() => {}); }}
+              onChange={(v) => { setSalles(v); persistSetting("salles", v); }}
               placeholder="Salle 14"
             />
           </Carte>
@@ -1707,7 +1723,11 @@ function SettingsPage() {
             {/* `setCreneaux` du store écrit aussi le réglage côté serveur. */}
             <ListeEditable
               valeurs={creneaux}
-              onChange={setCreneaux}
+              onChange={(v) => {
+                void setCreneaux(v).catch((err) =>
+                  toast.error(err instanceof Error ? err.message : "Enregistrement impossible"),
+                );
+              }}
               placeholder="19:15 – 20:45"
             />
             <p className="mt-3 text-xs text-muted-foreground">
@@ -1719,7 +1739,7 @@ function SettingsPage() {
         );
 
       case "modules":
-        return <ModulesSection filieres={listeFilieres} />;
+        return <ModulesSection filieres={filieres} />;
 
       case "planning":
         return (
@@ -1728,17 +1748,17 @@ function SettingsPage() {
               <ChampReglage
                 label="Jours ouvrés"
                 value={planning.joursOuvres}
-                onChange={(v) => { setPlanning({ ...planning, joursOuvres: v }); updateSetting("planning_joursOuvres", v).catch(() => {}); }}
+                onChange={(v) => { setPlanning({ ...planning, joursOuvres: v }); persistSetting("planning_joursOuvres", v); }}
               />
               <ChampReglage
                 label="Ouverture"
                 value={planning.heureDebut}
-                onChange={(v) => { setPlanning({ ...planning, heureDebut: v }); updateSetting("planning_heureDebut", v).catch(() => {}); }}
+                onChange={(v) => { setPlanning({ ...planning, heureDebut: v }); persistSetting("planning_heureDebut", v); }}
               />
               <ChampReglage
                 label="Fermeture"
                 value={planning.heureFin}
-                onChange={(v) => { setPlanning({ ...planning, heureFin: v }); updateSetting("planning_heureFin", v).catch(() => {}); }}
+                onChange={(v) => { setPlanning({ ...planning, heureFin: v }); persistSetting("planning_heureFin", v); }}
               />
             </div>
           </Carte>
@@ -1748,14 +1768,16 @@ function SettingsPage() {
         return (
           <Carte id="filieres">
             <ListeEditable
-              valeurs={listeFilieres}
-              onChange={(v) => {
-                const oldList = filieresRef.current;
-                const added = v.filter((x) => !oldList.includes(x));
-                const removed = oldList.filter((x) => !v.includes(x));
-                added.forEach((nom) => createFiliereApi(nom).catch(() => {}));
-                removed.forEach((nom) => deleteFiliereApi(nom).catch(() => {}));
-                setListeFilieres(v);
+              valeurs={filieres}
+              onChange={async (v) => {
+                const added = v.filter((x) => !filieres.includes(x));
+                const removed = filieres.filter((x) => !v.includes(x));
+                try {
+                  for (const nom of added) await addFiliere(nom);
+                  for (const nom of removed) await deleteFiliere(nom);
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+                }
               }}
               placeholder="Orthoptie"
             />
@@ -2072,7 +2094,7 @@ function SettingsPage() {
           <Carte id="examens">
             <ListeEditable
               valeurs={typesExamen}
-              onChange={(v) => { setTypesExamen(v); updateSetting("types_examen", v).catch(() => {}); }}
+              onChange={(v) => { setTypesExamen(v); persistSetting("types_examen", v); }}
               placeholder="Oral"
             />
             <p className="mt-2 text-[11px] text-muted-foreground">
@@ -2088,19 +2110,19 @@ function SettingsPage() {
               <ChampReglage
                 label="Barème"
                 value={bulletin.bareme}
-                onChange={(v) => { setBulletin({ ...bulletin, bareme: v }); updateSetting("bulletin_bareme", v).catch(() => {}); }}
+                onChange={(v) => { setBulletin({ ...bulletin, bareme: v }); persistSetting("bulletin_bareme", v); }}
                 suffix="points"
               />
               <ChampReglage
                 label="Seuil d'admission"
                 value={bulletin.seuilAdmission}
-                onChange={(v) => { setBulletin({ ...bulletin, seuilAdmission: v }); updateSetting("bulletin_seuilAdmission", v).catch(() => {}); }}
+                onChange={(v) => { setBulletin({ ...bulletin, seuilAdmission: v }); persistSetting("bulletin_seuilAdmission", v); }}
                 suffix="/20"
               />
               <ChampReglage
                 label="Crédits par semestre"
                 value={bulletin.creditsSemestre}
-                onChange={(v) => { setBulletin({ ...bulletin, creditsSemestre: v }); updateSetting("bulletin_creditsSemestre", v).catch(() => {}); }}
+                onChange={(v) => { setBulletin({ ...bulletin, creditsSemestre: v }); persistSetting("bulletin_creditsSemestre", v); }}
               />
             </div>
           </Carte>
@@ -2113,22 +2135,22 @@ function SettingsPage() {
               <ChampReglage
                 label="Nom"
                 value={institut.nom}
-                onChange={(v) => { setInstitut({ ...institut, nom: v }); updateSetting("institut_nom", v).catch(() => {}); }}
+                onChange={(v) => { setInstitut({ ...institut, nom: v }); persistSetting("institut_nom", v); }}
               />
               <ChampReglage
                 label="Ville"
                 value={institut.ville}
-                onChange={(v) => { setInstitut({ ...institut, ville: v }); updateSetting("institut_ville", v).catch(() => {}); }}
+                onChange={(v) => { setInstitut({ ...institut, ville: v }); persistSetting("institut_ville", v); }}
               />
               <ChampReglage
                 label="Téléphone"
                 value={institut.telephone}
-                onChange={(v) => { setInstitut({ ...institut, telephone: v }); updateSetting("institut_telephone", v).catch(() => {}); }}
+                onChange={(v) => { setInstitut({ ...institut, telephone: v }); persistSetting("institut_telephone", v); }}
               />
               <ChampReglage
                 label="E-mail"
                 value={institut.email}
-                onChange={(v) => { setInstitut({ ...institut, email: v }); updateSetting("institut_email", v).catch(() => {}); }}
+                onChange={(v) => { setInstitut({ ...institut, email: v }); persistSetting("institut_email", v); }}
               />
             </div>
           </Carte>
@@ -2141,17 +2163,17 @@ function SettingsPage() {
               <ChampReglage
                 label="Langue par défaut"
                 value={systeme.langue}
-                onChange={(v) => { setSysteme({ ...systeme, langue: v }); updateSetting("systeme_langue", v).catch(() => {}); }}
+                onChange={(v) => { setSysteme({ ...systeme, langue: v }); persistSetting("systeme_langue", v); }}
               />
               <ChampReglage
                 label="Devise"
                 value={systeme.devise}
-                onChange={(v) => { setSysteme({ ...systeme, devise: v }); updateSetting("systeme_devise", v).catch(() => {}); }}
+                onChange={(v) => { setSysteme({ ...systeme, devise: v }); persistSetting("systeme_devise", v); }}
               />
               <ChampReglage
                 label="Fuseau horaire"
                 value={systeme.fuseau}
-                onChange={(v) => { setSysteme({ ...systeme, fuseau: v }); updateSetting("systeme_fuseau", v).catch(() => {}); }}
+                onChange={(v) => { setSysteme({ ...systeme, fuseau: v }); persistSetting("systeme_fuseau", v); }}
               />
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
@@ -2173,13 +2195,13 @@ function SettingsPage() {
               <ChampReglage
                 label="Longueur minimale du mot de passe"
                 value={securite.longueurMdp}
-                onChange={(v) => { setSecurite({ ...securite, longueurMdp: v }); updateSetting("securite_longueurMdp", v).catch(() => {}); }}
+                onChange={(v) => { setSecurite({ ...securite, longueurMdp: v }); persistSetting("securite_longueurMdp", v); }}
                 suffix="car."
               />
               <ChampReglage
                 label="Expiration de session"
                 value={securite.expirationSession}
-                onChange={(v) => { setSecurite({ ...securite, expirationSession: v }); updateSetting("securite_expirationSession", v).catch(() => {}); }}
+                onChange={(v) => { setSecurite({ ...securite, expirationSession: v }); persistSetting("securite_expirationSession", v); }}
                 suffix="min"
               />
             </div>
@@ -2196,22 +2218,19 @@ function SettingsPage() {
         return (
           <Carte id="structures">
             <div className="space-y-3">
-              {listeStructures.map((s, i) => (
-                <div key={i} className="flex items-center gap-2 rounded-xl border border-brand/12 bg-card px-3 py-2">
+              {structuresAccueil.map((s) => (
+                <div key={s.nom} className="flex items-center gap-2 rounded-xl border border-brand/12 bg-card px-3 py-2">
                   <span className="min-w-0 flex-1 text-sm font-medium text-foreground">{s.nom}</span>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <span>Cap.</span>
                     <Input
                       type="number"
                       min={1}
-                      value={s.capacite}
+                      value={brouillonsCap[s.nom] ?? s.capacite}
                       onChange={(e) => {
                         const v = Number(e.target.value);
                         if (v >= 1) {
-                          const next = listeStructures.map((st, j) =>
-                            j === i ? { ...st, capacite: v } : st,
-                          );
-                          setListeStructures(next);
+                          setBrouillonsCap((p) => (v === s.capacite ? omitKey(p, s.nom) : { ...p, [s.nom]: v }));
                         }
                       }}
                       className="h-7 w-16 rounded-lg border-brand/20 text-center text-xs tabular-nums"
@@ -2222,10 +2241,9 @@ function SettingsPage() {
                     className={ghostPill + " text-alert p-1.5"}
                     aria-label={`Supprimer ${s.nom}`}
                     onClick={() => {
-                      const next = listeStructures.filter((_, j) => j !== i);
-                      setListeStructures(next);
-                      deleteStructureAccueil(s.nom);
-                      toast.success(`Supprimée   ${s.nom}`);
+                      void deleteStructureAccueil(s.nom)
+                        .then(() => toast.success(`Supprimée   ${s.nom}`))
+                        .catch((err) => toast.error(err instanceof Error ? err.message : "Suppression impossible"));
                     }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -2240,18 +2258,7 @@ function SettingsPage() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      const nom = nouvelleStructure.trim();
-                      if (nom && !listeStructures.some((s) => s.nom === nom)) {
-                        const next = [...listeStructures, { nom, capacite: 5 }].sort((a, b) =>
-                          a.nom.localeCompare(b.nom),
-                        );
-                        setListeStructures(next);
-                        addStructureAccueil(nom, 5);
-                        setNouvelleStructure("");
-                        toast.success(`Ajoutée   ${nom}`);
-                      } else if (nom) {
-                        toast.error("Cette structure existe déjà");
-                      }
+                      void ajouterStructure();
                     }
                   }}
                   className={cn(softInput, "h-9 flex-1 text-sm")}
@@ -2259,40 +2266,26 @@ function SettingsPage() {
                 <button
                   type="button"
                   className={cn(primaryPill, "h-9 px-4 text-sm")}
-                  onClick={() => {
-                    const nom = nouvelleStructure.trim();
-                    if (nom && !listeStructures.some((s) => s.nom === nom)) {
-                      const next = [...listeStructures, { nom, capacite: 5 }].sort((a, b) =>
-                        a.nom.localeCompare(b.nom),
-                      );
-                      setListeStructures(next);
-                      addStructureAccueil(nom, 5);
-                      setNouvelleStructure("");
-                      toast.success(`Ajoutée   ${nom}`);
-                    } else if (nom) {
-                      toast.error("Cette structure existe déjà");
-                    }
-                  }}
+                  onClick={() => void ajouterStructure()}
                 >
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
-              {listeStructures.some((st) => {
-                const orig = structuresAccueil.find((x) => x.nom === st.nom);
-                return orig && orig.capacite !== st.capacite;
-              }) ? (
+              {Object.keys(brouillonsCap).length ? (
                 <div className="flex justify-end border-t border-brand/12 pt-3">
                   <button
                     type="button"
                     className={cn(primaryPill, "h-9 gap-1.5 px-5 text-sm")}
-                    onClick={() => {
-                      for (const st of listeStructures) {
-                        const original = structuresAccueil.find((x) => x.nom === st.nom);
-                        if (original && original.capacite !== st.capacite) {
-                          updateStructureAccueil(st.nom, { capacite: st.capacite });
+                    onClick={async () => {
+                      try {
+                        for (const [nom, capacite] of Object.entries(brouillonsCap)) {
+                          await updateStructureAccueil(nom, { capacite });
                         }
+                        setBrouillonsCap({});
+                        toast.success("Capacités enregistrées");
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
                       }
-                      toast.success("Capacités enregistrées");
                     }}
                   >
                     <Save className="h-4 w-4" /> Enregistrer les capacités

@@ -107,7 +107,7 @@ export async function noteRoutes(app: FastifyInstance) {
 
   app.delete(
     "/:id",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "enseignant", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();
@@ -118,6 +118,19 @@ export async function noteRoutes(app: FastifyInstance) {
         .where(eq(notesEtudiant.id, id))
         .limit(1);
       if (!note) return reply.status(404).send({ error: "Note introuvable" });
+
+      // Un enseignant ne retire que les notes des étudiants de sa portée.
+      if (request.user.role === "enseignant") {
+        const [target] = await db
+          .select({ groupe: etudiants.groupe, filiere: etudiants.filiere })
+          .from(etudiants)
+          .where(eq(etudiants.id, note.etudiantId))
+          .limit(1);
+        const scope = await teacherScope(request.user.id);
+        if (!target || !scope || !etudiantInScope(target, scope)) {
+          return reply.status(404).send({ error: "Note introuvable" });
+        }
+      }
 
       await db.delete(notesEtudiant).where(eq(notesEtudiant.id, id));
       await recalculerMoyenne(db, note.etudiantId);

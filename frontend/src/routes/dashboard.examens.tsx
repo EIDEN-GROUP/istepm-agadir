@@ -15,13 +15,11 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useAuth, DEMO_FORMATEUR_ID } from "@/lib/auth";
-import { deleteNote } from "@/lib/istpm-api";
-import { useIstpm, useCurrentFormateur, moyennePonderee } from "@/lib/istpm-store";
+import { useAuth } from "@/lib/auth";
+import { useIstpm, useCurrentFormateur } from "@/lib/istpm-store";
 import {
   FILIERES,
   NIVEAUX,
-  ANNEES_UNIVERSITAIRES,
   ANNEES_ETUDE,
   anneeEtude,
   DUREES_EXAMEN,
@@ -39,10 +37,14 @@ import {
   type Formateur,
 } from "@/lib/istpm-data";
 import {
-  ACCEPTED_DOC_TYPES,
-  downloadDoc,
-  previewUrl,
-} from "@/lib/doc-store";
+  downloadExamenDocumentApi,
+  previewExamenDocumentApi,
+} from "@/lib/istpm-api";
+
+/** Types de fichiers acceptés au dépôt (PDF et Word). */
+const ACCEPTED_DOC_TYPES =
+  ".pdf,.doc,.docx,application/pdf,application/msword," +
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 import {
   softCard,
   primaryPill,
@@ -121,7 +123,7 @@ function DocumentBadge({ examen }: { examen: Examen }) {
   );
 }
 
-/** Boutons « Voir » / « Télécharger », désactivés sans document. */
+/** Boutons « Voir » / « Télécharger » (fichiers servis par le backend/MinIO). */
 function DocumentActions({
   examen,
   onPreview,
@@ -146,9 +148,12 @@ function DocumentActions({
         disabled={!doc}
         onClick={async () => {
           if (!doc) return;
-          const ok = await downloadDoc(doc.id, doc.nom);
-          if (ok) toast.success(`Téléchargement   ${doc.nom}`);
-          else toast.error("Fichier introuvable dans ce navigateur");
+          try {
+            await downloadExamenDocumentApi(examen.id, doc.nom);
+            toast.success(`Téléchargement   ${doc.nom}`);
+          } catch {
+            toast.error("Téléchargement impossible depuis le serveur");
+          }
         }}
       >
         <Download className="h-3.5 w-3.5" />
@@ -158,7 +163,7 @@ function DocumentActions({
 }
 
 /**
- * Aperçu intégré du sujet.
+ * Aperçu intégré du sujet, servi par le backend (`GET /examens/:id/document`).
  *
  * Le document est rendu dans une `iframe` plutôt qu'ouvert via `window.open` :
  * l'URL objet n'est disponible qu'après un `await`, moment où le geste
@@ -174,16 +179,17 @@ function DocumentPreview({
   const [url, setUrl] = useState<string | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing">("loading");
   const doc = examen?.document;
+  const examenId = examen?.id;
 
   useEffect(() => {
-    if (!doc) return;
+    if (!doc || !examenId) return;
     // `cancelled` couvre le cas où le dialogue se ferme avant la résolution :
     // sans lui, l'URL créée après le démontage ne serait jamais révoquée.
     let cancelled = false;
     let created: string | null = null;
     setState("loading");
 
-    previewUrl(doc.id).then((u) => {
+    previewExamenDocumentApi(examenId).then((u) => {
       if (cancelled) {
         if (u) URL.revokeObjectURL(u);
         return;
@@ -202,7 +208,7 @@ function DocumentPreview({
       if (created) URL.revokeObjectURL(created);
       setUrl(null);
     };
-  }, [doc]);
+  }, [doc, examenId]);
 
   const isPdf = doc?.mime === "application/pdf";
 
@@ -222,9 +228,13 @@ function DocumentPreview({
                 <button
                   className={cn(ghostPill, "gap-1.5")}
                   onClick={async () => {
-                    const ok = await downloadDoc(doc.id, doc.nom);
-                    if (ok) toast.success(`Téléchargement   ${doc.nom}`);
-                    else toast.error("Fichier introuvable");
+                    if (!examen) return;
+                    try {
+                      await downloadExamenDocumentApi(examen.id, doc.nom);
+                      toast.success(`Téléchargement   ${doc.nom}`);
+                    } catch {
+                      toast.error("Téléchargement impossible depuis le serveur");
+                    }
                   }}
                 >
                   <Download className="h-3.5 w-3.5" /> Télécharger
@@ -243,8 +253,8 @@ function DocumentPreview({
                   Fichier indisponible
                 </p>
                 <p className="max-w-sm text-xs text-muted-foreground">
-                  Les fichiers sont stockés dans ce navigateur. Ce document a
-                  été déposé depuis un autre appareil ou son stockage a été vidé.
+                  Le fichier est stocké sur le serveur. S'il est indisponible,
+                  déposez à nouveau le sujet depuis le formulaire.
                 </p>
               </div>
             ) : isPdf && url ? (
@@ -373,11 +383,18 @@ function EspaceFormateur() {
     attachDocument,
     removeDocument,
   } = useIstpm();
+  const { filieres: filieresApi } = useIstpm();
+  const filieresOptions = filieresApi.length ? filieresApi : [...FILIERES];
+  const anneesOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const x of examens) if (x.anneeUniversitaire) set.add(x.anneeUniversitaire);
+    return [...set].sort().reverse();
+  }, [examens]);
 
   // Le formateur connecté : ses examens seulement. Résolu depuis le profil
-  // sélectionné (référentiel hydraté), avec repli sur le formateur de démo.
+  // sélectionné (référentiel hydraté) ; sans fiche liée, la liste est vide.
   const moi = useCurrentFormateur();
-  const moiId = moi?.id ?? DEMO_FORMATEUR_ID;
+  const moiId = moi?.id ?? "";
 
   const [search, setSearch] = useState("");
   const [type, setType] = useState<string>(ALL);
@@ -620,16 +637,24 @@ function EspaceFormateur() {
         <ExamenForm
           key={editing?.id ?? "new"}
           initial={editing}
+          filieres={filieresOptions}
+          annees={anneesOptions}
           onCancel={() => setFormOpen(false)}
           onSubmit={async ({ data, file, removeExisting }) => {
-            const cible = editing
-              ? (updateExamen(editing.id, data), editing.id)
-              : addExamen(data, moiId).id;
+            let cible: string;
+            try {
+              cible = editing
+                ? (await updateExamen(editing.id, data)).id
+                : (await addExamen(data, moiId)).id;
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+              return;
+            }
 
             // Retrait explicite sans remplacement : passer par le store efface
-            // aussi le fichier dans IndexedDB, là où un simple patch du champ
-            // laisserait le blob orphelin. Inutile si un nouveau fichier est
-            // déposé   `attachDocument` remplace déjà l'ancien.
+            // aussi le fichier côté serveur (MinIO), là où un simple patch du
+            // champ laisserait l'objet orphelin. Inutile si un nouveau fichier
+            // est déposé   `attachDocument` remplace déjà l'ancien.
             if (removeExisting && editing && !file) {
               await removeDocument(editing.id);
             }
@@ -663,10 +688,14 @@ function EspaceFormateur() {
             ? `« ${toDelete.titre} » du ${fmtDate(toDelete.date)} sera supprimé, ainsi que le sujet déposé. Les notes déjà saisies pour les étudiants sont conservées.`
             : ""
         }
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!toDelete) return;
-          deleteExamen(toDelete.id);
-          toast.success(`Examen supprimé   ${toDelete.titre}`);
+          try {
+            await deleteExamen(toDelete.id);
+            toast.success(`Examen supprimé   ${toDelete.titre}`);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Suppression impossible");
+          }
           setToDelete(null);
         }}
       />
@@ -680,6 +709,12 @@ function EspaceFormateur() {
 
 function EspaceDirecteur() {
   const { examens, formateurs } = useIstpm();
+  // Années présentes dans les examens (jamais de liste figée).
+  const anneesOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const x of examens) if (x.anneeUniversitaire) set.add(x.anneeUniversitaire);
+    return [...set].sort().reverse();
+  }, [examens]);
 
   const [search, setSearch] = useState("");
   const [prof, setProf] = useState<string>(ALL);
@@ -797,7 +832,7 @@ function EspaceDirecteur() {
             label: "Année scolaire",
             value: anneeScolaire,
             onChange: setAnneeScolaire,
-            options: ANNEES_UNIVERSITAIRES,
+            options: anneesOptions,
             allLabel: "Toutes les années",
           },
         ]}
@@ -964,10 +999,14 @@ type SubmitPayload = {
 
 function ExamenForm({
   initial,
+  filieres,
+  annees,
   onSubmit,
   onCancel,
 }: {
   initial: Examen | null;
+  filieres: string[];
+  annees: string[];
   onSubmit: (p: SubmitPayload) => void;
   onCancel: () => void;
 }) {
@@ -977,7 +1016,8 @@ function ExamenForm({
     filiere: (initial?.filiere ?? "") as Filiere | "",
     niveau: (initial?.niveau ?? "") as Niveau | "",
     classe: initial?.classe ?? "",
-    anneeUniversitaire: initial?.anneeUniversitaire ?? "2025/2026",
+    // Vide = le serveur la déduit de la date (jamais d'année figée).
+    anneeUniversitaire: initial?.anneeUniversitaire ?? "",
     type: (initial?.type ?? "examen_theorique") as TypeExamen,
     composante: (initial?.composante ??
       "Théorique + Pratique") as Examen["composante"],
@@ -1107,8 +1147,8 @@ function ExamenForm({
           label="Filière"
           required
           value={f.filiere}
-          onChange={(v) => set("filiere", v)}
-          options={FILIERES}
+          onChange={(v) => set("filiere", v as Filiere)}
+          options={filieres}
           error={errors.filiere}
         />
       </FullWidth>
@@ -1132,7 +1172,7 @@ function ExamenForm({
         label="Année universitaire"
         value={f.anneeUniversitaire}
         onChange={(v) => set("anneeUniversitaire", v)}
-        options={ANNEES_UNIVERSITAIRES}
+        options={annees.length ? annees : [initial?.anneeUniversitaire ?? ""].filter(Boolean)}
       />
       <SelectField
         label="Type d'examen"
@@ -1240,7 +1280,7 @@ function ExamenForm({
  * en dessous et peuvent être retirées.
  */
 function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
-  const { etudiants, addNote, updateExamen, updateEtudiant } = useIstpm();
+  const { etudiants, addNote, updateExamen, deleteNote: supprimerNote } = useIstpm();
   const [examenId, setExamenId] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
 
@@ -1282,7 +1322,7 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
 
   const saisis = Object.values(notes).filter((v) => v.trim() !== "").length;
 
-  const enregistrer = () => {
+  const enregistrer = async () => {
     if (!examen) {
       toast.error("Choisir d'abord un examen");
       return;
@@ -1302,19 +1342,23 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
       toast.error("Aucune note à enregistrer");
       return;
     }
-    for (const v of valides) {
-      addNote(v.etudiantId, {
-        module: examen.module,
-        note: v.note,
-        coef: 3,
-        credits: 6,
-        examen: examen.titre,
-      });
+    try {
+      for (const v of valides) {
+        await addNote(v.etudiantId, {
+          module: examen.module,
+          note: v.note,
+          coef: 3,
+          credits: 6,
+          examen: examen.titre,
+        });
+      }
+      await updateExamen(examen.id, { statut: "notes_saisies" });
+      toast.success(
+        `Notes enregistrées pour ${valides.length} étudiant(s)   ${examen.module}`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
     }
-    updateExamen(examen.id, { statut: "notes_saisies" });
-    toast.success(
-      `Notes enregistrées pour ${valides.length} étudiant(s)   ${examen.module}`,
-    );
   };
 
   const notesSaisies = useMemo(() => {
@@ -1348,16 +1392,18 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
 
   const notesPager = usePagination(notesSaisies, notesSaisies.length);
 
-  const removeNote = (etudiantId: string, module: string) => {
+  const removeNote = async (etudiantId: string, module: string) => {
     const e = etudiants.find((x) => x.id === etudiantId);
     if (!e) return;
     const note = e.notes.find((n) => n.module === module);
-    if (note?.id) {
-      deleteNote(note.id).catch(() => toast.error("Erreur lors de la suppression côté serveur"));
+    if (!note?.id) return;
+    // Serveur d'abord : le store ne retire la note qu'après succès.
+    try {
+      await supprimerNote(note.id, etudiantId);
+      toast.success("Note supprimée");
+    } catch {
+      toast.error("Erreur lors de la suppression côté serveur");
     }
-    const notes = e.notes.filter((n) => n.module !== module);
-    updateEtudiant(etudiantId, { notes, moyenne: moyennePonderee(notes) });
-    toast.success("Note supprimée");
   };
 
   return (

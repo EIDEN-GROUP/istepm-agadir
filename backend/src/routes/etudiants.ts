@@ -455,30 +455,17 @@ export async function etudiantRoutes(app: FastifyInstance) {
           (n) => n.module.startsWith(semestre) || i < idx - 1,
         );
 
-        let modules: { module: string; note: number }[];
-        if (semestreNotes.length > 0) {
-          const seen = new Set<string>();
-          modules = [];
-          for (const n of semestreNotes) {
-            if (!seen.has(n.module)) {
-              seen.add(n.module);
-              modules.push({ module: n.module, note: Number(n.note) });
-            }
+        // Relevés réels uniquement : un semestre sans note enregistrée
+        // n'apparaît pas (jamais de notes fabriquées).
+        const seen = new Set<string>();
+        const modules: { module: string; note: number }[] = [];
+        for (const n of semestreNotes) {
+          if (!seen.has(n.module)) {
+            seen.add(n.module);
+            modules.push({ module: n.module, note: Number(n.note) });
           }
-        } else {
-          modules = [
-            "Sciences fondamentales",
-            "Enseignement clinique",
-            "Communication professionnelle",
-            "Travaux pratiques",
-          ].map((m) => {
-            const seed = hashStr(`${etudiant.cne}-${semestre}-${m}`);
-            const variation = ((seed % 60) - 25) / 10;
-            const base = Number(etudiant.moyenne) > 0 ? Number(etudiant.moyenne) : 12;
-            const note = Math.min(19, Math.max(6, Math.round((base + variation) * 4) / 4));
-            return { module: m, note };
-          });
         }
+        if (modules.length === 0) continue;
 
         const moyenne =
           Math.round(
@@ -492,10 +479,4 @@ export async function etudiantRoutes(app: FastifyInstance) {
       return semestres;
     },
   );
-}
-
-function hashStr(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
 }

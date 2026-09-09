@@ -5,13 +5,12 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { escapeHtml } from "@/lib/escape-html";
-import { getStamp } from "@/lib/stamp";
+import { useStamp } from "@/lib/stamp";
 import { useIstpm, mentionFor, decisionFor } from "@/lib/istpm-store";
 import {
   FILIERES,
   NIVEAUX,
   ANNEES_ETUDE,
-  ANNEES_UNIVERSITAIRES,
   anneeEtude,
   DECISION_TONE,
   MENTION_TONE,
@@ -76,7 +75,7 @@ const STATUTS: StatutBulletin[] = ["genere", "valide", "publie"];
  * dialog   "Enregistrer au format PDF" there produces the real document.
  * An iframe avoids the popup blocker that `window.open` would trip.
  */
-function printBulletin(b: Bulletin, groupe?: string) {
+function printBulletin(b: Bulletin, groupe?: string, stampDataUrl?: string | null) {
   const rows = b.notes
     .map(
       (n) =>
@@ -100,9 +99,9 @@ function printBulletin(b: Bulletin, groupe?: string) {
     )
     .join("");
 
-  // Cachet officiel (téléversé dans les Paramètres par le directeur).
+  // Cachet officiel servi par le backend (téléversé dans les Paramètres).
   // N'intègre que les data-URL d'image valides (anti "breakout d'attribut).
-  const stamp = getStamp();
+  const stamp = stampDataUrl ?? null;
   const safeStamp = stamp && /^data:image\/(png|jpeg|webp);base64,/.test(stamp) ? stamp : "";
   const cachet = safeStamp
     ? `<div class="cachet"><img src="${safeStamp}" alt="Cachet de l'établissement"><div class="lbl">Cachet de l'établissement</div></div>`
@@ -188,6 +187,8 @@ function BulletinsPage() {
     useIstpm();
   // Publishing transcripts is a student-administration act.
   const canPublish = role === "directeur" || role === "responsable";
+  // Cachet officiel servi par le backend, apposé sur les bulletins imprimés.
+  const stamp = useStamp();
 
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
@@ -206,6 +207,12 @@ function BulletinsPage() {
   // Le bulletin ne porte ni groupe ni formateur : on les rattache via l'étudiant
   // (groupe) et via les modules enseignés (formateur → notes du bulletin).
   const etuById = useMemo(() => new Map(etudiants.map((e) => [e.id, e])), [etudiants]);
+  // Années présentes dans les fiches (jamais de liste figée).
+  const anneesOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of etudiants) if (e.annee) set.add(e.annee);
+    return [...set].sort().reverse();
+  }, [etudiants]);
   const groupeOptions = useMemo(() => [...new Set(etudiants.map((e) => e.groupe))].sort(), [etudiants]);
   const formateursActifs = useMemo(() => formateurs.filter((f) => !f.archived), [formateurs]);
   const formateurOptions = useMemo(() => formateursActifs.map((f) => `${f.prenom} ${f.nom}`), [formateursActifs]);
@@ -301,7 +308,7 @@ function BulletinsPage() {
             label: "Année scolaire",
             value: anneeScolaire,
             onChange: setAnneeScolaire,
-            options: ANNEES_UNIVERSITAIRES,
+            options: anneesOptions,
             allLabel: "Toutes les années",
           },
           {
@@ -418,7 +425,7 @@ function BulletinsPage() {
                 <button
                   className={iconButton}
                   aria-label="Imprimer / PDF"
-                  onClick={() => printBulletin(b, etuById.get(b.etudiantId)?.groupe)}
+                  onClick={() => printBulletin(b, etuById.get(b.etudiantId)?.groupe, stamp)}
                 >
                   <FileDown className="h-3.5 w-3.5" />
                 </button>
@@ -436,10 +443,15 @@ function BulletinsPage() {
                       aria-label="Publier"
                       disabled={b.statut === "publie"}
                       onClick={() => {
-                        publierBulletin(b.id);
-                        toast.success(
-                          `Bulletin publié   ${b.prenom} ${b.nom} (${b.niveau})`,
-                        );
+                        void publierBulletin(b.id)
+                          .then(() =>
+                            toast.success(
+                              `Bulletin publié   ${b.prenom} ${b.nom} (${b.niveau})`,
+                            ),
+                          )
+                          .catch((err) =>
+                            toast.error(err instanceof Error ? err.message : "Publication impossible"),
+                          );
                       }}
                     >
                       <Send className="h-3.5 w-3.5" />
@@ -464,8 +476,11 @@ function BulletinsPage() {
               groupe={etuById.get(detail.etudiantId)?.groupe}
               canPublish={canPublish}
               onPublish={(b) => {
-                publierBulletin(b.id);
-                toast.success(`Bulletin publié   ${b.prenom} ${b.nom}`);
+                void publierBulletin(b.id)
+                  .then(() => toast.success(`Bulletin publié   ${b.prenom} ${b.nom}`))
+                  .catch((err) =>
+                    toast.error(err instanceof Error ? err.message : "Publication impossible"),
+                  );
               }}
             />
           ) : null}
@@ -477,12 +492,16 @@ function BulletinsPage() {
           key={editing.id}
           initial={editing}
           onCancel={() => setEditing(null)}
-          onSubmit={(patch) => {
-            updateBulletin(editing.id, patch);
-            toast.success(
-              `Bulletin mis à jour   ${editing.prenom} ${editing.nom}`,
-            );
-            setEditing(null);
+          onSubmit={async (patch) => {
+            try {
+              await updateBulletin(editing.id, patch);
+              toast.success(
+                `Bulletin mis à jour   ${editing.prenom} ${editing.nom}`,
+              );
+              setEditing(null);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+            }
           }}
         />
       ) : null}
@@ -493,9 +512,13 @@ function BulletinsPage() {
         title="Publier tous les bulletins ?"
         message={`${aPublier} bulletin(s) passeront au statut « Publié » et seront visibles par les étudiants.`}
         confirmLabel="Tout publier"
-        onConfirm={() => {
-          const n = publierTousBulletins();
-          toast.success(`${n} bulletin(s) publié(s)`);
+        onConfirm={async () => {
+          try {
+            const n = await publierTousBulletins();
+            toast.success(`${n} bulletin(s) publié(s)`);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Publication impossible");
+          }
         }}
       />
     </div>
@@ -616,6 +639,7 @@ function BulletinDetail({
   onPublish: (b: Bulletin) => void;
 }) {
   const { photoDe } = useIstpm();
+  const stamp = useStamp();
   const totalCredits = b.notes.reduce((s, n) => s + n.credits, 0);
   const creditsValides = b.notes
     .filter((n) => n.note >= 10)
@@ -650,7 +674,7 @@ function BulletinDetail({
         <div className="flex items-center justify-end gap-2">
           <button
             className={cn(ghostPill, "gap-1.5")}
-            onClick={() => printBulletin(b, groupe)}
+            onClick={() => printBulletin(b, groupe, stamp)}
           >
             <FileDown className="h-3.5 w-3.5" /> Imprimer / PDF
           </button>

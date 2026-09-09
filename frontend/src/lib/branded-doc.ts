@@ -16,7 +16,6 @@ import {
   type Stage,
   type StatutPaiement,
 } from "@/lib/istpm-data";
-import { getStamp } from "@/lib/stamp";
 
 /* ------------------------------------------------------------------ */
 /*  Palette de marque (miroir de styles.css)                           */
@@ -360,9 +359,13 @@ function buildContentStream(
   return ops.join("\n");
 }
 
-export async function makeStageDocPdf(s: Stage, kind: Kind): Promise<Blob> {
+export async function makeStageDocPdf(
+  s: Stage,
+  kind: Kind,
+  stampDataUrl?: string | null,
+): Promise<Blob> {
   const logo = await loadLogo();
-  const stampRaw = getStamp();
+  const stampRaw = stampDataUrl ?? null;
   const stamp = stampRaw ? await rasterizeDataUrl(stampRaw, 220) : null;
 
   const sections = stageSections(s, kind);
@@ -467,19 +470,22 @@ export async function makeStageDocPdf(s: Stage, kind: Kind): Promise<Blob> {
  * conventions de stage, avec les données de l'étudiant et de la ligne de
  * paiement.
  */
-export async function makePaiementDocPdf(params: {
-  prenom: string;
-  nom: string;
-  cne: string;
-  filiere: string;
-  mois: string;
-  montantDu: number;
-  montantPaye: number;
-  datePaiement: string;
-  statut: StatutPaiement;
-}): Promise<Blob> {
+export async function makePaiementDocPdf(
+  params: {
+    prenom: string;
+    nom: string;
+    cne: string;
+    filiere: string;
+    mois: string;
+    montantDu: number;
+    montantPaye: number;
+    datePaiement: string;
+    statut: StatutPaiement;
+  },
+  stampDataUrl?: string | null,
+): Promise<Blob> {
   const logo = await loadLogo();
-  const stampRaw = getStamp();
+  const stampRaw = stampDataUrl ?? null;
   const stamp = stampRaw ? await rasterizeDataUrl(stampRaw, 220) : null;
 
   const sections: Section[] = [

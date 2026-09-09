@@ -760,48 +760,24 @@ function SendMessageModal({
 }
 
 /**
- * Interface picker. Roles are a UI state only (no real auth), so switching is
- * instant and needs no re-login. Navigating home avoids being stranded on a
- * page the newly-selected role cannot reach.
+ * Pastille du rôle connecté (fichier historique non monté : affichage seul,
+ * aucun changement de rôle sans identifiants).
  */
 function RoleSwitcher({ compact }: { compact?: boolean }) {
-  const { role, setRole } = useAuth();
-  const navigate = useNavigate();
+  const { role } = useAuth();
 
   if (!role) return null;
 
   return (
-    <Select
-      value={role}
-      onValueChange={(next) => {
-        setRole(next as (typeof ROLES)[number]);
-        navigate({ to: "/dashboard" });
-      }}
+    <span
+      className={cn(
+        "inline-flex h-9 items-center gap-1.5 rounded-full border-brand/20 bg-card px-3 text-xs font-medium",
+        compact && "w-[3.25rem] justify-center px-2",
+      )}
     >
-      <SelectTrigger
-        aria-label="Changer de profil"
-        className={cn(
-          "h-9 gap-1.5 rounded-full border-brand/20 bg-card text-xs font-medium shadow-none focus:ring-0 focus:ring-offset-0",
-          compact ? "w-[3.25rem] px-2" : "w-auto min-w-[9.5rem] px-3",
-        )}
-      >
-        {compact ? (
-          <UserCog className="h-4 w-4 shrink-0 text-brand" />
-        ) : (
-          <span className="flex min-w-0 items-center gap-1.5">
-            <UserCog className="h-4 w-4 shrink-0 text-brand" />
-            <span className="truncate">{ROLE_META[role].short}</span>
-          </span>
-        )}
-      </SelectTrigger>
-      <SelectContent className="rounded-2xl border-brand/15">
-        {ROLES.map((r) => (
-          <SelectItem key={r} value={r} className="text-xs">
-            {ROLE_META[r].label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      <UserCog className="h-4 w-4 shrink-0 text-brand" />
+      {compact ? null : <span className="truncate">{ROLE_META[role].short}</span>}
+    </span>
   );
 }
 

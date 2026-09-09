@@ -15,7 +15,7 @@ const examenSchema = z.object({
   filiere: z.string().min(1, "Fili\u00e8re requise"),
   niveau: z.string().min(1, "Niveau requis"),
   type: z.string().min(1, "Type requis"),
-  date: z.string().min(1, "Date requise"),
+  date: z.string().optional().default(""),
   heure: z.string().optional().default(""),
   salle: z.string().optional().default(""),
   surveillants: z.array(z.string()).optional().default([]),
@@ -157,8 +157,29 @@ export async function examenRoutes(app: FastifyInstance) {
     return enrichExamen(examen);
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  /**
+   * Fiche formateur liée au compte (périmètre enseignant). `formateurs.user_id`
+   * porte l'`users.id` en texte (voir `services/auth.ts`).
+   */
+  async function ficheEnseignant(userId: string) {
+    const db = getDb();
+    const [fiche] = await db
+      .select({ id: formateurs.id })
+      .from(formateurs)
+      .where(eq(formateurs.userId, userId))
+      .limit(1);
+    return fiche ?? null;
+  }
+
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request, reply) => {
     const input = examenSchema.parse(request.body);
+    if (request.user.role === "enseignant") {
+      // Un enseignant ne crée que ses propres examens : l'auteur est forcé
+      // à la fiche liée (la valeur client est ignorée).
+      const fiche = await ficheEnseignant(request.user.id);
+      if (!fiche) return reply.status(403).send({ error: "Aucune fiche formateur liée à ce compte" });
+      input.createdBy = fiche.id;
+    }
     const db = getDb();
     const [examen] = await db
       .insert(examens)
@@ -167,9 +188,23 @@ export async function examenRoutes(app: FastifyInstance) {
     return enrichExamen(examen);
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = examenSchema.partial().parse(request.body);
+    if (request.user.role === "enseignant") {
+      const fiche = await ficheEnseignant(request.user.id);
+      const db = getDb();
+      const [row] = await db
+        .select({ createdBy: examens.createdBy })
+        .from(examens)
+        .where(eq(examens.id, id))
+        .limit(1);
+      // Ligne attribuée à un autre auteur → interdit. Les lignes historiques
+      // sans auteur (`createdBy` vide) restent modifiables.
+      if (!fiche || (row?.createdBy && row.createdBy !== fiche.id)) {
+        return reply.status(403).send({ error: "Examen d'un autre formateur" });
+      }
+    }
     const db = getDb();
     const values: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(input)) {
@@ -184,9 +219,25 @@ export async function examenRoutes(app: FastifyInstance) {
     return enrichExamen(examen);
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
+    if (request.user.role === "enseignant") {
+      const fiche = await ficheEnseignant(request.user.id);
+      const [row] = await db
+        .select({ createdBy: examens.createdBy, documentId: examens.documentId })
+        .from(examens)
+        .where(eq(examens.id, id))
+        .limit(1);
+      if (!fiche || (row?.createdBy && row.createdBy !== fiche.id)) {
+        return reply.status(403).send({ error: "Examen d'un autre formateur" });
+      }
+      if (row?.documentId) {
+        await deleteDocument(row.documentId).catch(() => {});
+      }
+      await db.delete(examens).where(eq(examens.id, id));
+      return { ok: true };
+    }
     // Delete document from MinIO if it exists
     const [examen] = await db
       .select()
@@ -214,6 +265,13 @@ export async function examenRoutes(app: FastifyInstance) {
         .where(eq(examens.id, id))
         .limit(1);
       if (!examen) return reply.status(404).send({ error: "Examen introuvable" });
+
+      if (request.user.role === "enseignant") {
+        const fiche = await ficheEnseignant(request.user.id);
+        if (!fiche || (examen.createdBy && examen.createdBy !== fiche.id)) {
+          return reply.status(403).send({ error: "Examen d'un autre formateur" });
+        }
+      }
 
       const { nom, mime, content } = documentSchema.parse(request.body);
 
@@ -311,6 +369,13 @@ export async function examenRoutes(app: FastifyInstance) {
       if (!examen) return reply.status(404).send({ error: "Examen introuvable" });
       if (!examen.documentId) return reply.status(404).send({ error: "Aucun document associ\u00e9 \u00e0 cet examen" });
 
+      if (request.user.role === "enseignant") {
+        const fiche = await ficheEnseignant(request.user.id);
+        if (!fiche || (examen.createdBy && examen.createdBy !== fiche.id)) {
+          return reply.status(403).send({ error: "Examen d'un autre formateur" });
+        }
+      }
+
       await deleteDocument(examen.documentId);
 
       await db
@@ -330,7 +395,7 @@ export async function examenRoutes(app: FastifyInstance) {
 
   app.post(
     "/:id/notes",
-    { preHandler: [authenticate, requireRole("directeur", "enseignant")] },
+    { preHandler: [authenticate, requireRole("directeur", "enseignant", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const { saisies } = saveNotesSchema.parse(request.body);
@@ -342,6 +407,13 @@ export async function examenRoutes(app: FastifyInstance) {
         .where(eq(examens.id, id))
         .limit(1);
       if (!examen) return reply.status(404).send({ error: "Examen introuvable" });
+
+      if (request.user.role === "enseignant") {
+        const fiche = await ficheEnseignant(request.user.id);
+        if (!fiche || (examen.createdBy && examen.createdBy !== fiche.id)) {
+          return reply.status(403).send({ error: "Examen d'un autre formateur" });
+        }
+      }
 
       for (const s of saisies) {
         await db

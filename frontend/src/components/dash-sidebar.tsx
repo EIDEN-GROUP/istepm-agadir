@@ -24,7 +24,7 @@ import {
   UserCog,
   RotateCcw,
 } from "lucide-react";
-import { ROLES, ROLE_META, SWITCHABLE_ROLES, useAuth } from "@/lib/auth";
+import { ROLE_META, useAuth } from "@/lib/auth";
 import { RequestBell } from "@/components/request-bell";
 import { PersonAvatar } from "@/components/person-avatar";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
@@ -32,12 +32,6 @@ import { useIstpm } from "@/lib/istpm-store";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { AiChatFloating } from "@/components/ai-chat";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -269,67 +263,54 @@ function NavGroupBlock({
 /*  Sélecteur de profil                                                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Identité connectée + sélecteur du formateur consulté (enseignants).
+ *
+ * Il n'y a plus de changement de rôle sans identifiants : le rôle affiché est
+ * toujours celui du compte connecté. Le sélecteur de formateur reste un simple
+ * filtre d'affichage (l'API applique de toute façon le périmètre du compte).
+ */
 function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
-  const { role, setRole, selectedFormateurId, setSelectedFormateurId } = useAuth();
+  const { role, user, selectedFormateurId, setSelectedFormateurId } = useAuth();
   const { formateurs } = useIstpm();
   const navigate = useNavigate();
   const [pickerOpen, setPickerOpen] = useState(false);
 
   if (!role) return null;
-
-  const handleSelectRole = (next: (typeof ROLES)[number]) => {
-    // If it's not enseignant, directly switch role
-    if (next !== "enseignant") {
-      setSelectedFormateurId(null);
-      setRole(next);
-      navigate({ to: "/dashboard" });
-      return;
-    }
-    // If it's enseignant, open the formateur picker
-    setPickerOpen(true);
-  };
+  const canPick = role === "enseignant";
 
   return (
     <>
-      <Select value={role} onValueChange={handleSelectRole}>
-        <SelectTrigger
-          aria-label="Changer de profil"
-          className={cn(
-            "h-9 rounded-xl border-brand/15 bg-brand/5 text-xs font-medium text-foreground shadow-none transition-colors hover:bg-brand/10 focus:ring-0 focus:ring-offset-0 [&>svg]:text-muted-foreground data-[state=open]:bg-brand/10",
-            collapsed ? "w-9 justify-center px-0 [&>svg:last-child]:hidden" : "w-full px-3",
-          )}
-        >
-          {collapsed ? (
-            <UserCog className="h-4 w-4 shrink-0 text-brand" />
-          ) : (
-            <span className="flex min-w-0 items-center gap-2">
-              <UserCog className="h-4 w-4 shrink-0 text-brand" />
-              <span className="truncate">{ROLE_META[role].short}</span>
+      <div
+        className={cn(
+          "flex h-9 items-center gap-2 rounded-xl border border-brand/15 bg-brand/5 px-3 text-xs font-medium text-foreground",
+          collapsed && "justify-center px-0",
+        )}
+        title={user ? `${user.name} — ${ROLE_META[role].label}` : ROLE_META[role].label}
+      >
+        <UserCog className="h-4 w-4 shrink-0 text-brand" />
+        {collapsed ? null : (
+          <span className="min-w-0 flex-1 truncate">
+            <span className="block truncate">{user?.name ?? ROLE_META[role].label}</span>
+            <span className="block truncate text-[10px] font-normal text-muted-foreground">
+              {ROLE_META[role].short}
             </span>
-          )}
-        </SelectTrigger>
-        <SelectContent className="rounded-2xl border-brand/15">
-          {role === "enseignant" && selectedFormateurId ? (
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setPickerOpen(true)}
-              onKeyDown={(e) => e.key === "Enter" && setPickerOpen(true)}
-              className="flex w-full cursor-pointer items-center gap-2 px-2 py-2 text-xs font-medium text-brand-dk hover:bg-brand/10 rounded-lg transition-colors"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Changer de formateur…
-            </div>
-          ) : null}
-          {SWITCHABLE_ROLES.map((r) => (
-            <SelectItem key={r} value={r} className="text-xs">
-              {ROLE_META[r].label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          </span>
+        )}
+        {canPick && !collapsed ? (
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            aria-label="Choisir le formateur consulté"
+            title="Choisir le formateur consulté"
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+      </div>
 
-      {/* Formateur picker dialog */}
+      {/* Formateur picker dialog (filtre d'affichage, sans changement de droits) */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent className="w-full max-h-[80vh] overflow-y-auto">
           <DialogTitle className="text-lg font-medium">
@@ -340,11 +321,12 @@ function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
               <button
                 key={f.id}
                 onClick={() => {
-                  // Persist the selected formateur through the auth context so
-                  // every page re-scopes reactively (no reload needed). This
-                  // also switches the session identity to the chosen teacher
-                  // (name/email), so no separate setRole call is needed.
-                  setSelectedFormateurId(f.id);
+                  // Filtre d'affichage réactif (aucun rechargement, aucun droit
+                  // accordé : le périmètre reste celui du compte connecté).
+                  setSelectedFormateurId(f.id, {
+                    name: `${f.prenom} ${f.nom}`,
+                    email: f.email,
+                  });
                   setPickerOpen(false);
                   navigate({ to: "/dashboard" });
                   toast.success(`Formateur sélectionné : ${f.prenom} ${f.nom}`);

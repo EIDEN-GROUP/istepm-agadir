@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
+import { useStamp } from "@/lib/stamp";
 import {
   makeStageDocPdf,
   buildStageEmailHtml,
@@ -103,8 +104,12 @@ const STATUTS: StatutStage[] = [
  * livrer. Le document est maintenant généré localement, au même format que les
  * sujets d'examen.
  */
-async function downloadStageDoc(s: Stage, kind: "convention" | "rapport") {
-  const blob = await makeStageDocPdf(s, kind);
+async function downloadStageDoc(
+  s: Stage,
+  kind: "convention" | "rapport",
+  stamp?: string | null,
+) {
+  const blob = await makeStageDocPdf(s, kind, stamp);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -443,6 +448,8 @@ function StagesPage() {
   const [emailTo, setEmailTo] = useState("");
   const [affectOpen, setAffectOpen] = useState(false);
   const [structuresOpen, setStructuresOpen] = useState(false);
+  // Cachet officiel servi par le backend, apposé sur les PDF générés.
+  const stamp = useStamp();
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -657,7 +664,7 @@ function StagesPage() {
                           className={cn(ghostPill, "gap-1.5 px-3.5 py-2 text-xs")}
                           onClick={() =>
                             s.conventionSignee
-                              ? (downloadStageDoc(s, "convention"),
+                              ? (downloadStageDoc(s, "convention", stamp),
                                 toast.success("Convention téléchargée (PDF)"))
                               : toast.error("Convention non encore signée")
                           }
@@ -668,7 +675,7 @@ function StagesPage() {
                           className={cn(ghostPill, "gap-1.5 px-3.5 py-2 text-xs")}
                           onClick={() =>
                             s.noteSoutenance !== undefined
-                              ? (downloadStageDoc(s, "rapport"),
+                              ? (downloadStageDoc(s, "rapport", stamp),
                                 toast.success("Rapport téléchargé (PDF)"))
                               : toast.error("Rapport de stage non encore déposé")
                           }
@@ -688,10 +695,13 @@ function StagesPage() {
                           <button
                             className={primaryPill + " ms-auto"}
                             onClick={() => {
-                              updateStage(s.id, { statut: "valide" });
-                              toast.success(
-                                `Stage validé   ${s.prenom} ${s.nom}`,
-                              );
+                              void updateStage(s.id, { statut: "valide" })
+                                .then(() =>
+                                  toast.success(`Stage validé   ${s.prenom} ${s.nom}`),
+                                )
+                                .catch((err) =>
+                                  toast.error(err instanceof Error ? err.message : "Validation impossible"),
+                                );
                             }}
                           >
                             Valider le stage
@@ -784,7 +794,7 @@ function StagesPage() {
                     const s = emailTarget!;
                     try {
                       const [blob, logoDataUrl] = await Promise.all([
-                        makeStageDocPdf(s, "convention"),
+                        makeStageDocPdf(s, "convention", stamp),
                         loadLogoDataUrl(),
                       ]);
                       const buf = await blob.arrayBuffer();
@@ -850,24 +860,36 @@ function StagesPage() {
           etudiants={etudiants}
           structuresAccueil={structuresAccueil.map((s) => s.nom)}
           servicesStage={servicesStage}
-          onCreateStructure={(nom) => {
-            addStructureAccueil(nom, 5);
-            toast.success(`Structure enregistrée — ${nom}`);
+          onCreateStructure={async (nom) => {
+            try {
+              await addStructureAccueil(nom, 5);
+              toast.success(`Structure enregistrée — ${nom}`);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+            }
           }}
-          onCreateService={(nom) => {
-            addServiceStage(nom);
-            toast.success(`Service enregistré — ${nom}`);
+          onCreateService={async (nom) => {
+            try {
+              await addServiceStage(nom);
+              toast.success(`Service enregistré — ${nom}`);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+            }
           }}
           onCancel={() => setFormOpen(false)}
-          onSubmit={(data) => {
-            if (editing) {
-              updateStage(editing.id, data);
-              toast.success(`Stage mis à jour   ${data.prenom} ${data.nom}`);
-            } else {
-              addStage(data);
-              toast.success(`Convention créée   ${data.prenom} ${data.nom}`);
+          onSubmit={async (data) => {
+            try {
+              if (editing) {
+                await updateStage(editing.id, data);
+                toast.success(`Stage mis à jour   ${data.prenom} ${data.nom}`);
+              } else {
+                await addStage(data);
+                toast.success(`Convention créée   ${data.prenom} ${data.nom}`);
+              }
+              setFormOpen(false);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
             }
-            setFormOpen(false);
           }}
         />
       ) : null}
@@ -879,13 +901,18 @@ function StagesPage() {
           etudiants={etudiants}
           stages={stages}
           structuresAccueil={structuresAccueil}
-          onCreateStructure={(nom) => {
-            addStructureAccueil(nom, 5);
-            toast.success(`Structure enregistrée — ${nom}`);
+          onCreateStructure={async (nom) => {
+            try {
+              await addStructureAccueil(nom, 5);
+              toast.success(`Structure enregistrée — ${nom}`);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+            }
           }}
-          onConfirm={(affectations) => {
-            for (const { etudiant, structure, debut, fin } of affectations) {
-              addStage({
+          onConfirm={async (affectations) => {
+            try {
+              for (const { etudiant, structure, debut, fin } of affectations) {
+                await addStage({
                 etudiantId: etudiant.id,
                 cne: etudiant.cne,
                 prenom: etudiant.prenom,
@@ -901,10 +928,13 @@ function StagesPage() {
                 statut: "recherche",
                 conventionSignee: false,
               });
+              }
+              toast.success(
+                `${affectations.length} étudiant(s) affecté(s) à un stage`,
+              );
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Affectation impossible");
             }
-            toast.success(
-              `${affectations.length} étudiant(s) affecté(s) à un stage`,
-            );
           }}
         />
       ) : null}
@@ -925,10 +955,14 @@ function StagesPage() {
             ? `Le stage de ${toDelete.prenom} ${toDelete.nom} à ${toDelete.structure} sera supprimé. Cette action est irréversible.`
             : ""
         }
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!toDelete) return;
-          deleteStage(toDelete.id);
-          toast.success(`Stage supprimé   ${toDelete.prenom} ${toDelete.nom}`);
+          try {
+            await deleteStage(toDelete.id);
+            toast.success(`Stage supprimé   ${toDelete.prenom} ${toDelete.nom}`);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Suppression impossible");
+          }
           setToDelete(null);
         }}
       />

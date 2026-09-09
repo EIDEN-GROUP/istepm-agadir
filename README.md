@@ -270,11 +270,20 @@ See `frontend/STRUCTURE.md` and `backend/STRUCTURE.md` for detailed file-by-file
 - `DEAD_CODE.md`   unused/legacy code inventory (listed, NOT removed)
 - `SECURITY.md`   security audit findings + applied remediations + required secrets
 
+`M:\plan\sql-istepm\` holds the idempotent demo dataset (6 ordered SQL files,
+replaces the removed `npm run seed`) with its own README.
+
 ## Security
 
 - Roles enforced server-side (`etudiant` sees only own records; teachers scoped to
-  their groups; exports and user admin reserved to direction). The UI role switcher
-  is a demo convenience, not a boundary.
+  their groups; exports and user admin reserved to direction). Enseignants create
+  and edit only their own examens (`createdBy` forcé/vérifié) and see only their
+  seances. Le sélecteur
+  latéral n'est qu'un affichage (filtre formateur) : aucun changement de rôle
+  sans identifiants.
+- Backend = seule source de vérité : aucune donnée de démonstration, aucun miroir
+  local (sujets d'examen dans MinIO via `POST/GET /api/examens/:id/document`,
+  fil « activité récente » dérivé des lignes serveur).
 - Login/invitations/demo endpoints are rate-limited; JWT 12h default (24h in prod);
   passwords min 8 chars, bcrypt cost 12.
 - Production refuses to boot with default `JWT_SECRET`/`ADMIN_API_KEY` — set strong

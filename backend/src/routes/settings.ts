@@ -1,17 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
-import { getDb, getPool } from "@/db";
+import { getDb } from "@/db";
 import { settings } from "@/db/schema/settings";
 import { levels } from "@/db/schema/levels";
 import { modules } from "@/db/schema/modules";
-import { etudiants } from "@/db/schema/etudiants";
-import { formateurs } from "@/db/schema/formateurs";
-import { examens } from "@/db/schema/examens";
-import { bulletins } from "@/db/schema/bulletins";
-import { stages } from "@/db/schema/stages";
-import { historiquePaiements } from "@/db/schema/historique-paiements";
-import { notesEtudiant } from "@/db/schema/notes-etudiant";
 import { groupConfigs } from "@/db/schema/groupConfigs";
 import { eq, desc, asc } from "drizzle-orm";
 
@@ -219,8 +212,8 @@ export async function settingsRoutes(app: FastifyInstance) {
     await db
       .update(settings)
       .set({ value: list })
-      .where(eq(settings.key, "structures_accueil"));
-    return { structures: list };
+      .where(eq(settings.key, "filieres"));
+    return { filieres: list };
   });
 
   /* ------------------------------------------------------------------ */
@@ -262,6 +255,46 @@ export async function settingsRoutes(app: FastifyInstance) {
     } else {
       await db.insert(settings).values({ key: "services_stage", value: list });
     }
+    return { services: list };
+  });
+
+  app.put("/stage-services/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const { nom } = request.params as { nom: string };
+    const body = z.object({ nouveauNom: z.string().trim().min(1).max(200).optional() }).parse(request.body);
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "services_stage"))
+      .limit(1);
+    if (!row) return reply.status(404).send({ error: "Aucun service enregistré" });
+    const list = asStrings(row.value);
+    const idx = list.findIndex((s) => s === nom);
+    if (idx === -1) return reply.status(404).send({ error: "Service introuvable" });
+    const newName = (body.nouveauNom ?? nom).trim().replace(/\s+/g, " ");
+    if (newName !== nom && list.some((s) => s.toLowerCase() === newName.toLowerCase())) {
+      return reply.status(409).send({ error: "Ce nom existe déjà" });
+    }
+    list[idx] = newName;
+    list.sort((a, b) => a.localeCompare(b));
+    await db.update(settings).set({ value: list }).where(eq(settings.key, "services_stage"));
+    return { services: list };
+  });
+
+  app.delete("/stage-services/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+    const { nom } = request.params as { nom: string };
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "services_stage"))
+      .limit(1);
+    if (!row) return reply.status(404).send({ error: "Aucun service enregistré" });
+    const list = asStrings(row.value);
+    const idx = list.findIndex((s) => s === nom);
+    if (idx === -1) return reply.status(404).send({ error: "Service introuvable" });
+    list.splice(idx, 1);
+    await db.update(settings).set({ value: list }).where(eq(settings.key, "services_stage"));
     return { services: list };
   });
 
@@ -377,58 +410,10 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   /* ------------------------------------------------------------------ */
-  /* Modules management                                                  */
+  /* Modules management (table créée par la migration 0023)               */
   /* ------------------------------------------------------------------ */
-  async function ensureModulesTableAndSeed() {
-    const db = getDb();
-    const pool = getPool();
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS modules (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        nom TEXT NOT NULL,
-        filiere TEXT NOT NULL,
-        code TEXT,
-        description TEXT,
-        volume_horaire INTEGER,
-        coefficient NUMERIC,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-      );
-    `);
-
-    const existing = await db.select().from(modules).limit(1);
-    if (existing.length === 0) {
-      const defaultModules = [
-        { nom: "Soins infirmiers en médecine", filiere: "Infirmier polyvalent" },
-        { nom: "Hygiène hospitalière", filiere: "Infirmier polyvalent" },
-        { nom: "Éthique et déontologie", filiere: "Infirmier polyvalent" },
-        { nom: "Pharmacologie", filiere: "Infirmier polyvalent" },
-        { nom: "Santé publique", filiere: "Infirmier polyvalent" },
-        { nom: "Réanimation et soins intensifs", filiere: "Infirmier en anesthésie-réanimation" },
-        { nom: "Anesthésie clinique", filiere: "Infirmier en anesthésie-réanimation" },
-        { nom: "Obstétrique", filiere: "Sage-femme" },
-        { nom: "Suivi de grossesse", filiere: "Sage-femme" },
-        { nom: "Néonatologie", filiere: "Sage-femme" },
-        { nom: "Rééducation fonctionnelle", filiere: "Kinésithérapie" },
-        { nom: "Électrothérapie", filiere: "Kinésithérapie" },
-        { nom: "Techniques de radiologie", filiere: "Radiologie / Imagerie médicale" },
-        { nom: "Scanner et IRM", filiere: "Radiologie / Imagerie médicale" },
-        { nom: "Radioprotection", filiere: "Radiologie / Imagerie médicale" },
-        { nom: "Hématologie", filiere: "Laboratoire / Biologie médicale" },
-        { nom: "Biochimie clinique", filiere: "Laboratoire / Biologie médicale" },
-        { nom: "Microbiologie", filiere: "Laboratoire / Biologie médicale" },
-        { nom: "Anatomie dentaire", filiere: "Prothèse dentaire" },
-        { nom: "Prothèse fixe (TP)", filiere: "Prothèse dentaire" },
-        { nom: "Occlusodontie", filiere: "Prothèse dentaire" },
-      ];
-      for (const m of defaultModules) {
-        await db.insert(modules).values(m);
-      }
-    }
-  }
 
   app.get("/modules", { preHandler: [authenticate] }, async (request) => {
-    await ensureModulesTableAndSeed();
     const db = getDb();
     const { filiere } = request.query as { filiere?: string };
     if (filiere) {
@@ -447,7 +432,6 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   app.post("/modules", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
-    await ensureModulesTableAndSeed();
     const body = moduleSchema.parse(request.body);
     const db = getDb();
     const [mod] = await db
@@ -465,7 +449,6 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   app.put("/modules/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
-    await ensureModulesTableAndSeed();
     const { id } = request.params as { id: string };
     const body = moduleSchema.parse(request.body);
     const db = getDb();
@@ -490,25 +473,12 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   app.delete("/modules/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
-    await ensureModulesTableAndSeed();
     const { id } = request.params as { id: string };
     const db = getDb();
     const [deleted] = await db.delete(modules).where(eq(modules.id, id)).returning();
     if (!deleted) {
       return reply.status(404).send({ error: "Module introuvable" });
     }
-    return { ok: true };
-  });
-
-  app.post("/reset", { preHandler: [authenticate, requireRole("directeur")] }, async () => {
-    const db = getDb();
-    await db.delete(historiquePaiements);
-    await db.delete(notesEtudiant);
-    await db.delete(bulletins);
-    await db.delete(stages);
-    await db.delete(examens);
-    await db.delete(formateurs);
-    await db.delete(etudiants);
     return { ok: true };
   });
 }
