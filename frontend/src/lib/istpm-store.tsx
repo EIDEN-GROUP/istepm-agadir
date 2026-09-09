@@ -565,13 +565,16 @@ const Ctx = createContext<IstpmCtx | null>(null);
 
 export function IstpmProvider({ children }: { children: ReactNode }) {
   // Source unique : le backend. L'état démarre vide ; `refresh()` le remplit
-  // au montage. Aucun seed, aucun miroir localStorage.
+  // dès qu'un compte est connecté. Aucun seed, aucun miroir localStorage.
   const [snap, setSnap] = useState<Snapshot>(emptySnapshot);
   const [loading, setLoading] = useState(true);
   const [syncFailed, setSyncFailed] = useState(false);
   // Miroir lecture pour les actions async (lecture avant `await`, sans écrire).
   const snapRef = useRef(snap);
   snapRef.current = snap;
+  // Signal de session : la synchro ne part que sous un compte connecté.
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
 
   // Synchronisation serveur : remplacement intégral, jamais de fusion locale.
   // Échec réseau = `syncFailed` (bandeau explicite), jamais de données inventées.
@@ -663,8 +666,19 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Le provider vit au-dessus du routeur : il monte sur l'écran de login,
+    // SANS jeton. On (re)charge donc à chaque connexion, jamais au montage
+    // aveugle — sinon le dashboard restait vide après login (401 initiaux,
+    // aucun nouvel essai). Déconnexion = état vidé (pas de fuite inter-comptes).
+    if (!userId) {
+      snapRef.current = emptySnapshot();
+      setSnap(emptySnapshot());
+      setSyncFailed(false);
+      setLoading(false);
+      return;
+    }
     void refresh();
-  }, [refresh]);
+  }, [userId, refresh]);
 
   // Re-synchronise les photos d'identité étudiant en tâche de fond : la
   // synchro principale ne tourne qu'au montage, donc une photo téléversée
@@ -1718,24 +1732,20 @@ export function useIstpm() {
 }
 
 /**
- * Formateur « courant » pour le rôle enseignant.
+ * Formateur « courant ».
  *
- * Résolu depuis le référentiel **serveur** : d'abord la fiche liée au compte
- * (`formateurs.user_id`), sinon la sélection manuelle du sélecteur, sinon la
- * première fiche. Plus aucun identifiant de démonstration.
+ * Enseignant : la fiche liée au compte (`formateurs.user_id`), sinon `null`
+ * (le compte doit être lié — aucun choix d'identité côté client). Autres
+ * rôles : première fiche du référentiel serveur (affichage uniquement).
  */
 export function useCurrentFormateur(): Formateur | null {
   const { formateurs } = useIstpm();
-  const { user, selectedFormateurId } = useAuth();
+  const { user } = useAuth();
   return useMemo(() => {
     if (formateurs.length === 0) return null;
-    if (selectedFormateurId) {
-      return formateurs.find((f) => f.id === selectedFormateurId) ?? null;
-    }
     if (user?.role === "enseignant" && user?.id) {
-      const liee = formateurs.find((f) => f.userId === user.id);
-      if (liee) return liee;
+      return formateurs.find((f) => f.userId === user.id) ?? null;
     }
     return formateurs[0];
-  }, [formateurs, selectedFormateurId, user]);
+  }, [formateurs, user]);
 }

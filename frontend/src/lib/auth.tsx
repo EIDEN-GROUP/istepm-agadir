@@ -37,7 +37,6 @@ export const ROLE_META: Record<
   },
 };
 
-export const FORMATEUR_STORAGE_KEY = "istpm-selected-formateur";
 const ROLE_STORAGE_KEY = "istpm-role";
 const TOKEN_STORAGE_KEY = "istpm-token";
 const USER_STORAGE_KEY = "istpm-user";
@@ -84,30 +83,19 @@ type AuthCtx = {
   user: AuthUser | null;
   role: UserRole | null;
   loading: boolean;
-  /**
-   * Le rôle affiché n'est pas celui du compte connecté : la fiche profil est
-   * alors en lecture seule — toute modification s'appliquerait au vrai compte,
-   * pas au rôle consulté.
-   */
-  impersonating: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   /** Applique un compte mis à jour (email/nom) + jeton renvoyés par l'API. */
   applyAccountUpdate: (token: string, patch: Partial<AuthUser>) => void;
-  selectedFormateurId: string | null;
-  setSelectedFormateurId: (id: string | null, meta?: { name: string; email: string }) => void;
 };
 
 const Ctx = createContext<AuthCtx>({
   user: null,
   role: null,
   loading: true,
-  impersonating: false,
   login: async () => {},
   logout: () => {},
   applyAccountUpdate: () => {},
-  selectedFormateurId: null,
-  setSelectedFormateurId: () => {},
 });
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -126,42 +114,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRoleState] = useState<UserRole | null>(null);
   const [user, setUserState] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedFormateurId, setSelectedFormateurId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem(FORMATEUR_STORAGE_KEY);
-  });
-  const [impersonating, setImpersonating] = useState(false);
-
-  /**
-   * Mémorise le formateur consulté (filtre d'affichage pour un enseignant).
-   * N'accorde aucun droit : l'API applique toujours le périmètre du compte
-   * connecté. `meta` (nom/e-mail) vient de la fiche déjà chargée, jamais d'un
-   * jeu local.
-   */
-  const persistSelectedFormateur = useCallback(
-    (id: string | null, meta?: { name: string; email: string }) => {
-      setSelectedFormateurId(id);
-      if (typeof window !== "undefined") {
-        if (id) window.localStorage.setItem(FORMATEUR_STORAGE_KEY, id);
-        else window.localStorage.removeItem(FORMATEUR_STORAGE_KEY);
-      }
-      if (id) {
-        const authUser: AuthUser = {
-          id,
-          role: "enseignant",
-          name: meta?.name ?? "Enseignant",
-          email: meta?.email ?? "",
-        };
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(ROLE_STORAGE_KEY, "enseignant");
-          window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(authUser));
-        }
-        setRoleState("enseignant");
-        setUserState(authUser);
-      }
-    },
-    [],
-  );
 
   useEffect(() => {
     const stored = readStoredRole();
@@ -182,10 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // La photo de profil vit côté serveur (`users.photo_url`) mais pas dans le
-  // JWT ni dans les identités fabriquées par `userFor` / le sélecteur de rôle.
-  // À chaque (re)montage et à chaque changement de rôle, on la ré-hydrate
-  // depuis `/auth/me` — mais seulement quand on agit sous son propre rôle
-  // (jeton). En impersonation d'un autre rôle, on retombe sur les initiales.
+  // JWT : à chaque (re)montage et à chaque changement de rôle, on la ré-hydrate
+  // depuis `/auth/me` pour le compte connecté.
   useEffect(() => {
     if (!role || typeof window === "undefined") return;
     const token = window.localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -198,9 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (!res.ok || cancelled) return;
         const me: { role?: string; photoUrl?: string } = await res.json();
-        const own = me.role ? mapBackendRole(me.role) === role : false;
-        setImpersonating(!own);
-        const url = own ? (me.photoUrl ?? "") : "";
+        if (me.role && mapBackendRole(me.role) !== role) return;
+        const url = me.photoUrl ?? "";
         setUserState((prev) => {
           if (!prev || prev.photoUrl === url) return prev;
           const next = { ...prev, photoUrl: url };
@@ -256,8 +205,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: mappedRole,
       };
       window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
-      window.localStorage.removeItem(FORMATEUR_STORAGE_KEY);
-      setSelectedFormateurId(null);
       persistRole(mappedRole, authUser);
     },
     [persistRole],
@@ -282,9 +229,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
-    // Purge les clés applicatives (session, préférence formateur) : évite les
-    // résidus sur poste partagé. `gestio-locale` (langue) est conservée, sans
-    // donnée personnelle.
+    // Purge la session : évite les résidus sur poste partagé. `gestio-locale`
+    // (langue) est conservée, sans donnée personnelle.
     if (typeof window !== "undefined") {
       const doomed: string[] = [];
       for (let i = 0; i < window.localStorage.length; i += 1) {
@@ -296,8 +242,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setRoleState(null);
     setUserState(null);
-    setImpersonating(false);
-    setSelectedFormateurId(null);
   }, []);
 
   return (
@@ -306,12 +250,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         role,
         loading,
-        impersonating,
         login,
         logout,
         applyAccountUpdate,
-        selectedFormateurId,
-        setSelectedFormateurId: persistSelectedFormateur,
       }}
     >
       {children}

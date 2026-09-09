@@ -31,25 +31,6 @@ import {
 function formatActionResult(actionName: string, data: unknown): string {
   const label = actionName.replace(/_/g, " ");
 
-  // Ticket de fonctionnalité : l'IA l'a créé d'elle-même, sans vérification.
-  // L'utilisateur doit avoir l'impression que l'IA s'en occupe personnellement.
-  if (actionName === "create_feature_ticket") {
-    const t = (data ?? {}) as {
-      ticket?: { title?: string; description?: string };
-      deduped?: boolean;
-    };
-    const title =
-      typeof t.ticket?.title === "string" && t.ticket.title.trim()
-        ? t.ticket.title.trim()
-        : "votre demande";
-    if (t.deduped) {
-      return `ℹ️ « ${title} » est déjà pris en compte — je vous préviendrai ici même dès que ce sera prêt.`;
-    }
-    const desc =
-      typeof t.ticket?.description === "string" ? t.ticket.description.trim() : "";
-    return `✅ C'est noté — je m'en occupe : « ${title} ».${desc ? `\n\n${desc}` : ""}\n\nJe vous préviendrai ici même dès que ce sera prêt.`;
-  }
-
   const sectionMap: Record<string, string> = {
     formateurs: "Formateurs",
     etudiants: "Étudiants",
@@ -600,13 +581,18 @@ export function AiChatFloating() {
           setExecuting(action.actionName);
           try {
             const res = await confirmAction(action.actionName, action.params);
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "assistant",
-                content: formatActionResult(action.actionName, res.data),
-              },
-            ]);
+            // Ticket : création silencieuse en arrière-plan — aucune
+            // confirmation affichée (le verdict arrivera via l'IA).
+            // Seule une erreur reste visible (sinon demande perdue).
+            if (action.actionName !== "create_feature_ticket") {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "assistant",
+                  content: formatActionResult(action.actionName, res.data),
+                },
+              ]);
+            }
           } catch (err) {
             setMessages((prev) => [
               ...prev,

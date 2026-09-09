@@ -215,16 +215,15 @@ function EditCard({ onDone }: { onDone: () => void }) {
 /* ------------------------------------------------------------------ */
 
 function MonProfilPage() {
-  const { user, selectedFormateurId, applyAccountUpdate, impersonating } =
+  const { user, applyAccountUpdate } =
     useAuth();
   const { formateurs } = useIstpm();
   const [editing, setEditing] = useState(false);
   const photoInput = useRef<HTMLInputElement>(null);
 
   const isEtudiant = user?.role === "etudiant";
-  // Photo verrouillée : en impersonation (ce n'est pas votre compte) OU pour un
-  // étudiant (sa photo est gérée par les affaires estudiantines).
-  const photoLocked = impersonating || isEtudiant;
+  // Photo verrouillée pour un étudiant (gérée par les affaires estudiantines).
+  const photoLocked = isEtudiant;
 
   const studentQuery = useQuery({
     queryKey: ["student-me"],
@@ -256,8 +255,8 @@ function MonProfilPage() {
   const me = studentQuery.data;
   const etu = me?.etudiant;
 
-  // La photo vient du compte courant (contexte auth, remis à zéro quand on
-  // change de rôle) ; pour un étudiant, la fiche sert de repli après un reload.
+  // La photo vient du compte connecté ; pour un étudiant, la fiche sert de
+  // repli après un reload.
   const photoUrl =
     user.photoUrl || etu?.photoUrl || etu?.photo_url || null;
 
@@ -267,12 +266,12 @@ function MonProfilPage() {
       .filter((v) => v !== "—")
       .join(" · ") || "Institut spécialisé des techniques paramédicales";
 
+  // Fiche formateur liée au compte (comparaison d'e-mails insensible à la casse).
   const formateur =
     user.role === "enseignant"
-      ? (formateurs.find((f) => f.id === selectedFormateurId) ??
-        formateurs.find(
+      ? formateurs.find(
           (f) => f.email?.toLowerCase() === user.email.toLowerCase(),
-        ))
+        )
       : undefined;
 
   const onPhotoFile = async (file: File | undefined) => {
@@ -294,7 +293,7 @@ function MonProfilPage() {
         eyebrow="Mon compte"
         title="Mon profil"
         actions={
-          !editing && !impersonating ? (
+          !editing ? (
             <button
               type="button"
               onClick={() => setEditing(true)}
@@ -306,16 +305,6 @@ function MonProfilPage() {
           ) : null
         }
       />
-
-      {impersonating ? (
-        <p className="flex items-start gap-2 rounded-2xl border border-amber-300/50 bg-amber-50 px-4 py-2.5 text-xs leading-relaxed text-amber-800">
-          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Vous consultez l'application en tant que{" "}
-          <strong>{roleMeta.label}</strong> via le sélecteur de rôle. Ce n'est
-          pas votre compte : la fiche est en lecture seule. Pour modifier un
-          profil, connectez-vous avec le compte concerné.
-        </p>
-      ) : null}
 
       {/* Fiche identité */}
       <section className={cn(softCard, "p-6")}>
@@ -364,7 +353,7 @@ function MonProfilPage() {
                 Retirer la photo
               </button>
             ) : null}
-            {isEtudiant && !impersonating ? (
+            {isEtudiant ? (
               <p className="mt-2 max-w-[7rem] text-center text-[10px] leading-tight text-muted-foreground">
                 Photo gérée par les affaires estudiantines.
               </p>

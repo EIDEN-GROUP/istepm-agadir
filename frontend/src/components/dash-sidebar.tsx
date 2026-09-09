@@ -22,21 +22,13 @@ import {
   Menu,
   X,
   UserCog,
-  RotateCcw,
 } from "lucide-react";
 import { ROLE_META, useAuth } from "@/lib/auth";
 import { RequestBell } from "@/components/request-bell";
 import { PersonAvatar } from "@/components/person-avatar";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
-import { useIstpm } from "@/lib/istpm-store";
-import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { AiChatFloating } from "@/components/ai-chat";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
@@ -260,106 +252,39 @@ function NavGroupBlock({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Sélecteur de profil                                                */
+/*  Identité connectée                                                   */
 /* ------------------------------------------------------------------ */
 
 /**
- * Identité connectée + sélecteur du formateur consulté (enseignants).
+ * Identité connectée (affichage seul).
  *
- * Il n'y a plus de changement de rôle sans identifiants : le rôle affiché est
- * toujours celui du compte connecté. Le sélecteur de formateur reste un simple
- * filtre d'affichage (l'API applique de toute façon le périmètre du compte).
+ * Aucun changement d'identité possible ici : le rôle et l'utilisateur sont
+ * toujours ceux du compte connecté. Le périmètre enseignant vient de la fiche
+ * liée au compte (`formateurs.user_id`), appliqué côté API.
  */
-function RoleSwitcher({ collapsed }: { collapsed?: boolean }) {
-  const { role, user, selectedFormateurId, setSelectedFormateurId } = useAuth();
-  const { formateurs } = useIstpm();
-  const navigate = useNavigate();
-  const [pickerOpen, setPickerOpen] = useState(false);
+function IdentityBadge({ collapsed }: { collapsed?: boolean }) {
+  const { role, user } = useAuth();
 
   if (!role) return null;
-  const canPick = role === "enseignant";
 
   return (
-    <>
-      <div
-        className={cn(
-          "flex h-9 items-center gap-2 rounded-xl border border-brand/15 bg-brand/5 px-3 text-xs font-medium text-foreground",
-          collapsed && "justify-center px-0",
-        )}
-        title={user ? `${user.name} — ${ROLE_META[role].label}` : ROLE_META[role].label}
-      >
-        <UserCog className="h-4 w-4 shrink-0 text-brand" />
-        {collapsed ? null : (
-          <span className="min-w-0 flex-1 truncate">
-            <span className="block truncate">{user?.name ?? ROLE_META[role].label}</span>
-            <span className="block truncate text-[10px] font-normal text-muted-foreground">
-              {ROLE_META[role].short}
-            </span>
+    <div
+      className={cn(
+        "flex h-9 items-center gap-2 rounded-xl border border-brand/15 bg-brand/5 px-3 text-xs font-medium text-foreground",
+        collapsed && "justify-center px-0",
+      )}
+      title={user ? `${user.name} — ${ROLE_META[role].label}` : ROLE_META[role].label}
+    >
+      <UserCog className="h-4 w-4 shrink-0 text-brand" />
+      {collapsed ? null : (
+        <span className="min-w-0 flex-1 truncate">
+          <span className="block truncate">{user?.name ?? ROLE_META[role].label}</span>
+          <span className="block truncate text-[10px] font-normal text-muted-foreground">
+            {ROLE_META[role].short}
           </span>
-        )}
-        {canPick && !collapsed ? (
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            aria-label="Choisir le formateur consulté"
-            title="Choisir le formateur consulté"
-            className="grid h-6 w-6 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </button>
-        ) : null}
-      </div>
-
-      {/* Formateur picker dialog (filtre d'affichage, sans changement de droits) */}
-      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <DialogContent className="w-full max-h-[80vh] overflow-y-auto">
-          <DialogTitle className="text-lg font-medium">
-            Sélectionner un formateur
-          </DialogTitle>
-          <div className="py-4 space-y-2">
-            {formateurs.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => {
-                  // Filtre d'affichage réactif (aucun rechargement, aucun droit
-                  // accordé : le périmètre reste celui du compte connecté).
-                  setSelectedFormateurId(f.id, {
-                    name: `${f.prenom} ${f.nom}`,
-                    email: f.email,
-                  });
-                  setPickerOpen(false);
-                  navigate({ to: "/dashboard" });
-                  toast.success(`Formateur sélectionné : ${f.prenom} ${f.nom}`);
-                }}
-                className={cn(
-                  "w-full text-left py-2 px-3 rounded border border-brand/10 hover:bg-brand/5",
-                  selectedFormateurId === f.id ? "bg-brand/20" : ""
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="flex-shrink-0">
-                    <div className="h-6 w-6 rounded bg-brand/20 flex items-center justify-center text-sm font-medium">
-                      {f.prenom[0]}{f.nom[0]}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="font-medium">{f.prenom} {f.nom}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {f.departement} • {f.groupes.join(", ")}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-            {formateurs.length === 0 && (
-              <div className="py-4 text-center text-xs text-muted-foreground">
-                Aucun formateur disponible
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -491,7 +416,7 @@ function SidebarBody({
           </Link>
         )}
 
-        <RoleSwitcher collapsed={collapsed} />
+        <IdentityBadge collapsed={collapsed} />
 
         <button
           type="button"
@@ -690,7 +615,7 @@ function IconRail({
       </nav>
 
       <div className="flex shrink-0 flex-col items-center gap-2 pt-2">
-        <RoleSwitcher collapsed />
+        <IdentityBadge collapsed />
         <div className="group/rail relative flex justify-center">
           <button
             type="button"
