@@ -222,6 +222,9 @@ function MonProfilPage() {
   const photoInput = useRef<HTMLInputElement>(null);
 
   const isEtudiant = user?.role === "etudiant";
+  // Photo verrouillée : en impersonation (ce n'est pas votre compte) OU pour un
+  // étudiant (sa photo est gérée par les affaires estudiantines).
+  const photoLocked = impersonating || isEtudiant;
 
   const studentQuery = useQuery({
     queryKey: ["student-me"],
@@ -321,10 +324,10 @@ function MonProfilPage() {
             <button
               type="button"
               onClick={() =>
-                impersonating ? undefined : photoInput.current?.click()
+                photoLocked ? undefined : photoInput.current?.click()
               }
-              disabled={impersonating}
-              title={impersonating ? undefined : "Changer ma photo"}
+              disabled={photoLocked}
+              title={photoLocked ? undefined : "Changer ma photo"}
               className="group relative block h-28 w-28 overflow-hidden rounded-2xl ring-2 ring-inset ring-brand/20 transition hover:ring-brand/45 disabled:cursor-default disabled:hover:ring-brand/20"
             >
               <PersonAvatar
@@ -334,7 +337,7 @@ function MonProfilPage() {
                 ring={false}
                 className="h-28 w-28 rounded-2xl"
               />
-              {!impersonating ? (
+              {!photoLocked ? (
                 <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/45 py-1 text-[10px] font-semibold text-white opacity-90 group-hover:opacity-100">
                   <Camera className="h-3 w-3" />
                   {photoMut.isPending ? "…" : "Photo"}
@@ -351,7 +354,7 @@ function MonProfilPage() {
                 e.target.value = "";
               }}
             />
-            {photoUrl && !impersonating ? (
+            {photoUrl && !photoLocked ? (
               <button
                 type="button"
                 onClick={() => photoMut.mutate("")}
@@ -360,6 +363,11 @@ function MonProfilPage() {
               >
                 Retirer la photo
               </button>
+            ) : null}
+            {isEtudiant && !impersonating ? (
+              <p className="mt-2 max-w-[7rem] text-center text-[10px] leading-tight text-muted-foreground">
+                Photo gérée par les affaires estudiantines.
+              </p>
             ) : null}
           </div>
 

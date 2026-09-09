@@ -1009,10 +1009,6 @@ export function fetchStudentMe(etudiantId?: string) {
   return api.get<StudentMe>("/student/me", etudiantId ? { etudiantId } : undefined);
 }
 
-export function updateStudentPhoto(photoUrl: string) {
-  return api.put<{ photoUrl: string }>("/student/me/photo", { photoUrl });
-}
-
 export interface AuthMe {
   id: string;
   email: string;

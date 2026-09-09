@@ -121,6 +121,15 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.status(404).send({ error: "Utilisateur introuvable" });
       }
 
+      // La photo d'un étudiant est gérée par les affaires estudiantines
+      // (route /etudiants), jamais par l'étudiant lui-même.
+      if (input.photoUrl !== undefined && me.role === "etudiant") {
+        return reply.status(403).send({
+          error:
+            "Votre photo est gérée par les affaires estudiantines.",
+        });
+      }
+
       const nextEmail = input.email?.trim().toLowerCase();
       const emailChanged = !!nextEmail && nextEmail !== me.email.toLowerCase();
       const passwordChanged = input.newPassword !== undefined;

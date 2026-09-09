@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
-  Camera,
   Stethoscope,
   CalendarDays,
   FileText,
@@ -15,7 +14,6 @@ import {
 } from "lucide-react";
 import { DashTabPanel } from "@/components/dash-tabs";
 import { PersonAvatar } from "@/components/person-avatar";
-import { downscaleImage } from "@/lib/image";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
@@ -24,7 +22,6 @@ import {
   fetchStudentCalendar,
   fetchStudentRequests,
   createStudentRequest,
-  updateStudentPhoto,
   fetchAllStudentRequests,
   updateStudentRequest,
   fetchStudentNotifications,
@@ -157,7 +154,6 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
   const [ancre, setAncre] = useState(() => new Date());
   const [demandeOpen, setDemandeOpen] = useState(false);
   const [detailSeance, setDetailSeance] = useState<Seance | null>(null);
-  const photoInput = useRef<HTMLInputElement>(null);
 
   // Espace personnel : uniquement pour l'étudiant. Le staff n'a ici que la
   // file des demandes à traiter.
@@ -289,31 +285,6 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Envoi impossible"),
   });
 
-  const photoMut = useMutation({
-    mutationFn: updateStudentPhoto,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["student-me"] });
-      toast.success("Photo mise à jour");
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Photo refusée"),
-  });
-
-  const onPhotoFile = async (file: File | undefined) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Choisissez une image (JPG / PNG)");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("Image trop lourde (8 Mo max)");
-      return;
-    }
-    try {
-      photoMut.mutate(await downscaleImage(file, 512));
-    } catch {
-      toast.error("Image illisible — essayez un autre fichier");
-    }
-  };
 
   const [aTraiter, setATraiter] = useState<StudentRequest | null>(null);
 
@@ -534,28 +505,8 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
       <section className={cn(softCard, "space-y-5 p-6 lg:col-span-2")}>
         <p className={eyebrowClass}>Mon identité</p>
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              onClick={() => photoInput.current?.click()}
-              title="Changer ma photo"
-              className="group relative block overflow-hidden rounded-full ring-2 ring-inset ring-brand/20 transition hover:ring-brand/45"
-            >
-              <PersonAvatar name={`${prenom} ${nom}`} photoUrl={photoUrl} size="xl" ring={false} />
-              <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/45 py-1 text-[10px] font-semibold text-white opacity-90 group-hover:opacity-100">
-                <Camera className="h-3 w-3" /> {photoMut.isPending ? "…" : "Photo"}
-              </span>
-            </button>
-            <input
-              ref={photoInput}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                onPhotoFile(e.target.files?.[0]);
-                e.target.value = "";
-              }}
-            />
+          <div className="shrink-0">
+            <PersonAvatar name={`${prenom} ${nom}`} photoUrl={photoUrl} size="xl" />
           </div>
           <div className="min-w-0 space-y-2">
             <p className="truncate font-display text-2xl font-bold text-foreground">
@@ -579,9 +530,8 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
         </div>
         <p className="flex items-center gap-1.5 rounded-xl bg-brand/6 px-3 py-2 text-[11px] text-muted-foreground">
           <BadgeCheck className="h-3.5 w-3.5 text-brand-dk" />
-          Votre photo est visible par le secrétariat et vos enseignants. Vos
-          informations sont gérées par les affaires estudiantines — signalez toute
-          erreur via une demande.
+          Votre photo et vos informations sont gérées par les affaires
+          estudiantines — signalez toute erreur via une demande.
         </p>
         <DetailSection title="Coordonnées">
           <DetailGrid>

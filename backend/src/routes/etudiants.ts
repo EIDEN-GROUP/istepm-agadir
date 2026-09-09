@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { etudiants } from "@/db/schema/etudiants";
+import { users } from "@/db/schema/users";
 import { formateurs } from "@/db/schema/formateurs";
 import { notesEtudiant } from "@/db/schema/notes-etudiant";
 import { historiquePaiements } from "@/db/schema/historique-paiements";
@@ -374,6 +375,15 @@ export async function etudiantRoutes(app: FastifyInstance) {
       .where(eq(etudiants.id, id))
       .returning();
     if (!etudiant) return reply.status(404).send({ error: "Étudiant introuvable" });
+    // La photo d'identité est gérée ici (affaires estudiantines) : on la
+    // recopie sur le compte lié pour qu'elle s'affiche dans l'espace étudiant
+    // (avatar du rail, page « Mon profil »).
+    if (values.photoUrl !== undefined && etudiant.userId) {
+      await db
+        .update(users)
+        .set({ photoUrl: String(values.photoUrl), updatedAt: new Date() })
+        .where(eq(users.id, etudiant.userId));
+    }
     return etudiant;
   });
 

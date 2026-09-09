@@ -3,7 +3,6 @@ import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { etudiants } from "@/db/schema/etudiants";
-import { users } from "@/db/schema/users";
 import { formateurs } from "@/db/schema/formateurs";
 import { stages } from "@/db/schema/stages";
 import { seances } from "@/db/schema/seances";
@@ -23,12 +22,6 @@ const createRequestSchema = z.object({
   type: z.enum(["libre", "predefini"]).optional().default("libre"),
   titre: z.string().trim().min(3, "Titre trop court").max(120, "Titre trop long"),
   description: z.string().trim().max(2000, "Description trop longue").optional().default(""),
-});
-
-// Une photo est soit une URL courte, soit un data:image/... (base64) : le
-// front réduit l'image avant l'envoi, mais un data URL reste ~50–150 Ko.
-const photoSchema = z.object({
-  photoUrl: z.string().max(1_500_000).optional().default(""),
 });
 
 async function resolveEtudiant(db: ReturnType<typeof getDb>, userId: string) {
@@ -93,21 +86,12 @@ export async function studentRoutes(app: FastifyInstance) {
     };
   });
 
-  // ── Photo de profil (URL http(s) ou data:image, 2 Mo max côté front) ──
-  app.put("/me/photo", { preHandler: [authenticate], bodyLimit: 2_000_000 }, async (request, reply) => {
-    const input = photoSchema.parse(request.body);
-    const url = input.photoUrl.trim();
-    if (url && !(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:image/"))) {
-      return reply.status(400).send({ error: "URL de photo invalide" });
-    }
-    const db = getDb();
-    const etudiant = await resolveEtudiant(db, request.user.id);
-    if (!etudiant) return reply.status(404).send({ error: "Fiche étudiant introuvable pour ce compte" });
-    const [updated] = await db.update(etudiants).set({ photoUrl: url }).where(eq(etudiants.id, etudiant.id)).returning();
-    // Garde la photo du compte synchrone : l'avatar du rail et la page profil
-    // lisent `users.photo_url`.
-    await db.update(users).set({ photoUrl: url, updatedAt: new Date() }).where(eq(users.id, request.user.id));
-    return { photoUrl: updated.photoUrl };
+  // La photo d'identité de l'étudiant est gérée par les affaires estudiantines
+  // (PUT /api/etudiants/:id) — l'étudiant ne la modifie jamais lui-même.
+  app.put("/me/photo", { preHandler: [authenticate] }, async (_request, reply) => {
+    return reply.status(403).send({
+      error: "Votre photo est gérée par les affaires estudiantines.",
+    });
   });
 
   // ── Calendrier personnel : séances du groupe + examens du niveau + fériés ──
