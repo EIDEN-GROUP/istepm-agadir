@@ -5,6 +5,16 @@ session: what changed, why, backend/DB impact, and anything the team must know.
 
 ---
 
+## 2026-09-10 — PDF preview looked cropped (height chain)
+
+`dialogSurfaceWide` only sets `max-h`, so the preview's flex column sized to
+its content and the reader area collapsed to its `min-h` — the PDF showed
+only its top and looked cut. Gave `DocumentPreview`'s DialogContent a fixed
+`h-[min(92vh,900px)]` and raised the reader `min-h` to `60vh`. Committed
+locally, **NOT pushed** (school is using the app live).
+
+---
+
 ## 2026-09-10 — PDF preview: UI redesign
 
 Rebuilt `DocumentPreview` (the only inline document viewer, shared by the

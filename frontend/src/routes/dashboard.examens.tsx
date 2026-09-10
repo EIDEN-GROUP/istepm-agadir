@@ -241,7 +241,10 @@ function DocumentPreview({
       <DialogContent
         className={cn(
           dialogSurfaceWide,
-          "max-h-[min(92vh,880px)] w-[min(100vw_-_1.5rem,880px)] max-w-[min(100vw_-_1.5rem,880px)]",
+          // Hauteur FIXE (pas seulement max-h) : sans quoi la colonne flex se
+          // réduit à son contenu et la zone de lecture s'écrase à sa hauteur
+          // mini — le PDF paraissait « coupé ».
+          "h-[min(92vh,900px)] max-h-[min(92vh,900px)] w-[min(100vw_-_1.5rem,880px)] max-w-[min(100vw_-_1.5rem,880px)]",
         )}
       >
         <DialogTitle className="sr-only">Aperçu du sujet</DialogTitle>
@@ -279,7 +282,7 @@ function DocumentPreview({
 
             {/* Zone de lecture */}
             <div className="min-h-0 flex-1 bg-muted/40 p-3 sm:p-4">
-              <div className="relative h-full min-h-[420px] overflow-hidden rounded-2xl border border-brand/12 bg-[#f4f4f5] shadow-inner">
+              <div className="relative h-full min-h-[60vh] overflow-hidden rounded-2xl border border-brand/12 bg-[#f4f4f5] shadow-inner">
                 {state === "loading" ? (
                   <div className="absolute inset-0 grid place-items-center">
                     <div className="flex flex-col items-center gap-3 text-muted-foreground">
