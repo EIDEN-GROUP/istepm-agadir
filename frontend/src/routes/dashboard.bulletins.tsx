@@ -169,12 +169,22 @@ ${cachet}
 
   const frame = document.createElement("iframe");
   frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-  // Bac à sable : le contenu imprimé n'a besoin d'aucun script.
-  frame.setAttribute("sandbox", "allow-modals allow-print");
+  // Bac à sable : contenu généré localement, aucun script dedans.
+  // `allow-same-origin` autorise le parent à appeler print() ; `allow-modals`
+  // autorise la boîte de dialogue d'impression. (`allow-print` n'existe pas
+  // et rendait l'impression impossible : SecurityError cross-origin.)
+  frame.setAttribute("sandbox", "allow-same-origin allow-modals");
   frame.srcdoc = html;
   frame.onload = () => {
-    frame.contentWindow?.focus();
-    frame.contentWindow?.print();
+    try {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+    } catch {
+      // Repli : ouvre le bulletin dans un onglet pour impression manuelle.
+      const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
     // Give the print dialog time to take its snapshot before teardown.
     setTimeout(() => frame.remove(), 60_000);
   };
