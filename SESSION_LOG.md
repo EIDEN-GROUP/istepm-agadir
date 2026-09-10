@@ -5,6 +5,36 @@ session: what changed, why, backend/DB impact, and anything the team must know.
 
 ---
 
+## 2026-09-10 — Frontend phases: pagination, teacher assignment, dup-inscription guard
+
+Off `origin/main` `b83c090` (after pulling the team's `3dd0929` "backend-only
+data" work). Commits:
+
+| Commit | Summary |
+|---|---|
+| `97484fc` | fix(inscription): reject duplicate students (CNE / e-mail) + no double-submit |
+| `92c0007` | feat(teacher): "Mon affectation" card (filière / semestres / groupes / modules) |
+| `4a653b2` | feat(ui): paginate staff request queue + student "Mes demandes" |
+
+- **Pagination** — both tables use the shared `usePagination` / `TablePagination`
+  (6 rows/page); status filter resets to page 1.
+- **Teacher "Mon affectation"** — read-only chip rows on the enseignant
+  dashboard, derived from the linked `Formateur` record (semestres = unique
+  group prefixes). Needs `formateurs.user_id` linked to the account; the demo
+  dataset doesn't link `enseignant@` — link it manually for local testing.
+- **Duplicate inscription** — `POST /api/etudiants` pre-checks a non-archived
+  student with the same lower(CNE) or lower(email) → 409 with a named message.
+  Students with no CNE/e-mail are still allowed. `FormDialog` gained an
+  optional `busy` prop (disables buttons, shows "Enregistrement…").
+- **Known:** prod still has pre-existing dup rows — CNE `JC636401` ×2, emails
+  `y.brox95@gmail.com` ×2, `abdelhakime2003@gmail.com` ×2. The guard only stops
+  new ones; dedupe those by hand (archive the older of each pair).
+- Local dev: `frontend` `npm ci` drops the Playwright test binary (not a repo
+  dep); reinstall into node_modules without touching package.json. Demo dataset
+  lives in `backend/migrations/sql-istepm/` (manual `psql`, not in the journal).
+
+---
+
 ## 2026-09-08 — Profile page, student space split, calendar table, photo pipeline
 
 Branched from `origin/main` at `b7f0314`. Commits (top = newest):
