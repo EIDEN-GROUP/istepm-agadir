@@ -26,7 +26,7 @@ ON CONFLICT ("id") DO UPDATE SET
 
 -- Notes (38) : n'insère que les couples (étudiant, module) absents.
 INSERT INTO "notes_etudiant" ("etudiant_id", "module", "note", "coef", "credits")
-SELECT v."etudiant_id", v."module", v."note", v."coef", v."credits"
+SELECT v."etudiant_id"::uuid, v."module", v."note", v."coef", v."credits"
 FROM (VALUES
   ('a5b0d3e8-7a11-4068-9769-cc9d6b96ed92', 'Soins infirmiers en médecine', 15.5, 3, 6),
   ('a5b0d3e8-7a11-4068-9769-cc9d6b96ed92', 'Pharmacologie', 13.0, 2, 4),
@@ -72,7 +72,7 @@ WHERE n."id" IS NULL;
 
 -- Historique des paiements (30) : n'insère que les périodes absentes par étudiant.
 INSERT INTO "historique_paiements" ("etudiant_id", "date", "montant", "mode", "periode", "recu", "statut")
-SELECT v."etudiant_id", v."date", v."montant", v."mode", v."periode", v."recu", v."statut"
+SELECT v."etudiant_id"::uuid, v."date", v."montant", v."mode", v."periode", v."recu", v."statut"
 FROM (VALUES
   ('a5b0d3e8-7a11-4068-9769-cc9d6b96ed92', '2025-10-05', 12000, 'Virement', 'Tranche 1 — 2025/26', 'ISTPM-R-2510-018', 'paye'),
   ('a5b0d3e8-7a11-4068-9769-cc9d6b96ed92', '2026-01-14', 11000, 'Chèque', 'Tranche 2 — 2025/26', 'ISTPM-R-2601-051', 'paye'),

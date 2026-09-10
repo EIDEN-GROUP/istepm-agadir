@@ -91,15 +91,15 @@ ON CONFLICT ("id") DO NOTHING;
 
 -- Sessions d'appel (5) + relevés de présence (8).
 INSERT INTO "attendance_session" ("id", "seance_id", "date", "statut") VALUES
-  ('83a07622-6c92-4aaa-9160-42a8c2fa4df0', 'f4d6a9cc-ba53-47b8-bc9f-0606c707f654', '2026-07-21', 'termine'),
-  ('f10d6843-36d5-43b0-b83d-d20e2b46656d', '983e6141-5876-41ae-8f7e-fadfba9dfa77', '2026-07-21', 'termine'),
-  ('f2f3a3a6-5302-4f73-ae03-7f1abb146538', 'b26249b1-db10-4741-9d02-0054625ff63c', '2026-07-21', 'termine'),
-  ('bb630574-9dc9-49fc-9f26-b238c0a1ceda', 'eb5ec423-ba0e-42f6-b8f5-4b4194a974b6', '2026-07-22', 'termine'),
-  ('77845045-5bd8-4e23-9bd2-558fdc6bebd5', '66c01484-7f32-4bbd-8e35-7a6e2f560e5d', '2026-07-22', 'termine')
+  ('83a07622-6c92-4aaa-9160-42a8c2fa4df0'::uuid, 'f4d6a9cc-ba53-47b8-bc9f-0606c707f654'::uuid, '2026-07-21', 'termine'),
+  ('f10d6843-36d5-43b0-b83d-d20e2b46656d'::uuid, '983e6141-5876-41ae-8f7e-fadfba9dfa77'::uuid, '2026-07-21', 'termine'),
+  ('f2f3a3a6-5302-4f73-ae03-7f1abb146538'::uuid, 'b26249b1-db10-4741-9d02-0054625ff63c'::uuid, '2026-07-21', 'termine'),
+  ('bb630574-9dc9-49fc-9f26-b238c0a1ceda'::uuid, 'eb5ec423-ba0e-42f6-b8f5-4b4194a974b6'::uuid, '2026-07-22', 'termine'),
+  ('77845045-5bd8-4e23-9bd2-558fdc6bebd5'::uuid, '66c01484-7f32-4bbd-8e35-7a6e2f560e5d'::uuid, '2026-07-22', 'termine')
 ON CONFLICT ("seance_id") DO NOTHING;
 
 INSERT INTO "attendance" ("seance_id", "etudiant_id", "present", "justifie", "note")
-SELECT v."seance_id", v."etudiant_id", v."present", v."justifie", v."note"
+SELECT v."seance_id"::uuid, v."etudiant_id", v."present", v."justifie", v."note"
 FROM (VALUES
   ('f4d6a9cc-ba53-47b8-bc9f-0606c707f654', 'a5b0d3e8-7a11-4068-9769-cc9d6b96ed92', true, false, ''),
   ('f4d6a9cc-ba53-47b8-bc9f-0606c707f654', 'b8810be2-d95c-4935-893b-7560613a27f5', false, true, 'Rendez-vous médical'),

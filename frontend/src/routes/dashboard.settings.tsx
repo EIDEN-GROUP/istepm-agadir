@@ -1541,14 +1541,21 @@ function SettingsPage() {
     fetchSmtpStatus().then((s) => setSmtpOk(s.configured)).catch(() => setSmtpOk(false));
   }, []);
 
+  // Les comptes étudiants sont gérés via les fiches (espace étudiant),
+  // pas dans la liste des comptes CRM.
   const filteredUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
     return usersList.filter((u) => {
+      if (u.role === "etudiant") return false;
       if (userRoleFilter !== "__all__" && u.role !== userRoleFilter) return false;
       if (!q) return true;
       return `${u.name} ${u.email} ${u.role}`.toLowerCase().includes(q);
     });
   }, [usersList, userSearch, userRoleFilter]);
+  const staffCount = useMemo(
+    () => usersList.filter((u) => u.role !== "etudiant").length,
+    [usersList],
+  );
 
   const PERM_GROUPS = [
     { label: "Étudiants", perms: ["etudiants.read", "etudiants.write", "etudiants.delete"] },
@@ -1852,8 +1859,8 @@ function SettingsPage() {
                   )}
                   aria-label="Filtrer par rôle"
                 >
-                  <option value="__all__">Tous les rôles ({usersList.length})</option>
-                  {["directeur", "responsable", "enseignant", "etudiant"].map((r) => (
+                  <option value="__all__">Tous les rôles ({staffCount})</option>
+                  {["directeur", "responsable", "enseignant"].map((r) => (
                     <option key={r} value={r}>
                       {ROLE_META[r as UserRole]?.label ?? r}
                     </option>
@@ -1893,7 +1900,7 @@ function SettingsPage() {
                         "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
                       )}
                     >
-                      {["directeur", "responsable", "enseignant", "etudiant"].map((r) => (
+                      {["directeur", "responsable", "enseignant"].map((r) => (
                         <option key={r} value={r}>
                           {ROLE_META[r as UserRole]?.label ?? r}
                         </option>

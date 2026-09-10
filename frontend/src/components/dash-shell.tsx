@@ -1,7 +1,7 @@
 import { Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ROLES, ROLE_META, useAuth } from "@/lib/auth";
+import { ROLE_META, useAuth } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
 import { cn } from "@/lib/utils";
@@ -42,7 +42,6 @@ import {
   Send,
   Plus,
   Trash2,
-  UserCog,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import {
@@ -760,28 +759,6 @@ function SendMessageModal({
 }
 
 /**
- * Pastille du rôle connecté (fichier historique non monté : affichage seul,
- * aucun changement de rôle sans identifiants).
- */
-function RoleSwitcher({ compact }: { compact?: boolean }) {
-  const { role } = useAuth();
-
-  if (!role) return null;
-
-  return (
-    <span
-      className={cn(
-        "inline-flex h-9 items-center gap-1.5 rounded-full border-brand/20 bg-card px-3 text-xs font-medium",
-        compact && "w-[3.25rem] justify-center px-2",
-      )}
-    >
-      <UserCog className="h-4 w-4 shrink-0 text-brand" />
-      {compact ? null : <span className="truncate">{ROLE_META[role].short}</span>}
-    </span>
-  );
-}
-
-/**
  * Is this nav destination the active one?
  *
  * `/dashboard` is the index and must match exactly, otherwise it would light up
@@ -933,7 +910,6 @@ export function DashShell({
             </div>
             <div className="flex shrink-0 items-center gap-2 pt-0.5">
               {hideNotifications ? null : <ShellNotifications />}
-              <RoleSwitcher compact />
               <div className="grid h-9 w-9 place-items-center rounded-full bg-brand text-sm font-medium text-white shadow-[0_10px_20px_-10px_rgb(var(--istpm-shadow)/0.5)]">
                 {(user?.name || user?.email || "A")!.slice(0, 1).toUpperCase()}
               </div>
@@ -994,7 +970,6 @@ export function DashShell({
 
             <div className="flex w-full flex-wrap items-center justify-end gap-2 justify-self-end lg:w-auto">
               {hideNotifications ? null : <ShellNotifications />}
-              <RoleSwitcher />
               <div className="flex items-center gap-2">
                 <div className="hidden text-right sm:block">
                   <p className="text-sm font-medium leading-none text-foreground">

@@ -16,11 +16,11 @@ ON CONFLICT ("id") DO NOTHING;
 
 -- Factures + règlement CRM.
 INSERT INTO "invoices" ("client_id", "period", "amount_due", "amount_paid", "due_date", "status")
-SELECT 'e9a2a912-38fd-4770-8e38-c4721c2e7f68', '2026-07', 2500, 2500, '2026-07-05', 'payee'
+SELECT 'e9a2a912-38fd-4770-8e38-c4721c2e7f68', '2026-07', 2500, 2500, '2026-07-05'::date, 'payee'
 WHERE NOT EXISTS (SELECT 1 FROM "invoices" WHERE "client_id" = 'e9a2a912-38fd-4770-8e38-c4721c2e7f68' AND "period" = '2026-07');
 
 INSERT INTO "invoices" ("client_id", "period", "amount_due", "amount_paid", "due_date", "status")
-SELECT '2fd05b74-5061-46b1-94c6-eb3524e43001', v."period", v."due", 0, v."due_date", 'impayee'
+SELECT '2fd05b74-5061-46b1-94c6-eb3524e43001', v."period", v."due", 0, v."due_date"::date, 'impayee'
 FROM (VALUES ('2026-07', 2500, '2026-07-10'), ('2026-08', 2900, '2026-08-10')) AS v("period", "due", "due_date")
 WHERE NOT EXISTS (SELECT 1 FROM "invoices" i WHERE i."client_id" = '2fd05b74-5061-46b1-94c6-eb3524e43001' AND i."period" = v."period");
 

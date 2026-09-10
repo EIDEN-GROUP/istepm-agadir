@@ -190,30 +190,57 @@ export async function etudiantRoutes(app: FastifyInstance) {
     }
 
     const rows = await result;
-    const enriched = await Promise.all(
-      rows.map(async (e) => {
-        const [notes, paiements, stageEnCours] = await Promise.all([
-          db
-            .select()
-            .from(notesEtudiant)
-            .where(eq(notesEtudiant.etudiantId, e.id)),
-          db
+    const ids = rows.map((e) => e.id);
+    // Enrichissement groupé : 3 requêtes au total au lieu de 3 par étudiant
+    // (le N+1 prenait ~11 s pour 800+ fiches).
+    const [allNotes, allPaiements, allStages]: [
+      (typeof notesEtudiant.$inferSelect)[],
+      (typeof historiquePaiements.$inferSelect)[],
+      (typeof stages.$inferSelect)[],
+    ] = await Promise.all([
+      ids.length
+        ? db.select().from(notesEtudiant).where(inArray(notesEtudiant.etudiantId, ids))
+        : [],
+      ids.length
+        ? db
             .select()
             .from(historiquePaiements)
-            .where(eq(historiquePaiements.etudiantId, e.id))
-            .orderBy(desc(historiquePaiements.date)),
-          db
+            .where(inArray(historiquePaiements.etudiantId, ids))
+            .orderBy(desc(historiquePaiements.date))
+        : [],
+      ids.length
+        ? db
             .select()
             .from(stages)
             .where(
               and(
-                eq(stages.etudiantId, e.id),
+                inArray(stages.etudiantId, ids),
                 sql`${stages.statut} IN ('en_cours', 'convention_signee', 'soutenance')`,
               ),
             )
-            .limit(1)
-            .then((s) => s[0] ?? null),
-        ]);
+        : [],
+    ]);
+    const notesByEtudiant = new Map<string, typeof allNotes>();
+    for (const n of allNotes) {
+      const list = notesByEtudiant.get(n.etudiantId);
+      if (list) list.push(n);
+      else notesByEtudiant.set(n.etudiantId, [n]);
+    }
+    const paiementsByEtudiant = new Map<string, typeof allPaiements>();
+    for (const p of allPaiements) {
+      const list = paiementsByEtudiant.get(p.etudiantId);
+      if (list) list.push(p);
+      else paiementsByEtudiant.set(p.etudiantId, [p]);
+    }
+    const stageByEtudiant = new Map<string, (typeof allStages)[number]>();
+    for (const s of allStages) {
+      if (!stageByEtudiant.has(s.etudiantId)) stageByEtudiant.set(s.etudiantId, s);
+    }
+    const enriched = rows.map((e) => {
+      const notes = notesByEtudiant.get(e.id) ?? [];
+      const paiements = paiementsByEtudiant.get(e.id) ?? [];
+      const stageEnCours = stageByEtudiant.get(e.id) ?? null;
+      {
         return {
           id: e.id,
           cne: e.cne,
@@ -260,8 +287,8 @@ export async function etudiantRoutes(app: FastifyInstance) {
             ? `${stageEnCours.structure}   ${stageEnCours.service}`
             : undefined,
         };
-      }),
-    );
+      }
+    });
     return enriched;
   });
 

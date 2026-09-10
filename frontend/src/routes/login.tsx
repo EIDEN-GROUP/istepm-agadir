@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
-import { useAuth } from "@/lib/auth";
+import { getStoredRole, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 /**
@@ -182,4 +182,12 @@ function LoginPage() {
   );
 }
 
-export const Route = createFileRoute("/login")({ component: LoginPage });
+export const Route = createFileRoute("/login")({
+  // Déjà connecté ? Pas de formulaire : retour direct au tableau de bord.
+  beforeLoad: () => {
+    if (getStoredRole()) {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
+  component: LoginPage,
+});

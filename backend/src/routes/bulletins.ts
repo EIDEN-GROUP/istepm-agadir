@@ -84,27 +84,33 @@ export async function bulletinRoutes(app: FastifyInstance) {
     }
 
     const rows = await result;
-    return Promise.all(
-      rows.map(async (b) => {
-        const notes = await db
-          .select()
-          .from(notesEtudiant)
-          .where(eq(notesEtudiant.etudiantId, b.etudiantId));
-        return {
-          ...b,
-          moyenne: Number(b.moyenne),
-          evaluationClinique: Number(b.evaluationClinique),
-          notes: notes.map((n) => ({
-            id: n.id,
-            module: n.module,
-            note: Number(n.note),
-            coef: Number(n.coef),
-            credits: Number(n.credits),
-            examen: n.examen || undefined,
-          })),
-        };
-      }),
-    );
+    // Notes groupées : 1 requête au lieu de 1 par bulletin (N+1).
+    const ids = rows.map((b) => b.etudiantId);
+    const allNotes: (typeof notesEtudiant.$inferSelect)[] = ids.length
+      ? await db.select().from(notesEtudiant).where(inArray(notesEtudiant.etudiantId, ids))
+      : [];
+    const notesByEtudiant = new Map<string, typeof allNotes>();
+    for (const n of allNotes) {
+      const list = notesByEtudiant.get(n.etudiantId);
+      if (list) list.push(n);
+      else notesByEtudiant.set(n.etudiantId, [n]);
+    }
+    return rows.map((b) => {
+      const notes = notesByEtudiant.get(b.etudiantId) ?? [];
+      return {
+        ...b,
+        moyenne: Number(b.moyenne),
+        evaluationClinique: Number(b.evaluationClinique),
+        notes: notes.map((n) => ({
+          id: n.id,
+          module: n.module,
+          note: Number(n.note),
+          coef: Number(n.coef),
+          credits: Number(n.credits),
+          examen: n.examen || undefined,
+        })),
+      };
+    });
   });
 
   app.get("/:id", { preHandler: [authenticate] }, async (request, reply) => {

@@ -116,21 +116,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = readStoredRole();
-    if (stored) {
-      setRoleState(stored);
-      const userData = window.localStorage.getItem(USER_STORAGE_KEY);
-      if (userData) {
-        try {
-          setUserState(JSON.parse(userData));
-        } catch {
+    const hydrate = () => {
+      const stored = readStoredRole();
+      if (stored) {
+        setRoleState(stored);
+        const userData = window.localStorage.getItem(USER_STORAGE_KEY);
+        if (userData) {
+          try {
+            setUserState(JSON.parse(userData));
+          } catch {
+            setUserState(userFor(stored));
+          }
+        } else {
           setUserState(userFor(stored));
         }
       } else {
-        setUserState(userFor(stored));
+        setRoleState(null);
+        setUserState(null);
       }
-    }
+    };
+    hydrate();
     setLoading(false);
+    // Sync inter-onglets : une connexion/déconnexion dans un onglet
+    // (l'événement `storage` ne tire que dans LES AUTRES onglets)
+    // ré-hydrate celui-ci au lieu de garder une session fantôme.
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key || e.key.startsWith("istpm-")) hydrate();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   // La photo de profil vit côté serveur (`users.photo_url`) mais pas dans le
