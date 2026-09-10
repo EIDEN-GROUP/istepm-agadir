@@ -50,6 +50,7 @@ import {
   DetailField,
   DetailSection,
 } from "@/components/dash-page";
+import { usePagination, TablePagination } from "@/components/table-pagination";
 import {
   FormDialog,
   TextField,
@@ -225,6 +226,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
   const bulletins = (me?.bulletins as unknown as Record<string, string | number>[] | undefined) ?? [];
   const paiements = (me?.paiements as unknown as Record<string, string | number>[] | undefined) ?? [];
   const demandes: StudentRequest[] = reqQuery.data ?? [];
+  const demandesPager = usePagination(demandes);
 
   const seances: Seance[] = useMemo(() => {
     // Source unique : le calendrier servi par le backend. Sans réponse, vide.
@@ -736,6 +738,16 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
         minWidth="min-w-[760px]"
         isEmpty={demandes.length === 0}
         empty="Aucune demande. Utilisez « Nouvelle demande »."
+        footer={
+          <TablePagination
+            page={demandesPager.page}
+            pageCount={demandesPager.pageCount}
+            total={demandesPager.total}
+            pageSize={demandesPager.pageSize}
+            onPage={demandesPager.setPage}
+            label="demande(s)"
+          />
+        }
         head={
           <>
             <th>Titre</th>
@@ -746,7 +758,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
           </>
         }
       >
-        {demandes.map((d) => (
+        {demandesPager.pageItems.map((d) => (
           <tr key={d.id} className={tableRow}>
             <td className={cn("font-medium", cellTruncate)}>{d.titre}</td>
             <td className="text-muted-foreground">
@@ -1151,6 +1163,7 @@ function StaffRequestsView({
   );
   const filtered = filtre ? rows.filter((r) => r.statut === filtre) : rows;
   const nbAttente = rows.filter((r) => r.statut === "en_attente").length;
+  const pager = usePagination(filtered, filtre);
 
   return (
     <div className="space-y-6">
@@ -1195,6 +1208,16 @@ function StaffRequestsView({
           minWidth="min-w-[880px]"
           isEmpty={!loading && filtered.length === 0}
           empty={loading ? "Chargement…" : "Aucune demande dans cette catégorie."}
+          footer={
+            <TablePagination
+              page={pager.page}
+              pageCount={pager.pageCount}
+              total={pager.total}
+              pageSize={pager.pageSize}
+              onPage={pager.setPage}
+              label="demande(s)"
+            />
+          }
           head={
             <>
               <th>Étudiant</th>
@@ -1205,7 +1228,7 @@ function StaffRequestsView({
             </>
           }
         >
-          {filtered.map((d) => {
+          {pager.pageItems.map((d) => {
             const etu = parId.get(d.etudiantId);
             const prenom = d.etudiantPrenom ?? etu?.prenom ?? "";
             const nomFam = d.etudiantNom ?? etu?.nom ?? "";
