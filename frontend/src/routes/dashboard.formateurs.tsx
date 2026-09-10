@@ -692,6 +692,27 @@ function FormateurForm({
     setErrors((prev) => ({ ...prev, [k]: undefined }));
   };
 
+  // Alerte en direct sous le champ : CIN / e-mail déjà pris par un autre
+  // formateur, signalé pendant la saisie (avant de valider).
+  const cinDup = useMemo(() => {
+    const v = f.cin.trim().toLowerCase();
+    if (!v) return null;
+    return (
+      existing.find(
+        (o) => o.id !== initial?.id && o.cin.trim().toLowerCase() === v,
+      ) ?? null
+    );
+  }, [f.cin, existing, initial]);
+  const emailDup = useMemo(() => {
+    const v = f.email.trim().toLowerCase();
+    if (!v) return null;
+    return (
+      existing.find(
+        (o) => o.id !== initial?.id && o.email.trim().toLowerCase() === v,
+      ) ?? null
+    );
+  }, [f.email, existing, initial]);
+
   const submit = () => {
     const next: Record<string, string> = {};
     if (!f.prenom.trim()) next.prenom = "Prénom obligatoire";
@@ -773,6 +794,11 @@ function FormateurForm({
         onChange={(v) => set("cin", v)}
         placeholder="JB145872"
         error={errors.cin}
+        warn={
+          cinDup
+            ? `Déjà utilisé par ${cinDup.prenom} ${cinDup.nom} — vérifiez avant d'ajouter.`
+            : undefined
+        }
       />
       <TextField
         label="Prénom"
@@ -849,6 +875,11 @@ function FormateurForm({
         value={f.email}
         onChange={(v) => set("email", v)}
         error={errors.email}
+        warn={
+          emailDup
+            ? `Déjà utilisé par ${emailDup.prenom} ${emailDup.nom} — vérifiez avant d'ajouter.`
+            : undefined
+        }
       />
       {isNew ? (
         <FullWidth>

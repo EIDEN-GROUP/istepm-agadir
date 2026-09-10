@@ -647,6 +647,7 @@ function EtudiantsPage() {
           key={editing?.id ?? "new"}
           initial={editing}
           filieres={filieresOptions}
+          existing={etudiants}
           onCancel={() => setFormOpen(false)}
           onSubmit={async (data) => {            if (editing) {
               try {
@@ -795,11 +796,13 @@ type FormState = {
 function EtudiantForm({
   initial,
   filieres,
+  existing,
   onSubmit,
   onCancel,
 }: {
   initial: Etudiant | null;
   filieres: string[];
+  existing: Etudiant[];
   onSubmit: (data: Omit<FormState, "fraisMensuels"> & {
     filiere: Filiere;
     niveau: Niveau;
@@ -841,6 +844,23 @@ function EtudiantForm({
     setF((prev) => ({ ...prev, [k]: v }));
     setErrors((prev) => ({ ...prev, [k]: undefined }));
   };
+
+  // Alerte en direct : prévenir juste sous le champ si le CNE / l'e-mail est
+  // déjà utilisé par une autre fiche, avant même de valider.
+  const cneDup = useMemo(() => {
+    const v = f.cne.trim().toLowerCase();
+    if (!v) return null;
+    return existing.find(
+      (e) => e.id !== initial?.id && !e.archived && e.cne.trim().toLowerCase() === v,
+    ) ?? null;
+  }, [f.cne, existing, initial]);
+  const emailDup = useMemo(() => {
+    const v = f.email.trim().toLowerCase();
+    if (!v) return null;
+    return existing.find(
+      (e) => e.id !== initial?.id && !e.archived && e.email.trim().toLowerCase() === v,
+    ) ?? null;
+  }, [f.email, existing, initial]);
 
   const photoInput = useRef<HTMLInputElement>(null);
   const onPhoto = async (file: File | undefined) => {
@@ -961,6 +981,11 @@ function EtudiantForm({
         onChange={(v) => set("cne", v)}
         placeholder="G134567890"
         error={errors.cne}
+        warn={
+          cneDup
+            ? `Déjà utilisé par ${cneDup.prenom} ${cneDup.nom} — vérifiez avant d'inscrire.`
+            : undefined
+        }
       />
       <TextField
         label="Matricule"
@@ -1035,6 +1060,11 @@ function EtudiantForm({
         value={f.email}
         onChange={(v) => set("email", v)}
         error={errors.email}
+        warn={
+          emailDup
+            ? `Déjà utilisé par ${emailDup.prenom} ${emailDup.nom} — vérifiez avant d'inscrire.`
+            : undefined
+        }
       />
       {isNew ? (
         <FullWidth>

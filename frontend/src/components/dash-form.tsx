@@ -45,11 +45,13 @@ import { cn } from "@/lib/utils";
 function FieldShell({
   label,
   error,
+  warn,
   required,
   children,
 }: {
   label: string;
   error?: string;
+  warn?: string;
   required?: boolean;
   children: ReactNode;
 }) {
@@ -68,7 +70,15 @@ function FieldShell({
         >
           {error}
         </motion.p>
-      ) : null}
+      ) : !warn ? null : (
+        <motion.p
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-[11px] text-warn"
+        >
+          {warn}
+        </motion.p>
+      )}
     </div>
   );
 }
@@ -79,6 +89,7 @@ export function TextField({
   onChange,
   placeholder,
   error,
+  warn,
   required,
   type = "text",
 }: {
@@ -87,17 +98,22 @@ export function TextField({
   onChange: (v: string) => void;
   placeholder?: string;
   error?: string;
+  warn?: string;
   required?: boolean;
   type?: string;
 }) {
   return (
-    <FieldShell label={label} error={error} required={required}>
+    <FieldShell label={label} error={error} warn={warn} required={required}>
       <Input
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className={cn(softInput, error && "border-alert focus-visible:border-alert")}
+        className={cn(
+          softInput,
+          error && "border-alert focus-visible:border-alert",
+          !error && warn && "border-warn focus-visible:border-warn",
+        )}
       />
     </FieldShell>
   );
