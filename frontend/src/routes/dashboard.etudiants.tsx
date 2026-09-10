@@ -124,6 +124,13 @@ function EtudiantsPage() {
   // Groups relevant to the current filière / semestre choice, so the teacher's
   // group picker only offers real classes.
   const groupeOptions = useMemo(() => {
+    // Un formateur ne choisit que parmi SES groupes encadrés (filtrés par le
+    // semestre sélectionné) — pas tous les groupes de l'établissement.
+    if (enseignantScope) {
+      return [...new Set(enseignantScope.groupes)]
+        .filter((g) => niveau === ALL || g.split("-")[0] === niveau)
+        .sort();
+    }
     const set = new Set<string>();
     for (const e of etudiants) {
       if (filiere !== ALL && e.filiere !== filiere) continue;
@@ -131,7 +138,7 @@ function EtudiantsPage() {
       if (e.groupe) set.add(e.groupe);
     }
     return [...set].sort();
-  }, [etudiants, filiere, niveau]);
+  }, [etudiants, filiere, niveau, enseignantScope]);
   // Drop a group choice that no longer matches the filière/semestre.
   useEffect(() => {
     if (groupe !== ALL && !groupeOptions.includes(groupe)) setGroupe(ALL);
