@@ -1035,7 +1035,7 @@ function EtudiantForm({
                 Envoyer une invitation par e-mail
               </span>
               <span className="block text-xs text-muted-foreground">
-                L'étudiant reçoit un lien pour définir son mot de passe (usage unique, 30 min) et son compte est créé avec le rôle Étudiant.
+                L'étudiant reçoit un lien pour définir son mot de passe (usage unique, 24 h) et son compte est créé avec le rôle Étudiant.
               </span>
             </span>
           </label>

@@ -869,7 +869,7 @@ function FormateurForm({
           </div>
           {f.acces === "invite" ? (
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Le formateur reçoit un lien pour définir son mot de passe (usage unique, 30 min, renvoi possible).
+              Le formateur reçoit un lien pour définir son mot de passe (usage unique, 24 h, renvoi possible).
             </p>
           ) : null}
         </FullWidth>

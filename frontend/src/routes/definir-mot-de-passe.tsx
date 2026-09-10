@@ -6,24 +6,45 @@ import { motion } from "framer-motion";
 import { verifyInvitation, acceptInvitation, requestInviteResend } from "@/lib/istpm-api";
 import { cn } from "@/lib/utils";
 
+const TOKEN_BACKUP_KEY = "istpm-invite-token";
+
 function readToken(): string {
   if (typeof window === "undefined") return "";
   const params = new URLSearchParams(window.location.search);
   const token = params.get("token") ?? "";
   // Le token ne doit pas traîner dans l'URL (historique, Referer) :
-  // on le lit une fois puis on nettoie l'adresse.
+  // on le lit une fois, on le sauvegarde pour survivre au rechargement,
+  // puis on nettoie l'adresse.
   if (token) {
+    try {
+      window.sessionStorage.setItem(TOKEN_BACKUP_KEY, token);
+    } catch {
+      /* stockage indisponible : on garde le token en mémoire */
+    }
     params.delete("token");
     const clean = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
     window.history.replaceState({}, "", clean);
+    return token;
   }
-  return token;
+  try {
+    return window.sessionStorage.getItem(TOKEN_BACKUP_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function clearTokenBackup(): void {
+  try {
+    window.sessionStorage.removeItem(TOKEN_BACKUP_KEY);
+  } catch {
+    /* stockage indisponible */
+  }
 }
 
 /**
  * Page publique de définition du mot de passe (lien d'invitation).
  *
- * Lien à usage unique, 30 minutes : vérifié d'abord (`verify`), puis le mot
+ * Lien à usage unique, 24 heures : vérifié d'abord (`verify`), puis le mot
  * de passe est défini (`accept`, qui brûle le lien et connecte directement).
  */
 function DefinirMotDePassePage() {
@@ -70,6 +91,7 @@ function DefinirMotDePassePage() {
       window.localStorage.setItem("istpm-token", res.token);
       window.localStorage.setItem("istpm-user", JSON.stringify({ ...res.user, role: mapped }));
       window.localStorage.setItem("istpm-role", mapped);
+      clearTokenBackup();
       setDone(true);
       setTimeout(() => navigate({ to: "/dashboard" }), 1600);
     } catch (err) {
@@ -104,7 +126,7 @@ function DefinirMotDePassePage() {
             Définir mon mot de passe
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Lien à usage unique, valable 30 minutes
+            Lien à usage unique, valable 24 heures
           </p>
         </div>
 
@@ -123,7 +145,7 @@ function DefinirMotDePassePage() {
             {!verifyQ.isLoading ? (
               resendSent ? (
                 <p role="status" className="rounded-xl bg-brand/10 px-4 py-3 text-center text-sm font-medium text-brand-dk">
-                  Si un compte en attente existe pour cet e-mail, un nouveau lien vient d'être envoyé (30 min).
+                  Si un compte en attente existe pour cet e-mail, un nouveau lien vient d'être envoyé (24 h).
                 </p>
               ) : (
                 <form

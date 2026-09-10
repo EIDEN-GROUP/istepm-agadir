@@ -385,7 +385,7 @@ export type NouvelEtudiant = Omit<
 >;
 export type NouveauFormateur = Omit<Formateur, "id" | "notesSaisies">;
 /** `createdBy` et `document` sont posés par le store, pas par le formulaire. */
-export type NouvelExamen = Omit<Examen, "id" | "createdBy" | "document">;
+  export type NouvelExamen = Omit<Examen, "id" | "createdBy" | "document" | "titre" | "anneeUniversitaire">;
 export type NouveauStage = Omit<Stage, "id">;
 
 /** Une note saisie pour un examen, par étudiant. */

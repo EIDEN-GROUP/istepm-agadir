@@ -11,17 +11,26 @@ import { bulletins } from "@/db/schema/bulletins";
 import { teacherAvailability } from "@/db/schema/teacher-availability";
 import { eq, and, gte, lte, inArray, desc, sql } from "drizzle-orm";
 
+/**
+ * Fiche formateur du compte connecté. L'API confondait historiquement
+ * `users.id` et `formateurs.id` (égalité UUID impossible) : tout l'espace
+ * enseignant répondait vide. La liaison passe par `formateurs.user_id`,
+ * posée à l'acceptation d'invitation (email) — voir services/invitations.ts.
+ */
+async function ficheConnectee(db: ReturnType<typeof getDb>, userId: string | undefined) {
+  if (!userId) return null;
+  const [formateur] = await db
+    .select()
+    .from(formateurs)
+    .where(eq(formateurs.userId, userId))
+    .limit(1);
+  return formateur ?? null;
+}
+
 export async function teacherRoutes(app: FastifyInstance) {
   app.get("/dashboard", { preHandler: [authenticate] }, async (request) => {
-    const userId = request.user?.id;
-    if (!userId) return {};
-
     const db = getDb();
-    const [formateur] = await db
-      .select()
-      .from(formateurs)
-      .where(eq(formateurs.id, userId))
-      .limit(1);
+    const formateur = await ficheConnectee(db, request.user?.id);
 
     if (!formateur) return {};
 
@@ -32,7 +41,7 @@ export async function teacherRoutes(app: FastifyInstance) {
         db
           .select()
           .from(seances)
-          .where(and(eq(seances.professeurId, userId), eq(seances.date, today)))
+          .where(and(eq(seances.professeurId, formateur.id), eq(seances.date, today)))
           .orderBy(seances.debut),
         db
           .select()
@@ -41,43 +50,55 @@ export async function teacherRoutes(app: FastifyInstance) {
             sql`${examens.module} = ANY(${formateur.modules}::text[])`,
           )
           .orderBy(examens.date),
-        db.select().from(bulletins),
+        db
+          .select()
+          .from(bulletins)
+          .where(
+            and(
+              inArray(
+                bulletins.niveau,
+                formateur.groupes.map((g: string) => g.split("-")[0]),
+              ),
+              eq(bulletins.filiere, formateur.departement),
+            ),
+          ),
         db
           .select()
           .from(etudiants)
           .where(
-            inArray(
-              etudiants.niveau,
-              formateur.groupes.map((g: string) => g.split("-")[0]),
+            and(
+              inArray(
+                etudiants.niveau,
+                formateur.groupes.map((g: string) => g.split("-")[0]),
+              ),
+              eq(etudiants.filiere, formateur.departement),
             ),
-          ),
+          )
+          .orderBy(etudiants.nom),
       ]);
 
-    const niveauxFormateur = [...new Set(formateur.groupes.map((g: string) => g.split("-")[0]))];
-    const bulletinsFiltres = tousBulletins.filter((b: any) =>
-      niveauxFormateur.includes(b.niveau),
-    );
-
     const aNoter = mesExamens.filter((x: any) => x.statut !== "notes_saisies");
-    const bulletinsAPublier = bulletinsFiltres.filter((b: any) => b.statut !== "publie");
+    const bulletinsAPublier = tousBulletins.filter((b: any) => b.statut !== "publie");
 
     return {
       formateur,
       seancesAujourdhui: rawSeancesAujourdhui.map(enrichSeance),
       examens: mesExamens,
       aNoter: aNoter.length,
+      bulletins: tousBulletins,
       bulletinsAPublier: bulletinsAPublier.length,
+      etudiants: mesEtudiants,
       groupes: formateur.groupes,
       modules: formateur.modules,
     };
   });
 
   app.get("/seances", { preHandler: [authenticate] }, async (request) => {
-    const userId = request.user?.id;
-    if (!userId) return [];
-    const query = request.query as { start?: string; end?: string };
     const db = getDb();
-    const conditions = [eq(seances.professeurId, userId)];
+    const formateur = await ficheConnectee(db, request.user?.id);
+    if (!formateur) return [];
+    const query = request.query as { start?: string; end?: string };
+    const conditions = [eq(seances.professeurId, formateur.id)];
     if (query.start) conditions.push(gte(seances.date, query.start));
     if (query.end) conditions.push(lte(seances.date, query.end));
     const rows = await db
@@ -89,14 +110,8 @@ export async function teacherRoutes(app: FastifyInstance) {
   });
 
   app.get("/examens", { preHandler: [authenticate] }, async (request) => {
-    const userId = request.user?.id;
-    if (!userId) return [];
     const db = getDb();
-    const [formateur] = await db
-      .select({ modules: formateurs.modules })
-      .from(formateurs)
-      .where(eq(formateurs.id, userId))
-      .limit(1);
+    const formateur = await ficheConnectee(db, request.user?.id);
     if (!formateur) return [];
     return db
       .select()
@@ -106,14 +121,8 @@ export async function teacherRoutes(app: FastifyInstance) {
   });
 
   app.get("/etudiants", { preHandler: [authenticate] }, async (request) => {
-    const userId = request.user?.id;
-    if (!userId) return [];
     const db = getDb();
-    const [formateur] = await db
-      .select({ groupes: formateurs.groupes })
-      .from(formateurs)
-      .where(eq(formateurs.id, userId))
-      .limit(1);
+    const formateur = await ficheConnectee(db, request.user?.id);
     if (!formateur) return [];
     const niveaux = [...new Set(formateur.groupes.map((g: string) => g.split("-")[0]))];
     return db
@@ -124,19 +133,21 @@ export async function teacherRoutes(app: FastifyInstance) {
   });
 
   app.get("/availability", { preHandler: [authenticate] }, async (request) => {
-    const userId = request.user?.id;
-    if (!userId) return [];
     const db = getDb();
+    const formateur = await ficheConnectee(db, request.user?.id);
+    if (!formateur) return [];
     return db
       .select()
       .from(teacherAvailability)
-      .where(eq(teacherAvailability.teacherId, userId))
+      .where(eq(teacherAvailability.teacherId, formateur.id))
       .orderBy(teacherAvailability.dayOfWeek);
   });
 
   app.put("/availability", { preHandler: [authenticate] }, async (request, reply) => {
-    const userId = request.user?.id;
-    if (!userId) return reply.status(401).send({ error: "Non authentifié" });
+    const db = getDb();
+    const formateur = await ficheConnectee(db, request.user?.id);
+    if (!formateur)
+      return reply.status(404).send({ error: "Fiche formateur introuvable pour ce compte" });
 
     const schema = z.object({
       slots: z.array(
@@ -148,14 +159,13 @@ export async function teacherRoutes(app: FastifyInstance) {
       ),
     });
     const input = schema.parse(request.body);
-    const db = getDb();
 
-    await db.delete(teacherAvailability).where(eq(teacherAvailability.teacherId, userId));
+    await db.delete(teacherAvailability).where(eq(teacherAvailability.teacherId, formateur.id));
     const created = [];
     for (const slot of input.slots) {
       const [av] = await db
         .insert(teacherAvailability)
-        .values({ teacherId: userId, ...slot })
+        .values({ teacherId: formateur.id, ...slot })
         .returning();
       created.push(av);
     }

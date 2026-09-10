@@ -377,6 +377,8 @@ function EspaceFormateur() {
   const {
     examens,
     formateurs,
+    seances,
+    etudiants,
     addExamen,
     updateExamen,
     deleteExamen,
@@ -390,6 +392,29 @@ function EspaceFormateur() {
     for (const x of examens) if (x.anneeUniversitaire) set.add(x.anneeUniversitaire);
     return [...set].sort().reverse();
   }, [examens]);
+
+  /** Classes réelles (séances + couples niveau-groupe des étudiants) : la
+   *  convocation compare `${niveau}-${groupe}` à l'identique — la saisie
+   *  libre produisait des classes vides. */
+  const classesDisponibles = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of seances) if (s.groupe.trim()) set.add(s.groupe.trim());
+    for (const e of etudiants) {
+      if (e.niveau && e.groupe) set.add(`${e.niveau}-${e.groupe}`);
+    }
+    return [...set].sort();
+  }, [seances, etudiants]);
+
+  /** Effectif réel par classe, affiché sous « Effectif convoqué ». */
+  const effectifsClasse = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const e of etudiants) {
+      if (!e.niveau || !e.groupe || e.statut === "abandon") continue;
+      const k = `${e.niveau}-${e.groupe}`;
+      map[k] = (map[k] ?? 0) + 1;
+    }
+    return map;
+  }, [etudiants]);
 
   // Le formateur connecté : ses examens seulement. Résolu depuis le profil
   // sélectionné (référentiel hydraté) ; sans fiche liée, la liste est vide.
@@ -638,7 +663,8 @@ function EspaceFormateur() {
           key={editing?.id ?? "new"}
           initial={editing}
           filieres={filieresOptions}
-          annees={anneesOptions}
+          classesDisponibles={classesDisponibles}
+          effectifs={effectifsClasse}
           onCancel={() => setFormOpen(false)}
           onSubmit={async ({ data, file, removeExisting }) => {
             let cible: string;
@@ -671,8 +697,8 @@ function EspaceFormateur() {
             }
             toast.success(
               editing
-                ? `Examen mis à jour   ${data.titre}`
-                : `Examen créé   ${data.titre}`,
+                ? `Examen mis à jour   ${data.module}`
+                : `Examen créé   ${data.module}`,
             );
             setFormOpen(false);
           }}
@@ -992,7 +1018,8 @@ function ExamenDetailFormateur({
 /* ------------------------------------------------------------------ */
 
 type SubmitPayload = {
-  data: Omit<Examen, "id" | "createdBy" | "document">;
+  // Titre et année universitaire : dérivés côté serveur, jamais saisis.
+  data: Omit<Examen, "id" | "createdBy" | "document" | "titre" | "anneeUniversitaire">;
   file: File | null;
   removeExisting: boolean;
 };
@@ -1000,24 +1027,25 @@ type SubmitPayload = {
 function ExamenForm({
   initial,
   filieres,
-  annees,
+  classesDisponibles,
+  effectifs,
   onSubmit,
   onCancel,
 }: {
   initial: Examen | null;
   filieres: string[];
-  annees: string[];
+  classesDisponibles: string[];
+  effectifs: Record<string, number>;
   onSubmit: (p: SubmitPayload) => void;
   onCancel: () => void;
 }) {
   const [f, setF] = useState(() => ({
-    titre: initial?.titre ?? "",
     module: initial?.module ?? "",
     filiere: (initial?.filiere ?? "") as Filiere | "",
     niveau: (initial?.niveau ?? "") as Niveau | "",
+    // Titre et année universitaire : dérivés par le serveur (type — module,
+    // année déduite de la date) — pas de doublon à saisir.
     classe: initial?.classe ?? "",
-    // Vide = le serveur la déduit de la date (jamais d'année figée).
-    anneeUniversitaire: initial?.anneeUniversitaire ?? "",
     type: (initial?.type ?? "examen_theorique") as TypeExamen,
     composante: (initial?.composante ??
       "Théorique + Pratique") as Examen["composante"],
@@ -1065,11 +1093,12 @@ function ExamenForm({
 
   const submit = () => {
     const next: Record<string, string> = {};
-    if (!f.titre.trim()) next.titre = "Titre obligatoire";
     if (!f.module.trim()) next.module = "Module obligatoire";
     if (!f.filiere) next.filiere = "Filière obligatoire";
     if (!f.niveau) next.niveau = "Semestre obligatoire";
     if (!f.classe.trim()) next.classe = "Groupe obligatoire";
+    else if (!classesDisponibles.includes(f.classe.trim()))
+      next.classe = "Groupe inconnu — choisissez une classe existante";
     if (!f.date) next.date = "Date obligatoire";
     if (!f.salle.trim()) next.salle = "Salle obligatoire";
     if (!/^\d{2}:\d{2}$/.test(f.heure)) next.heure = "Format attendu HH:MM";
@@ -1083,12 +1112,10 @@ function ExamenForm({
 
     onSubmit({
       data: {
-        titre: f.titre.trim(),
         module: f.module.trim(),
         filiere: f.filiere as Filiere,
         niveau: f.niveau as Niveau,
         classe: f.classe.trim(),
-        anneeUniversitaire: f.anneeUniversitaire,
         type: f.type,
         composante: f.composante,
         date: f.date,
@@ -1120,16 +1147,6 @@ function ExamenForm({
       onSubmit={submit}
     >
       <FullWidth>
-        <TextField
-          label="Titre de l'examen"
-          required
-          value={f.titre}
-          onChange={(v) => set("titre", v)}
-          placeholder="Examen final   Soins infirmiers en médecine"
-          error={errors.titre}
-        />
-      </FullWidth>
-      <FullWidth>
         <ComboBoxField
           label="Module"
           required
@@ -1160,19 +1177,13 @@ function ExamenForm({
         options={NIVEAUX}
         error={errors.niveau}
       />
-      <TextField
-        label="Groupe"
+      <SelectField
+        label="Groupe (classe convoquée)"
         required
         value={f.classe}
         onChange={(v) => set("classe", v)}
-        placeholder="S5-G1"
+        options={classesDisponibles}
         error={errors.classe}
-      />
-      <SelectField
-        label="Année universitaire"
-        value={f.anneeUniversitaire}
-        onChange={(v) => set("anneeUniversitaire", v)}
-        options={annees.length ? annees : [initial?.anneeUniversitaire ?? ""].filter(Boolean)}
       />
       <SelectField
         label="Type d'examen"
@@ -1229,12 +1240,19 @@ function ExamenForm({
           label: STATUT_EXAMEN_LABEL[s],
         }))}
       />
-      <TextField
-        label="Effectif convoqué"
-        type="number"
-        value={f.etudiantsConvoques}
-        onChange={(v) => set("etudiantsConvoques", v)}
-      />
+      <div>
+        <TextField
+          label="Effectif convoqué"
+          type="number"
+          value={f.etudiantsConvoques}
+          onChange={(v) => set("etudiantsConvoques", v)}
+        />
+        {f.classe.trim() && effectifs[f.classe.trim()] !== undefined ? (
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {effectifs[f.classe.trim()]} étudiant(s) dans cette classe (hors abandons).
+          </p>
+        ) : null}
+      </div>
       <FullWidth>
         <ListField
           label="Surveillant(s)"

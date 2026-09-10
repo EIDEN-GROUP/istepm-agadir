@@ -8,8 +8,10 @@ import { createUser, findByEmail, hashPassword } from "@/services/auth";
 import { getEnv } from "@/config/env";
 import { eq, and, desc, isNull, isNotNull, gt } from "drizzle-orm";
 
-/** Durée de validité d'un lien d'invitation : 30 minutes, usage unique. */
-export const INVITATION_TTL_MS = 30 * 60 * 1000;
+/** Durée de validité d'un lien d'invitation : 24 heures, usage unique.
+ *  30 minutes expiraient avant lecture (boîtes lentes, week-ends) ; le lien
+ *  reste à usage unique et brûlé à l'acceptation. */
+export const INVITATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 export type InvitationRole =
   | "directeur"
@@ -44,19 +46,40 @@ function getTransporter() {
   return _transporter;
 }
 
+const escInvite = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** Gabarit aux couleurs du site (bandeau teal, carte, bouton d'action). */
+function inviteHtml(name: string, role: string, inviteUrl: string) {
+  return (
+    `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">` +
+    `<div style="background:#0d7a74;border-radius:12px 12px 0 0;padding:24px;text-align:center;">` +
+    `<p style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">ISTPM Agadir</p>` +
+    `<p style="margin:4px 0 0;color:#d7f0ee;font-size:13px;">Institut des technologies paramédicales</p>` +
+    `</div>` +
+    `<div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">` +
+    `<p>Bonjour ${escInvite(name)},</p>` +
+    `<p>Un compte <strong>${escInvite(role)}</strong> a été créé pour vous sur la plateforme ISTPM Agadir.</p>` +
+    `<p style="text-align:center;margin:24px 0;">` +
+    `<a href="${inviteUrl}" style="display:inline-block;background:#0d7a74;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 28px;border-radius:999px;">Définir mon mot de passe</a>` +
+    `</p>` +
+    `<p style="color:#6b7280;font-size:13px;">Lien à usage unique, valable 24 heures. Passé ce délai, demandez au secrétariat de vous renvoyer une invitation.</p>` +
+    `<p style="color:#9ca3af;font-size:12px;">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>${inviteUrl}</p>` +
+    `</div>` +
+    `<p style="color:#9ca3af;font-size:12px;text-align:center;">Cet e-mail a été envoyé automatiquement, merci de ne pas y répondre.</p>` +
+    `</div>`
+  );
+}
+
 function buildInviteEmail(name: string, role: string, inviteUrl: string) {
   return {
     subject: "Créez votre mot de passe — ISTPM Agadir",
     text:
       `Bonjour ${name},\n\n` +
       `Un compte ${role} a été créé pour vous sur la plateforme ISTPM Agadir.\n` +
-      `Définissez votre mot de passe en cliquant sur ce lien (valable 30 minutes, utilisable une seule fois) :\n${inviteUrl}\n\n` +
+      `Définissez votre mot de passe en cliquant sur ce lien (valable 24 heures, utilisable une seule fois) :\n${inviteUrl}\n\n` +
       `Passé ce délai, demandez au secrétariat de vous renvoyer une invitation.`,
-    html:
-      `<p>Bonjour ${name},</p>` +
-      `<p>Un compte <strong>${role}</strong> a été créé pour vous sur la plateforme ISTPM Agadir.</p>` +
-      `<p><a href="${inviteUrl}">Définir mon mot de passe</a> <em>(lien valable 30 minutes, utilisable une seule fois)</em>.</p>` +
-      `<p>Passé ce délai, demandez au secrétariat de vous renvoyer une invitation.</p>`,
+    html: inviteHtml(name, role, inviteUrl),
   };
 }
 
@@ -218,7 +241,9 @@ export async function resendInvite(userId: string) {
   if (!issued) return { ok: false as const, error: "Utilisateur introuvable" };
   return { ok: true as const, ...issued };
 }
-/** Auto-renvoi par l'utilisateur (lien expiré) : même réponse dans tous les cas. */
+/** Auto-renvoi par l'utilisateur (lien expiré) : même réponse publique dans
+ *  tous les cas (anti-énumération), mais le détail est renvoyé à l'appelant
+ *  pour journalisation. */
 export async function resendInviteByEmail(email: string) {
   const db = getDb();
   const clean = email.trim().toLowerCase();
@@ -233,8 +258,15 @@ export async function resendInviteByEmail(email: string) {
       ),
     )
     .limit(1);
-  if (row) await issueInvite(row.id);
-  return { ok: true };
+  if (!row) return { ok: true as const, sent: false, email: clean, error: "aucune invitation en attente" };
+  const issued = await issueInvite(row.id);
+  if (!issued) return { ok: true as const, sent: false, email: clean, error: "utilisateur introuvable" };
+  return {
+    ok: true as const,
+    sent: issued.emailSent,
+    email: clean,
+    error: issued.emailSent ? null : (issued.emailError ?? "envoi impossible"),
+  };
 }
 
 /** Révoquer : le lien meurt, le compte reste verrouillé (mot de passe aléatoire). */

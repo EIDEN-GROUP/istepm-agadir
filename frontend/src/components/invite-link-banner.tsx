@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
  * Affiche le lien d'invitation à partager (copie manuelle).
  *
  * Utilisé quand le SMTP n'a pas pu envoyer l'e-mail, ou en complément :
- * le lien à usage unique (30 min) peut être transmis via WhatsApp / affichage.
+ * le lien à usage unique (24 h) peut être transmis via WhatsApp / affichage.
  */
 export function InviteLinkBanner({
   email,
@@ -68,7 +68,7 @@ export function InviteLinkBanner({
           </button>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Lien à usage unique, valable 30 minutes. L'utilisateur y définira son mot de passe.
+          Lien à usage unique, valable 24 heures. L'utilisateur y définira son mot de passe.
         </p>
       </div>
       <button

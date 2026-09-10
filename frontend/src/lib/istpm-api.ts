@@ -771,7 +771,7 @@ export function createUser(data: {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Invitations (lien 30 min, usage unique)                            */
+/*  Invitations (lien 24 h, usage unique)                            */
 /* ------------------------------------------------------------------ */
 
 export interface InviteResult {

@@ -1113,7 +1113,7 @@ function NewUserForm({
         ) : (
           <div className="sm:col-span-2">
             <p className="rounded-lg bg-brand/8 px-3 py-2 text-[11px] text-brand-dk">
-              L'utilisateur reçoit un lien pour définir lui-même son mot de passe (usage unique, 30 min, renvoi possible depuis la liste ci-dessous).
+              L'utilisateur reçoit un lien pour définir lui-même son mot de passe (usage unique, 24 h, renvoi possible depuis la liste ci-dessous).
             </p>
           </div>
         )}
@@ -1377,6 +1377,14 @@ function GroupesSection() {
 
 /* ------------------------------------------------------------------ */
 
+/** Rôles pilotés depuis leurs fiches métier, masqués de la gestion des comptes. */
+function isHiddenAccountRole(role: string): boolean {
+  return role === "etudiant" || role === "enseignant";
+}
+
+/** Rôles visibles/éditables dans « Utilisateurs ». */
+const VISIBLE_ACCOUNT_ROLES = ["directeur", "responsable"];
+
 function SettingsPage() {
   const { role } = useAuth();
   const {
@@ -1541,24 +1549,25 @@ function SettingsPage() {
     fetchSmtpStatus().then((s) => setSmtpOk(s.configured)).catch(() => setSmtpOk(false));
   }, []);
 
-  // Les comptes étudiants sont gérés via les fiches (espace étudiant),
-  // pas dans la liste des comptes CRM.
+  // Les comptes étudiants et enseignants sont gérés via leurs fiches
+  // (espace étudiant, module Formateurs), pas dans la liste des comptes CRM.
+  // Seuls Directeur et Responsable restent visibles/éditables ici.
   const filteredUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
     return usersList.filter((u) => {
-      if (u.role === "etudiant") return false;
+      if (isHiddenAccountRole(u.role)) return false;
       if (userRoleFilter !== "__all__" && u.role !== userRoleFilter) return false;
       if (!q) return true;
       return `${u.name} ${u.email} ${u.role}`.toLowerCase().includes(q);
     });
   }, [usersList, userSearch, userRoleFilter]);
   const staffCount = useMemo(
-    () => usersList.filter((u) => u.role !== "etudiant").length,
+    () => usersList.filter((u) => !isHiddenAccountRole(u.role)).length,
     [usersList],
   );
-  // Idem pour les invitations en attente : pas de comptes étudiants ici.
+  // Idem pour les invitations en attente.
   const visiblePendingInvites = useMemo(
-    () => pendingInvites.filter((i) => i.role !== "etudiant"),
+    () => pendingInvites.filter((i) => !isHiddenAccountRole(i.role)),
     [pendingInvites],
   );
 
@@ -1865,7 +1874,7 @@ function SettingsPage() {
                   aria-label="Filtrer par rôle"
                 >
                   <option value="__all__">Tous les rôles ({staffCount})</option>
-                  {["directeur", "responsable", "enseignant"].map((r) => (
+                  {VISIBLE_ACCOUNT_ROLES.map((r) => (
                     <option key={r} value={r}>
                       {ROLE_META[r as UserRole]?.label ?? r}
                     </option>
@@ -1905,7 +1914,7 @@ function SettingsPage() {
                         "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
                       )}
                     >
-                      {["directeur", "responsable", "enseignant"].map((r) => (
+                      {VISIBLE_ACCOUNT_ROLES.map((r) => (
                         <option key={r} value={r}>
                           {ROLE_META[r as UserRole]?.label ?? r}
                         </option>
@@ -1926,7 +1935,7 @@ function SettingsPage() {
             {visiblePendingInvites.length ? (
               <div className="mt-3 space-y-1.5 rounded-xl border border-amber-300/40 bg-amber-50/50 p-3">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
-                  Invitations en attente ({visiblePendingInvites.length}) — lien 30 min, usage unique
+                  Invitations en attente ({visiblePendingInvites.length}) — lien 24 h, usage unique
                 </p>
                 {resentInfo ? (
                   <InviteLinkBanner

@@ -1,6 +1,23 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
+import { getDb } from "@/db";
+import { emailLogs } from "@/db/schema/email-logs";
+
+/** Trace d'envoi consultable (Paramètres › E-mails) : rend les échecs visibles. */
+async function logInviteEmail(recipient: string, sent: boolean, errorMsg?: string | null) {
+  try {
+    await getDb().insert(emailLogs).values({
+      recipient,
+      subject: "Invitation — ISTPM Agadir",
+      type: "invite",
+      status: sent ? "sent" : "failed",
+      errorMsg: errorMsg ?? "",
+    });
+  } catch {
+    // La journalisation ne doit jamais casser l'invitation.
+  }
+}
 import {
   registerWithInvite,
   verifyInvite,
@@ -45,6 +62,7 @@ export async function invitationRoutes(app: FastifyInstance) {
       if (!result.emailSent) {
         request.log.error({ email: input.email, reason: result.emailError }, "Échec envoi e-mail d'invitation");
       }
+      await logInviteEmail(input.email, result.emailSent, result.emailError);
       return { user: result.user, emailSent: result.emailSent, emailError: result.emailError, inviteUrl: result.inviteUrl };
     },
   );
@@ -59,7 +77,7 @@ export async function invitationRoutes(app: FastifyInstance) {
     return listPendingInvites();
   });
 
-  // Renvoyer : nouveau lien 30 min (staff).
+  // Renvoyer : nouveau lien 24 h (staff).
   app.post(
     "/:userId/resend",
     { preHandler: [authenticate, requireRole("directeur", "responsable")] },
@@ -70,6 +88,7 @@ export async function invitationRoutes(app: FastifyInstance) {
       if (!result.emailSent) {
         request.log.error({ userId, reason: result.emailError }, "Échec renvoi e-mail d'invitation");
       }
+      await logInviteEmail(result.user.email, result.emailSent, result.emailError);
       return { emailSent: result.emailSent, emailError: result.emailError, inviteUrl: result.inviteUrl };
     },
   );
@@ -85,19 +104,25 @@ export async function invitationRoutes(app: FastifyInstance) {
   );
 
   // Vérifier un lien (public, pour afficher la page de définition).
-  app.get(
-    "/verify",
-    { config: { rateLimit: { max: 30, timeWindow: "15 minutes" } } },
-    async (request) => {
-      const { token } = request.query as { token?: string };
-      if (!token) return { valid: false };
-      const found = await verifyInvite(token);
-      if (!found) return { valid: false };
-      return { valid: true, ...found };
-    },
-  );
+  // Le client envoie le token en corps POST (jamais en query : pas de fuite
+  // dans les logs/referers) ; le GET query reste pour compatibilité.
+  const verifyLimits = { config: { rateLimit: { max: 30, timeWindow: "15 minutes" } } };
+  async function verifyToken(token?: string) {
+    if (!token) return { valid: false };
+    const found = await verifyInvite(token);
+    if (!found) return { valid: false };
+    return { valid: true, ...found };
+  }
+  app.get("/verify", verifyLimits, async (request) => {
+    const { token } = request.query as { token?: string };
+    return verifyToken(token);
+  });
+  app.post("/verify", verifyLimits, async (request) => {
+    const { token } = (request.body ?? {}) as { token?: string };
+    return verifyToken(token);
+  });
 
-  // Accepter : définit le mot de passe (usage unique, 30 min), connecte directement.
+  // Accepter : définit le mot de passe (usage unique, 24 h), connecte directement.
   app.post(
     "/accept",
     { config: { rateLimit: { max: 10, timeWindow: "15 minutes" } } },
@@ -111,7 +136,6 @@ export async function invitationRoutes(app: FastifyInstance) {
       const result = await acceptInvite(input.token, input.password);
       if (!result.ok) return reply.status(400).send({ error: result.error });
       reply.header("Cache-Control", "no-store");
-    reply.header("Cache-Control", "no-store");
       const token = app.jwt.sign({
         id: result.user.id,
         email: result.user.email,
@@ -129,7 +153,10 @@ export async function invitationRoutes(app: FastifyInstance) {
     { config: { rateLimit: { max: 10, timeWindow: "15 minutes" } } },
     async (request) => {
       const input = z.object({ email: z.string().email("Email invalide") }).parse(request.body);
-      await resendInviteByEmail(input.email);
+      const result = await resendInviteByEmail(input.email);
+      // Journalisé même en cas d'échec silencieux : sans trace, un renvoi
+      // qui n'aboutit pas est indétectable côté staff.
+      await logInviteEmail(result.email, result.sent, result.error);
       return { ok: true };
     },
   );
