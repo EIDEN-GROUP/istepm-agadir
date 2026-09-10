@@ -1,189 +1,258 @@
-import { useState } from "react";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
-import { motion } from "framer-motion";
+import { Eye, EyeOff, LoaderCircle, ArrowRight } from "lucide-react";
+import { type FormEvent, useEffect, useState } from "react";
+import { z } from "zod";
+
 import { getStoredRole, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 /**
- * Écran de connexion   minimaliste, centré, aux accents de la couleur de marque.
+ * Portail étudiant — écran de connexion.
  *
- * Pas d'illustration ni de panneau : une colonne centrée, beaucoup de blanc, la
- * marque en teal et un unique point focal (le formulaire). Le CTA est une pilule
- * teal pleine largeur.
- *
- * L'authentification est celle du backend (`POST /auth/login`) : aucun choix de
- * profil n'est proposé, le rôle est déduit du compte renvoyé par le serveur.
+ * Design importé de la maquette Lovable « agadir-faces » (panneau visuel +
+ * formulaire, dégradé teal, motif zellige). L'authentification reste celle du
+ * backend (`POST /auth/login` via `useAuth().login`) : le rôle est déduit du
+ * compte. Un membre du personnel qui se connecte ici est simplement redirigé
+ * vers son tableau de bord. L'espace personnel a sa propre adresse (`/istepm`).
  */
+const loginSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Saisissez votre adresse e-mail.")
+    .email("Saisissez une adresse e-mail valide."),
+  password: z.string().min(1, "Saisissez votre mot de passe."),
+});
+
 function LoginPage() {
-  const { login } = useAuth();
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || !password.trim()) {
-      setError("Veuillez remplir tous les champs");
+  useEffect(() => {
+    document.title = "Connexion étudiant | ISTEPM Agadir";
+  }, []);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      setError(result.error.issues[0]?.message ?? "Vérifiez les informations saisies.");
       return;
     }
-    setError("");
-    setSubmitting(true);
-    try {
-      await login(email.trim(), password);
-      navigate({ to: "/dashboard" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur de connexion");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
-  const fieldClass =
-    "w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground/55 focus:border-brand focus:ring-4 focus:ring-brand/12";
+    setIsLoading(true);
+    try {
+      await login(result.data.email, result.data.password);
+      await navigate({ to: "/dashboard", replace: true });
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : "E-mail ou mot de passe incorrect.",
+      );
+      setIsLoading(false);
+    }
+  }
 
   return (
-    <div className="relative grid min-h-dvh place-items-center overflow-hidden bg-white px-6 py-10">
-      {/* Un seul accent de marque : un halo teal très discret en haut, sinon du blanc. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[42rem] max-w-none -translate-x-1/2 rounded-full opacity-60 blur-3xl"
-        style={{
-          background:
-            "radial-gradient(circle, color-mix(in srgb, var(--istpm-teal) 12%, transparent) 0%, transparent 70%)",
-        }}
-      />
+    <main className="login-canvas relative min-h-dvh overflow-hidden px-4 py-6 sm:px-8 sm:py-10 lg:grid lg:place-items-center">
+      <div className="login-blob login-blob-one" aria-hidden="true" />
+      <div className="login-blob login-blob-two" aria-hidden="true" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-sm"
-      >
-        {/* Marque */}
-        <div className="flex flex-col items-center text-center">
-          <span className="grid place-items-center">
-            <img
-              src="/istpm-logo.svg"
-              alt="ISTEPM Agadir"
-              className="h-28 w-28 rounded-full"
-            />
-          </span>
-          <h1 className="mt-6 font-display text-2xl font-bold tracking-tight text-foreground">
-            Connexion
-          </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Accédez à votre espace ISTEPM Agadir
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-9 space-y-5">
-          {error ? (
-            <div
-              role="alert"
-              className="anim-shake rounded-xl bg-alert/10 px-4 py-3 text-sm font-medium text-alert"
-            >
-              {error}
-            </div>
-          ) : null}
-
-          <div className="space-y-1.5">
-            <label
-              htmlFor="login-email"
-              className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              Identifiant
-            </label>
-            <input
-              id="login-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Adresse e-mail"
-              autoComplete="email"
-              autoFocus
-              className={fieldClass}
-            />
+      <div className="login-shell relative z-10 mx-auto grid w-full max-w-6xl overflow-hidden rounded-[34px] lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1fr)]">
+        {/* Panneau visuel */}
+        <section
+          className="login-hero relative hidden min-h-[640px] overflow-hidden lg:block"
+          aria-hidden="true"
+        >
+          <div className="login-zellige absolute inset-0 opacity-[0.22]" />
+          <img
+            src="/login-student-hero.png"
+            alt=""
+            width={960}
+            height={1280}
+            className="absolute bottom-0 start-[-14%] h-[96%] w-auto object-contain"
+          />
+          <div className="absolute inset-y-0 end-0 flex w-[48%] flex-col justify-center pe-8">
+            <span className="font-display text-5xl leading-none text-[color:oklch(0.31_0.058_191/0.8)]">
+              &ldquo;
+            </span>
+            <p className="-mt-1 font-display text-[1.6rem] font-extrabold uppercase leading-[1.14] tracking-[-0.02em] text-[color:var(--l-ink)]">
+              L&rsquo;humain d&rsquo;abord,
+              <br />à chaque geste
+              <br />de soin.
+            </p>
+            <div className="mt-6 h-1 w-14 rounded-full bg-[color:var(--l-red)]" />
+            <p className="mt-6 max-w-[15rem] text-[13px] font-medium leading-6 text-[color:oklch(0.31_0.058_191/0.7)]">
+              Institut spécialisé des techniques paramédicales — Agadir
+            </p>
           </div>
+        </section>
 
-          <div className="space-y-1.5">
-            <label
-              htmlFor="login-password"
-              className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              Mot de passe
-            </label>
-            <div className="relative">
-              <input
-                id="login-password"
-                type={showPw ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mot de passe"
-                autoComplete="current-password"
-                className={cn(fieldClass, "pe-11")}
+        {/* Panneau formulaire */}
+        <section className="flex items-center justify-center px-6 py-10 sm:px-12 sm:py-14">
+          <div className="login-form-enter w-full max-w-[380px]">
+            <div className="flex items-center gap-3">
+              <img
+                src="/istpm-logo.svg"
+                alt="ISTEPM Agadir"
+                width={56}
+                height={56}
+                className="h-14 w-auto"
               />
+              <div className="min-w-0 border-s border-[color:var(--l-border)] ps-3">
+                <p className="font-display text-[15px] font-extrabold leading-tight text-[color:var(--l-ink)]">
+                  ISTEPM Agadir
+                </p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--l-muted-fg)]">
+                  Techniques paramédicales
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-10 font-display text-[11px] font-bold uppercase tracking-[0.22em] text-[color:var(--l-primary)]">
+              Espace étudiant
+            </p>
+            <h1 className="mt-2 font-display text-[34px] font-extrabold leading-none tracking-[-0.02em] text-[color:var(--l-ink)]">
+              Bienvenue
+            </h1>
+            <p className="mt-3 text-[14px] leading-6 text-[color:var(--l-muted-fg)]">
+              Connectez-vous pour accéder à vos cours, votre emploi du temps, vos
+              notes et vos demandes.
+            </p>
+
+            <form className="mt-8 space-y-4" onSubmit={handleSubmit} noValidate>
+              <div className="space-y-2">
+                <label
+                  htmlFor="email"
+                  className="block text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--l-muted-fg)]"
+                >
+                  E-mail
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder="prenom.nom@istpm.ma"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  aria-invalid={Boolean(error)}
+                  className="login-field h-[52px] w-full rounded-[16px] border border-transparent bg-[color:var(--l-muted)] px-5 text-[15px] text-[color:var(--l-ink)] outline-none placeholder:text-[color:oklch(0.554_0.046_257.417/0.6)]"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="password"
+                  className="block text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--l-muted-fg)]"
+                >
+                  Mot de passe
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="Votre mot de passe"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    aria-invalid={Boolean(error)}
+                    className="login-field h-[52px] w-full rounded-[16px] border border-transparent bg-[color:var(--l-muted)] ps-5 pe-14 text-[15px] text-[color:var(--l-ink)] outline-none placeholder:text-[color:oklch(0.554_0.046_257.417/0.6)]"
+                  />
+                  <button
+                    type="button"
+                    className="absolute end-2 top-2 grid size-9 place-items-center rounded-full text-[color:var(--l-muted-fg)] transition-colors hover:bg-[color:var(--l-teal-pale)] hover:text-[color:var(--l-primary)]"
+                    onClick={() => setShowPassword((value) => !value)}
+                    aria-label={
+                      showPassword
+                        ? "Masquer le mot de passe"
+                        : "Afficher le mot de passe"
+                    }
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="size-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="size-4" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="min-h-5" aria-live="polite">
+                {error ? (
+                  <p className="text-[13px] font-semibold text-[color:var(--l-red)]">
+                    {error}
+                  </p>
+                ) : null}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={cn(
+                  "group flex h-[52px] w-full items-center justify-center gap-2 rounded-full",
+                  "bg-[color:var(--l-primary)] font-display text-[15px] font-bold tracking-[0.01em] text-white",
+                  "shadow-[0_12px_24px_-14px_color-mix(in_oklab,var(--l-primary)_70%,transparent)]",
+                  "transition-all hover:bg-[color:var(--l-primary-hover)] hover:shadow-none active:scale-[0.985]",
+                  "disabled:cursor-not-allowed disabled:opacity-70",
+                )}
+              >
+                {isLoading ? (
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                ) : null}
+                {isLoading ? "Connexion…" : "Se connecter"}
+                {!isLoading ? (
+                  <ArrowRight
+                    className="size-4 transition-transform group-hover:translate-x-0.5"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </button>
+            </form>
+
+            <div className="mt-8 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:oklch(0.554_0.046_257.417/0.7)]">
+              <span className="h-px flex-1 bg-[color:var(--l-border)]" />
+              Besoin d&rsquo;aide
+              <span className="h-px flex-1 bg-[color:var(--l-border)]" />
+            </div>
+            <p className="mt-4 text-center text-[13px] leading-6 text-[color:var(--l-muted-fg)]">
+              Mot de passe oublié, ou lien d&rsquo;invitation expiré ?{" "}
               <button
                 type="button"
-                onClick={() => setShowPw((v) => !v)}
-                aria-label={
-                  showPw ? "Masquer le mot de passe" : "Afficher le mot de passe"
-                }
-                tabIndex={-1}
-                className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-brand-dk"
+                onClick={() => navigate({ to: "/definir-mot-de-passe" })}
+                className="font-semibold text-[color:var(--l-primary)] underline-offset-4 hover:underline"
               >
-                {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                Recevoir un nouveau lien
               </button>
-            </div>
+            </p>
+            <p className="mt-2 text-center text-[13px] leading-6 text-[color:var(--l-muted-fg)]">
+              Un autre souci ?{" "}
+              <a
+                className="font-semibold text-[color:var(--l-primary)] underline-offset-4 hover:underline"
+                href="mailto:secretariat@istpm.ma"
+              >
+                Contactez le secrétariat.
+              </a>
+            </p>
           </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className={cn(
-              "group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3 text-sm font-bold text-white",
-              "shadow-[0_4px_14px_-4px_rgb(var(--istpm-shadow)/0.32)] transition-all duration-300",
-              "hover:bg-brand-dk active:scale-[0.985]",
-              "disabled:cursor-not-allowed disabled:opacity-70",
-            )}
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Connexion…
-              </>
-            ) : (
-              <>
-                Se connecter
-                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-              </>
-            )}
-          </button>
-        </form>
-
-        <p className="mt-8 text-center text-[11px] leading-relaxed text-muted-foreground">
-          Plateforme de gestion des formations paramédicales
-        </p>
-        <p className="mt-2 text-center text-[11px]">
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/definir-mot-de-passe" })}
-            className="font-medium text-brand-dk hover:underline"
-          >
-            Lien d'invitation expiré ou non reçu ? Recevoir un nouveau lien
-          </button>
-        </p>
-      </motion.div>
-    </div>
+        </section>
+      </div>
+    </main>
   );
 }
 
 export const Route = createFileRoute("/login")({
-  // Déjà connecté ? Pas de formulaire : retour direct au tableau de bord.
   beforeLoad: () => {
     if (getStoredRole()) {
       throw redirect({ to: "/dashboard" });
