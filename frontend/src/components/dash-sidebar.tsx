@@ -21,7 +21,6 @@ import {
   LogOut,
   Menu,
   X,
-  UserCog,
 } from "lucide-react";
 import { ROLE_META, useAuth } from "@/lib/auth";
 import { RequestBell } from "@/components/request-bell";
@@ -252,43 +251,6 @@ function NavGroupBlock({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Identité connectée                                                   */
-/* ------------------------------------------------------------------ */
-
-/**
- * Identité connectée (affichage seul).
- *
- * Aucun changement d'identité possible ici : le rôle et l'utilisateur sont
- * toujours ceux du compte connecté. Le périmètre enseignant vient de la fiche
- * liée au compte (`formateurs.user_id`), appliqué côté API.
- */
-function IdentityBadge({ collapsed }: { collapsed?: boolean }) {
-  const { role, user } = useAuth();
-
-  if (!role) return null;
-
-  return (
-    <div
-      className={cn(
-        "flex h-9 items-center gap-2 rounded-xl border border-brand/15 bg-brand/5 px-3 text-xs font-medium text-foreground",
-        collapsed && "justify-center px-0",
-      )}
-      title={user ? `${user.name} — ${ROLE_META[role].label}` : ROLE_META[role].label}
-    >
-      <UserCog className="h-4 w-4 shrink-0 text-brand" />
-      {collapsed ? null : (
-        <span className="min-w-0 flex-1 truncate">
-          <span className="block truncate">{user?.name ?? ROLE_META[role].label}</span>
-          <span className="block truncate text-[10px] font-normal text-muted-foreground">
-            {ROLE_META[role].short}
-          </span>
-        </span>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /*  Contenu du rail                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -415,8 +377,6 @@ function SidebarBody({
             </span>
           </Link>
         )}
-
-        <IdentityBadge collapsed={collapsed} />
 
         <button
           type="button"
@@ -615,7 +575,6 @@ function IconRail({
       </nav>
 
       <div className="flex shrink-0 flex-col items-center gap-2 pt-2">
-        <IdentityBadge collapsed />
         <div className="group/rail relative flex justify-center">
           <button
             type="button"

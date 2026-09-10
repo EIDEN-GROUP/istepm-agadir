@@ -1556,6 +1556,11 @@ function SettingsPage() {
     () => usersList.filter((u) => u.role !== "etudiant").length,
     [usersList],
   );
+  // Idem pour les invitations en attente : pas de comptes étudiants ici.
+  const visiblePendingInvites = useMemo(
+    () => pendingInvites.filter((i) => i.role !== "etudiant"),
+    [pendingInvites],
+  );
 
   const PERM_GROUPS = [
     { label: "Étudiants", perms: ["etudiants.read", "etudiants.write", "etudiants.delete"] },
@@ -1918,10 +1923,10 @@ function SettingsPage() {
                 ))
               )}
             </div>
-            {pendingInvites.length ? (
+            {visiblePendingInvites.length ? (
               <div className="mt-3 space-y-1.5 rounded-xl border border-amber-300/40 bg-amber-50/50 p-3">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
-                  Invitations en attente ({pendingInvites.length}) — lien 30 min, usage unique
+                  Invitations en attente ({visiblePendingInvites.length}) — lien 30 min, usage unique
                 </p>
                 {resentInfo ? (
                   <InviteLinkBanner
@@ -1932,7 +1937,7 @@ function SettingsPage() {
                     onClose={() => setResentInfo(null)}
                   />
                 ) : null}
-                {pendingInvites.map((inv) => {
+                {visiblePendingInvites.map((inv) => {
                   const expired = inv.expiresAt ? new Date(inv.expiresAt).getTime() < Date.now() : false;
                   return (
                     <div key={inv.id} className="flex items-center justify-between gap-2 rounded-lg bg-card px-2.5 py-1.5">

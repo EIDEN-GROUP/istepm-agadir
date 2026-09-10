@@ -28,7 +28,9 @@ const etudiantSchema = z.object({
   email: z.string().optional().default(""),
   dateNaissance: z.string().optional().default(""),
   ville: z.string().optional().default(""),
-  photoUrl: z.string().max(2000).optional().default(""),
+  // Même plafond que Mon profil (auth.ts) : une photo 512px encodée en
+  // data URL pèse 15–40 Ko ; l'ancienne limite (2000) rejetait toute photo.
+  photoUrl: z.string().max(3_000_000, "Image trop volumineuse").optional().default(""),
   // NOTE (sécurité) : la liaison de compte (userId) ne passe jamais par ici —
   // inscription/invitation avec CNE (voir services/auth.ts, routes/invitations.ts).
   fraisMensuels: z.number().optional().default(0),
