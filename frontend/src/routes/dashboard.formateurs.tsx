@@ -50,7 +50,6 @@ import {
   ConfirmDialog,
   TextField,
   SelectField,
-  ListField,
   MultiSelectField,
   FullWidth,
   parseList,
@@ -73,7 +72,7 @@ const STATUTS: StatutFormateur[] = ["permanent", "vacataire", "en_conge"];
 
 function FormateursPage() {
   const { role } = useAuth();
-  const { formateurs, modules, filieres: filieresApi, addFormateur, updateFormateur, deleteFormateur } =
+  const { formateurs, modules, seances, etudiants, filieres: filieresApi, addFormateur, updateFormateur, deleteFormateur } =
     useIstpm();
   const canEdit = role === "directeur" || role === "responsable";
   const filieresOptions = filieresApi.length ? filieresApi : [...FILIERES];
@@ -91,6 +90,34 @@ function FormateursPage() {
       ].sort(),
     [modules, formateurs],
   );
+
+  /** Groupes réels (séances + étudiants + fiches) : seule source proposée au
+   *  formulaire — le périmètre enseignant exige une correspondance EXACTE,
+   *  la saisie libre produisait des groupes invisibles. */
+  const groupesDisponibles = useMemo(
+    () =>
+      [
+        ...new Set([
+          ...seances.map((s) => s.groupe),
+          ...etudiants.map((e) => e.groupe),
+          ...formateurs.flatMap((f) => f.groupes),
+        ]),
+      ]
+        .map((g) => g.trim())
+        .filter(Boolean)
+        .sort(),
+    [seances, etudiants, formateurs],
+  );
+
+  /** Matricule suivant libre (ENS-…) : pas de tirage aléatoire qui collisionne. */
+  const nextMatricule = useMemo(() => {
+    let max = 99;
+    for (const f of formateurs) {
+      const m = /(\d+)\s*$/.exec(f.matricule ?? "");
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+    return `ENS-${max + 1}`;
+  }, [formateurs]);
 
   const [search, setSearch] = useState("");
   const [departement, setDepartement] = useState<string>(ALL);
@@ -497,6 +524,10 @@ function FormateursPage() {
           key={editing?.id ?? "new"}
           initial={editing}
           modulesDisponibles={modulesDisponibles}
+          modulesByFiliere={modules}
+          groupesDisponibles={groupesDisponibles}
+          nextMatricule={nextMatricule}
+          existing={formateurs}
           filieres={filieresOptions}
           onCancel={() => setFormOpen(false)}
     onSubmit={async (data) => {
@@ -598,6 +629,10 @@ function FormateurForm({
   onSubmit,
   onCancel,
   modulesDisponibles,
+  modulesByFiliere,
+  groupesDisponibles,
+  nextMatricule,
+  existing,
   filieres,
 }: {
   initial: Formateur | null;
@@ -618,12 +653,14 @@ function FormateurForm({
   }) => void;
   onCancel: () => void;
   modulesDisponibles: string[];
+  modulesByFiliere: { nom: string; filiere: string }[];
+  groupesDisponibles: string[];
+  nextMatricule: string;
+  existing: Formateur[];
   filieres: string[];
 }) {
   const [f, setF] = useState(() => ({
-    matricule:
-      initial?.matricule ??
-      `ENS-${String(Math.floor(Math.random() * 900) + 100)}`,
+    matricule: initial?.matricule ?? nextMatricule,
     cin: initial?.cin ?? "",
     prenom: initial?.prenom ?? "",
     nom: initial?.nom ?? "",
@@ -640,6 +677,16 @@ function FormateurForm({
   const isNew = !initial;
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
+  /** Modules du département choisi (+ ceux déjà cochés, jamais perdus).
+   *  Sans département : repli sur le registre global. */
+  const modulesOptions = useMemo(() => {
+    const picked = new Set(parseList(f.modules));
+    const base = f.departement
+      ? modulesByFiliere.filter((m) => m.filiere === f.departement).map((m) => m.nom)
+      : modulesDisponibles;
+    return [...new Set([...base, ...picked])].sort();
+  }, [modulesByFiliere, modulesDisponibles, f.departement, f.modules]);
+
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => {
     setF((prev) => ({ ...prev, [k]: v }));
     setErrors((prev) => ({ ...prev, [k]: undefined }));
@@ -653,6 +700,18 @@ function FormateurForm({
     else if (!/^[A-Za-z]{1,2}\d{1,6}$/.test(f.cin.trim()))
       next.cin = "Format CIN invalide (ex. JB145872)";
     if (!f.departement) next.departement = "Département obligatoire";
+    const others = existing.filter((o) => o.id !== initial?.id);
+    const clashMat = others.find(
+      (o) => o.matricule.trim().toLowerCase() === f.matricule.trim().toLowerCase(),
+    );
+    if (clashMat) next.matricule = `Matricule déjà utilisé par ${clashMat.prenom} ${clashMat.nom}`;
+    if (f.email.trim()) {
+      const clashMail = others.find(
+        (o) => o.email.trim().toLowerCase() === f.email.trim().toLowerCase(),
+      );
+      if (clashMail)
+        next.email = `E-mail déjà utilisé par ${clashMail.prenom} ${clashMail.nom}`;
+    }
     if (isNew && f.acces === "password" && !f.password.trim())
       next.password = "Mot de passe requis";
     else if (isNew && f.acces === "password" && f.password.trim().length < 8)
@@ -705,6 +764,7 @@ function FormateurForm({
         label="Matricule"
         value={f.matricule}
         onChange={(v) => set("matricule", v)}
+        error={errors.matricule}
       />
       <TextField
         label="CIN"
@@ -743,18 +803,23 @@ function FormateurForm({
           label="Modules enseignés"
           value={f.modules}
           onChange={(v) => set("modules", v)}
-          options={modulesDisponibles.map((m) => ({ value: m, label: m }))}
-          placeholder="Sélectionner les modules…"
+          options={modulesOptions.map((m) => ({ value: m, label: m }))}
+          placeholder={
+            f.departement ? "Sélectionner les modules…" : "Choisir d'abord un département…"
+          }
           error={errors.modules}
           required
         />
       </FullWidth>
       <FullWidth>
-        <ListField
-          label="Groupes"
+        <MultiSelectField
+          label="Groupes encadrés"
           value={f.groupes}
           onChange={(v) => set("groupes", v)}
-          placeholder="S5-G1, S1-B"
+          options={groupesDisponibles.map((g) => ({ value: g, label: g }))}
+          placeholder="Sélectionner les groupes…"
+          searchPlaceholder="Rechercher un groupe…"
+          emptyText="Aucun groupe — renseignez d'abord séances et étudiants."
         />
       </FullWidth>
       <SelectField
@@ -809,11 +874,11 @@ function FormateurForm({
           ) : null}
         </FullWidth>
       ) : null}
-      {(!isNew || f.acces === "password") ? (
+      {isNew && f.acces === "password" ? (
         <TextField
           label="Mot de passe"
           type="password"
-          required={isNew && f.acces === "password"}
+          required
           value={f.password}
           onChange={(v) => set("password", v)}
           placeholder="••••••"
