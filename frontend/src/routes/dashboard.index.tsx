@@ -45,6 +45,7 @@ import {
   STATUT_EXAMEN_LABEL,
   TYPE_EXAMEN_LABEL,
   minutesDepuisMinuit,
+  type Formateur,
 } from "@/lib/istpm-data";
 import { PersonAvatar } from "@/components/person-avatar";
 import {
@@ -1148,6 +1149,72 @@ function DashboardDirecteur() {
 /*  Professor Dashboard                                                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Récapitulatif de ce qu'un formateur enseigne : filière, semestres (déduits
+ * du préfixe de ses groupes, ex. « S5-G1 » → « S5 »), groupes et modules.
+ * Lecture seule — l'affectation est gérée dans Formateurs par la direction.
+ */
+function AffectationEnseignant({ formateur }: { formateur: Formateur }) {
+  const semestres = useMemo(
+    () =>
+      [
+        ...new Set(
+          formateur.groupes
+            .map((g) => g.split("-")[0]?.trim())
+            .filter((s): s is string => !!s && /^S\d$/i.test(s)),
+        ),
+      ].sort(),
+    [formateur.groupes],
+  );
+
+  const lignes: {
+    label: string;
+    items: string[];
+    tone: "teal" | "blue" | "neutral";
+  }[] = [
+    { label: "Filière", items: formateur.departement ? [formateur.departement] : [], tone: "teal" },
+    { label: "Semestres", items: semestres, tone: "blue" },
+    { label: "Groupes", items: [...formateur.groupes].sort(), tone: "neutral" },
+    { label: "Modules", items: [...formateur.modules].sort(), tone: "teal" },
+  ];
+
+  return (
+    <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
+      {lignes.map((l) => (
+        <div
+          key={l.label}
+          className="flex flex-col gap-2 px-4 py-3.5 sm:flex-row sm:items-start sm:gap-4 sm:px-5"
+        >
+          <span className="shrink-0 pt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground sm:w-28">
+            {l.label}
+          </span>
+          {l.items.length ? (
+            <span className="flex flex-wrap gap-1.5">
+              {l.items.map((it) => (
+                <span
+                  key={it}
+                  className={cn(
+                    "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
+                    l.tone === "teal" && "bg-brand/10 text-brand-dk ring-1 ring-inset ring-brand/15",
+                    l.tone === "blue" && "bg-info-pale text-info ring-1 ring-inset ring-info/20",
+                    l.tone === "neutral" && "bg-muted text-foreground/80 ring-1 ring-inset ring-brand/12",
+                  )}
+                >
+                  {it}
+                </span>
+              ))}
+            </span>
+          ) : (
+            <span className="pt-0.5 text-xs italic text-muted-foreground">
+              Non assigné
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DashboardEnseignant() {
   const { tab, setTab, direction } = useTabs();
   const { seances, examens, bulletins, etudiants } = useIstpm();
@@ -1189,6 +1256,9 @@ function DashboardEnseignant() {
               <KpiCard label="Mes examens" value={mesExamens.length} tone="amber" icon={GraduationCap} />
               <KpiCard label="Examens À  noter" value={aNoter.length} tone={aNoter.length ? "red" : "teal"} icon={PenLine} />
             </KpiGrid>
+            <Section title="Mon affectation">
+              <AffectationEnseignant formateur={moi} />
+            </Section>
             <div className="grid gap-6 xl:grid-cols-2">
               <Section title="Notifications"><ActiviteFeed /></Section>
               <Section title="Mon calendrier (7 jours)" action={<SectionLink to="/dashboard/calendar">Voir tout</SectionLink>}>
