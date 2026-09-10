@@ -5,6 +5,19 @@ session: what changed, why, backend/DB impact, and anything the team must know.
 
 ---
 
+## 2026-09-10 — PDF preview rendered blank
+
+The in-app PDF viewer (exam "Voir le sujet", formateur + directeur) showed
+only the pdf.js toolbar over a black canvas. Cause: the `<iframe sandbox="">`
+gave the frame an opaque origin, so the browser PDF viewer could not read
+the `blob:` URL created by our origin. Changed to
+`sandbox="allow-scripts allow-same-origin"` (native PDF rendering never runs
+a file's embedded JS, so a deposited sujet still can't execute anything) and
+gave the frame a white background. `dashboard.examens.tsx` — the only inline
+PDF viewer in the app; every other PDF path is a download.
+
+---
+
 ## 2026-09-10 — Teacher exam form: group persistence + scoped semester/group
 
 Off `cb9534d`.

@@ -272,9 +272,13 @@ function DocumentPreview({
               <iframe
                 src={url}
                 title={doc.nom}
-                // Bac à sable : un document déposé ne doit jamais exécuter de script.
-                sandbox=""
-                className="h-[55vh] w-full rounded-2xl border border-brand/12"
+                // La visionneuse PDF du navigateur (pdf.js) a besoin de scripts
+                // ET d'un accès same-origin pour lire le blob : sans quoi
+                // l'iframe reste noire (seule la barre d'outils s'affiche).
+                // Le rendu PDF natif n'exécute jamais le JavaScript embarqué
+                // dans le fichier — le sujet déposé ne peut donc rien lancer.
+                sandbox="allow-scripts allow-same-origin"
+                className="h-[55vh] w-full rounded-2xl border border-brand/12 bg-white"
               />
             ) : (
               <div className="flex flex-col items-center gap-2 py-10 text-center">
