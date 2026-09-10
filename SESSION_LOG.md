@@ -5,6 +5,25 @@ session: what changed, why, backend/DB impact, and anything the team must know.
 
 ---
 
+## 2026-09-10 — Teacher group filter + toast shape
+
+Off `origin/main` `facf806`. Pushed `30240b3`.
+
+| Commit | Summary |
+|---|---|
+| `30240b3` | style(toast): quieter sonner shape — square-ish card, thin left rule |
+| (prev)   | fix(teacher): group filter lists only the formateur's assigned groups |
+
+- **Teacher group filter** — `dashboard.etudiants.tsx` `groupeOptions` was
+  built from every student. Now, for a teacher, it returns only
+  `enseignantScope.groupes` (assigned encadré groups), filtered by the
+  selected semester prefix. Non-teacher roles unchanged.
+- **Toast shape** — `ui/sonner.tsx` + `styles.css`: 8px radius (was pill),
+  2px type-colored left border, sans-medium title (was heavy display),
+  type-colored icon. Not visually verified before push.
+
+---
+
 ## 2026-09-10 — Frontend phases: pagination, teacher assignment, dup-inscription guard
 
 Off `origin/main` `b83c090` (after pulling the team's `3dd0929` "backend-only
