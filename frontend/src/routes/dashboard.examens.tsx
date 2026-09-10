@@ -12,6 +12,8 @@ import {
   ClipboardList,
   PenLine,
   Lock,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -222,77 +224,149 @@ function DocumentPreview({
   }, [doc, examenId]);
 
   const isPdf = doc?.mime === "application/pdf";
+  const ext = (doc?.nom.split(".").pop() ?? "").toUpperCase();
+
+  const telecharger = async () => {
+    if (!examen || !doc) return;
+    try {
+      await downloadExamenDocumentApi(examen.id, doc.nom);
+      toast.success(`Téléchargement   ${doc.nom}`);
+    } catch {
+      toast.error("Téléchargement impossible depuis le serveur");
+    }
+  };
 
   return (
     <Dialog open={!!examen} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className={dialogSurfaceWide}>
+      <DialogContent
+        className={cn(
+          dialogSurfaceWide,
+          "max-h-[min(92vh,880px)] w-[min(100vw_-_1.5rem,880px)] max-w-[min(100vw_-_1.5rem,880px)]",
+        )}
+      >
         <DialogTitle className="sr-only">Aperçu du sujet</DialogTitle>
         <DialogDescription className="sr-only">
           Document d'examen déposé
         </DialogDescription>
+
         {examen && doc ? (
-          <DetailShell
-            title={doc.nom}
-            subtitle={`${examen.titre} · déposé le ${fmtDate(doc.uploadedAt)} · ${fmtTaille(doc.taille)}`}
-            footer={
-              <div className="flex items-center justify-end gap-2">
+          <div className="flex min-h-0 flex-1 flex-col">
+            {/* En-tête : type de fichier + nom + méta */}
+            <header className="flex items-start gap-3.5 border-b border-brand/12 px-5 py-4 pr-14">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand/15 to-brand/5 text-brand-dk ring-1 ring-inset ring-brand/15">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-semibold leading-tight text-foreground">
+                  {doc.nom}
+                </p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                  {ext ? (
+                    <span className="rounded-md bg-brand/10 px-1.5 py-0.5 font-semibold tracking-wide text-brand-dk">
+                      {ext}
+                    </span>
+                  ) : null}
+                  <span className="truncate font-medium text-foreground/80">
+                    {examen.titre}
+                  </span>
+                  <span aria-hidden>·</span>
+                  <span>déposé le {fmtDate(doc.uploadedAt)}</span>
+                  <span aria-hidden>·</span>
+                  <span>{fmtTaille(doc.taille)}</span>
+                </div>
+              </div>
+            </header>
+
+            {/* Zone de lecture */}
+            <div className="min-h-0 flex-1 bg-muted/40 p-3 sm:p-4">
+              <div className="relative h-full min-h-[420px] overflow-hidden rounded-2xl border border-brand/12 bg-[#f4f4f5] shadow-inner">
+                {state === "loading" ? (
+                  <div className="absolute inset-0 grid place-items-center">
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                      <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                      <p className="text-xs font-medium">
+                        Chargement du document…
+                      </p>
+                    </div>
+                  </div>
+                ) : state === "missing" ? (
+                  <div className="absolute inset-0 grid place-items-center p-6">
+                    <div className="flex max-w-sm flex-col items-center gap-2 text-center">
+                      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-warn/12 text-warn">
+                        <FileWarning className="h-6 w-6" />
+                      </div>
+                      <p className="text-sm font-semibold text-foreground">
+                        Fichier indisponible
+                      </p>
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        Le fichier est stocké sur le serveur. S'il est
+                        indisponible, déposez à nouveau le sujet depuis le
+                        formulaire.
+                      </p>
+                    </div>
+                  </div>
+                ) : isPdf && url ? (
+                  <iframe
+                    src={url}
+                    title={doc.nom}
+                    // La visionneuse PDF du navigateur (pdf.js) a besoin de
+                    // scripts ET d'un accès same-origin pour lire le blob :
+                    // sans quoi l'iframe reste noire (seule la barre d'outils
+                    // s'affiche). Le rendu PDF natif n'exécute jamais le
+                    // JavaScript embarqué — le sujet déposé ne peut rien lancer.
+                    sandbox="allow-scripts allow-same-origin"
+                    className="h-full w-full bg-white"
+                  />
+                ) : (
+                  <div className="absolute inset-0 grid place-items-center p-6">
+                    <div className="flex max-w-sm flex-col items-center gap-2 text-center">
+                      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand/10 text-brand-dk">
+                        <FileText className="h-6 w-6" />
+                      </div>
+                      <p className="text-sm font-semibold text-foreground">
+                        Aperçu indisponible pour ce format
+                      </p>
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        Les documents Word ne s'affichent pas dans le
+                        navigateur — utilisez « Télécharger » pour l'ouvrir.
+                      </p>
+                      <button
+                        className={cn(primaryPill, "mt-2 px-4 py-2 text-xs")}
+                        onClick={telecharger}
+                      >
+                        <Download className="h-3.5 w-3.5" /> Télécharger
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Pied : actions */}
+            <footer className="flex items-center justify-between gap-3 border-t border-brand/12 px-5 py-3.5">
+              <p className="hidden text-[11px] text-muted-foreground sm:block">
+                Sujet confidentiel — ne pas diffuser hors de l'établissement.
+              </p>
+              <div className="flex items-center gap-2">
+                {isPdf && url ? (
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={cn(ghostPill, "gap-1.5 px-4 py-2 text-xs")}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> Ouvrir
+                  </a>
+                ) : null}
                 <button
-                  className={cn(ghostPill, "gap-1.5")}
-                  onClick={async () => {
-                    if (!examen) return;
-                    try {
-                      await downloadExamenDocumentApi(examen.id, doc.nom);
-                      toast.success(`Téléchargement   ${doc.nom}`);
-                    } catch {
-                      toast.error("Téléchargement impossible depuis le serveur");
-                    }
-                  }}
+                  className={cn(primaryPill, "px-4 py-2 text-xs")}
+                  onClick={telecharger}
                 >
                   <Download className="h-3.5 w-3.5" /> Télécharger
                 </button>
               </div>
-            }
-          >
-            {state === "loading" ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
-                Chargement du document…
-              </p>
-            ) : state === "missing" ? (
-              <div className="flex flex-col items-center gap-2 py-10 text-center">
-                <FileWarning className="h-8 w-8 text-warn" />
-                <p className="text-sm font-medium text-foreground">
-                  Fichier indisponible
-                </p>
-                <p className="max-w-sm text-xs text-muted-foreground">
-                  Le fichier est stocké sur le serveur. S'il est indisponible,
-                  déposez à nouveau le sujet depuis le formulaire.
-                </p>
-              </div>
-            ) : isPdf && url ? (
-              <iframe
-                src={url}
-                title={doc.nom}
-                // La visionneuse PDF du navigateur (pdf.js) a besoin de scripts
-                // ET d'un accès same-origin pour lire le blob : sans quoi
-                // l'iframe reste noire (seule la barre d'outils s'affiche).
-                // Le rendu PDF natif n'exécute jamais le JavaScript embarqué
-                // dans le fichier — le sujet déposé ne peut donc rien lancer.
-                sandbox="allow-scripts allow-same-origin"
-                className="h-[55vh] w-full rounded-2xl border border-brand/12 bg-white"
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-2 py-10 text-center">
-                <FileText className="h-8 w-8 text-brand" />
-                <p className="text-sm font-medium text-foreground">
-                  Aperçu indisponible pour ce format
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Les documents Word ne s'affichent pas dans le navigateur  
-                  utilisez « Télécharger ».
-                </p>
-              </div>
-            )}
-          </DetailShell>
+            </footer>
+          </div>
         ) : null}
       </DialogContent>
     </Dialog>

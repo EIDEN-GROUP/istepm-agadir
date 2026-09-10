@@ -5,6 +5,18 @@ session: what changed, why, backend/DB impact, and anything the team must know.
 
 ---
 
+## 2026-09-10 — PDF preview: UI redesign
+
+Rebuilt `DocumentPreview` (the only inline document viewer, shared by the
+formateur + directeur exam views) with a custom shell instead of
+`DetailShell`: header with a file-type tile + `.EXT` chip + exam / date /
+size meta; larger reading area (up to 880px wide, `min-h-[420px]`) framed
+on a soft ground; spinner loading state, iconified missing / unsupported
+states; footer with a confidentiality note, "Ouvrir" (new tab) and
+"Télécharger". Logic unchanged.
+
+---
+
 ## 2026-09-10 — PDF preview rendered blank
 
 The in-app PDF viewer (exam "Voir le sujet", formateur + directeur) showed
