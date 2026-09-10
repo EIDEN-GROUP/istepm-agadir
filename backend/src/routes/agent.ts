@@ -5,7 +5,7 @@ import { getToolDefinitions } from "@/lib/agent/actions";
 import { analyzeIntent, analyzeIntentStream } from "@/lib/agent/llm";
 import { executeAction, executeBatch } from "@/lib/agent/executor";
 
-function agentErrorMessage(err: unknown): string {
+export function agentErrorMessage(err: unknown): string {
   let msg = "Erreur de communication avec l'IA";
   if (err instanceof Error) {
     if ("status" in err) {

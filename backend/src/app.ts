@@ -69,6 +69,17 @@ export async function buildApp() {
   await app.register(rateLimit, {
     max: 100,
     timeWindow: "1 minute",
+    // Identité par client réel, pas par IP du proxy : sans ceci, derrière
+    // eiden-nginx toutes les requêtes partagent le même seau (DoS mutuel et
+    // limites de login contournables/aveugles). eiden-nginx ÉCRASE
+    // X-Real-IP avec $remote_addr (non falsifiable au niveau TCP), tandis
+    // que X-Forwarded-For est concaténé ($proxy_add_x_forwarded_for) donc
+    // falsifiable à gauche — on ne l'utilise jamais ici.
+    keyGenerator: (request) => {
+      const real = request.headers["x-real-ip"];
+      if (typeof real === "string" && real.trim()) return real.split(",")[0].trim();
+      return request.ip;
+    },
   });
 
   // Defense in depth: security headers on every response (the SPA's nginx

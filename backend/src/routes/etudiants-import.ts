@@ -186,6 +186,12 @@ export async function etudiantImportRoutes(app: FastifyInstance) {
     }
 
     const rows = toutes.slice(1);
+    // Garde-fou DoS : chaque ligne = requêtes DB. Au-delà, découper le fichier.
+    if (rows.length > 5000) {
+      return reply
+        .status(400)
+        .send({ error: "Fichier trop volumineux (5000 lignes max, découper l'import)" });
+    }
     const results: Array<{
       index: number;
       data: Record<string, string>;

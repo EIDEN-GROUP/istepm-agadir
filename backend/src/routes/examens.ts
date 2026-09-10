@@ -340,6 +340,13 @@ export async function examenRoutes(app: FastifyInstance) {
         .where(eq(examens.id, id))
         .limit(1);
       if (!examen) return reply.status(404).send({ error: "Examen introuvable" });
+      // Même périmètre que l'upload : un enseignant ne télécharge que ses sujets.
+      if (request.user.role === "enseignant") {
+        const fiche = await ficheEnseignant(request.user.id);
+        if (!fiche || (examen.createdBy && examen.createdBy !== fiche.id)) {
+          return reply.status(403).send({ error: "Examen d'un autre formateur" });
+        }
+      }
       if (!examen.documentId) return reply.status(404).send({ error: "Aucun document associ\u00e9 \u00e0 cet examen" });
 
       const data = await getDocument(examen.documentId);

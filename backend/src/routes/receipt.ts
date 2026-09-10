@@ -16,6 +16,39 @@ const STAMP_BOX = 120;
 const STAMP_X = 50;
 const STAMP_Y = 100;
 
+/**
+ * Hôtes interdits pour les récupérations serveur (SSRF) : littéraux IP de
+ * loopback, réseaux privés, lien-local (dont 169.254.169.254 métadonnées cloud)
+ * et IPv6 locales. Les noms d'hôtes passent (résolution DNS hors scope ici —
+ * la source est un réglage staff, pas une entrée utilisateur quelconque).
+ */
+export function isPrivateHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  if (["localhost", "0.0.0.0"].includes(h)) return true;
+  if (h === "::1" || h === "::") return true;
+  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const o = v4.slice(1).map(Number);
+    if (o.some((n) => n > 255)) return false;
+    if (o[0] === 10 || o[0] === 127) return true;
+    if (o[0] === 172 && o[1] >= 16 && o[1] <= 31) return true;
+    if (o[0] === 192 && o[1] === 168) return true;
+    if (o[0] === 169 && o[1] === 254) return true;
+    if (o[0] === 0) return true;
+    return false;
+  }
+  if (h.includes(":")) {
+    const low = h.split("%")[0];
+    return (
+      low === "::1" ||
+      low.startsWith("fc") || low.startsWith("fd") ||
+      low.startsWith("fe80") || low.startsWith("fe90") || low.startsWith("fea") ||
+      low.startsWith("feb") || low === "::ffff:127.0.0.1"
+    );
+  }
+  return false;
+}
+
 function dataUrlToBytes(dataUrl: string): Uint8Array | null {
   const comma = dataUrl.indexOf(",");
   if (comma === -1) return null;
@@ -79,7 +112,7 @@ async function embedFontWithFallback(doc: PDFDocument) {
 }
 
 export async function receiptRoutes(app: FastifyInstance) {
-  app.post("/generate", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/generate", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
     const input = generateSchema.parse(request.body);
     const db = getDb();
 
@@ -132,7 +165,18 @@ export async function receiptRoutes(app: FastifyInstance) {
       return { base64, contentType: "application/pdf" };
     }
 
-    const tmplRes = await fetch(templateMeta.url);
+    // L'URL du gabarit vient des réglages (staff) : on la confine quand même
+    // au web public — jamais de loopback, réseau privé ou protocole exotique.
+    let tmplUrl: URL;
+    try {
+      tmplUrl = new URL(templateMeta.url);
+    } catch {
+      return reply.status(400).send({ error: "URL de gabarit invalide" });
+    }
+    if (!["http:", "https:"].includes(tmplUrl.protocol) || isPrivateHost(tmplUrl.hostname)) {
+      return reply.status(400).send({ error: "URL de gabarit non autorisée" });
+    }
+    const tmplRes = await fetch(tmplUrl.toString());
     const tmplBytes = new Uint8Array(await tmplRes.arrayBuffer());
     const pdfDoc = await PDFDocument.load(tmplBytes);
     const font = await embedFontWithFallback(pdfDoc);
