@@ -114,6 +114,17 @@ function nomFormateur(formateurs: Formateur[], id: string) {
   return f ? `${f.prenom} ${f.nom}` : " ";
 }
 
+/**
+ * Classe convoquée normalisée, ex. « S2-A ». Les fiches étudiants sont
+ * incohérentes : certaines portent le groupe brut (« A »), d'autres déjà
+ * préfixé (« S2-A »). On ne préfixe donc qu'une seule fois — sinon la liste
+ * affichait « S2-S2-A » et la convocation ne trouvait personne.
+ */
+function classeLabel(niveau: string, groupe: string) {
+  if (!groupe) return "";
+  return groupe.startsWith(`${niveau}-`) ? groupe : `${niveau}-${groupe}`;
+}
+
 /** Pastille d'état du sujet déposé. */
 function DocumentBadge({ examen }: { examen: Examen }) {
   return examen.document ? (
@@ -400,7 +411,7 @@ function EspaceFormateur() {
     const set = new Set<string>();
     for (const s of seances) if (s.groupe.trim()) set.add(s.groupe.trim());
     for (const e of etudiants) {
-      if (e.niveau && e.groupe) set.add(`${e.niveau}-${e.groupe}`);
+      if (e.niveau && e.groupe) set.add(classeLabel(e.niveau, e.groupe));
     }
     return [...set].sort();
   }, [seances, etudiants]);
@@ -410,7 +421,7 @@ function EspaceFormateur() {
     const map: Record<string, number> = {};
     for (const e of etudiants) {
       if (!e.niveau || !e.groupe || e.statut === "abandon") continue;
-      const k = `${e.niveau}-${e.groupe}`;
+      const k = classeLabel(e.niveau, e.groupe);
       map[k] = (map[k] ?? 0) + 1;
     }
     return map;
@@ -420,6 +431,13 @@ function EspaceFormateur() {
   // sélectionné (référentiel hydraté) ; sans fiche liée, la liste est vide.
   const moi = useCurrentFormateur();
   const moiId = moi?.id ?? "";
+
+  // Groupes réellement encadrés par le formateur connecté (« S2-A »…), pour
+  // restreindre les sélecteurs Semestre / Groupe à son affectation.
+  const mesGroupes = useMemo(
+    () => [...new Set((moi?.groupes ?? []).filter(Boolean))].sort(),
+    [moi],
+  );
 
   const [search, setSearch] = useState("");
   const [type, setType] = useState<string>(ALL);
@@ -664,6 +682,7 @@ function EspaceFormateur() {
           initial={editing}
           filieres={filieresOptions}
           classesDisponibles={classesDisponibles}
+          mesGroupes={mesGroupes}
           effectifs={effectifsClasse}
           onCancel={() => setFormOpen(false)}
           onSubmit={async ({ data, file, removeExisting }) => {
@@ -1028,6 +1047,7 @@ function ExamenForm({
   initial,
   filieres,
   classesDisponibles,
+  mesGroupes,
   effectifs,
   onSubmit,
   onCancel,
@@ -1035,6 +1055,7 @@ function ExamenForm({
   initial: Examen | null;
   filieres: string[];
   classesDisponibles: string[];
+  mesGroupes: string[];
   effectifs: Record<string, number>;
   onSubmit: (p: SubmitPayload) => void;
   onCancel: () => void;
@@ -1071,6 +1092,38 @@ function ExamenForm({
     setErrors((prev) => ({ ...prev, [k]: undefined }));
   };
 
+  /** Semestres enseignés par le formateur (préfixe de ses groupes). Repli sur
+   *  la liste complète si son affectation est vide. */
+  const semestreOptions = useMemo(() => {
+    const s = [
+      ...new Set(
+        mesGroupes.map((g) => g.split("-")[0]).filter((x) => /^S\d$/.test(x)),
+      ),
+    ].sort();
+    return s.length ? s : [...NIVEAUX];
+  }, [mesGroupes]);
+
+  /** Groupes proposés : ceux du formateur (filtrés par le semestre choisi),
+   *  sinon les classes réelles de l'établissement. La valeur déjà portée par
+   *  un examen en édition est toujours conservée. */
+  const groupeOptions = useMemo(() => {
+    const base = mesGroupes.length ? mesGroupes : classesDisponibles;
+    const list = base.filter(
+      (g) => !f.niveau || !/^S\d-/.test(g) || g.startsWith(`${f.niveau}-`),
+    );
+    if (initial?.classe && !list.includes(initial.classe)) list.push(initial.classe);
+    return [...new Set(list)].sort();
+  }, [mesGroupes, classesDisponibles, f.niveau, initial]);
+
+  // Le groupe choisi ne colle plus au semestre : on le remet à zéro.
+  useEffect(() => {
+    setF((prev) =>
+      prev.classe && !groupeOptions.includes(prev.classe)
+        ? { ...prev, classe: "" }
+        : prev,
+    );
+  }, [groupeOptions]);
+
   /** Options du sélecteur de module : le référentiel, complété par la valeur
    *  déjà saisie sur un examen existant pour ne rien perdre à l'édition. */
   const moduleOptions = useMemo(() => {
@@ -1097,7 +1150,7 @@ function ExamenForm({
     if (!f.filiere) next.filiere = "Filière obligatoire";
     if (!f.niveau) next.niveau = "Semestre obligatoire";
     if (!f.classe.trim()) next.classe = "Groupe obligatoire";
-    else if (!classesDisponibles.includes(f.classe.trim()))
+    else if (!groupeOptions.includes(f.classe.trim()))
       next.classe = "Groupe inconnu — choisissez une classe existante";
     if (!f.date) next.date = "Date obligatoire";
     if (!f.salle.trim()) next.salle = "Salle obligatoire";
@@ -1173,8 +1226,8 @@ function ExamenForm({
         label="Semestre"
         required
         value={f.niveau}
-        onChange={(v) => set("niveau", v)}
-        options={NIVEAUX}
+        onChange={(v) => set("niveau", v as Niveau)}
+        options={semestreOptions}
         error={errors.niveau}
       />
       <SelectField
@@ -1182,7 +1235,7 @@ function ExamenForm({
         required
         value={f.classe}
         onChange={(v) => set("classe", v)}
-        options={classesDisponibles}
+        options={groupeOptions}
         error={errors.classe}
       />
       <SelectField
@@ -1310,7 +1363,7 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
       examen
         ? etudiants.filter(
             (e) =>
-              `${e.niveau}-${e.groupe}` === examen.classe &&
+              classeLabel(e.niveau, e.groupe) === examen.classe &&
               e.statut !== "abandon",
           )
         : [],
@@ -1323,7 +1376,8 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
     const roster = ex
       ? etudiants.filter(
           (e) =>
-            `${e.niveau}-${e.groupe}` === ex.classe && e.statut !== "abandon",
+            classeLabel(e.niveau, e.groupe) === ex.classe &&
+            e.statut !== "abandon",
         )
       : [];
     // Pré-remplit avec les notes déjà attribuées pour ce module.
@@ -1398,7 +1452,7 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
           etudiantId: e.id,
           etudiant: `${e.prenom} ${e.nom}`,
           cne: e.cne,
-          groupe: `${e.niveau}-${e.groupe}`,
+          groupe: classeLabel(e.niveau, e.groupe),
           module: n.module,
           examen: n.examen,
           note: n.note,

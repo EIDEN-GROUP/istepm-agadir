@@ -21,6 +21,9 @@ const examenSchema = z.object({
   surveillants: z.array(z.string()).optional().default([]),
   statut: z.string().optional().default("planifie"),
   groupe: z.string().optional().default(""),
+  // Le front envoie la classe convoquée sous la forme « S2-A ». On en dérive
+  // le groupe (« A ») ci-dessous ; la colonne `classe` n'existe pas en base.
+  classe: z.string().optional(),
   etudiantsConvoques: z.number().optional().default(0),
   composante: z.string().optional().default("Theorique"),
   duree: z.number().min(0).optional().default(120),
@@ -87,6 +90,23 @@ function ponderee(notes: { note: string; coef: string }[]): number {
     totalCoef += Number(n.coef);
   }
   return totalCoef > 0 ? Math.round((total / totalCoef) * 100) / 100 : 0;
+}
+
+/**
+ * Le formulaire envoie `classe` (« S2-A »). La base ne stocke que `niveau` +
+ * `groupe` : on extrait le groupe (« A »), en retirant le préfixe de semestre
+ * s'il est présent, puis on supprime `classe` avant l'écriture.
+ */
+function normaliseClasse(input: Record<string, unknown>) {
+  const classe = typeof input.classe === "string" ? input.classe.trim() : "";
+  if (classe) {
+    const niveau = typeof input.niveau === "string" ? input.niveau.trim() : "";
+    input.groupe =
+      niveau && classe.startsWith(`${niveau}-`)
+        ? classe.slice(niveau.length + 1)
+        : classe;
+  }
+  delete input.classe;
 }
 
 export async function examenRoutes(app: FastifyInstance) {
@@ -172,7 +192,8 @@ export async function examenRoutes(app: FastifyInstance) {
   }
 
   app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request, reply) => {
-    const input = examenSchema.parse(request.body);
+    const input = examenSchema.parse(request.body) as Record<string, unknown>;
+    normaliseClasse(input);
     if (request.user.role === "enseignant") {
       // Un enseignant ne crée que ses propres examens : l'auteur est forcé
       // à la fiche liée (la valeur client est ignorée).
@@ -183,14 +204,15 @@ export async function examenRoutes(app: FastifyInstance) {
     const db = getDb();
     const [examen] = await db
       .insert(examens)
-      .values(input)
+      .values(input as typeof examens.$inferInsert)
       .returning();
     return enrichExamen(examen);
   });
 
   app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const input = examenSchema.partial().parse(request.body);
+    const input = examenSchema.partial().parse(request.body) as Record<string, unknown>;
+    normaliseClasse(input);
     if (request.user.role === "enseignant") {
       const fiche = await ficheEnseignant(request.user.id);
       const db = getDb();

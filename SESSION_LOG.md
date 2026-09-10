@@ -5,6 +5,29 @@ session: what changed, why, backend/DB impact, and anything the team must know.
 
 ---
 
+## 2026-09-10 — Teacher exam form: group persistence + scoped semester/group
+
+Off `cb9534d`.
+
+- **Group wasn't saved** — `ExamenForm` sends `classe` (« S2-A »); the backend
+  `examenSchema` only knew a bare `groupe` field, so it was dropped and the
+  GROUPE column came out empty. `examens.ts` now accepts `classe`,
+  derives `groupe` from it (`normaliseClasse`, strips the `S#-` prefix) and
+  drops `classe` before the insert/update. No schema/migration change.
+- **Malformed dropdown** (`S1-S1-A`, `S2-S2-A`…) — group lists were built as
+  `` `${niveau}-${groupe}` `` over student fiches whose `groupe` is
+  inconsistent (some already prefixed). New `classeLabel()` helper prefixes
+  once; applied to `classesDisponibles`, effectif counts and the
+  Saisie-des-notes roster/label matching.
+- **Semestre / Groupe now scoped to the formateur** — the exam form's
+  Semestre select lists only the teacher's assigned semesters, the Groupe
+  select only their encadré groups (`moi.groupes`), filtered by the chosen
+  semester. Falls back to the full lists when the account has no linked
+  formateur. Validation checks against the scoped list; a stale group
+  resets when the semester changes.
+
+---
+
 ## 2026-09-10 — Teacher group filter + toast shape
 
 Off `origin/main` `facf806`. Pushed `30240b3`.
