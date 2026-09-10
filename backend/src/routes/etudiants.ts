@@ -352,6 +352,36 @@ export async function etudiantRoutes(app: FastifyInstance) {
   app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")], bodyLimit: 2_000_000 }, async (request, reply) => {
     const input = etudiantSchema.parse(request.body);
     const db = getDb();
+
+    // Anti-doublon : un même CNE (ou, à défaut, un même e-mail) ne peut pas
+    // être ré-inscrit tant que la fiche active existe. Bloque les double-clics
+    // sur « Inscrire » et les créations en double depuis deux postes.
+    const cne = input.cne.trim();
+    const email = input.email.trim().toLowerCase();
+    if (cne || email) {
+      const clauses = [];
+      if (cne) clauses.push(sql`lower(${etudiants.cne}) = ${cne.toLowerCase()}`);
+      if (email) clauses.push(sql`lower(${etudiants.email}) = ${email}`);
+      const [dup] = await db
+        .select({
+          cne: etudiants.cne,
+          email: etudiants.email,
+          prenom: etudiants.prenom,
+          nom: etudiants.nom,
+        })
+        .from(etudiants)
+        .where(and(eq(etudiants.archived, false), or(...clauses)))
+        .limit(1);
+      if (dup) {
+        const parCne = cne && dup.cne.toLowerCase() === cne.toLowerCase();
+        return reply.status(409).send({
+          error: `Un étudiant avec ${
+            parCne ? `le CNE « ${cne} »` : `l'e-mail « ${input.email.trim()} »`
+          } est déjà inscrit (${dup.prenom} ${dup.nom}).`,
+        });
+      }
+    }
+
     try {
       const fraisAnnuels = input.fraisMensuels * 10;
       const insertValues: Record<string, unknown> = {};

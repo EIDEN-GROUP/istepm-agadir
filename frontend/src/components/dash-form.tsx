@@ -659,6 +659,7 @@ export function FormDialog({
   subtitle,
   submitLabel = "Enregistrer",
   onSubmit,
+  busy = false,
   wide,
   children,
 }: {
@@ -668,11 +669,13 @@ export function FormDialog({
   subtitle?: string;
   submitLabel?: string;
   onSubmit: () => void;
+  /** Désactive les boutons pendant l'envoi — évite les doubles soumissions. */
+  busy?: boolean;
   wide?: boolean;
   children: ReactNode;
 }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent className={wide ? dialogSurfaceWide : dialogSurface}>
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription className="sr-only">
@@ -685,19 +688,21 @@ export function FormDialog({
             <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
-                className={ghostPill}
+                className={cn(ghostPill, "disabled:opacity-50")}
+                disabled={busy}
                 onClick={() => onOpenChange(false)}
               >
                 Annuler
               </button>
               <motion.button
                 type="button"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className={primaryPill}
-                onClick={onSubmit}
+                whileHover={busy ? undefined : { scale: 1.02 }}
+                whileTap={busy ? undefined : { scale: 0.98 }}
+                className={cn(primaryPill, "disabled:opacity-60 disabled:pointer-events-none")}
+                disabled={busy}
+                onClick={() => !busy && onSubmit()}
               >
-                {submitLabel}
+                {busy ? "Enregistrement…" : submitLabel}
               </motion.button>
             </div>
           }

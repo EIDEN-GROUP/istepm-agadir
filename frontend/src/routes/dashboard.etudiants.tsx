@@ -797,7 +797,7 @@ function EtudiantForm({
     filiere: Filiere;
     niveau: Niveau;
     fraisMensuels: number;
-  }) => void;
+  }) => void | Promise<void>;
   onCancel: () => void;
 }) {
   const isNew = !initial;
@@ -828,6 +828,7 @@ function EtudiantForm({
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
+  const [busy, setBusy] = useState(false);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setF((prev) => ({ ...prev, [k]: v }));
@@ -852,7 +853,8 @@ function EtudiantForm({
     }
   };
 
-  const submit = () => {
+  const submit = async () => {
+    if (busy) return;
     const next: Partial<Record<keyof FormState, string>> = {};
     if (!f.cne.trim()) next.cne = "CNE obligatoire";
     if (!f.prenom.trim()) next.prenom = "Prénom obligatoire";
@@ -872,12 +874,17 @@ function EtudiantForm({
       return;
     }
 
-    onSubmit({
-      ...f,
-      filiere: f.filiere as Filiere,
-      niveau: f.niveau as Niveau,
-      fraisMensuels: Number(f.fraisMensuels),
-    });
+    setBusy(true);
+    try {
+      await onSubmit({
+        ...f,
+        filiere: f.filiere as Filiere,
+        niveau: f.niveau as Niveau,
+        fraisMensuels: Number(f.fraisMensuels),
+      });
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -893,6 +900,7 @@ function EtudiantForm({
       }
       submitLabel={initial ? "Enregistrer les modifications" : "Inscrire"}
       onSubmit={submit}
+      busy={busy}
     >
       <FullWidth>
         <div className="flex items-center gap-4 rounded-xl border border-brand/15 bg-muted/40 p-3">
