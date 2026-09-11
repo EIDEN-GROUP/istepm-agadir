@@ -575,13 +575,18 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   // Signal de session : la synchro ne part que sous un compte connecté.
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const userRole = user?.role ?? null;
 
   // Synchronisation serveur : remplacement intégral, jamais de fusion locale.
   // Échec réseau = `syncFailed` (bandeau explicite), jamais de données inventées.
+  // Les listes staff (étudiants, formateurs, stages, séances) répondent
+  // 403/404 à un compte étudiant (qui a son espace dédié via /api/student/*) :
+  // on ne les demande même pas pour éviter erreurs console + bandeau abusif.
   const refresh = useCallback(async () => {
     setLoading(true);
     setSyncFailed(false);
     try {
+      const staffOnly = userRole === "etudiant";
       const [
         etudiantsRaw,
         formateursRaw,
@@ -600,12 +605,12 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         filieresRaw,
         groupsRaw,
       ] = await Promise.all([
-        apiFetchEtudiants(),
-        apiFetchFormateurs(),
+        staffOnly ? [] : apiFetchEtudiants(),
+        staffOnly ? [] : apiFetchFormateurs(),
         apiFetchExamens(),
         apiFetchBulletins(),
-        apiFetchStages(),
-        apiFetchSeances(),
+        staffOnly ? [] : apiFetchStages(),
+        staffOnly ? [] : apiFetchSeances(),
         apiFetchStructures(),
         apiFetchStageServices(),
         fetchSettings().catch(() => ({}) as Record<string, unknown>),
@@ -663,7 +668,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userRole]);
 
   useEffect(() => {
     // Le provider vit au-dessus du routeur : il monte sur l'écran de login,
