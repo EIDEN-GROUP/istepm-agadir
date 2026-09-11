@@ -811,7 +811,7 @@ function StagesPage() {
                       );
                       const res = await sendEmailApi({
                         to,
-                        subject: `Convention de stage — ${s.prenom} ${s.nom}`,
+                        subject: `Convention de stage · ${s.prenom} ${s.nom}`,
                         html,
                         text,
                         attachments: [
@@ -863,7 +863,7 @@ function StagesPage() {
           onCreateStructure={async (nom) => {
             try {
               await addStructureAccueil(nom, 5);
-              toast.success(`Structure enregistrée — ${nom}`);
+              toast.success(`Structure enregistrée : ${nom}`);
             } catch (err) {
               toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
             }
@@ -871,7 +871,7 @@ function StagesPage() {
           onCreateService={async (nom) => {
             try {
               await addServiceStage(nom);
-              toast.success(`Service enregistré — ${nom}`);
+              toast.success(`Service enregistré : ${nom}`);
             } catch (err) {
               toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
             }
@@ -904,7 +904,7 @@ function StagesPage() {
           onCreateStructure={async (nom) => {
             try {
               await addStructureAccueil(nom, 5);
-              toast.success(`Structure enregistrée — ${nom}`);
+              toast.success(`Structure enregistrée : ${nom}`);
             } catch (err) {
               toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
             }

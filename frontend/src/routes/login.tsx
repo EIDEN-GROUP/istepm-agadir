@@ -91,7 +91,7 @@ function LoginPage() {
             </p>
             <div className="mt-6 h-1 w-14 rounded-full bg-[color:var(--l-red)]" />
             <p className="mt-6 max-w-[15rem] text-[13px] font-medium leading-6 text-[color:oklch(0.31_0.058_191/0.7)]">
-              Institut spécialisé des techniques paramédicales — Agadir
+              Institut spécialisé des techniques paramédicales · Agadir
             </p>
           </div>
         </section>

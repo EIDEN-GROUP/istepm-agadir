@@ -636,7 +636,7 @@ function ActiviteFeed() {
       if (x.statut !== "notes_saisies" || !x.date) continue;
       out.push({
         type: "note",
-        texte: `Notes saisies — ${x.module} (${x.classe})`,
+        texte: `Notes saisies · ${x.module} (${x.classe})`,
         date: x.date,
       });
     }
@@ -644,7 +644,7 @@ function ActiviteFeed() {
       if (!s.debut) continue;
       out.push({
         type: "inscription",
-        texte: `Stage — ${s.prenom} ${s.nom} · ${s.structure}`,
+        texte: `Stage · ${s.prenom} ${s.nom} · ${s.structure}`,
         date: s.debut,
       });
     }
@@ -654,7 +654,7 @@ function ActiviteFeed() {
         if (r.statut !== "paye" || !r.datePaiement) continue;
         out.push({
           type: "paiement",
-          texte: `Paiement reçu — ${r.montantPaye.toLocaleString("fr-FR")} MAD (${nomParId.get(r.etudiantId) ?? "étudiant"})`,
+          texte: `Paiement reçu · ${r.montantPaye.toLocaleString("fr-FR")} MAD (${nomParId.get(r.etudiantId) ?? "étudiant"})`,
           date: r.datePaiement.slice(0, 10),
         });
       }

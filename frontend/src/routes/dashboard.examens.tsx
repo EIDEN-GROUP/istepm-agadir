@@ -331,7 +331,7 @@ function DocumentPreview({
                       </p>
                       <p className="text-xs leading-relaxed text-muted-foreground">
                         Les documents Word ne s'affichent pas dans le
-                        navigateur — utilisez « Télécharger » pour l'ouvrir.
+                        navigateur. Utilisez « Télécharger » pour l'ouvrir.
                       </p>
                       <button
                         className={cn(primaryPill, "mt-2 px-4 py-2 text-xs")}
@@ -348,7 +348,7 @@ function DocumentPreview({
             {/* Pied : actions */}
             <footer className="flex items-center justify-between gap-3 border-t border-brand/12 px-5 py-3.5">
               <p className="hidden text-[11px] text-muted-foreground sm:block">
-                Sujet confidentiel — ne pas diffuser hors de l'établissement.
+                Sujet confidentiel : ne pas diffuser hors de l'établissement.
               </p>
               <div className="flex items-center gap-2">
                 {isPdf && url ? (
@@ -1232,7 +1232,7 @@ function ExamenForm({
     if (!f.niveau) next.niveau = "Semestre obligatoire";
     if (!f.classe.trim()) next.classe = "Groupe obligatoire";
     else if (!groupeOptions.includes(f.classe.trim()))
-      next.classe = "Groupe inconnu — choisissez une classe existante";
+      next.classe = "Groupe inconnu : choisissez une classe existante";
     if (!f.date) next.date = "Date obligatoire";
     if (!f.salle.trim()) next.salle = "Salle obligatoire";
     if (!/^\d{2}:\d{2}$/.test(f.heure)) next.heure = "Format attendu HH:MM";

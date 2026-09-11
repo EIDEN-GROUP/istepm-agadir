@@ -141,7 +141,7 @@ export function RequestBell() {
             id: String(d.id ?? ""),
             title: String(d.titre ?? "Demande"),
             sub: who || String(d.description ?? ""),
-            detail: [who, String(d.description ?? "")].filter(Boolean).join(" — "),
+            detail: [who, String(d.description ?? "")].filter(Boolean).join(" · "),
             date: fmtDateNotif(d.createdAt),
             tone: "amber" as Tone,
             label: "À traiter",
@@ -277,7 +277,7 @@ export function RequestBell() {
               </ul>
             ) : (
               <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                Aucune notification — tout est à jour.
+                Aucune notification pour le moment.
               </p>
             )}
           </DetailShell>

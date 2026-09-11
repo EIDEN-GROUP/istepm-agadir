@@ -205,7 +205,7 @@ function DefinirMotDePassePage() {
           <div role="status" className="mt-9 flex flex-col items-center gap-3 rounded-xl bg-brand/10 px-4 py-6 text-center">
             <CheckCircle2 className="h-8 w-8 text-brand-dk" />
             <p className="text-sm font-medium text-brand-dk">
-              Mot de passe enregistré — redirection vers votre espace…
+              Mot de passe enregistré. Redirection vers votre espace…
             </p>
           </div>
         ) : (

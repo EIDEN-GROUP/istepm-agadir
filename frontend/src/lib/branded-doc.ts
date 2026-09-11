@@ -723,7 +723,7 @@ export function buildStageEmailHtml(
             <tr><td style="padding:14px 16px;font:600 13px/1.4 Arial,Helvetica,sans-serif;color:${
               BRAND.tealMd
             };">
-              📎 ${escapeHtml(title)} — document PDF joint à cet e-mail.
+              📎 ${escapeHtml(title)} · document PDF joint à cet e-mail.
             </td></tr>
           </table>
         </td></tr>
@@ -736,7 +736,7 @@ export function buildStageEmailHtml(
             BRAND.tealPale
           };">Institut spécialisé des techniques paramédicales</div>
           <div style="margin-top:8px;font:400 11px/1.5 Arial,Helvetica,sans-serif;color:#8fb3b1;">
-            E-mail automatique — merci de ne pas y répondre.
+            E-mail automatique. Merci de ne pas y répondre.
           </div>
         </td></tr>
 
@@ -747,7 +747,7 @@ export function buildStageEmailHtml(
 </html>`;
 
   const text = [
-    "ISTEPM Agadir — Techniques paramédicales",
+    "ISTEPM Agadir · Techniques paramédicales",
     "",
     title,
     "",
@@ -762,7 +762,7 @@ export function buildStageEmailHtml(
     ]),
     "Document PDF joint à cet e-mail.",
     "",
-    "ISTEPM Agadir — e-mail automatique, merci de ne pas y répondre.",
+    "ISTEPM Agadir · e-mail automatique, merci de ne pas y répondre.",
   ].join("\n");
 
   return { html, text };

@@ -56,7 +56,7 @@ function DashboardLayout() {
             >
               <WifiOff className="h-4 w-4 shrink-0 text-alert" />
               <p className="min-w-0 flex-1 text-alert-dk">
-                Serveur injoignable — les données affichées peuvent être incomplètes.
+                Serveur injoignable : les données affichées peuvent être incomplètes.
               </p>
               <button
                 type="button"

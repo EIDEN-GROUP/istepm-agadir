@@ -125,13 +125,13 @@ export function AppelSeanceDialog({
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className={dialogSurface}>
-        <DialogTitle className="sr-only">Appel — {seance.module}</DialogTitle>
+        <DialogTitle className="sr-only">Appel · {seance.module}</DialogTitle>
         <DialogDescription className="sr-only">
           Marquer les présents et absents de la séance
         </DialogDescription>
         <DetailShell
           icon={<ClipboardCheck className="h-5 w-5" />}
-          title={`Appel — ${seance.module}`}
+          title={`Appel · ${seance.module}`}
           subtitle={`${fmtDate(seance.date)} · ${seance.debut}–${seance.fin} · ${seance.groupe || "tous groupes"}`}
           badges={
             <span className={toneBadge("teal")}>

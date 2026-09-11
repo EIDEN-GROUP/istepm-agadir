@@ -74,8 +74,8 @@ export function istpmEmailShell(opts: {
                 <tr>
                   <td style="font-size:11.5px;color:#8b9a99;line-height:1.6;">
                     ${opts.footerNote ? `<p style="margin:0 0 6px;">${opts.footerNote}</p>` : ""}
-                    <p style="margin:0;">Institut Spécialisé des Techniques Paramédicales — Agadir, Maroc</p>
-                    <p style="margin:2px 0 0;">Cet e-mail a été envoyé automatiquement par la plateforme de gestion ISTEPM Agadir — merci de ne pas y répondre directement.</p>
+                    <p style="margin:0;">Institut Spécialisé des Techniques Paramédicales · Agadir, Maroc</p>
+                    <p style="margin:2px 0 0;">Cet e-mail a été envoyé automatiquement par la plateforme de gestion ISTEPM Agadir. Merci de ne pas y répondre directement.</p>
                   </td>
                 </tr>
               </table>

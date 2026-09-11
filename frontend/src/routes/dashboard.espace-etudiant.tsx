@@ -259,7 +259,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["student-requests"] });
       setDemandeOpen(false);
-      toast.success("Demande envoyée — le secrétariat la traitera");
+      toast.success("Demande envoyée : le secrétariat la traitera");
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Envoi impossible"),
   });
@@ -274,9 +274,9 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
       qc.invalidateQueries({ queryKey: ["student-requests-all"] });
       toast.success(
         vars.statut === "traite"
-          ? "Demande approuvée — l'étudiant est notifié"
+          ? "Demande approuvée : l'étudiant est notifié"
           : vars.statut === "rejete"
-            ? "Demande rejetée — l'étudiant est notifié"
+            ? "Demande rejetée : l'étudiant est notifié"
             : "Demande mise à jour",
       );
       setATraiter(null);
@@ -513,7 +513,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
         <p className="flex items-center gap-1.5 rounded-xl bg-brand/6 px-3 py-2 text-[11px] text-muted-foreground">
           <BadgeCheck className="h-3.5 w-3.5 text-brand-dk" />
           Votre photo et vos informations sont gérées par les affaires
-          estudiantines — signalez toute erreur via une demande.
+          estudiantines. Signalez toute erreur via une demande.
         </p>
         <DetailSection title="Coordonnées">
           <DetailGrid>
@@ -685,7 +685,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
           </p>
           {stages.slice(0, 6).map((s, i) => (
             <p key={String(s.id ?? i)} className="truncate text-xs text-muted-foreground">
-              {String(s.structure ?? "")} — {String(s.service ?? "")} · {String(s.statut ?? "")}
+              {String(s.structure ?? "")} · {String(s.service ?? "")} · {String(s.statut ?? "")}
             </p>
           ))}
         </div>

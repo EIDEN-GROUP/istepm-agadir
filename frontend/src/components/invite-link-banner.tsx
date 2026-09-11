@@ -31,7 +31,7 @@ export function InviteLinkBanner({
       toast.success("Lien copié");
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Copie impossible — sélectionnez le lien manuellement");
+      toast.error("Copie impossible : sélectionnez le lien manuellement");
     }
   };
 

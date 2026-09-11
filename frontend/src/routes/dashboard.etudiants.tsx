@@ -677,8 +677,8 @@ function EtudiantsPage() {
                   setInviteInfo({ email: data.email, inviteUrl: inv.inviteUrl, emailSent: inv.emailSent, emailError: inv.emailError });
                   toast.success(
                     inv.emailSent
-                      ? "Invitation envoyée par e-mail — l'étudiant définira son mot de passe"
-                      : "Compte créé — partagez le lien d'invitation ci-dessous",
+                      ? "Invitation envoyée par e-mail : l'étudiant définira son mot de passe"
+                      : "Compte créé : partagez le lien d'invitation ci-dessous",
                   );
                 } catch (err) {
                   toast.error(err instanceof Error ? err.message : "Invitation impossible");
@@ -876,7 +876,7 @@ function EtudiantForm({
     try {
       set("photoUrl", await downscaleImage(file, 512));
     } catch {
-      toast.error("Image illisible — essayez un autre fichier");
+      toast.error("Image illisible : essayez un autre fichier");
     }
   };
 
@@ -983,7 +983,7 @@ function EtudiantForm({
         error={errors.cne}
         warn={
           cneDup
-            ? `Déjà utilisé par ${cneDup.prenom} ${cneDup.nom} — vérifiez avant d'inscrire.`
+            ? `Déjà utilisé par ${cneDup.prenom} ${cneDup.nom} : vérifiez avant d'inscrire.`
             : undefined
         }
       />
@@ -1062,7 +1062,7 @@ function EtudiantForm({
         error={errors.email}
         warn={
           emailDup
-            ? `Déjà utilisé par ${emailDup.prenom} ${emailDup.nom} — vérifiez avant d'inscrire.`
+            ? `Déjà utilisé par ${emailDup.prenom} ${emailDup.nom} : vérifiez avant d'inscrire.`
             : undefined
         }
       />

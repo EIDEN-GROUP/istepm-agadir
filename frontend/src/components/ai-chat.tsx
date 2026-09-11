@@ -65,7 +65,7 @@ function formatActionResult(actionName: string, data: unknown): string {
         return `  • ${name}${extra ? ` (${extra})` : ""}`;
       })
       .join("\n");
-    return `📋 **${label}** — ${count} résultat(s)\n\n${items}\n\n*Pour voir l'ensemble des ${count} résultats, rendez-vous dans la section **${section}** ou précisez votre recherche.*`;
+    return `📋 **${label}** · ${count} résultat(s)\n\n${items}\n\n*Pour voir l'ensemble des ${count} résultats, rendez-vous dans la section **${section}** ou précisez votre recherche.*`;
   }
 
   return `📋 **${label}**\n\nDonnée chargée avec succès. Pour plus de détails, consultez la section **${section}**.`;
@@ -78,7 +78,7 @@ function formatVerdictMessage(n: TicketNotification): ChatMessage {
   if (n.statut === "done") {
     return {
       role: "assistant",
-      content: `✅ Bonne nouvelle — « ${title} » est disponible !${motif ? `\n\n${motif}` : ""}\n\nDites-moi si vous voulez un ajustement.`,
+      content: `✅ Bonne nouvelle : « ${title} » est disponible !${motif ? `\n\n${motif}` : ""}\n\nDites-moi si vous voulez un ajustement.`,
     };
   }
   return {

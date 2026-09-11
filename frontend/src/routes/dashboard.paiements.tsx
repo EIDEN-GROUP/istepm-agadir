@@ -459,7 +459,7 @@ function PaiementsPage() {
               </ul>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Aucun solde en attente — tous les étudiants sont à jour.
+                Aucun solde en attente : tous les étudiants sont à jour.
               </p>
             )}
           </DetailShell>
@@ -907,7 +907,7 @@ function StudentSearchField({
   error?: string;
 }) {
   const label = (s: { prenom: string; nom: string; cne: string }) =>
-    `${s.prenom} ${s.nom} — ${s.cne}`;
+    `${s.prenom} ${s.nom} · ${s.cne}`;
   const selected = students.find((s) => s.id === value);
   const [query, setQuery] = useState(selected ? label(selected) : "");
   const [open, setOpen] = useState(false);

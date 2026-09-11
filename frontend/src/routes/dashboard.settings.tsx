@@ -231,7 +231,7 @@ function StampSection() {
     mutationFn: saveStampImage,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["stamp"] });
-      toast.success("Cachet enregistré — il sera apposé sur tous les PDF");
+      toast.success("Cachet enregistré : il sera apposé sur tous les PDF");
     },
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Enregistrement impossible"),
@@ -1024,7 +1024,7 @@ function NewUserForm({
         toast.success(
           inv.emailSent
             ? `Invitation envoyée à ${email.trim()}`
-            : `Compte créé — partagez le lien d'invitation`,
+            : `Compte créé : partagez le lien d'invitation`,
         );
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Invitation impossible");
@@ -1935,7 +1935,7 @@ function SettingsPage() {
             {visiblePendingInvites.length ? (
               <div className="mt-3 space-y-1.5 rounded-xl border border-amber-300/40 bg-amber-50/50 p-3">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
-                  Invitations en attente ({visiblePendingInvites.length}) — lien 24 h, usage unique
+                  Invitations en attente ({visiblePendingInvites.length}) · lien 24 h, usage unique
                 </p>
                 {resentInfo ? (
                   <InviteLinkBanner
@@ -1957,7 +1957,7 @@ function SettingsPage() {
                         <span className="text-[10px] text-muted-foreground">
                           {ROLE_META[inv.role as UserRole]?.label ?? inv.role} ·{" "}
                           {expired ? (
-                            <span className="font-semibold text-alert">expiré — renvoyez un lien</span>
+                            <span className="font-semibold text-alert">expiré : renvoyez un lien</span>
                           ) : inv.expiresAt ? (
                             <>expire le {new Date(inv.expiresAt).toLocaleString("fr-FR")}</>
                           ) : (
@@ -1975,7 +1975,7 @@ function SettingsPage() {
                               toast.success(
                                 r.emailSent
                                   ? `Nouveau lien envoyé à ${inv.email}`
-                                  : "Nouveau lien créé — copiez-le ci-dessus",
+                                  : "Nouveau lien créé : copiez-le ci-dessus",
                               );
                             })
                             .catch((err) => toast.error(err instanceof Error ? err.message : "Renvoi impossible"));

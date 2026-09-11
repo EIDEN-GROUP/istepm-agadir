@@ -283,7 +283,7 @@ function MonProfilPage() {
     try {
       photoMut.mutate(await downscaleImage(file, 512));
     } catch {
-      toast.error("Image illisible — essayez un autre fichier.");
+      toast.error("Image illisible : essayez un autre fichier.");
     }
   };
 
@@ -422,7 +422,7 @@ function MonProfilPage() {
             <p className="flex items-start gap-1.5 rounded-xl bg-brand/6 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
               <BadgeCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-dk" />
               {roleMeta.description}. Le nom et le rôle sont gérés par la
-              direction — signalez toute erreur via une demande.
+              direction. Signalez toute erreur via une demande.
             </p>
 
             {isEtudiant && studentQuery.isError ? (

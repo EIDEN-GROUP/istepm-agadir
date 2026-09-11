@@ -59,7 +59,7 @@ function inviteHtml(name: string, role: string, inviteUrl: string) {
     <p style="margin:0 0 16px;">
       Un compte <strong>${escInvite(roleLabel)}</strong> vient d'être créé pour vous sur la
       plateforme de gestion scolaire de l'ISTEPM Agadir. Il vous donne accès à votre espace
-      personnel — emploi du temps, notes, paiements et démarches administratives selon votre profil.
+      personnel : emploi du temps, notes, paiements et démarches administratives selon votre profil.
     </p>
     <p style="margin:0 0 26px;">
       Pour commencer, choisissez votre mot de passe en cliquant sur le bouton ci-dessous.
@@ -97,7 +97,7 @@ function inviteHtml(name: string, role: string, inviteUrl: string) {
 function buildInviteEmail(name: string, role: string, inviteUrl: string) {
   const roleLabel = EMAIL_ROLE_LABELS[role] ?? role;
   return {
-    subject: "Créez votre mot de passe — ISTEPM Agadir",
+    subject: "ISTEPM Agadir · Créez votre mot de passe",
     text:
       `Bonjour ${name},\n\n` +
       `Un compte ${roleLabel} a été créé pour vous sur la plateforme de gestion scolaire ISTEPM Agadir.\n` +

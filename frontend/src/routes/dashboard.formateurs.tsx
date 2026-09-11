@@ -558,8 +558,8 @@ function FormateursPage() {
           setInviteInfo({ email: data.email, inviteUrl: inv.inviteUrl, emailSent: inv.emailSent, emailError: inv.emailError });
           toast.success(
             inv.emailSent
-              ? "Invitation envoyée par e-mail — le formateur définira son mot de passe"
-              : "Formateur ajouté — partagez le lien d'invitation ci-dessous",
+              ? "Invitation envoyée par e-mail : le formateur définira son mot de passe"
+              : "Formateur ajouté : partagez le lien d'invitation ci-dessous",
           );
         } catch (err) {
           toast.error(err instanceof Error ? err.message : "Invitation impossible");
@@ -796,7 +796,7 @@ function FormateurForm({
         error={errors.cin}
         warn={
           cinDup
-            ? `Déjà utilisé par ${cinDup.prenom} ${cinDup.nom} — vérifiez avant d'ajouter.`
+            ? `Déjà utilisé par ${cinDup.prenom} ${cinDup.nom} : vérifiez avant d'ajouter.`
             : undefined
         }
       />
@@ -845,7 +845,7 @@ function FormateurForm({
           options={groupesDisponibles.map((g) => ({ value: g, label: g }))}
           placeholder="Sélectionner les groupes…"
           searchPlaceholder="Rechercher un groupe…"
-          emptyText="Aucun groupe — renseignez d'abord séances et étudiants."
+          emptyText="Aucun groupe : renseignez d'abord séances et étudiants."
         />
       </FullWidth>
       <SelectField
@@ -877,7 +877,7 @@ function FormateurForm({
         error={errors.email}
         warn={
           emailDup
-            ? `Déjà utilisé par ${emailDup.prenom} ${emailDup.nom} — vérifiez avant d'ajouter.`
+            ? `Déjà utilisé par ${emailDup.prenom} ${emailDup.nom} : vérifiez avant d'ajouter.`
             : undefined
         }
       />

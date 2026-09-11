@@ -728,7 +728,7 @@ const [importOpen, setImportOpen] = useState(false);
                         <ul className="mt-1.5 space-y-0.5 text-xs text-alert-dk">
                           {conflits.map((cf, i) => (
                             <li key={i}>
-                              {LIBELLE_CONFLIT[cf.type]} — {cf.seance.module} (
+                              {LIBELLE_CONFLIT[cf.type]} · {cf.seance.module} (
                               {cf.seance.debut}–{cf.seance.fin},{" "}
                               {cf.seance.salle})
                             </li>

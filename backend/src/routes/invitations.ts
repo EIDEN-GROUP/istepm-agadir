@@ -9,7 +9,7 @@ async function logInviteEmail(recipient: string, sent: boolean, errorMsg?: strin
   try {
     await getDb().insert(emailLogs).values({
       recipient,
-      subject: "Invitation — ISTPM Agadir",
+      subject: "ISTEPM Agadir · Invitation",
       type: "invite",
       status: sent ? "sent" : "failed",
       errorMsg: errorMsg ?? "",

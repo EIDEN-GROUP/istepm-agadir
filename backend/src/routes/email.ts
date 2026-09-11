@@ -257,18 +257,18 @@ export async function emailRoutes(app: FastifyInstance) {
         await transporter.sendMail({
           from: env.FROM_EMAIL,
           to: env.ADMIN_EMAIL,
-          subject: "Demande de démo — ISTPM",
+          subject: "ISTPM · Demande de démo",
           html: bodyHtml,
           text: bodyText,
           replyTo: input.email,
         });
-        await logEmail(env.ADMIN_EMAIL, "Demande de démo — ISTPM", "demo", "sent");
+        await logEmail(env.ADMIN_EMAIL, "ISTPM · Demande de démo", "demo", "sent");
 
         if (input.email) {
           await transporter.sendMail({
             from: env.FROM_EMAIL,
             to: input.email,
-            subject: "Demande bien reçue — ISTPM Agadir",
+            subject: "ISTPM Agadir · Demande bien reçue",
             html: `<p>Bonjour ${esc(input.name)},</p><p>Nous avons bien reçu votre demande de démonstration. Notre équipe vous recontactera très vite.</p>`,
             text: `Bonjour ${input.name},\n\nNous avons bien reçu votre demande de démonstration. Notre équipe vous recontactera très vite.`,
           });
