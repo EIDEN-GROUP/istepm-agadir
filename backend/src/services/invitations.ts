@@ -7,6 +7,7 @@ import { formateurs } from "@/db/schema/formateurs";
 import { createUser, findByEmail, hashPassword } from "@/services/auth";
 import { getEnv } from "@/config/env";
 import { eq, and, desc, isNull, isNotNull, gt } from "drizzle-orm";
+import { istpmEmailShell, istpmLogoAttachment, EMAIL_ROLE_LABELS } from "@/lib/email-brand";
 
 /** Durée de validité d'un lien d'invitation : 24 heures, usage unique.
  *  30 minutes expiraient avant lecture (boîtes lentes, week-ends) ; le lien
@@ -49,37 +50,61 @@ function getTransporter() {
 const escInvite = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** Gabarit aux couleurs du site (bandeau teal, carte, bouton d'action). */
+/** Gabarit officiel (logo, carte blanche, bouton d'action) — coquille commune à `email-brand.ts`. */
 function inviteHtml(name: string, role: string, inviteUrl: string) {
-  return (
-    `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">` +
-    `<div style="background:#0d7a74;border-radius:12px 12px 0 0;padding:24px;text-align:center;">` +
-    `<p style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">ISTPM Agadir</p>` +
-    `<p style="margin:4px 0 0;color:#d7f0ee;font-size:13px;">Institut des technologies paramédicales</p>` +
-    `</div>` +
-    `<div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">` +
-    `<p>Bonjour ${escInvite(name)},</p>` +
-    `<p>Un compte <strong>${escInvite(role)}</strong> a été créé pour vous sur la plateforme ISTPM Agadir.</p>` +
-    `<p style="text-align:center;margin:24px 0;">` +
-    `<a href="${inviteUrl}" style="display:inline-block;background:#0d7a74;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 28px;border-radius:999px;">Définir mon mot de passe</a>` +
-    `</p>` +
-    `<p style="color:#6b7280;font-size:13px;">Lien à usage unique, valable 24 heures. Passé ce délai, demandez au secrétariat de vous renvoyer une invitation.</p>` +
-    `<p style="color:#9ca3af;font-size:12px;">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>${inviteUrl}</p>` +
-    `</div>` +
-    `<p style="color:#9ca3af;font-size:12px;text-align:center;">Cet e-mail a été envoyé automatiquement, merci de ne pas y répondre.</p>` +
-    `</div>`
-  );
+  const roleLabel = EMAIL_ROLE_LABELS[role] ?? role;
+  const body = `
+    <p style="margin:0 0 4px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#029994;">Bienvenue</p>
+    <h1 style="margin:0 0 18px;font-size:21px;line-height:1.3;color:#123b3a;">Bonjour ${escInvite(name)},</h1>
+    <p style="margin:0 0 16px;">
+      Un compte <strong>${escInvite(roleLabel)}</strong> vient d'être créé pour vous sur la
+      plateforme de gestion scolaire de l'ISTEPM Agadir. Il vous donne accès à votre espace
+      personnel — emploi du temps, notes, paiements et démarches administratives selon votre profil.
+    </p>
+    <p style="margin:0 0 26px;">
+      Pour commencer, choisissez votre mot de passe en cliquant sur le bouton ci-dessous.
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 26px;">
+      <tr>
+        <td style="border-radius:999px;background-color:#029994;">
+          <a href="${inviteUrl}"
+             style="display:inline-block;padding:13px 34px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:999px;">
+            Définir mon mot de passe
+          </a>
+        </td>
+      </tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fbf6ec;border:1px solid #f0e2c0;border-radius:10px;margin:0 0 22px;">
+      <tr>
+        <td style="padding:12px 16px;font-size:12.5px;color:#7a5f1f;line-height:1.55;">
+          ⏱ Ce lien est <strong>personnel, à usage unique</strong> et reste valable
+          <strong>24 heures</strong>. Passé ce délai, demandez au secrétariat de vous
+          renvoyer une invitation.
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0;font-size:12px;color:#8b9a99;word-break:break-all;">
+      Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>
+      <a href="${inviteUrl}" style="color:#029994;">${inviteUrl}</a>
+    </p>
+  `;
+  return istpmEmailShell({
+    preheader: `Votre accès ${roleLabel.toLowerCase()} à l'espace ISTEPM Agadir vous attend.`,
+    bodyHtml: body,
+  });
 }
 
 function buildInviteEmail(name: string, role: string, inviteUrl: string) {
+  const roleLabel = EMAIL_ROLE_LABELS[role] ?? role;
   return {
-    subject: "Créez votre mot de passe — ISTPM Agadir",
+    subject: "Créez votre mot de passe — ISTEPM Agadir",
     text:
       `Bonjour ${name},\n\n` +
-      `Un compte ${role} a été créé pour vous sur la plateforme ISTPM Agadir.\n` +
+      `Un compte ${roleLabel} a été créé pour vous sur la plateforme de gestion scolaire ISTEPM Agadir.\n` +
       `Définissez votre mot de passe en cliquant sur ce lien (valable 24 heures, utilisable une seule fois) :\n${inviteUrl}\n\n` +
       `Passé ce délai, demandez au secrétariat de vous renvoyer une invitation.`,
     html: inviteHtml(name, role, inviteUrl),
+    attachments: [istpmLogoAttachment()],
   };
 }
 
