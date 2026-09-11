@@ -109,12 +109,37 @@ export async function findById(id: string) {
   return user ?? null;
 }
 
-export async function login(email: string, password: string) {
+export type LoginResult =
+  | { ok: true; user: UserResult }
+  | { ok: false; reason: "invalid" | "archived" };
+
+export async function login(email: string, password: string): Promise<LoginResult> {
   const user = await findByEmail(email);
-  if (!user) return null;
+  if (!user) return { ok: false, reason: "invalid" };
   const valid = await verifyPassword(password, user.passwordHash);
-  if (!valid) return null;
-  return toUserResult(user);
+  if (!valid) return { ok: false, reason: "invalid" };
+  // Compte archivé (étudiant ou enseignant) = accès coupé jusqu'à
+  // désarchivage. Testé APRÈS le mot de passe pour ne pas révéler
+  // l'existence du compte.
+  if (user.role === "etudiant" || user.role === "enseignant") {
+    const db = getDb();
+    if (user.role === "etudiant") {
+      const [fiche] = await db
+        .select({ archived: etudiants.archived })
+        .from(etudiants)
+        .where(eq(etudiants.userId, user.id))
+        .limit(1);
+      if (fiche?.archived) return { ok: false, reason: "archived" };
+    } else {
+      const [fiche] = await db
+        .select({ archived: formateurs.archived })
+        .from(formateurs)
+        .where(eq(formateurs.userId, user.id))
+        .limit(1);
+      if (fiche?.archived) return { ok: false, reason: "archived" };
+    }
+  }
+  return { ok: true, user: toUserResult(user) };
 }
 
 export async function listAllUsers(): Promise<UserResult[]> {

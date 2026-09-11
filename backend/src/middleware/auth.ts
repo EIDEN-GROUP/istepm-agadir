@@ -1,6 +1,8 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { getDb } from "@/db";
 import { users } from "@/db/schema/users";
+import { etudiants } from "@/db/schema/etudiants";
+import { formateurs } from "@/db/schema/formateurs";
 import { eq } from "drizzle-orm";
 
 export interface AuthUserPayload {
@@ -43,6 +45,30 @@ export async function authenticate(
       .limit(1);
     if (!user) {
       return reply.status(401).send({ error: "Utilisateur introuvable" });
+    }
+    // Coupe aussi les sessions en cours : un compte archivé pendant sa
+    // session est rejeté dès la requête suivante (réactivé au désarchivage).
+    // Sans fiche liée : comportement inchangé (connexion autorisée).
+    if (user.role === "etudiant" || user.role === "enseignant") {
+      const archived =
+        user.role === "etudiant"
+          ? (
+              await db
+                .select({ archived: etudiants.archived })
+                .from(etudiants)
+                .where(eq(etudiants.userId, user.id))
+                .limit(1)
+            )[0]?.archived
+          : (
+              await db
+                .select({ archived: formateurs.archived })
+                .from(formateurs)
+                .where(eq(formateurs.userId, user.id))
+                .limit(1)
+            )[0]?.archived;
+      if (archived) {
+        return reply.status(401).send({ error: "Compte désactivé — contactez le secrétariat." });
+      }
     }
     request.user = {
       id: user.id,

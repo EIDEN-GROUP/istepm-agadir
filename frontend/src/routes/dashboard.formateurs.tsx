@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Eye, Trash2, Upload, Archive, Download, FileUp } from "lucide-react";
+import { Plus, Pencil, Eye, Upload, Archive, Download, FileUp, RotateCcw } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -47,7 +47,6 @@ import {
 import { usePagination, TablePagination } from "@/components/table-pagination";
 import {
   FormDialog,
-  ConfirmDialog,
   TextField,
   SelectField,
   MultiSelectField,
@@ -72,7 +71,7 @@ const STATUTS: StatutFormateur[] = ["permanent", "vacataire", "en_conge"];
 
 function FormateursPage() {
   const { role } = useAuth();
-  const { formateurs, modules, seances, etudiants, filieres: filieresApi, addFormateur, updateFormateur, deleteFormateur } =
+  const { formateurs, modules, seances, etudiants, filieres: filieresApi, addFormateur, updateFormateur, archiveFormateur, restoreFormateur } =
     useIstpm();
   const canEdit = role === "directeur" || role === "responsable";
   const filieresOptions = filieresApi.length ? filieresApi : [...FILIERES];
@@ -121,6 +120,7 @@ function FormateursPage() {
 
   const [search, setSearch] = useState("");
   const [departement, setDepartement] = useState<string>(ALL);
+  const [showArchived, setShowArchived] = useState(false);
 
   const [detail, setDetail] = useState<Formateur | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -132,15 +132,28 @@ function FormateursPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return formateurs.filter((f) => {
+      if (!showArchived && f.archived) return false;
       if (departement !== ALL && f.departement !== departement) return false;
       if (!q) return true;
       return `${f.matricule} ${f.cin} ${f.prenom} ${f.nom} ${f.modules.join(" ")} ${f.groupes.join(" ")}`
         .toLowerCase()
         .includes(q);
     });
-  }, [formateurs, search, departement]);
+  }, [formateurs, search, departement, showArchived]);
 
-  const pager = usePagination(filtered, `${search}|${departement}`);
+  const archivedCount = useMemo(() => formateurs.filter((f) => f.archived).length, [formateurs]);
+
+  /** Effectifs par groupe pour le dialogue d'archivage (zéro requête). */
+  const groupConfigsLocal = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of etudiants) {
+      if (e.archived) continue;
+      if (e.groupe.trim()) counts.set(e.groupe, (counts.get(e.groupe) ?? 0) + 1);
+    }
+    return [...counts.entries()].map(([name, studentCount]) => ({ name, studentCount }));
+  }, [etudiants]);
+
+  const pager = usePagination(filtered, `${search}|${departement}|${showArchived}`);
 
   const colonnesImportFormateurs: ImportColumn[] = [
     { key: "matricule", label: "Matricule", required: true },
@@ -321,6 +334,19 @@ function FormateursPage() {
         ]}
       />
 
+      <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={showArchived}
+          onChange={() => setShowArchived((v) => !v)}
+          className="h-3.5 w-3.5 accent-[var(--brand)]"
+        />
+        Afficher les archivés
+        {archivedCount > 0 ? (
+          <span className="font-semibold text-foreground">({archivedCount})</span>
+        ) : null}
+      </label>
+
       {inviteInfo ? (
         <InviteLinkBanner
           email={inviteInfo.email}
@@ -362,7 +388,7 @@ function FormateursPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.25, delay: i * 0.03, ease: "easeOut" }}
             onClick={() => setDetail(f)}
-            className={tableRow}
+            className={cn(tableRow, f.archived && "opacity-50")}
           >
             <td className="font-medium tabular-nums">{f.matricule}</td>
             <td>
@@ -410,13 +436,29 @@ function FormateursPage() {
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    <button
-                      className={iconButtonDanger}
-                      aria-label="Supprimer"
-                      onClick={() => setToDelete(f)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {f.archived ? (
+                      <button
+                        className={iconButton}
+                        aria-label="Restaurer"
+                        onClick={() => {
+                          void restoreFormateur(f.id)
+                            .then(() => toast.success(`Formateur restauré   ${f.prenom} ${f.nom}`))
+                            .catch((err) =>
+                              toast.error(err instanceof Error ? err.message : "Restauration impossible"),
+                            );
+                        }}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        className={iconButtonDanger}
+                        aria-label="Archiver"
+                        onClick={() => setToDelete(f)}
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </>
                 ) : null}
               </div>
@@ -586,28 +628,26 @@ function FormateursPage() {
         />
       ) : null}
 
-      <ConfirmDialog
-        open={!!toDelete}
-        onOpenChange={(o) => !o && setToDelete(null)}
-        title="Supprimer ce formateur ?"
-        message={
-          toDelete
-            ? `${toDelete.prenom} ${toDelete.nom} (${toDelete.matricule}) sera retiré du corps enseignant. Cette action est irréversible.`
-            : ""
-        }
-        onConfirm={async () => {
-          if (!toDelete) return;
-          try {
-            await deleteFormateur(toDelete.id);
-            toast.success(
-              `Formateur supprimé   ${toDelete.prenom} ${toDelete.nom}`,
-            );
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Suppression impossible");
-          }
-          setToDelete(null);
-        }}
-      />
+      {toDelete ? (
+        <ArchiveFormateurDialog
+          key={toDelete.id}
+          formateur={toDelete}
+          formateurs={formateurs.filter((f) => f.id !== toDelete.id && !f.archived)}
+          groupConfigs={groupConfigsLocal}
+          onCancel={() => setToDelete(null)}
+          onConfirm={async (groupReassignments, filiereReassignment) => {
+            try {
+              await archiveFormateur(toDelete.id, groupReassignments, filiereReassignment);
+              toast.success(
+                `Formateur archivé   ${toDelete.prenom} ${toDelete.nom}`,
+              );
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Archivage impossible");
+            }
+            setToDelete(null);
+          }}
+        />
+      ) : null}
 
       <ImportCsvDialog
         open={importOpen}

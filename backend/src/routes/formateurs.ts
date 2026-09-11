@@ -205,10 +205,12 @@ export async function formateurRoutes(app: FastifyInstance) {
     return formateur;
   });
 
+  // Suppression logique comme les étudiants : l'historique (notes saisies,
+  // séances, disponibilités) survit ; restauration via POST /:id/restore.
   app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
-    await db.delete(formateurs).where(eq(formateurs.id, id));
+    await db.update(formateurs).set({ archived: true }).where(eq(formateurs.id, id));
     return { ok: true };
   });
 }
