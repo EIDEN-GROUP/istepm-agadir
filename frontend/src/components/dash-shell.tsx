@@ -1,7 +1,7 @@
 import { Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ROLE_META, useAuth } from "@/lib/auth";
+import { ROLE_META, getStoredRole, logoutTarget, useAuth } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
 import { cn } from "@/lib/utils";
@@ -874,15 +874,18 @@ export function DashShell({
 
   useEffect(() => {
     if (!loading && !user && typeof window !== "undefined") {
-      const t = setTimeout(() => navigate({ to: "/login" }), 0);
+      // Session expirée : le stockage retient souvent encore le rôle.
+      const to = logoutTarget(getStoredRole());
+      const t = setTimeout(() => navigate({ to }), 0);
       return () => clearTimeout(t);
     }
   }, [user, loading, navigate]);
 
   if (variant === "topnav" && topNav && topNav.length > 0) {
     const handleLogout = () => {
+      const to = logoutTarget(user?.role);
       logout();
-      navigate({ to: "/login" });
+      navigate({ to });
     };
 
     return (
@@ -1081,8 +1084,9 @@ export function DashShell({
         <div className="p-3 border-t border-border">
           <button
             onClick={() => {
+              const to = logoutTarget(user?.role);
               logout();
-              navigate({ to: "/login" });
+              navigate({ to });
             }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-muted/80"
           >

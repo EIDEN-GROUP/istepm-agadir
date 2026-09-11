@@ -65,6 +65,15 @@ export function getStoredRole(): UserRole | null {
   return readStoredRole();
 }
 
+/**
+ * Portail de retour après déconnexion : le personnel (directeur,
+ * responsable, enseignant) retrouve l'adresse discrète `/istepm`,
+ * les étudiants leur portail `/login`. Rôle inconnu → `/login`.
+ */
+export function logoutTarget(role: UserRole | null | undefined): string {
+  return role === "etudiant" ? "/login" : role ? "/istepm" : "/login";
+}
+
 export function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(TOKEN_STORAGE_KEY);

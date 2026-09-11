@@ -22,7 +22,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { ROLE_META, useAuth } from "@/lib/auth";
+import { ROLE_META, logoutTarget, useAuth } from "@/lib/auth";
 import { RequestBell } from "@/components/request-bell";
 import { PersonAvatar } from "@/components/person-avatar";
 import { useDashboardI18n } from "@/lib/dashboard-i18n";
@@ -381,8 +381,9 @@ function SidebarBody({
         <button
           type="button"
           onClick={() => {
+            const to = logoutTarget(user?.role);
             logout();
-            navigate({ to: "/login" });
+            navigate({ to });
           }}
           aria-label={t.shell.logoutAria}
           title={collapsed ? t.shell.logout : undefined}
@@ -579,8 +580,9 @@ function IconRail({
           <button
             type="button"
             onClick={() => {
+              const to = logoutTarget(user?.role);
               logout();
-              navigate({ to: "/login" });
+              navigate({ to });
             }}
             aria-label={t.shell.logoutAria}
             className={cn(RAIL_TILE, "h-10 w-10", RAIL_TILE_IDLE, "hover:bg-alert/10 hover:text-alert-dk")}
