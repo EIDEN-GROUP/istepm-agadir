@@ -87,13 +87,17 @@ export async function authRoutes(app: FastifyInstance) {
     { config: { rateLimit: { max: 15, timeWindow: "15 minutes" } } },
     async (request, reply) => {
       const input = loginSchema.parse(request.body);
-      const user = await login(input.email, input.password);
-      if (!user) {
+      const result = await login(input.email, input.password);
+      if (!result.ok) {
         request.log.warn({ email: input.email, ip: request.ip }, "Échec connexion");
-        return reply
-          .status(401)
-          .send({ error: "Email ou mot de passe incorrect" });
+        return reply.status(401).send({
+          error:
+            result.reason === "archived"
+              ? "Compte désactivé — contactez le secrétariat."
+              : "Email ou mot de passe incorrect",
+        });
       }
+      const user = result.user;
     const token = app.jwt.sign({
       id: user.id,
       email: user.email,
