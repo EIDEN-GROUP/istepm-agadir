@@ -1570,7 +1570,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     () => {
       const counts = new Map<string, number>();
       for (const e of snap.etudiants) {
-        const n = e.niveau || "—";
+        const n = e.niveau || "Non précisé";
         counts.set(n, (counts.get(n) ?? 0) + 1);
       }
       return [...counts.entries()]

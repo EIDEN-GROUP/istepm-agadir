@@ -43,7 +43,7 @@ import { cn } from "@/lib/utils";
 
 const str = (v: unknown) => {
   const s = v == null ? "" : String(v);
-  return s.trim() ? s : "—";
+  return s.trim();
 };
 
 function Field({ label, value }: { label: string; value: ReactNode }) {
@@ -263,7 +263,7 @@ function MonProfilPage() {
   const s = settingsQuery.data ?? {};
   const institut =
     [str(s.institut_nom), str(s.institut_ville)]
-      .filter((v) => v !== "—")
+      .filter(Boolean)
       .join(" · ") || "Institut spécialisé des techniques paramédicales";
 
   // Fiche formateur liée au compte (comparaison d'e-mails insensible à la casse).
@@ -383,7 +383,7 @@ function MonProfilPage() {
                   <Field
                     label="Niveau · groupe"
                     value={
-                      [etu.niveau, etu.groupe].filter(Boolean).join(" · ") || "—"
+                      [etu.niveau, etu.groupe].filter(Boolean).join(" · ")
                     }
                   />
                   <Field
@@ -470,7 +470,7 @@ function MonProfilPage() {
             <Stat
               icon={<CalendarCheck className="h-4 w-4" />}
               label="Assiduité"
-              value={me.presence ? `${Math.round(me.presence.taux)}%` : "—"}
+              value={me.presence ? `${Math.round(me.presence.taux)}%` : ""}
             />
           </div>
         </section>

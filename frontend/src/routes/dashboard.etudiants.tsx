@@ -556,7 +556,7 @@ function EtudiantsPage() {
                       : null;
                     return (
                       <span className={toneBadge(mNote ? "teal" : "neutral")}>
-                        {mNote ? `${mNote.note.toFixed(1)}/20` : "—"}
+                        {mNote ? `${mNote.note.toFixed(1)}/20` : ""}
                       </span>
                     );
                   })()}
@@ -1337,7 +1337,7 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
                   {fmtMAD(r.montantPaye)} / {fmtMAD(r.montantDu)}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2">
-                  {r.datePaiement ? fmtDate(r.datePaiement) : "—"}
+                  {r.datePaiement ? fmtDate(r.datePaiement) : ""}
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">{r.mode}</td>
                 <td className="px-3 py-2">
@@ -1346,7 +1346,7 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted-foreground">
-                  {r.recu || "—"}
+                  {r.recu || ""}
                 </td>
               </tr>
             ))}

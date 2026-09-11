@@ -34,14 +34,14 @@ type BellItem = {
   lu: boolean;
 };
 
-/** Formattage de date qui ne plante jamais (données inattendues → "—"). */
+/** Formattage de date qui ne plante jamais (données inattendues → chaîne vide). */
 function fmtDateNotif(v: unknown): string {
   try {
     const d = new Date(String(v ?? ""));
-    if (Number.isNaN(+d)) return "—";
+    if (Number.isNaN(+d)) return "";
     return d.toLocaleDateString("fr-FR");
   } catch {
-    return "—";
+    return "";
   }
 }
 

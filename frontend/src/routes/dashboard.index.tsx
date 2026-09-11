@@ -1502,9 +1502,9 @@ function DashboardEtudiant() {
 
       {/* Situation en bref */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MiniStat label="Moyenne générale" value={moyenne ? `${moyenne}/20` : "—"} icon={BarChart3} />
+        <MiniStat label="Moyenne générale" value={moyenne ? `${moyenne}/20` : ""} icon={BarChart3} />
         <MiniStat label="Bulletins" value={String(bulletins.length)} icon={CheckCircle2} />
-        <MiniStat label="Reste à payer" value={reste ? `${reste} MAD` : "—"} icon={Wallet} />
+        <MiniStat label="Reste à payer" value={reste ? `${reste} MAD` : ""} icon={Wallet} />
         <MiniStat
           label="Demandes"
           value={reponses > 0 ? `${reponses} réponse(s)` : enAttente > 0 ? `${enAttente} en cours` : "À jour"}
@@ -1530,7 +1530,7 @@ function DashboardEtudiant() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-foreground">{c.module}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {c.debut}–{c.fin} · {c.salle || "—"}{nomProf(c.professeurId) ? ` · ${nomProf(c.professeurId)}` : ""}
+                      {c.debut}–{c.fin} · {c.salle || "Salle non précisée"}{nomProf(c.professeurId) ? ` · ${nomProf(c.professeurId)}` : ""}
                     </span>
                   </span>
                 </li>

@@ -165,8 +165,8 @@ function stageSections(s: Stage, kind: Kind): Section[] {
     {
       title: "Encadrement",
       rows: [
-        { label: "Tuteur clinique", value: s.encadrantClinique || "—" },
-        { label: "Tuteur académique", value: s.tuteurAcademique || "—" },
+        { label: "Tuteur clinique", value: s.encadrantClinique || "Non renseigné" },
+        { label: "Tuteur académique", value: s.tuteurAcademique || "Non renseigné" },
       ],
     },
   ];
@@ -505,7 +505,7 @@ export async function makePaiementDocPdf(
         { label: "Montant réglé", value: `${params.montantPaye.toFixed(2)} MAD` },
         {
           label: "Date de paiement",
-          value: params.datePaiement ? fmtDate(params.datePaiement) : "—",
+          value: params.datePaiement ? fmtDate(params.datePaiement) : "Non renseignée",
         },
         {
           label: "Statut",

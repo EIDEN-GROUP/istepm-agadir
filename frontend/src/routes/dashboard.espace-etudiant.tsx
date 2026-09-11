@@ -75,7 +75,7 @@ import {
 /** Libellé FR d'un statut de paiement, tolérant aux valeurs inconnues. */
 const libellePaiement = (v: unknown): string => {
   const k = String(v ?? "").trim();
-  if (!k) return "—";
+  if (!k) return "Inconnu";
   return (
     (STATUT_PAIEMENT_LABEL as Record<string, string>)[k] ?? k
   );
@@ -83,7 +83,7 @@ const libellePaiement = (v: unknown): string => {
 /** Libellé FR d'un statut d'étudiant. */
 const libelleStatutEtudiant = (v: unknown): string => {
   const k = String(v ?? "").trim();
-  if (!k) return "—";
+  if (!k) return "Inconnu";
   return (
     (STATUT_ETUDIANT_LABEL as Record<string, string>)[k] ?? k
   );
@@ -235,7 +235,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
 
   const nomProf = useMemo(() => {
     const map = new Map(store.formateurs.map((f) => [f.id, `${f.prenom} ${f.nom}`]));
-    return (id: string) => map.get(id) ?? "—";
+    return (id: string) => map.get(id) ?? "Formateur non assigné";
   }, [store.formateurs]);
 
   const joursSemaine = useMemo(() => {
@@ -445,7 +445,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
                         ) : null}
                       </span>
                     </td>
-                    <td className="text-muted-foreground">{s.salle || "—"}</td>
+                    <td className="text-muted-foreground">{s.salle || "Salle non précisée"}</td>
                     <td className={cn("text-muted-foreground", cellTruncate)}>
                       {nomProf(s.professeurId)}
                     </td>
@@ -494,15 +494,15 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
             <p className="truncate font-display text-2xl font-bold text-foreground">
               {prenom} {nom}
             </p>
-            <p className="text-xs text-muted-foreground">
-              CNE {String(profil?.cne ?? "—")}
-            </p>
+            {profil?.cne ? (
+              <p className="text-xs text-muted-foreground">CNE {String(profil.cne)}</p>
+            ) : null}
             <div className="flex flex-wrap gap-1.5">
               <span className={toneBadge("teal")}>
-                {String(profil?.filiere ?? "—")}
+                {profil?.filiere ? String(profil.filiere) : "Filière non précisée"}
               </span>
               <span className={toneBadge("blue")}>
-                {String(profil?.niveau ?? "—")}
+                {profil?.niveau ? String(profil.niveau) : "Niveau non précisé"}
               </span>
               <span className={toneBadge("neutral")}>
                 {libelleStatutEtudiant(profil?.statut)}
@@ -519,32 +519,32 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
           <DetailGrid>
             <DetailField
               label="Téléphone"
-              value={String(profil?.telephone ?? "—")}
+              value={String(profil?.telephone ?? "")}
             />
             <DetailField
               label="Email"
-              value={String(profil?.email ?? "—")}
+              value={String(profil?.email ?? "")}
             />
             <DetailField
               label="Ville"
-              value={String(profil?.ville ?? "—")}
+              value={String(profil?.ville ?? "")}
             />
             <DetailField
               label="Naissance"
               value={String(
                 profil?.dateNaissance ??
                   (profil as unknown as Record<string, string> | undefined)?.date_naissance ??
-                  "—",
+                  "",
               )}
             />
           </DetailGrid>
         </DetailSection>
         <DetailSection title="Cursus">
           <DetailGrid>
-            <DetailField label="Groupe" value={String(profil?.groupe ?? "—")} />
+            <DetailField label="Groupe" value={String(profil?.groupe ?? "")} />
             <DetailField
               label="Année"
-              value={String(profil?.annee ?? "—")}
+              value={String(profil?.annee ?? "")}
             />
           </DetailGrid>
         </DetailSection>
@@ -553,7 +553,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
       <section className={cn(softCard, "space-y-3 p-6")}>
         <p className={eyebrowClass}>En bref</p>
         <DetailGrid single>
-          <DetailField label="Moyenne générale" value={moyenne ? `${moyenne}/20` : "—"} />
+          <DetailField label="Moyenne générale" value={moyenne ? `${moyenne}/20` : ""} />
           <DetailField label="Bulletins publiés" value={String(bulletins.length)} />
           <DetailField
             label="Statut de paiement"
@@ -561,7 +561,11 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
           />
           <DetailField
             label="Reste à payer"
-            value={`${String(profil?.resteAPayer ?? profil?.reste_a_payer ?? "—")} MAD`}
+            value={
+              profil?.resteAPayer ?? profil?.reste_a_payer
+                ? `${String(profil.resteAPayer ?? profil.reste_a_payer)} MAD`
+                : ""
+            }
           />
         </DetailGrid>
       </section>
@@ -627,7 +631,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
         )}
         <DetailSection title="Synthèse">
           <DetailGrid>
-            <DetailField label="Moyenne" value={moyenne ? `${moyenne}/20` : "—"} />
+            <DetailField label="Moyenne" value={moyenne ? `${moyenne}/20` : ""} />
             <DetailField label="Bulletins" value={String(bulletins.length)} />
           </DetailGrid>
         </DetailSection>
@@ -650,7 +654,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
             <span className={toneBadge("blue")}>{String(stageEnCours.statut ?? "")}</span>
           </div>
           <DetailGrid>
-            <DetailField label="Service" value={String(stageEnCours.service ?? "—")} />
+            <DetailField label="Service" value={String(stageEnCours.service ?? "")} />
             <DetailField
               label="Période"
               value={`${String(stageEnCours.debut ?? "")} → ${String(stageEnCours.fin ?? "")}`}
@@ -658,13 +662,13 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
             <DetailField
               label="Encadrant"
               value={String(
-                stageEnCours.encadrantClinique ?? stageEnCours.encadrant_clinique ?? "—",
+                stageEnCours.encadrantClinique ?? stageEnCours.encadrant_clinique ?? "",
               )}
             />
             <DetailField
               label="Tuteur"
               value={String(
-                stageEnCours.tuteurAcademique ?? stageEnCours.tuteur_academique ?? "—",
+                stageEnCours.tuteurAcademique ?? stageEnCours.tuteur_academique ?? "",
               )}
             />
           </DetailGrid>
@@ -704,7 +708,11 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
       <DetailGrid>
         <DetailField
           label="Reste à payer"
-          value={`${String(profil?.resteAPayer ?? profil?.reste_a_payer ?? "—")} MAD`}
+          value={
+            profil?.resteAPayer ?? profil?.reste_a_payer
+              ? `${String(profil.resteAPayer ?? profil.reste_a_payer)} MAD`
+              : ""
+          }
         />
         <DetailField label="Statut" value={libellePaiement(profil?.paiement)} />
       </DetailGrid>
@@ -772,7 +780,9 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
             <td className="text-muted-foreground">
               {new Date(d.createdAt).toLocaleDateString("fr-FR")}
             </td>
-            <td className={cn("text-muted-foreground", cellTruncate)}>{d.reponse || "—"}</td>
+            <td className={cn("text-muted-foreground", cellTruncate)}>
+              {d.reponse || "En attente de réponse"}
+            </td>
           </tr>
         ))}
       </DataTable>
@@ -873,8 +883,8 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
             >
               <DetailGrid>
                 <DetailField label="Formateur" value={nomProf(detailSeance.professeurId)} />
-                <DetailField label="Salle" value={detailSeance.salle || "—"} />
-                <DetailField label="Groupe" value={detailSeance.groupe || "—"} />
+                <DetailField label="Salle" value={detailSeance.salle || ""} />
+                <DetailField label="Groupe" value={detailSeance.groupe || ""} />
                 <DetailField label="Type" value={detailSeance.type} />
               </DetailGrid>
               {detailSeance.notes ? <p className="text-xs text-muted-foreground">{detailSeance.notes}</p> : null}
