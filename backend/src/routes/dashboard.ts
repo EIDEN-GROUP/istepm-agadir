@@ -147,6 +147,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         count: sql<number>`count(*)::int`,
       })
       .from(etudiants)
+      .where(eq(etudiants.archived, false))
       .groupBy(etudiants.filiere)
       .orderBy(etudiants.filiere);
     return rows;
@@ -160,6 +161,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         count: sql<number>`count(*)::int`,
       })
       .from(etudiants)
+      .where(eq(etudiants.archived, false))
       .groupBy(etudiants.niveau)
       .orderBy(etudiants.niveau);
     return rows;
@@ -174,6 +176,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         reussite: sql<number>`count(*) FILTER (WHERE moyenne::numeric >= 10)::int`,
       })
       .from(etudiants)
+      .where(eq(etudiants.archived, false))
       .groupBy(etudiants.filiere)
       .orderBy(etudiants.filiere);
 

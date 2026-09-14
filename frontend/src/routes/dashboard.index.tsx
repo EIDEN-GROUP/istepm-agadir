@@ -968,7 +968,10 @@ function DashboardDirecteur() {
     [seances, chargeDu, chargeA],
   );
   const chargeFormateurs = useMemo(() => formateurs.filter((f) => f.statut !== "en_conge").map((f) => ({ id: f.id, nom: `${f.prenom} ${f.nom}`, seances: seancesPeriode.filter((s) => s.professeurId === f.id).length, groupes: f.groupes.length, modules: f.modules.length })).sort((a, b) => b.seances - a.seances), [formateurs, seancesPeriode]);
-  const derniersEtudiants = useMemo(() => etudiants.slice().reverse().slice(0, 6), [etudiants]);
+  const derniersEtudiants = useMemo(
+    () => etudiants.filter((e) => !e.archived).slice().reverse().slice(0, 6),
+    [etudiants],
+  );
   const examensRecents = useMemo(() => examens.slice().reverse().slice(0, 6), [examens]);
   // Synthèse des examens : répartition par statut et par type (onglet Académique).
   const examensParStatut = useMemo<ChartDatum[]>(() => Object.entries(STATUT_EXAMEN_LABEL).map(([k, label]) => ({ name: label, value: examens.filter((e) => e.statut === k).length })), [examens]);
@@ -1229,7 +1232,7 @@ function DashboardEnseignant() {
     if (!moi) return [];
     const niveaux = new Set(moi.groupes.map((g) => g.split("-")[0]));
     return etudiants.filter(
-      (e) => e.filiere === moi.departement && niveaux.has(e.niveau),
+      (e) => !e.archived && e.filiere === moi.departement && niveaux.has(e.niveau),
     );
   }, [etudiants, moi]);
   const mesBulletins = useMemo(() => (moi ? bulletins.filter((b) => moi.modules.some((m) => b.notes?.some((n) => n.module === m))) : []), [bulletins, moi]);

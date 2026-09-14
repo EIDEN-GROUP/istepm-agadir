@@ -23,6 +23,7 @@ export function fetchEtudiants(params?: {
   filiere?: string;
   niveau?: string;
   statut?: string;
+  archived?: string;
 }) {
   return api.get<Etudiant[]>("/etudiants", params as Record<string, string | undefined>);
 }
@@ -57,6 +58,7 @@ export function fetchFormateurs(params?: {
   search?: string;
   departement?: string;
   grade?: string;
+  archived?: string;
 }) {
   return api.get<Formateur[]>("/formateurs", params as Record<string, string | undefined>);
 }

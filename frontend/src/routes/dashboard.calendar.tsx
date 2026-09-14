@@ -1182,10 +1182,12 @@ function SeanceForm({
             }));
             setErrors((p) => ({ ...p, professeurId: undefined }));
           }}
-          options={formateurs.map((p) => ({
-            value: p.id,
-            label: `${p.prenom} ${p.nom}   ${p.departement}`,
-          }))}
+          options={formateurs
+            .filter((p) => !p.archived)
+            .map((p) => ({
+              value: p.id,
+              label: `${p.prenom} ${p.nom}   ${p.departement}`,
+            }))}
           error={errors.professeurId}
         />
       </FullWidth>

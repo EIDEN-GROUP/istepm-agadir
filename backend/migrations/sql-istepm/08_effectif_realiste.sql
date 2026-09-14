@@ -78,8 +78,8 @@ n AS (
 ),
 m AS (
   SELECT n.*,
-    CASE niveau WHEN 'S1' THEN '1re année' WHEN 'S2' THEN '1re année'
-      WHEN 'S3' THEN '2e année' WHEN 'S4' THEN '2e année' ELSE '3e année' END AS annee,
+    CASE niveau WHEN 'S1' THEN '1ère année' WHEN 'S2' THEN '1ère année'
+      WHEN 'S3' THEN '2ème année' WHEN 'S4' THEN '2ème année' ELSE '3ème année' END AS annee,
     CASE niveau
       WHEN 'S1' THEN CASE WHEN seq % 2 = 0 THEN 'S1-A' ELSE 'S1-B' END
       WHEN 'S2' THEN 'S2-A'

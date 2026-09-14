@@ -605,8 +605,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         filieresRaw,
         groupsRaw,
       ] = await Promise.all([
-        staffOnly ? [] : apiFetchEtudiants(),
-        staffOnly ? [] : apiFetchFormateurs(),
+        staffOnly ? [] : apiFetchEtudiants({ archived: "all" }),
+        staffOnly ? [] : apiFetchFormateurs({ archived: "all" }),
         apiFetchExamens(),
         apiFetchBulletins(),
         staffOnly ? [] : apiFetchStages(),
@@ -1455,7 +1455,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const paiements = useMemo<PaiementLigne[]>(
     () =>
-      snap.etudiants.flatMap((e) =>
+      snap.etudiants.filter((e) => !e.archived).flatMap((e) =>
         e.paiementsMensuelsRecords.map((r) => ({
           id: r.id,
           etudiantId: e.id,
@@ -1477,7 +1477,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const totalUnpaidMonths = useMemo(
     () =>
-      snap.etudiants.reduce((s, e) => {
+      snap.etudiants.filter((e) => !e.archived).reduce((s, e) => {
         const unpaid = e.paiementsMensuelsRecords
           .filter((r) => r.statut !== "paye")
           .reduce((sum, r) => sum + (r.montantDu - r.montantPaye), 0);
@@ -1487,7 +1487,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   );
 
   const financier = useMemo(() => {
-    const encaisse = snap.etudiants.reduce((sum, e) => {
+    const actifs = snap.etudiants.filter((e) => !e.archived);
+    const encaisse = actifs.reduce((sum, e) => {
       const paye = e.paiementsMensuelsRecords
         .filter((r) => r.statut === "paye")
         .reduce((s, r) => s + r.montantPaye, 0);
@@ -1495,7 +1496,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     }, 0);
 
     const now = new Date();
-    const encaisseCeMois = snap.etudiants.reduce((sum, e) => {
+    const encaisseCeMois = actifs.reduce((sum, e) => {
       const paye = e.paiementsMensuelsRecords
         .filter(
           (r) =>
@@ -1511,7 +1512,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     let enAttente = 0;
     let impaye = 0;
     let retard = 0;
-    for (const e of snap.etudiants) {
+    for (const e of actifs) {
       for (const r of e.paiementsMensuelsRecords) {
         const reste = r.montantDu - r.montantPaye;
         if (reste <= 0) continue;
@@ -1536,9 +1537,9 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   const dashboard = useMemo(() => {
     const inscrits = snap.etudiants.filter(
-      (e) => e.statut === "inscrit" || e.statut === "diplome",
+      (e) => !e.archived && (e.statut === "inscrit" || e.statut === "diplome"),
     );
-    const notes = snap.etudiants.filter((e) => e.moyenne > 0);
+    const notes = snap.etudiants.filter((e) => !e.archived && e.moyenne > 0);
     return {
       totalInscrits: inscrits.length,
       deltaSemestre: 6,
@@ -1557,6 +1558,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     () => {
       const counts = new Map<string, number>();
       for (const e of snap.etudiants) {
+        if (e.archived) continue;
         const f = e.filiere || "Sans filière";
         counts.set(f, (counts.get(f) ?? 0) + 1);
       }
@@ -1575,6 +1577,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     () => {
       const counts = new Map<string, number>();
       for (const e of snap.etudiants) {
+        if (e.archived) continue;
         const n = e.niveau || "Non précisé";
         counts.set(n, (counts.get(n) ?? 0) + 1);
       }
@@ -1588,7 +1591,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   const etudiantsARisque = useMemo(
     () =>
       snap.etudiants.filter(
-        (e) => (e.moyenne > 0 && e.moyenne < 10) || e.statut === "abandon",
+        (e) => !e.archived && ((e.moyenne > 0 && e.moyenne < 10) || e.statut === "abandon"),
       ),
     [snap.etudiants],
   );
@@ -1596,6 +1599,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   const aRelancer = useMemo(
     () =>
       snap.etudiants.filter((e) => {
+        if (e.archived) return false;
         const moisNonPayes = e.paiementsMensuelsRecords.filter(
           (r) => r.statut !== "paye" && r.montantPaye < r.montantDu,
         );
