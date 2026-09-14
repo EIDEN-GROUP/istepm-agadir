@@ -1159,8 +1159,8 @@ function NewUserForm({
 /*  Groupes / classes  registre des groupes avec comptage d'étudiants  */
 /* ------------------------------------------------------------------ */
 
-function GroupesSection() {
-  const { groupConfigs, addGroupConfig, updateGroupConfig, deleteGroupConfig } = useIstpm();
+function GroupesSection({ semestresRegistre }: { semestresRegistre: string[] }) {
+  const { groupConfigs, addGroupConfig, updateGroupConfig, deleteGroupConfig, etudiants } = useIstpm();
   const [activeSemester, setActiveSemester] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<GroupConfig | null>(null);
@@ -1168,9 +1168,33 @@ function GroupesSection() {
   const [errors, setErrors] = useState<{ name?: string }>({});
   const [toDelete, setToDelete] = useState<GroupConfig | null>(null);
 
-  const semesters = [...new Set(groupConfigs.map((g) => g.semester))].sort();
+  // Groupes réels issus des fiches étudiants (jamais vides en pratique) :
+  // le registre manuel seul restait vide. Effectifs calculés en direct.
+  const discovered = useMemo(() => {
+    const map = new Map<string, { count: number; niveaux: Set<string> }>();
+    for (const e of etudiants) {
+      if (e.archived || !e.groupe.trim() || !e.niveau) continue;
+      const g = e.groupe.trim();
+      const entry = map.get(g) ?? { count: 0, niveaux: new Set<string>() };
+      entry.count += 1;
+      entry.niveaux.add(e.niveau);
+      map.set(g, entry);
+    }
+    return [...map.entries()]
+      .map(([name, v]) => ({ name, count: v.count, niveaux: [...v.niveaux].sort() }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [etudiants]);
+  // Semestres = registre « Semestres » + valeurs réellement utilisées.
+  // (Le registre seul restait vide et le dialogue n'offrait aucun choix.)
+  const semesters = useMemo(
+    () => [...new Set([...semestresRegistre, ...groupConfigs.map((g) => g.semester), ...discovered.flatMap((d) => d.niveaux)])].sort(),
+    [semestresRegistre, groupConfigs, discovered],
+  );
   const active = activeSemester || semesters[0] || "";
   const filtered = groupConfigs.filter((g) => g.semester === active);
+  const filteredDiscovered = discovered.filter(
+    (d) => d.niveaux.includes(active) && !groupConfigs.some((g) => g.name === d.name),
+  );
 
   const openCreate = () => {
     setEditing(null);
@@ -1263,7 +1287,12 @@ function GroupesSection() {
           >
             {s}
             <span className="ml-1 text-[10px] opacity-60">
-              {groupConfigs.filter((g) => g.semester === s).length}
+              {groupConfigs.filter((g) => g.semester === s).length +
+                discovered.filter(
+                  (d) =>
+                    d.niveaux.includes(s) &&
+                    !groupConfigs.some((g) => g.name === d.name),
+                ).length}
             </span>
           </button>
         ))}
@@ -1271,12 +1300,13 @@ function GroupesSection() {
 
       {/* Group list */}
       <div className="space-y-1.5">
-        {filtered.length === 0 ? (
+        {filtered.length === 0 && filteredDiscovered.length === 0 ? (
           <p className="py-3 text-center text-xs text-muted-foreground">
             Aucun groupe pour ce semestre.
           </p>
         ) : (
-          filtered.map((g) => (
+          <>
+          {filtered.map((g) => (
             <div
               key={g.id}
               className="flex items-center justify-between gap-3 rounded-xl border border-brand/12 px-3 py-2"
@@ -1322,7 +1352,35 @@ function GroupesSection() {
                 </button>
               </span>
             </div>
-          ))
+          ))}
+          {filteredDiscovered.map((d) => (
+            <div
+              key={`auto-${d.name}`}
+              className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-brand/20 bg-brand/[0.03] px-3 py-2"
+              title="Groupe détecté depuis les fiches étudiants"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-foreground">
+                  {d.name}
+                </span>
+                <span className="block truncate text-[10px] text-muted-foreground">
+                  Niveaux : {d.niveaux.join(", ")}
+                </span>
+              </span>
+              <span className="flex items-center gap-2 shrink-0">
+                <span className="text-xs font-semibold text-foreground">
+                  {d.count}
+                </span>
+                <span className="text-[10px] text-muted-foreground min-w-[3ch]">
+                  étud.
+                </span>
+                <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand-dk">
+                  auto
+                </span>
+              </span>
+            </div>
+          ))}
+          </>
         )}
       </div>
 
@@ -1725,7 +1783,7 @@ function SettingsPage() {
         );
 
       case "groupes":
-        return <GroupesSection />;
+        return <GroupesSection semestresRegistre={semestres} />;
 
       case "salles":
         return (
