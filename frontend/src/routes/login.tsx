@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-router";
 import { Eye, EyeOff, LoaderCircle, ArrowRight } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { z } from "zod";
@@ -26,7 +26,8 @@ const loginSchema = z.object({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
+  const [staffBlocked, setStaffBlocked] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,6 +42,7 @@ function LoginPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setStaffBlocked(false);
     const result = loginSchema.safeParse({ email, password });
     if (!result.success) {
       setError(result.error.issues[0]?.message ?? "Vérifiez les informations saisies.");
@@ -50,6 +52,15 @@ function LoginPage() {
     setIsLoading(true);
     try {
       await login(result.data.email, result.data.password);
+      // Portail réservé aux étudiants et enseignants : le personnel
+      // (directeur, responsable, comptable) passe par /istepm.
+      const r = getStoredRole();
+      if (r !== "etudiant" && r !== "enseignant") {
+        logout();
+        setStaffBlocked(true);
+        setIsLoading(false);
+        return;
+      }
       await navigate({ to: "/dashboard", replace: true });
     } catch (err) {
       setError(
@@ -195,6 +206,15 @@ function LoginPage() {
                 {error ? (
                   <p className="text-[13px] font-semibold text-[color:var(--l-red)]">
                     {error}
+                  </p>
+                ) : null}
+                {staffBlocked ? (
+                  <p className="text-[13px] font-semibold text-[color:var(--l-red)]">
+                    Ce portail est réservé aux étudiants et enseignants.{" "}
+                    <Link to="/istepm" className="underline">
+                      Connectez-vous sur /istepm
+                    </Link>
+                    .
                   </p>
                 ) : null}
               </div>

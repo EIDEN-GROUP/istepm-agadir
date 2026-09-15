@@ -1254,11 +1254,11 @@ function DashboardEnseignant() {
         {tab === 0 ? (
           <div className="space-y-5">
             <KpiGrid>
-              <KpiCard label="Mes groupes" value={moi.groupes.length} icon={Users} accent />
-              <KpiCard label="Mes modules" value={moi.modules.length} tone="blue" icon={BookOpen} />
-              <KpiCard label="Séances aujourd&rsquo;hui" value={seancesAujourdhui.length} icon={Calendar} />
-              <KpiCard label="Mes examens" value={mesExamens.length} tone="amber" icon={GraduationCap} />
-              <KpiCard label="Examens À  noter" value={aNoter.length} tone={aNoter.length ? "red" : "teal"} icon={PenLine} />
+              <KpiCard label="Mes groupes" value={moi.groupes.length} spark={false} icon={Users} accent />
+              <KpiCard label="Mes modules" value={moi.modules.length} tone="blue" spark={false} icon={BookOpen} />
+              <KpiCard label="Séances aujourd&rsquo;hui" value={seancesAujourdhui.length} icon={Calendar} spark={false} />
+              <KpiCard label="Mes examens" value={mesExamens.length} tone="amber" icon={GraduationCap} spark={false} />
+              <KpiCard label="Examens À  noter" value={aNoter.length} tone={aNoter.length ? "red" : "teal"} icon={PenLine} spark={false} />
             </KpiGrid>
             <Section title="Mon affectation">
               <AffectationEnseignant formateur={moi} />
@@ -1426,9 +1426,78 @@ function DashboardResponsable() {
 
 /* ------------------------------------------------------------------ */
 
+/** Carte « Comptes à relancer » : total + détail par statut ayant
+ *  produit ce total (nom + nombre de comptes). */
+function ComptesRelancerCard() {
+  const { etudiants } = useIstpm();
+  const lignes = useMemo(() => {
+    const parStatut = new Map<string, Set<string>>();
+    for (const e of etudiants) {
+      if (e.archived) continue;
+      for (const r of e.paiementsMensuelsRecords) {
+        if (r.statut === "paye" || r.montantPaye >= r.montantDu) continue;
+        if (!parStatut.has(r.statut)) parStatut.set(r.statut, new Set());
+        parStatut.get(r.statut)!.add(e.id);
+      }
+    }
+    const ordre = ["en_attente", "retard", "impaye"];
+    return [...parStatut.entries()]
+      .map(([statut, ids]) => ({ statut, count: ids.size }))
+      .sort(
+        (a, b) =>
+          (ordre.indexOf(a.statut) === -1 ? 99 : ordre.indexOf(a.statut)) -
+          (ordre.indexOf(b.statut) === -1 ? 99 : ordre.indexOf(b.statut)),
+      );
+  }, [etudiants]);
+  const total = useMemo(
+    () =>
+      etudiants.filter(
+        (e) =>
+          !e.archived &&
+          e.paiementsMensuelsRecords.some(
+            (r) => r.statut !== "paye" && r.montantPaye < r.montantDu,
+          ),
+      ).length,
+    [etudiants],
+  );
+  const STATUT_LABEL: Record<string, string> = {
+    en_attente: "En attente",
+    retard: "Retard",
+    impaye: "Impayé",
+  };
+  return (
+    <div className={cn(softCard, "p-4 sm:p-5")}>
+      <div className="flex items-center gap-2">
+        <PhoneCall className="h-4 w-4 text-amber-600" />
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Comptes à relancer
+        </p>
+      </div>
+      <p className="mt-1 font-display text-2xl font-bold text-foreground">
+        {total}
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {lignes.map((l) => (
+          <li
+            key={l.statut}
+            className="flex items-center justify-between gap-2 text-sm"
+          >
+            <span className="text-muted-foreground">
+              {STATUT_LABEL[l.statut] ?? l.statut}
+            </span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {l.count}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** Accueil du comptable : KPIs 2×2, carte donut à droite (motif
- *  « Étudiants éligibles »), échéances du mois en cours, puis les plus
- *  gros taux d'impayés. */
+ *  « Étudiants éligibles »), échéances du mois en cours, puis les
+ *  plus gros taux d'impayés. */
 function DashboardComptable() {
   const { financier, etudiants } = useIstpm();
   const resteData = useMemo(
@@ -1440,19 +1509,9 @@ function DashboardComptable() {
     [financier],
   );
   const resteTotal = resteData.reduce((s, d) => s + d.value, 0);
-  const impayes = useMemo(
-    () =>
-      etudiants.filter(
-        (e) =>
-          !e.archived &&
-          e.paiementsMensuelsRecords.some(
-            (r) => r.statut !== "paye" && r.montantPaye < r.montantDu,
-          ),
-      ).length,
-    [etudiants],
-  );
-  // Échéances du mois en cours (toutes mensualités non soldées du mois).
-  const moisCle = new Date().toISOString().slice(0, 7);
+  // Échéances du mois en cours (mensualités non soldées libellées
+  // « septembre 2026 », comparées dans le même format).
+  const moisCle = new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
   const echeancesMois = useMemo(() => {
     const lignes: Array<{ id: string; etudiant: string; mois: string; reste: number }> = [];
     for (const e of etudiants) {
@@ -1460,7 +1519,7 @@ function DashboardComptable() {
       for (const r of e.paiementsMensuelsRecords) {
         const reste = r.montantDu - r.montantPaye;
         if (reste <= 0) continue;
-        if (String(r.mois).slice(0, 7) !== moisCle) continue;
+        if (String(r.mois).trim().toLowerCase() !== moisCle) continue;
         lignes.push({
           id: `${e.id}:${r.id}`,
           etudiant: `${e.prenom} ${e.nom}`,
@@ -1489,24 +1548,17 @@ function DashboardComptable() {
   }, [etudiants]);
   return (
     <div className="space-y-6">
-      <DashHero chips={[
-        { label: "Encaissé", value: financier.encaisse },
-        { label: "Reste à recouvrer", value: resteTotal },
-        { label: "Comptes à relancer", value: impayes },
-      ]} />
+      <DashHero chips={[]} />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <KpiCard label="Encaissé" value={financier.encaisse} icon={Wallet} />
-          <KpiCard label="Reste à recouvrer" value={resteTotal} tone="amber" icon={AlertCircle} />
+          <KpiCard label="Encaissé" value={fmtMAD(financier.encaisse)} icon={Wallet} />
+          <KpiCard label="Reste à recouvrer" value={fmtMAD(resteTotal)} tone="amber" icon={AlertCircle} />
           <KpiCard label="Taux de recouvrement" value={`${financier.tauxRecouvrement} %`} tone="teal" icon={CheckCircle2} />
-          <KpiCard label="Comptes à relancer" value={impayes} tone="amber" icon={PhoneCall} />
+          <ComptesRelancerCard />
         </div>
         <div className={cn(softCard, "p-4 sm:p-5")}>
           <div className="flex items-baseline justify-between gap-2">
             <p className={eyebrowClass}>Reste par statut</p>
-            <span className="text-2xl font-bold tabular-nums leading-none text-brand-dk">
-              {fmtMAD(resteTotal)}
-            </span>
           </div>
           <div className="mt-3 w-full" style={{ height: 180 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -1581,7 +1633,7 @@ function DashboardComptable() {
         </div>
       </Section>
       <Section title="Plus gros taux d'impayés">
-        <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
+        <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden max-h-[380px] overflow-y-auto")}>
           {topTaux.length ? (
             topTaux.map((x) => (
               <MeterRow

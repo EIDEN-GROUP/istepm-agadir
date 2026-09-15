@@ -111,7 +111,6 @@ function PaiementsPage() {
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
   const [semestre, setSemestre] = useState<string>(ALL);
-  const [annee, setAnnee] = useState<string>(ALL);
   const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
   const [statut, setStatut] = useState<string>(ALL);
   const [mois, setMois] = useState<string>(ALL);
@@ -122,6 +121,12 @@ function PaiementsPage() {
   );
   const [addOpen, setAddOpen] = useState(false);
   const [relanceOpen, setRelanceOpen] = useState(false);
+  const [relanceSel, setRelanceSel] = useState<Set<string>>(new Set());
+  // Sélection par défaut : tout coché à l'ouverture.
+  useEffect(() => {
+    if (relanceOpen) setRelanceSel(new Set(aRelancer.map((e) => e.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [relanceOpen]);
   const [editStudent, setEditStudent] = useState<Etudiant | null>(null);
   const [historyStudent, setHistoryStudent] = useState<Etudiant | null>(null);
 
@@ -131,7 +136,6 @@ function PaiementsPage() {
       .filter((e) => {
         if (filiere !== ALL && e.filiere !== filiere) return false;
         if (semestre !== ALL && e.niveau !== semestre) return false;
-        if (annee !== ALL && anneeEtude(e.niveau) !== annee) return false;
         if (anneeScolaire !== ALL && e.annee !== anneeScolaire) return false;
         const statutE = deriveStatutPaiement(e.paiementsMensuelsRecords);
         if (statut !== ALL && STATUT_PAIEMENT_LABEL[statutE] !== statut) return false;
@@ -154,11 +158,11 @@ function PaiementsPage() {
         const moisRetard = records.filter((r) => r.statut === "retard").length;
         return { etudiant: e, statut: statutE, totalPaye: total, resteDu: reste, moisNonPayes, moisRetard };
       });
-  }, [etudiants, search, filiere, semestre, annee, anneeScolaire, statut, mois]);
+  }, [etudiants, search, filiere, semestre, anneeScolaire, statut, mois]);
 
   const pager = usePagination(
     parEtudiant,
-    `${search}|${filiere}|${semestre}|${annee}|${anneeScolaire}|${statut}|${mois}`,
+    `${search}|${filiere}|${semestre}|${anneeScolaire}|${statut}|${mois}`,
   );
 
   const kpis = [
@@ -225,23 +229,9 @@ function PaiementsPage() {
             id: "filiere", label: "Filière", value: filiere, onChange: setFiliere,
             options: FILIERES, allLabel: "Toutes les filières",
           },
-          ...(role === "directeur"
-            ? []
-            : [
-                {
-                  id: "annee",
-                  label: "Niveau",
-                  value: annee,
-                  onChange: setAnnee,
-                  options: ANNEES_ETUDE,
-                  allLabel: "Tous les niveaux",
-                },
-              ]),
           {
-            // Libellé « Niveau » comme sur les autres pages : c'est l'année
-            // d'étude (1ère/2ème/3ème), à ne pas confondre avec l'année scolaire.
-            id: "annee", label: "Niveau", value: annee, onChange: setAnnee,
-            options: ANNEES_ETUDE, allLabel: "Tous les niveaux",
+            id: "semestre", label: "Semestre", value: semestre, onChange: setSemestre,
+            options: NIVEAUX, allLabel: "Tous les semestres",
           },
           {
             id: "anneeScolaire", label: "Année scolaire", value: anneeScolaire, onChange: setAnneeScolaire,
@@ -432,24 +422,57 @@ function PaiementsPage() {
             footer={
               <button
                 className={cn(primaryPill, "w-full justify-center")}
-                disabled={aRelancer.length === 0}
+                disabled={relanceSel.size === 0}
                 onClick={() => {
-                  toast.success(`${aRelancer.length} relance(s) envoyée(s) par e-mail et SMS`);
+                  toast.success(`${relanceSel.size} relance(s) envoyée(s) par e-mail et SMS`);
                   setRelanceOpen(false);
                 }}
               >
-                <BellRing className="h-4 w-4" /> Envoyer toutes les relances
+                <BellRing className="h-4 w-4" /> Envoyer la sélection ({relanceSel.size})
               </button>
             }
           >
             {aRelancer.length ? (
+              <>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {relanceSel.size} sélectionné(s)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRelanceSel((prev) =>
+                      prev.size === aRelancer.length
+                        ? new Set<string>()
+                        : new Set(aRelancer.map((x) => x.id)),
+                    );
+                  }}
+                  className="rounded-full px-3 py-1.5 text-xs font-semibold text-brand-dk transition hover:bg-brand/10"
+                >
+                  {relanceSel.size === aRelancer.length ? "Tout désélectionner" : "Tout sélectionner"}
+                </button>
+              </div>
               <ul className="space-y-2">
                 {aRelancer.map((e) => (
                   <li
                     key={e.id}
                     className="flex items-center justify-between gap-3 rounded-2xl border border-brand/12 px-4 py-3"
                   >
-                    <span className="min-w-0">
+                    <input
+                      type="checkbox"
+                      aria-label={`Sélectionner ${e.prenom} ${e.nom}`}
+                      checked={relanceSel.has(e.id)}
+                      onChange={() => {
+                        setRelanceSel((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(e.id)) next.delete(e.id);
+                          else next.add(e.id);
+                          return next;
+                        });
+                      }}
+                      className="h-4 w-4 shrink-0 accent-[var(--brand)]"
+                    />
+                    <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium text-foreground">
                         {e.prenom} {e.nom}
                       </span>
@@ -465,6 +488,7 @@ function PaiementsPage() {
                   </li>
                 ))}
               </ul>
+              </>
             ) : (
               <p className="text-sm text-muted-foreground">
                 Aucun solde en attente : tous les étudiants sont à jour.
@@ -748,6 +772,8 @@ function HistoriquePaiementsDialog({
               <DetailField label="Semestre" value={etudiant.niveau} />
               <DetailField label="Année" value={anneeEtude(etudiant.niveau)} />
               <DetailField label="Groupe" value={etudiant.groupe} />
+              <DetailField label="Téléphone" value={etudiant.telephone || "—"} />
+              <DetailField label="E-mail" value={etudiant.email || "—"} />
               <DetailField
                 label="Frais mensuels"
                 value={fmtMAD(etudiant.fraisMensuels)}

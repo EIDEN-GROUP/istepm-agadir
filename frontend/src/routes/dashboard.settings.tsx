@@ -1931,22 +1931,24 @@ function SettingsPage() {
                     className={cn(softInput, "h-8 text-sm")}
                   />
                 </div>
-                <select
-                  value={userRoleFilter}
-                  onChange={(e) => setUserRoleFilter(e.target.value)}
-                  className={cn(
-                    "h-8 rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none",
-                    "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
-                  )}
-                  aria-label="Filtrer par rôle"
-                >
-                  <option value="__all__">Tous les rôles ({staffCount})</option>
-                  {VISIBLE_ACCOUNT_ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {ROLE_META[r as UserRole]?.label ?? r}
-                    </option>
-                  ))}
-                </select>
+                {role === "comptable" ? null : (
+                  <select
+                    value={userRoleFilter}
+                    onChange={(e) => setUserRoleFilter(e.target.value)}
+                    className={cn(
+                      "h-8 rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none",
+                      "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
+                    )}
+                    aria-label="Filtrer par rôle"
+                  >
+                    <option value="__all__">Tous les rôles ({staffCount})</option>
+                    {VISIBLE_ACCOUNT_ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_META[r as UserRole]?.label ?? r}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               {filteredUsers.length === 0 ? (
                 <p className="py-3 text-center text-xs text-muted-foreground">
