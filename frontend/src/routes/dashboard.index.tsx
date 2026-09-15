@@ -69,6 +69,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -1426,78 +1428,9 @@ function DashboardResponsable() {
 
 /* ------------------------------------------------------------------ */
 
-/** Carte « Comptes à relancer » : total + détail par statut ayant
- *  produit ce total (nom + nombre de comptes). */
-function ComptesRelancerCard() {
-  const { etudiants } = useIstpm();
-  const lignes = useMemo(() => {
-    const parStatut = new Map<string, Set<string>>();
-    for (const e of etudiants) {
-      if (e.archived) continue;
-      for (const r of e.paiementsMensuelsRecords) {
-        if (r.statut === "paye" || r.montantPaye >= r.montantDu) continue;
-        if (!parStatut.has(r.statut)) parStatut.set(r.statut, new Set());
-        parStatut.get(r.statut)!.add(e.id);
-      }
-    }
-    const ordre = ["en_attente", "retard", "impaye"];
-    return [...parStatut.entries()]
-      .map(([statut, ids]) => ({ statut, count: ids.size }))
-      .sort(
-        (a, b) =>
-          (ordre.indexOf(a.statut) === -1 ? 99 : ordre.indexOf(a.statut)) -
-          (ordre.indexOf(b.statut) === -1 ? 99 : ordre.indexOf(b.statut)),
-      );
-  }, [etudiants]);
-  const total = useMemo(
-    () =>
-      etudiants.filter(
-        (e) =>
-          !e.archived &&
-          e.paiementsMensuelsRecords.some(
-            (r) => r.statut !== "paye" && r.montantPaye < r.montantDu,
-          ),
-      ).length,
-    [etudiants],
-  );
-  const STATUT_LABEL: Record<string, string> = {
-    en_attente: "En attente",
-    retard: "Retard",
-    impaye: "Impayé",
-  };
-  return (
-    <div className={cn(softCard, "p-4 sm:p-5")}>
-      <div className="flex items-center gap-2">
-        <PhoneCall className="h-4 w-4 text-amber-600" />
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Comptes à relancer
-        </p>
-      </div>
-      <p className="mt-1 font-display text-2xl font-bold text-foreground">
-        {total}
-      </p>
-      <ul className="mt-2 space-y-1.5">
-        {lignes.map((l) => (
-          <li
-            key={l.statut}
-            className="flex items-center justify-between gap-2 text-sm"
-          >
-            <span className="text-muted-foreground">
-              {STATUT_LABEL[l.statut] ?? l.statut}
-            </span>
-            <span className="font-semibold tabular-nums text-foreground">
-              {l.count}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** Accueil du comptable : KPIs 2×2, carte donut à droite (motif
- *  « Étudiants éligibles »), échéances du mois en cours, puis les
- *  plus gros taux d'impayés. */
+/** Accueil du comptable : graphe encaissé/taux, carte donut du reste
+ *  (avec total + comptes à relancer), échéances du mois en cours, puis
+ *  les plus gros taux d'impayés. */
 function DashboardComptable() {
   const { financier, etudiants } = useIstpm();
   const resteData = useMemo(
@@ -1509,6 +1442,69 @@ function DashboardComptable() {
     [financier],
   );
   const resteTotal = resteData.reduce((s, d) => s + d.value, 0);
+  // Comptes distincts à relancer (global + par statut du reste).
+  const relancerParStatut = useMemo(() => {
+    const parStatut = new Map<string, Set<string>>();
+    const tous = new Set<string>();
+    for (const e of etudiants) {
+      if (e.archived) continue;
+      for (const r of e.paiementsMensuelsRecords) {
+        if (r.statut === "paye" || r.montantPaye >= r.montantDu) continue;
+        tous.add(e.id);
+        if (!parStatut.has(r.statut)) parStatut.set(r.statut, new Set());
+        parStatut.get(r.statut)!.add(e.id);
+      }
+    }
+    return {
+      total: tous.size,
+      parStatut: [...parStatut.entries()].map(([statut, ids]) => ({ statut, count: ids.size })),
+    };
+  }, [etudiants]);
+  // Série mensuelle (12 derniers mois) : encaissé + taux de recouvrement.
+  const tendanceFinance = useMemo(() => {
+    const MOIS_FR = [
+      "janvier", "février", "mars", "avril", "mai", "juin",
+      "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+    ];
+    const cleMois = (label: string): string | null => {
+      const m = String(label)
+        .trim()
+        .toLowerCase()
+        .match(/^([a-zéû]+)\s+(\d{4})$/);
+      if (!m) return null;
+      const idx = MOIS_FR.indexOf(m[1]);
+      if (idx < 0) return null;
+      return `${m[2]}-${String(idx + 1).padStart(2, "0")}`;
+    };
+    const paye = new Map<string, number>();
+    const du = new Map<string, number>();
+    for (const e of etudiants) {
+      if (e.archived) continue;
+      for (const r of e.paiementsMensuelsRecords) {
+        if (r.datePaiement && r.montantPaye > 0) {
+          const k = String(r.datePaiement).slice(0, 7);
+          paye.set(k, (paye.get(k) ?? 0) + r.montantPaye);
+          du.set(k, (du.get(k) ?? 0) + r.montantPaye);
+        }
+        const reste = r.montantDu - r.montantPaye;
+        if (reste > 0) {
+          const k = cleMois(r.mois);
+          if (k) du.set(k, (du.get(k) ?? 0) + reste);
+        }
+      }
+    }
+    const cles = [...new Set([...paye.keys(), ...du.keys()])].sort().slice(-12);
+    return cles.map((k) => {
+      const p = paye.get(k) ?? 0;
+      const d = du.get(k) ?? 0;
+      const [y, m] = k.split("-");
+      return {
+        name: `${MOIS_FR[Number(m) - 1].slice(0, 3)} ${y.slice(2)}`,
+        encaisse: Math.round(p),
+        taux: d > 0 ? Math.round((p / d) * 100) : 0,
+      };
+    });
+  }, [etudiants]);
   // Échéances du mois en cours (mensualités non soldées libellées
   // « septembre 2026 », comparées dans le même format).
   const moisCle = new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
@@ -1549,16 +1545,79 @@ function DashboardComptable() {
   return (
     <div className="space-y-6">
       <DashHero chips={[]} />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <KpiCard label="Encaissé" value={fmtMAD(financier.encaisse)} icon={Wallet} />
-          <KpiCard label="Reste à recouvrer" value={fmtMAD(resteTotal)} tone="amber" icon={AlertCircle} />
-          <KpiCard label="Taux de recouvrement" value={`${financier.tauxRecouvrement} %`} tone="teal" icon={CheckCircle2} />
-          <ComptesRelancerCard />
+      <div className={cn(softCard, "p-4 sm:p-5")}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className={eyebrowClass}>Encaissé &amp; taux de recouvrement · 12 mois</p>
+          <span className="flex items-center gap-3 text-[11px] font-medium text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[var(--istpm-teal)]" />
+              Encaissé
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[var(--istpm-blue)]" />
+              Taux %
+            </span>
+          </span>
         </div>
+        <div className="mt-3 w-full" style={{ height: 230 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={tendanceFinance} margin={{ top: 6, right: 6, left: -14, bottom: 0 }}>
+              <CartesianGrid stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} stroke="var(--muted-foreground)" />
+              <YAxis
+                yAxisId="mad"
+                width={44}
+                tick={{ fontSize: 11 }}
+                tickLine={false}
+                stroke="var(--muted-foreground)"
+                tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${v}`)}
+              />
+              <YAxis
+                yAxisId="pct"
+                orientation="right"
+                width={36}
+                domain={[0, 100]}
+                tick={{ fontSize: 11 }}
+                tickLine={false}
+                stroke="var(--muted-foreground)"
+                tickFormatter={(v: number) => `${v}%`}
+              />
+              <Tooltip contentStyle={dashTooltip} />
+              <Line
+                yAxisId="mad"
+                type="monotone"
+                dataKey="encaisse"
+                name="Encaissé (MAD)"
+                stroke="var(--istpm-teal)"
+                strokeWidth={2.5}
+                dot={{ r: 3, strokeWidth: 0, fill: "var(--istpm-teal)" }}
+              />
+              <Line
+                yAxisId="pct"
+                type="monotone"
+                dataKey="taux"
+                name="Taux (%)"
+                stroke="var(--istpm-blue)"
+                strokeWidth={2.5}
+                strokeDasharray="6 3"
+                dot={{ r: 3, strokeWidth: 0, fill: "var(--istpm-blue)" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className={cn(softCard, "p-4 sm:p-5")}>
           <div className="flex items-baseline justify-between gap-2">
             <p className={eyebrowClass}>Reste par statut</p>
+            <span className="text-right">
+              <span className="block text-lg font-bold tabular-nums leading-none text-foreground">
+                {fmtMAD(resteTotal)}
+              </span>
+              <span className="mt-0.5 block text-[11px] font-medium text-muted-foreground">
+                {relancerParStatut.total} compte(s) à relancer
+              </span>
+            </span>
           </div>
           <div className="mt-3 w-full" style={{ height: 180 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -1588,20 +1647,30 @@ function DashboardComptable() {
             </ResponsiveContainer>
           </div>
           <ul className="mt-3 space-y-2">
-            {resteData.map((d, i) => (
-              <li key={d.name} className="flex items-center justify-between gap-2 text-sm">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length] }}
-                  />
-                  <span className="truncate text-muted-foreground">{d.name}</span>
-                </span>
-                <span className="shrink-0 font-semibold tabular-nums text-foreground">
-                  {fmtMAD(d.value)}
-                </span>
-              </li>
-            ))}
+            {resteData.map((d, i) => {
+              const key =
+                d.name === "En attente" ? "en_attente" : d.name === "Retard" ? "retard" : "impaye";
+              const nb = relancerParStatut.parStatut.find((p) => p.statut === key)?.count ?? 0;
+              return (
+                <li key={d.name} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length] }}
+                    />
+                    <span className="truncate text-muted-foreground">{d.name}</span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block font-semibold tabular-nums text-foreground">
+                      {fmtMAD(d.value)}
+                    </span>
+                    <span className="block text-[11px] font-normal tabular-nums text-muted-foreground">
+                      {nb} compte(s)
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>
