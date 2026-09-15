@@ -738,9 +738,6 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
           <ClipboardCheck className="h-4 w-4 text-brand-dk" />
           <p className={eyebrowClass}>Mes demandes ({demandes.length})</p>
         </div>
-        <button className={ghostPill} onClick={() => setDemandeOpen(true)}>
-          <Plus className="h-3.5 w-3.5" /> Nouvelle demande
-        </button>
       </div>
       <DataTable
         minWidth="min-w-[760px]"

@@ -636,6 +636,7 @@ export function DashSidebarShell({
 }) {
   const loc = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { user: shellUser } = useAuth();
 
   // Route change closes the mobile drawer.
   useEffect(() => setDrawerOpen(false), [loc.pathname]);
@@ -743,7 +744,7 @@ export function DashSidebarShell({
       </div>
 
       <Toaster />
-      <AiChatFloating />
+      {shellUser?.role === "etudiant" ? null : <AiChatFloating />}
       {/* Cloche des demandes sur desktop (coin haut-droit, seulement s'il y a du nouveau). */}
       <div className="fixed end-6 top-6 z-40 hidden lg:block">
         <RequestBell />

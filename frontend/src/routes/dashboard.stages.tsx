@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { Eye, FileDown, FileText, Pencil, Trash2, Mail, Users, Building2 } from "lucide-react";
+import { Eye, FileDown, FileText, Pencil, Trash2, Mail, Users, Building2, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   BarChart,
@@ -220,6 +220,10 @@ function StagesAnalytics({
   const [vueStages, setVueStages] = useState<"statut" | "structure">(
     "structure",
   );
+  // Pagination des barres (5 par page) : 10 structures ne tiennent pas
+  // lisiblement sur la carte. Légende synchronisée sur la page.
+  const [structPage, setStructPage] = useState(0);
+  const STRUCT_PAGE_SIZE = 5;
 
   const eligible = useMemo(() => {
     const activeIds = new Set(
@@ -279,7 +283,10 @@ function StagesAnalytics({
           <ChartSwitch
             label="Choisir l'angle d'analyse des stages"
             value={vueStages}
-            onChange={setVueStages}
+            onChange={(v) => {
+              setVueStages(v);
+              setStructPage(0);
+            }}
             options={[
               ["structure", "Structure"],
               ["statut", "Statut"],
@@ -287,85 +294,117 @@ function StagesAnalytics({
           />
         }
       >
-        {vueStages === "statut" ? (
-          <BarChart data={parStatut}>
-            <CartesianGrid stroke="var(--border)" vertical={false} />
-            <XAxis
-              dataKey="name"
-              tick={{ fontSize: 10 }}
-              stroke="var(--muted-foreground)"
-              interval={0}
-              angle={-15}
-              textAnchor="end"
-              height={54}
-            />
-            <YAxis
-              allowDecimals={false}
-              tick={{ fontSize: 11 }}
-              stroke="var(--muted-foreground)"
-              width={28}
-            />
-            <Tooltip contentStyle={dashTooltip} cursor={false} />
-            <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-              {parStatut.map((_, i) => (
-                <Cell
-                  key={i}
-                  fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        ) : (
-          <BarChart data={parStructure} layout="vertical">
-            <CartesianGrid stroke="var(--border)" horizontal={false} />
-            <XAxis
-              type="number"
-              allowDecimals={false}
-              tick={{ fontSize: 11 }}
-              stroke="var(--muted-foreground)"
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              tick={{ fontSize: 10 }}
-              stroke="var(--muted-foreground)"
-              width={130}
-            />
-            <Tooltip contentStyle={dashTooltip} cursor={false} />
-            <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-              {parStructure.map((_, i) => (
-                <Cell
-                  key={i}
-                  fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        )}
-        {/* Légende nom + couleur sous le graphe (même motif que
-            « Étudiants éligibles »), pour les deux angles d'analyse. */}
-        <ul className="mt-3 space-y-2">
-          {(vueStages === "structure" ? parStructure : parStatut).map((d, i) => (
-            <li
-              key={d.name}
-              className="flex items-center justify-between gap-2 text-sm"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor:
-                      BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length],
-                  }}
-                />
-                <span className="truncate text-muted-foreground">{d.name}</span>
-              </span>
-              <span className="shrink-0 font-semibold tabular-nums text-foreground">
-                {d.value}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {(() => {
+          // Pagination des barres seules (la carte ne bouge pas) : 10
+          // structures ne tiennent pas lisiblement. Couleurs indexées sur
+          // la position globale pour rester stables d'une page à l'autre.
+          const full = vueStages === "structure" ? parStructure : parStatut;
+          const pages = Math.max(1, Math.ceil(full.length / STRUCT_PAGE_SIZE));
+          const page = Math.min(structPage, pages - 1);
+          const start = page * STRUCT_PAGE_SIZE;
+          const rows = full.slice(start, start + STRUCT_PAGE_SIZE);
+          const colorOf = (i: number) =>
+            BRAND_CHART_COLORS[(start + i) % BRAND_CHART_COLORS.length];
+          return (
+            <>
+              {vueStages === "statut" ? (
+                <BarChart data={rows}>
+                  <CartesianGrid stroke="var(--border)" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 10 }}
+                    stroke="var(--muted-foreground)"
+                    interval={0}
+                    angle={-15}
+                    textAnchor="end"
+                    height={54}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11 }}
+                    stroke="var(--muted-foreground)"
+                    width={28}
+                  />
+                  <Tooltip contentStyle={dashTooltip} cursor={false} />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    {rows.map((_, i) => (
+                      <Cell key={i} fill={colorOf(i)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              ) : (
+                <BarChart data={rows} layout="vertical">
+                  <CartesianGrid stroke="var(--border)" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fontSize: 11 }}
+                    stroke="var(--muted-foreground)"
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 10 }}
+                    stroke="var(--muted-foreground)"
+                    width={130}
+                  />
+                  <Tooltip contentStyle={dashTooltip} cursor={false} />
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                    {rows.map((_, i) => (
+                      <Cell key={i} fill={colorOf(i)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              )}
+              {pages > 1 ? (
+                <div className="mt-2 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    aria-label="Page précédente"
+                    disabled={page === 0}
+                    onClick={() => setStructPage(page - 1)}
+                    className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk disabled:opacity-35 disabled:pointer-events-none"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                    {start + 1}–{start + rows.length} sur {full.length}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Page suivante"
+                    disabled={page >= pages - 1}
+                    onClick={() => setStructPage(page + 1)}
+                    className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk disabled:opacity-35 disabled:pointer-events-none"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : null}
+              {/* Légende nom + couleur sous le graphe (même motif que
+                  « Étudiants éligibles »), synchronisée sur la page. */}
+              <ul className="mt-3 space-y-2">
+                {rows.map((d, i) => (
+                  <li
+                    key={d.name}
+                    className="flex items-center justify-between gap-2 text-sm"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: colorOf(i) }}
+                      />
+                      <span className="truncate text-muted-foreground">{d.name}</span>
+                    </span>
+                    <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                      {d.value}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          );
+        })()}
       </ChartCard>
 
       {/* Carte des étudiants éligibles */}

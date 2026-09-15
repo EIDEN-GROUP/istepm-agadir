@@ -57,10 +57,13 @@ export async function verifyPassword(
 export async function createUser(input: CreateUserInput): Promise<UserResult> {
   const db = getDb();
   const passwordHash = await hashPassword(input.password);
+  // E-mails insensibles à la casse : normalisés une fois pour toutes
+  // (sinon `Comptable@…` créé puis `comptable@…` à la connexion = 401).
+  const email = input.email.trim().toLowerCase();
   const [user] = await db
     .insert(users)
     .values({
-      email: input.email,
+      email,
       passwordHash,
       name: input.name,
       role: input.role ?? "directeur",
@@ -114,7 +117,7 @@ export type LoginResult =
   | { ok: false; reason: "invalid" | "archived" };
 
 export async function login(email: string, password: string): Promise<LoginResult> {
-  const user = await findByEmail(email);
+  const user = await findByEmail(email.trim().toLowerCase());
   if (!user) return { ok: false, reason: "invalid" };
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) return { ok: false, reason: "invalid" };
