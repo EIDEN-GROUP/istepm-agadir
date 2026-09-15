@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
-import { Wallet, AlertTriangle, TrendingUp, Users } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Wallet, AlertTriangle, TrendingUp, Users, Plus, PenLine } from "lucide-react";
+import { toast } from "sonner";
 import { useIstpm } from "@/lib/istpm-store";
 import { fmtMAD } from "@/lib/istpm-data";
 import { PageHeader, DataTable } from "@/components/dash-page";
 import { AreaTrend, DonutChart } from "@/components/dash-charts";
-import { softCard, tableRow, cellTruncate, toneBadge, BRAND_CHART_COLORS } from "@/lib/dash-ui";
+import { softCard, tableRow, cellTruncate, toneBadge, BRAND_CHART_COLORS, iconButton } from "@/lib/dash-ui";
 import { cn } from "@/lib/utils";
 import type { Etudiant } from "@/lib/istpm-data";
+import { EditPaiementDialog } from "./dashboard.paiements";
 
 /** Reste dû d'une fiche (mensualités non soldées). */
 function resteDu(e: Etudiant): number {
@@ -18,11 +20,13 @@ function resteDu(e: Etudiant): number {
 
 /**
  * Espace Finance (rôle `comptable`, visible aussi par la direction) :
- * encaissements, recouvrement, impayés à relancer et tendance mensuelle.
- * Lecture seule ici — les règlements se saisissent dans « Paiements ».
+ * encaissements, recouvrement, impayés à relancer et tendance mensuelle,
+ * avec saisie et modification des règlements sur place.
  */
 function FinancePage() {
-  const { financier, etudiants, paiements } = useIstpm();
+  const { financier, etudiants, paiements, payerMois } = useIstpm();
+  const [addOpen, setAddOpen] = useState(false);
+  const [payFor, setPayFor] = useState<Etudiant | null>(null);
 
   const aRelancer = useMemo(
     () =>
@@ -54,12 +58,21 @@ function FinancePage() {
         eyebrow="Finance"
         title="Pilotage financier"
         actions={
-          <Link
-            to="/dashboard/paiements"
-            className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white shadow transition hover:bg-brand-dk"
-          >
-            <Wallet className="h-4 w-4" /> Saisir un règlement
-          </Link>
+          <>
+            <Link
+              to="/dashboard/paiements"
+              className="inline-flex items-center gap-2 rounded-full border border-brand/20 px-5 py-2.5 text-sm font-bold text-brand-dk transition hover:bg-brand/10"
+            >
+              <Wallet className="h-4 w-4" /> Paiements
+            </Link>
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white shadow transition hover:bg-brand-dk"
+            >
+              <Plus className="h-4 w-4" /> Nouveau paiement
+            </button>
+          </>
         }
       />
 
@@ -103,6 +116,7 @@ function FinancePage() {
         <p className="px-4 pt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground sm:px-5">
           À relancer ({aRelancer.length})
         </p>
+        <div className="max-h-[420px] overflow-y-auto">
         <DataTable
           isEmpty={aRelancer.length === 0}
           empty="Aucun impayé. Tout est recouvré."
@@ -112,10 +126,11 @@ function FinancePage() {
               <th>Filière</th>
               <th className="text-right">Reste dû</th>
               <th>Paiement</th>
+              <th className="text-center">Actions</th>
             </>
           }
         >
-          {aRelancer.slice(0, 50).map(({ e, reste }) => (
+          {aRelancer.map(({ e, reste }) => (
             <tr key={e.id} className={tableRow}>
               <td className={cn("font-medium", cellTruncate)}>
                 {e.prenom} {e.nom}
@@ -125,10 +140,59 @@ function FinancePage() {
               <td>
                 <span className={toneBadge("amber")}>{e.paiement}</span>
               </td>
+              <td className="text-center" onClick={(ev) => ev.stopPropagation()}>
+                <button
+                  type="button"
+                  className={iconButton}
+                  aria-label={`Modifier le paiement de ${e.prenom} ${e.nom}`}
+                  onClick={() => setPayFor(e)}
+                >
+                  <PenLine className="h-3.5 w-3.5" />
+                </button>
+              </td>
             </tr>
           ))}
         </DataTable>
+        </div>
       </div>
+
+      {payFor ? (
+        <EditPaiementDialog
+          etudiant={payFor}
+          onClose={() => setPayFor(null)}
+          onSave={async (mois, details) => {
+            try {
+              await payerMois(payFor.id, mois, details);
+              toast.success(`Paiement enregistré pour ${payFor.prenom} ${payFor.nom}`);
+              setPayFor(null);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+            }
+          }}
+        />
+      ) : null}
+
+      {addOpen ? (
+        <EditPaiementDialog
+          etudiant={null}
+          etudiants={etudiants.filter((e) => !e.archived)}
+          onClose={() => setAddOpen(false)}
+          onSave={(mois, details) => {
+            toast.error("Veuillez sélectionner un étudiant");
+          }}
+          isNew
+          onNewPayment={async (etudiantId, mois, details) => {
+            const et = etudiants.find((e) => e.id === etudiantId);
+            try {
+              await payerMois(etudiantId, mois, details);
+              toast.success(`Paiement enregistré pour ${et?.prenom} ${et?.nom}`);
+              setAddOpen(false);
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

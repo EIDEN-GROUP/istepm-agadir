@@ -1916,7 +1916,7 @@ function SettingsPage() {
             }
           >
             <div className="space-y-1.5">
-              {smtpOk === false ? (
+              {smtpOk === false && role !== "comptable" ? (
                 <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
                   E-mails non configurés sur le serveur (SMTP) : les invitations devront être
                   partagées manuellement via leur lien.

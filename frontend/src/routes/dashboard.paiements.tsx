@@ -473,7 +473,7 @@ function PaiementsPage() {
 /*  Edit Paiement Dialog                                               */
 /* ------------------------------------------------------------------ */
 
-function EditPaiementDialog({
+export function EditPaiementDialog({
   etudiant,
   etudiants,
   onClose,

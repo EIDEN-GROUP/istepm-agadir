@@ -177,6 +177,7 @@ function EcheancesView() {
         }
       />
       <div className={cn(softCard, "overflow-hidden")}>
+        <div className="max-h-[480px] overflow-y-auto">
         <DataTable
           isEmpty={lignes.length === 0}
           empty="Aucune échéance impayée."
@@ -192,7 +193,7 @@ function EcheancesView() {
             </>
           }
         >
-          {lignes.slice(0, 200).map((l) => (
+          {lignes.map((l) => (
             <tr key={l.id} className={tableRow}>
               <td className={cn("font-medium", cellTruncate)}>{l.etudiant}</td>
               <td className="text-muted-foreground">{l.filiere}</td>
@@ -206,6 +207,7 @@ function EcheancesView() {
             </tr>
           ))}
         </DataTable>
+        </div>
       </div>
     </div>
   );
