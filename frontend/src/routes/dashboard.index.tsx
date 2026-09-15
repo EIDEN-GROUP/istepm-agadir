@@ -1545,6 +1545,7 @@ function DashboardComptable() {
   return (
     <div className="space-y-6">
       <DashHero chips={[]} />
+      <div className="grid gap-4 xl:grid-cols-2">
       <div className={cn(softCard, "p-4 sm:p-5")}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className={eyebrowClass}>Encaissé &amp; taux de recouvrement · 12 mois</p>
@@ -1606,7 +1607,6 @@ function DashboardComptable() {
           </ResponsiveContainer>
         </div>
       </div>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className={cn(softCard, "p-4 sm:p-5")}>
           <div className="flex items-baseline justify-between gap-2">
             <p className={eyebrowClass}>Reste par statut</p>
