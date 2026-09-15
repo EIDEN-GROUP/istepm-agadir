@@ -580,13 +580,17 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   // Synchronisation serveur : remplacement intégral, jamais de fusion locale.
   // Échec réseau = `syncFailed` (bandeau explicite), jamais de données inventées.
   // Les listes staff (étudiants, formateurs, stages, séances) répondent
-  // 403/404 à un compte étudiant (qui a son espace dédié via /api/student/*) :
-  // on ne les demande même pas pour éviter erreurs console + bandeau abusif.
+  // 403/404 aux rôles sans accès (étudiant via /api/student/*, comptable
+  // via son espace Finance) : on ne les demande même pas pour éviter
+  // erreurs console + bandeau abusif.
   const refresh = useCallback(async () => {
     setLoading(true);
     setSyncFailed(false);
     try {
-      const staffOnly = userRole === "etudiant";
+      const isStudent = userRole === "etudiant";
+      // Comptable : ni formateurs, ni stages, ni séances (403) ; la liste
+      // des étudiants reste accessible (recouvrement).
+      const noStaffLists = isStudent || userRole === "comptable";
       const [
         etudiantsRaw,
         formateursRaw,
@@ -605,12 +609,12 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         filieresRaw,
         groupsRaw,
       ] = await Promise.all([
-        staffOnly ? [] : apiFetchEtudiants({ archived: "all" }),
-        staffOnly ? [] : apiFetchFormateurs({ archived: "all" }),
+        isStudent ? [] : apiFetchEtudiants({ archived: "all" }),
+        noStaffLists ? [] : apiFetchFormateurs({ archived: "all" }),
         apiFetchExamens(),
         apiFetchBulletins(),
-        staffOnly ? [] : apiFetchStages(),
-        staffOnly ? [] : apiFetchSeances(),
+        noStaffLists ? [] : apiFetchStages(),
+        noStaffLists ? [] : apiFetchSeances(),
         apiFetchStructures(),
         apiFetchStageServices(),
         fetchSettings().catch(() => ({}) as Record<string, unknown>),

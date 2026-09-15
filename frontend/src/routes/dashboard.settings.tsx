@@ -1132,7 +1132,7 @@ function NewUserForm({
               onChange={(e) => setRole(e.target.value)}
               className={selectClass}
             >
-              {["directeur", "responsable", "enseignant", "etudiant", "comptable"].map((r) => (
+              {["directeur", "responsable", "comptable", "enseignant", "etudiant"].map((r) => (
                 <option key={r} value={r}>{ROLE_META[r as UserRole]?.label ?? r}</option>
               ))}
             </select>

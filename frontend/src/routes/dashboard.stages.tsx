@@ -244,19 +244,19 @@ function StagesAnalytics({
     <>
     <section className="grid gap-4 md:grid-cols-1 2xl:grid-cols-[2fr_1fr]">
       <div className="space-y-4">
-      <div className="flex justify-end">
-        <ChartSwitch
-          label="Choisir l'angle d'analyse des stages"
-          value={vueStages}
-          onChange={setVueStages}
-          options={[
-            ["structure", "Structure"],
-            ["statut", "Statut"],
-          ] as const}
-        />
-      </div>
       <div className={cn(softCard, "p-4 sm:p-5", vueStages !== "structure" && "hidden")}>
-        <p className={eyebrowClass}>Stages par structure hospitalière</p>
+        <div className="flex items-start justify-between gap-3">
+          <p className={eyebrowClass}>Stages par structure hospitalière</p>
+          <ChartSwitch
+            label="Choisir l'angle d'analyse des stages"
+            value={vueStages}
+            onChange={setVueStages}
+            options={[
+              ["structure", "Structure"],
+              ["statut", "Statut"],
+            ] as const}
+          />
+        </div>
         <div className="mt-3 max-h-[248px] overflow-y-auto pe-1">
           <div style={{ height: Math.max(parStructure.length * 36, 120) }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -314,7 +314,18 @@ function StagesAnalytics({
         </div>
       </div>
       <div className={cn(softCard, "p-4 sm:p-5", vueStages !== "statut" && "hidden")}>
-        <p className={eyebrowClass}>Statistiques des stages (par statut)</p>
+        <div className="flex items-start justify-between gap-3">
+          <p className={eyebrowClass}>Statistiques des stages (par statut)</p>
+          <ChartSwitch
+            label="Choisir l'angle d'analyse des stages"
+            value={vueStages}
+            onChange={setVueStages}
+            options={[
+              ["structure", "Structure"],
+              ["statut", "Statut"],
+            ] as const}
+          />
+        </div>
         <div className="mt-3 max-h-[248px] overflow-y-auto pe-1">
           <div style={{ height: Math.max(parStatut.length * 44, 140) }}>
             <ResponsiveContainer width="100%" height="100%">
