@@ -166,10 +166,7 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
   // calendrier des échéances ; lecture des fiches étudiants (recouvrement).
   comptable: [
     "/dashboard",
-    "/dashboard/finance",
     "/dashboard/paiements",
-    "/dashboard/calendar",
-    "/dashboard/etudiants",
     "/dashboard/settings",
   ],
 };

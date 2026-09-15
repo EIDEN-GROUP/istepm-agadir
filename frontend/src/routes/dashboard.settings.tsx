@@ -1001,7 +1001,7 @@ function NewUserForm({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState(fixedRole ?? "enseignant");
+  const [role, setRole] = useState(fixedRole ?? "directeur");
   const [cne, setCne] = useState("");
   const [mode, setMode] = useState<"password" | "invite">("invite");
   const [loading, setLoading] = useState(false);
@@ -1132,7 +1132,7 @@ function NewUserForm({
               onChange={(e) => setRole(e.target.value)}
               className={selectClass}
             >
-              {["directeur", "responsable", "comptable", "enseignant", "etudiant"].map((r) => (
+              {["directeur", "responsable", "comptable"].map((r) => (
                 <option key={r} value={r}>{ROLE_META[r as UserRole]?.label ?? r}</option>
               ))}
             </select>

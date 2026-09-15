@@ -1426,9 +1426,20 @@ function DashboardResponsable() {
 
 /* ------------------------------------------------------------------ */
 
-/** Accueil du comptable : l'essentiel finance + accès à l'espace Finance. */
+/** Accueil du comptable : KPIs 2×2, carte donut à droite (motif
+ *  « Étudiants éligibles »), échéances du mois en cours, puis les plus
+ *  gros taux d'impayés. */
 function DashboardComptable() {
   const { financier, etudiants } = useIstpm();
+  const resteData = useMemo(
+    () => [
+      { name: "En attente", value: financier.enAttente },
+      { name: "Retard", value: financier.retard },
+      { name: "Impayé", value: financier.impaye },
+    ],
+    [financier],
+  );
+  const resteTotal = resteData.reduce((s, d) => s + d.value, 0);
   const impayes = useMemo(
     () =>
       etudiants.filter(
@@ -1440,24 +1451,153 @@ function DashboardComptable() {
       ).length,
     [etudiants],
   );
+  // Échéances du mois en cours (toutes mensualités non soldées du mois).
+  const moisCle = new Date().toISOString().slice(0, 7);
+  const echeancesMois = useMemo(() => {
+    const lignes: Array<{ id: string; etudiant: string; mois: string; reste: number }> = [];
+    for (const e of etudiants) {
+      if (e.archived) continue;
+      for (const r of e.paiementsMensuelsRecords) {
+        const reste = r.montantDu - r.montantPaye;
+        if (reste <= 0) continue;
+        if (String(r.mois).slice(0, 7) !== moisCle) continue;
+        lignes.push({
+          id: `${e.id}:${r.id}`,
+          etudiant: `${e.prenom} ${e.nom}`,
+          mois: r.mois,
+          reste,
+        });
+      }
+    }
+    return lignes.sort((a, b) => b.reste - a.reste);
+  }, [etudiants, moisCle]);
+  const totalMois = echeancesMois.reduce((s, l) => s + l.reste, 0);
+  // Plus gros taux d'impayés (reste / dû total de la fiche).
+  const topTaux = useMemo(() => {
+    return etudiants
+      .filter((e) => !e.archived)
+      .map((e) => {
+        const du = e.paiementsMensuelsRecords.reduce((s, r) => s + r.montantDu, 0);
+        const reste = e.paiementsMensuelsRecords
+          .filter((r) => r.statut !== "paye")
+          .reduce((s, r) => s + Math.max(0, r.montantDu - r.montantPaye), 0);
+        return { id: e.id, nom: `${e.prenom} ${e.nom}`, ratio: du > 0 ? reste / du : 0, reste };
+      })
+      .filter((x) => x.reste > 0)
+      .sort((a, b) => b.ratio - a.ratio)
+      .slice(0, 8);
+  }, [etudiants]);
   return (
     <div className="space-y-6">
-      <KpiGrid>
-        <KpiCard label="Encaissé" value={financier.encaisse} icon={Wallet} />
-        <KpiCard label="Reste à recouvrer" value={financier.enAttente + financier.retard + financier.impaye} tone="amber" icon={AlertCircle} />
-        <KpiCard label="Taux de recouvrement" value={`${financier.tauxRecouvrement} %`} tone="teal" icon={CheckCircle2} />
-        <KpiCard label="Comptes à relancer" value={impayes} tone="amber" icon={PhoneCall} />
-      </KpiGrid>
-      <Section title="Recouvrement" action={<SectionLink to="/dashboard/finance">Espace Finance</SectionLink>}>
-        <DonutChart
-          title="Reste par statut"
-          data={[
-            { name: "En attente", value: financier.enAttente },
-            { name: "Retard", value: financier.retard },
-            { name: "Impayé", value: financier.impaye },
-          ]}
-          palette={BRAND_CHART_COLORS}
-        />
+      <DashHero chips={[
+        { label: "Encaissé", value: financier.encaisse },
+        { label: "Reste à recouvrer", value: resteTotal },
+        { label: "Comptes à relancer", value: impayes },
+      ]} />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <KpiCard label="Encaissé" value={financier.encaisse} icon={Wallet} />
+          <KpiCard label="Reste à recouvrer" value={resteTotal} tone="amber" icon={AlertCircle} />
+          <KpiCard label="Taux de recouvrement" value={`${financier.tauxRecouvrement} %`} tone="teal" icon={CheckCircle2} />
+          <KpiCard label="Comptes à relancer" value={impayes} tone="amber" icon={PhoneCall} />
+        </div>
+        <div className={cn(softCard, "p-4 sm:p-5")}>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className={eyebrowClass}>Reste par statut</p>
+            <span className="text-2xl font-bold tabular-nums leading-none text-brand-dk">
+              {fmtMAD(resteTotal)}
+            </span>
+          </div>
+          <div className="mt-3 w-full" style={{ height: 180 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={resteData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="52%"
+                  outerRadius="92%"
+                  paddingAngle={1}
+                  stroke="var(--card)"
+                  strokeWidth={2}
+                  labelLine={false}
+                >
+                  {resteData.map((_, i) => (
+                    <Cell
+                      key={i}
+                      fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={dashTooltip} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {resteData.map((d, i) => (
+              <li key={d.name} className="flex items-center justify-between gap-2 text-sm">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length] }}
+                  />
+                  <span className="truncate text-muted-foreground">{d.name}</span>
+                </span>
+                <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                  {fmtMAD(d.value)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <Section title={`Échéances du mois (${echeancesMois.length})`}>
+        <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
+          {echeancesMois.length ? (
+            echeancesMois.slice(0, 10).map((l) => (
+              <div key={l.id} className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-foreground">{l.etudiant}</span>
+                  <span className="block text-[11px] text-muted-foreground">{l.mois}</span>
+                </span>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-alert-dk">
+                  {fmtMAD(l.reste)}
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="px-5 py-8 text-center text-sm text-muted-foreground">
+              Aucune échéance ce mois-ci.
+            </p>
+          )}
+          {echeancesMois.length ? (
+            <div className="flex items-center justify-between bg-muted/40 px-4 py-2.5 text-sm sm:px-5">
+              <span className="font-medium text-muted-foreground">Total du mois</span>
+              <span className="font-bold tabular-nums text-foreground">{fmtMAD(totalMois)}</span>
+            </div>
+          ) : null}
+        </div>
+      </Section>
+      <Section title="Plus gros taux d'impayés">
+        <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
+          {topTaux.length ? (
+            topTaux.map((x) => (
+              <MeterRow
+                key={x.id}
+                label={x.nom}
+                ratio={x.ratio}
+                color={x.ratio > 0.5 ? TONE_COLORS.red : x.ratio > 0.25 ? TONE_COLORS.amber : TONE_COLORS.teal}
+                detail={`${Math.round(x.ratio * 100)} % impayé · ${fmtMAD(x.reste)} restants`}
+              />
+            ))
+          ) : (
+            <p className="px-5 py-8 text-center text-sm text-muted-foreground">
+              Aucun impayé : tout est recouvré.
+            </p>
+          )}
+        </div>
       </Section>
     </div>
   );

@@ -106,7 +106,7 @@ function PaiementsPage() {
     for (const e of etudiants) if (e.annee) set.add(e.annee);
     return [...set].sort().reverse();
   }, [etudiants]);
-  const canEdit = role === "directeur" || role === "responsable";
+  const canEdit = role === "directeur" || role === "responsable" || role === "comptable";
 
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
@@ -225,10 +225,18 @@ function PaiementsPage() {
             id: "filiere", label: "Filière", value: filiere, onChange: setFiliere,
             options: FILIERES, allLabel: "Toutes les filières",
           },
-          {
-            id: "semestre", label: "Semestre", value: semestre, onChange: setSemestre,
-            options: NIVEAUX, allLabel: "Tous les semestres",
-          },
+          ...(role === "directeur"
+            ? []
+            : [
+                {
+                  id: "annee",
+                  label: "Niveau",
+                  value: annee,
+                  onChange: setAnnee,
+                  options: ANNEES_ETUDE,
+                  allLabel: "Tous les niveaux",
+                },
+              ]),
           {
             // Libellé « Niveau » comme sur les autres pages : c'est l'année
             // d'étude (1ère/2ème/3ème), à ne pas confondre avec l'année scolaire.
@@ -674,7 +682,7 @@ function HistoriquePaiementsDialog({
   const stamp = useStamp();
   const academicYear = getCurrentAcademicYear();
   const months = useMemo(() => getAcademicYearMonths(academicYear), [academicYear]);
-  const canEdit = useAuth().role === "directeur" || useAuth().role === "responsable";
+  const canEdit = useAuth().role === "directeur" || useAuth().role === "responsable" || useAuth().role === "comptable";
 
   const records = etudiant.paiementsMensuelsRecords;
   const totalPayeE = records

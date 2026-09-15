@@ -128,91 +128,6 @@ function resumeConflits(conflits: Conflit[]) {
 
 /* ------------------------------------------------------------------ */
 
-/**
- * Vue Échéances (rôle `comptable`) : toutes les mensualités dues de chaque
- * étudiant, triées par date — pas d'emploi du temps des séances.
- */
-function EcheancesView() {
-  const { etudiants } = useIstpm();
-  const lignes = useMemo(() => {
-    const out: Array<{
-      id: string;
-      etudiant: string;
-      filiere: string;
-      mois: string;
-      du: number;
-      paye: number;
-      statut: string;
-    }> = [];
-    for (const e of etudiants) {
-      if (e.archived) continue;
-      for (const r of e.paiementsMensuelsRecords) {
-        const reste = r.montantDu - r.montantPaye;
-        if (reste <= 0) continue;
-        out.push({
-          id: `${e.id}:${r.id}`,
-          etudiant: `${e.prenom} ${e.nom}`,
-          filiere: e.filiere,
-          mois: r.mois,
-          du: r.montantDu,
-          paye: r.montantPaye,
-          statut: r.statut,
-        });
-      }
-    }
-    return out.sort((a, b) => (a.mois < b.mois ? -1 : 1));
-  }, [etudiants]);
-  const total = lignes.reduce((s, l) => s + (l.du - l.paye), 0);
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Calendrier"
-        title="Échéances de paiement"
-        actions={
-          <span className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
-            <Wallet className="h-3.5 w-3.5" />
-            {fmtMAD(total)} à recouvrer · {lignes.length} échéance(s)
-          </span>
-        }
-      />
-      <div className={cn(softCard, "overflow-hidden")}>
-        <div className="max-h-[480px] overflow-y-auto">
-        <DataTable
-          isEmpty={lignes.length === 0}
-          empty="Aucune échéance impayée."
-          head={
-            <>
-              <th>Étudiant</th>
-              <th>Filière</th>
-              <th>Mois</th>
-              <th className="text-right">Dû</th>
-              <th className="text-right">Payé</th>
-              <th className="text-right">Reste</th>
-              <th>Statut</th>
-            </>
-          }
-        >
-          {lignes.map((l) => (
-            <tr key={l.id} className={tableRow}>
-              <td className={cn("font-medium", cellTruncate)}>{l.etudiant}</td>
-              <td className="text-muted-foreground">{l.filiere}</td>
-              <td className="text-muted-foreground">{l.mois}</td>
-              <td className="text-right tabular-nums">{fmtMAD(l.du)}</td>
-              <td className="text-right tabular-nums">{fmtMAD(l.paye)}</td>
-              <td className="text-right font-semibold tabular-nums">{fmtMAD(l.du - l.paye)}</td>
-              <td>
-                <span className={toneBadge(l.statut === "retard" ? "red" : "amber")}>{l.statut}</span>
-              </td>
-            </tr>
-          ))}
-        </DataTable>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function PlanningPage() {
   const { role } = useAuth();
   const {
@@ -544,11 +459,6 @@ const [importOpen, setImportOpen] = useState(false);
     URL.revokeObjectURL(a.href);
     toast.success("Modèle CSV d'exemple téléchargé");
   };
-
-  // Comptable : vue Échéances au lieu du planning des séances.
-  if (role === "comptable") {
-    return <EcheancesView />;
-  }
 
   return (
     <div className="space-y-6">
