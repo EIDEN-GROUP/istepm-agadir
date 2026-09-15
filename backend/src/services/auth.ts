@@ -12,7 +12,7 @@ export type CreateUserInput = {
   email: string;
   password: string;
   name: string;
-  role?: "directeur" | "enseignant" | "responsable" | "etudiant";
+  role?: "directeur" | "enseignant" | "responsable" | "etudiant" | "comptable";
   filiere?: string;
   niveau?: string;
   groupe?: string;

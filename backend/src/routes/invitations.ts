@@ -30,7 +30,7 @@ import {
   type InvitationRole,
 } from "@/services/invitations";
 
-const INVITE_ROLES = ["directeur", "enseignant", "responsable", "etudiant"] as const;
+const INVITE_ROLES = ["directeur", "enseignant", "responsable", "etudiant", "comptable"] as const;
 
 const createInviteSchema = z.object({
   email: z.string().email("Email invalide"),
@@ -44,11 +44,16 @@ const createInviteSchema = z.object({
 
 export async function invitationRoutes(app: FastifyInstance) {
   // Crée le compte + envoie le lien (staff uniquement).
+  // Un comptable ne peut créer que des comptes comptables (borné serveur,
+  // pas seulement masqué dans l'UI).
   app.post(
     "/",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable")] },
     async (request, reply) => {
       const input = createInviteSchema.parse(request.body);
+      if (request.user.role === "comptable" && input.role !== "comptable") {
+        return reply.status(403).send({ error: "Un comptable ne peut créer que des comptes comptables" });
+      }
       const result = await registerWithInvite({
         email: input.email,
         name: input.name,

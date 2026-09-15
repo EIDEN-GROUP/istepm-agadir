@@ -112,7 +112,7 @@ async function embedFontWithFallback(doc: PDFDocument) {
 }
 
 export async function receiptRoutes(app: FastifyInstance) {
-  app.post("/generate", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.post("/generate", { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable")] }, async (request, reply) => {
     const input = generateSchema.parse(request.body);
     const db = getDb();
 

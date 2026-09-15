@@ -28,6 +28,7 @@ import {
   CalendarRange,
   Search,
   Bell,
+  PhoneCall,
   MessageSquare,
   Activity,
   type LucideProps,
@@ -1248,7 +1249,7 @@ function DashboardEnseignant() {
 
   return (
     <>
-      <DashHero chips={[{ label: "Groupes", value: moi.groupes.length }, { label: "Séances ajd", value: seancesAujourdhui.length }, { label: "À€ noter", value: aNoter.length }]} />
+      <DashHero chips={[{ label: "Groupes", value: moi.groupes.length }, { label: "Séances ajd", value: seancesAujourdhui.length }, { label: "À noter", value: aNoter.length }]} />
       <DashWorkspace tabs={PROFESSOR_TABS} tab={tab} onChange={setTab} direction={direction}>
         {tab === 0 ? (
           <div className="space-y-5">
@@ -1426,9 +1427,47 @@ function DashboardResponsable() {
 
 /* ------------------------------------------------------------------ */
 
+/** Accueil du comptable : l'essentiel finance + accès à l'espace Finance. */
+function DashboardComptable() {
+  const { financier, etudiants } = useIstpm();
+  const impayes = useMemo(
+    () =>
+      etudiants.filter(
+        (e) =>
+          !e.archived &&
+          e.paiementsMensuelsRecords.some(
+            (r) => r.statut !== "paye" && r.montantPaye < r.montantDu,
+          ),
+      ).length,
+    [etudiants],
+  );
+  return (
+    <div className="space-y-6">
+      <KpiGrid>
+        <KpiCard label="Encaissé" value={financier.encaisse} icon={Wallet} />
+        <KpiCard label="Reste à recouvrer" value={financier.enAttente + financier.retard + financier.impaye} tone="amber" icon={AlertCircle} />
+        <KpiCard label="Taux de recouvrement" value={`${financier.tauxRecouvrement} %`} tone="teal" icon={CheckCircle2} />
+        <KpiCard label="Comptes à relancer" value={impayes} tone="amber" icon={PhoneCall} />
+      </KpiGrid>
+      <Section title="Recouvrement" action={<SectionLink to="/dashboard/finance">Espace Finance</SectionLink>}>
+        <DonutChart
+          title="Reste par statut"
+          data={[
+            { name: "En attente", value: financier.enAttente },
+            { name: "Retard", value: financier.retard },
+            { name: "Impayé", value: financier.impaye },
+          ]}
+          palette={BRAND_CHART_COLORS}
+        />
+      </Section>
+    </div>
+  );
+}
+
 function DashboardIndex() {
   const { role } = useAuth();
   if (role === "etudiant") return <DashboardEtudiant />;
+  if (role === "comptable") return <DashboardComptable />;
   return (
     <div className="space-y-6">
       {role === "enseignant" ? <DashboardEnseignant /> : role === "responsable" ? <DashboardResponsable /> : <DashboardDirecteur />}

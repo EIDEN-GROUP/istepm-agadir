@@ -18,6 +18,7 @@ import {
   FileText,
   Stethoscope,
   CreditCard,
+  Wallet,
   Settings,
   Inbox,
 } from "lucide-react";
@@ -161,6 +162,16 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
     "/dashboard/espace-etudiant/paiements",
     "/dashboard/espace-etudiant/demandes",
   ],
+  // Le comptable pilote la finance : paiements, espace Finance dédié,
+  // calendrier des échéances ; lecture des fiches étudiants (recouvrement).
+  comptable: [
+    "/dashboard",
+    "/dashboard/finance",
+    "/dashboard/paiements",
+    "/dashboard/calendar",
+    "/dashboard/etudiants",
+    "/dashboard/settings",
+  ],
 };
 
 /**
@@ -282,6 +293,12 @@ export function useDashboardNav(role: UserRole | null) {
         t.nav.paiements,
         t.navShort.paiements,
         CreditCard,
+      ),
+      item(
+        "/dashboard/finance",
+        t.nav.finance,
+        t.navShort.finance,
+        Wallet,
       ),
       item("/dashboard/settings", t.nav.settings, t.navShort.settings, Settings),
     ];

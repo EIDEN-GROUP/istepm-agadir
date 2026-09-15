@@ -739,7 +739,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
           <p className={eyebrowClass}>Mes demandes ({demandes.length})</p>
         </div>
         <button className={ghostPill} onClick={() => setDemandeOpen(true)}>
-          <Plus className="h-3.5 w-3.5" /> Nouvelle
+          <Plus className="h-3.5 w-3.5" /> Nouvelle demande
         </button>
       </div>
       <DataTable
@@ -824,9 +824,11 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
         eyebrow="Espace étudiant"
         title={prenom || nom ? `Bonjour, ${prenom} ${nom}`.trim() : "Mon espace"}
         actions={
-          <button className={primaryPill} onClick={() => setDemandeOpen(true)}>
-            <Plus className="h-4 w-4" /> Nouvelle demande
-          </button>
+          section === "demandes" ? (
+            <button className={primaryPill} onClick={() => setDemandeOpen(true)}>
+              <Plus className="h-4 w-4" /> Nouvelle demande
+            </button>
+          ) : undefined
         }
       />
 

@@ -164,15 +164,13 @@ function EtudiantsPage() {
     }
   }, [enseignantScope]);
 
-  // Teacher must pick all three before the roster appears. Même avec une
-  // portée de formateur (filière verrouillée sur son département), on exige un
-  // choix explicite de semestre et de groupe : la table reste masquée tant que
-  // le formateur n'a pas sélectionné filière + semestre + groupe.
-  // Sans fiche liée au compte ni sélection, on invite à choisir un formateur
-  // dans le menu (le périmètre API reste dans tous les cas celui du compte).
+  // Sans fiche liée au compte, on invite à choisir un formateur dans le menu
+  // (le périmètre API reste dans tous les cas celui du compte).
+  // Le panneau de filtres étant masqué pour les enseignants (liste déjà
+  // périmétrée côté serveur), aucune sélection n'est requise : la table
+  // s'affiche directement.
   const noFormateur = isTeacher && !currentFormateur;
-  const needsSelection =
-    isTeacher && !noFormateur && (filiere === ALL || niveau === ALL || groupe === ALL);
+  const needsSelection = false;
 
   const [detail, setDetail] = useState<Etudiant | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -312,6 +310,8 @@ function EtudiantsPage() {
         }
       />
 
+      {/* Espace enseignant : liste déjà périmétrée côté serveur, pas de filtres. */}
+      {!isTeacher ? (
       <FilterPanel
         search={search}
         onSearch={setSearch}
@@ -443,6 +443,7 @@ function EtudiantsPage() {
           )
         }
       />
+      ) : null}
 
       {inviteInfo ? (
         <InviteLinkBanner

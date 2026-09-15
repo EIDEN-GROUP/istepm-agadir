@@ -9,7 +9,7 @@ export interface AuthUserPayload {
   id: string;
   email: string;
   name: string;
-  role: "directeur" | "enseignant" | "responsable" | "etudiant";
+  role: "directeur" | "enseignant" | "responsable" | "etudiant" | "comptable";
   /** Absent du JWT (trop volumineux) : renseigné par `authenticate` depuis la BDD. */
   photoUrl?: string;
 }

@@ -7,9 +7,9 @@ import {
   type ReactNode,
 } from "react";
 
-export type UserRole = "directeur" | "enseignant" | "responsable" | "etudiant";
+export type UserRole = "directeur" | "enseignant" | "responsable" | "etudiant" | "comptable";
 
-export const ROLES: UserRole[] = ["directeur", "enseignant", "responsable", "etudiant"];
+export const ROLES: UserRole[] = ["directeur", "enseignant", "responsable", "etudiant", "comptable"];
 
 export const ROLE_META: Record<
   UserRole,
@@ -34,6 +34,11 @@ export const ROLE_META: Record<
     label: "Étudiant",
     short: "Étudiant",
     description: "Mon profil, mes cours, mes stages et mes demandes",
+  },
+  comptable: {
+    label: "Comptable",
+    short: "Comptable",
+    description: "Paiements, reçus, recouvrement et finance",
   },
 };
 
@@ -112,6 +117,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
   enseignant: "Enseignant",
   responsable: "Responsable",
   etudiant: "Étudiant",
+  comptable: "Comptable",
 };
 
 function userFor(role: UserRole): AuthUser {
@@ -295,6 +301,8 @@ function mapBackendRole(backendRole: string): UserRole {
       return "responsable";
     case "etudiant":
       return "etudiant";
+    case "comptable":
+      return "comptable";
     default:
       return "directeur";
   }

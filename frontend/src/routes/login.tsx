@@ -80,17 +80,19 @@ function LoginPage() {
             height={1280}
             className="absolute bottom-0 start-[-14%] h-[96%] w-auto object-contain"
           />
-          <div className="absolute inset-y-0 end-0 flex w-[48%] flex-col justify-center pe-8">
-            <span className="font-display text-5xl leading-none text-[color:oklch(0.31_0.058_191/0.8)]">
-              &ldquo;
-            </span>
-            <p className="-mt-1 font-display text-[1.6rem] font-extrabold uppercase leading-[1.14] tracking-[-0.02em] text-[color:var(--l-ink)]">
-              L&rsquo;humain d&rsquo;abord,
-              <br />à chaque geste
-              <br />de soin.
-            </p>
-            <div className="mt-6 h-1 w-14 rounded-full bg-[color:var(--l-red)]" />
-            <p className="mt-6 max-w-[15rem] text-[13px] font-medium leading-6 text-[color:oklch(0.31_0.058_191/0.7)]">
+          <div className="absolute inset-y-0 end-0 flex w-[48%] flex-col justify-between py-10 pe-8">
+            <div>
+              <span className="font-display text-5xl leading-none text-[color:oklch(0.31_0.058_191/0.8)]">
+                &ldquo;
+              </span>
+              <p className="-mt-1 font-display text-[1.6rem] font-extrabold uppercase leading-[1.14] tracking-[-0.02em] text-[color:var(--l-ink)]">
+                L&rsquo;humain d&rsquo;abord,
+                <br />à chaque geste
+                <br />de soin.
+              </p>
+              <div className="mt-6 h-1 w-14 rounded-full bg-[color:var(--l-red)]" />
+            </div>
+            <p className="max-w-[15rem] text-[13px] font-medium leading-6 text-[color:oklch(0.31_0.058_191/0.7)]">
               Institut spécialisé des techniques paramédicales · Agadir
             </p>
           </div>

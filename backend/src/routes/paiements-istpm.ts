@@ -71,7 +71,7 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
     return rows;
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable")] }, async (request, reply) => {
     const input = paiementMensuelSchema.parse(request.body);
     const db = getDb();
 
@@ -156,7 +156,7 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
     };
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = updateMensuelSchema.parse(request.body);
     const db = getDb();

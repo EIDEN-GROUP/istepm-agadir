@@ -342,6 +342,30 @@ function StagesAnalytics({
             </Bar>
           </BarChart>
         )}
+        {/* Légende nom + couleur sous le graphe (même motif que
+            « Étudiants éligibles »), pour les deux angles d'analyse. */}
+        <ul className="mt-3 space-y-2">
+          {(vueStages === "structure" ? parStructure : parStatut).map((d, i) => (
+            <li
+              key={d.name}
+              className="flex items-center justify-between gap-2 text-sm"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor:
+                      BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length],
+                  }}
+                />
+                <span className="truncate text-muted-foreground">{d.name}</span>
+              </span>
+              <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                {d.value}
+              </span>
+            </li>
+          ))}
+        </ul>
       </ChartCard>
 
       {/* Carte des étudiants éligibles */}

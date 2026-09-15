@@ -912,7 +912,7 @@ export function DashShell({
               </Link>
             </div>
             <div className="flex shrink-0 items-center gap-2 pt-0.5">
-              {hideNotifications ? null : <ShellNotifications />}
+              {hideNotifications || user?.role === "enseignant" ? null : <ShellNotifications />}
               <div className="grid h-9 w-9 place-items-center rounded-full bg-brand text-sm font-medium text-white shadow-[0_10px_20px_-10px_rgb(var(--istpm-shadow)/0.5)]">
                 {(user?.name || user?.email || "A")!.slice(0, 1).toUpperCase()}
               </div>
@@ -972,7 +972,7 @@ export function DashShell({
             </nav>
 
             <div className="flex w-full flex-wrap items-center justify-end gap-2 justify-self-end lg:w-auto">
-              {hideNotifications ? null : <ShellNotifications />}
+              {hideNotifications || user?.role === "enseignant" ? null : <ShellNotifications />}
               <div className="flex items-center gap-2">
                 <div className="hidden text-right sm:block">
                   <p className="text-sm font-medium leading-none text-foreground">

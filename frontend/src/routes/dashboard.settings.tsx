@@ -153,6 +153,8 @@ const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
   ],
   enseignant: [],
   etudiant: [],
+  // Le comptable ne voit que les comptes (création limitée au rôle comptable).
+  comptable: ["utilisateurs"],
 };
 
 const META: Record<
@@ -989,14 +991,17 @@ function NewRoleForm({
 function NewUserForm({
   onClose,
   onCreated,
+  fixedRole,
 }: {
   onClose: () => void;
   onCreated: (user: UserRecord) => void;
+  /** Rôle imposé (ex. comptable créant un pair) : sélecteur masqué. */
+  fixedRole?: string;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("enseignant");
+  const [role, setRole] = useState(fixedRole ?? "enseignant");
   const [cne, setCne] = useState("");
   const [mode, setMode] = useState<"password" | "invite">("invite");
   const [loading, setLoading] = useState(false);
@@ -1117,18 +1122,24 @@ function NewUserForm({
             </p>
           </div>
         )}
-        <div>
-          <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Rôle</label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className={selectClass}
-          >
-            {["directeur", "responsable", "enseignant", "etudiant"].map((r) => (
-              <option key={r} value={r}>{ROLE_META[r as UserRole]?.label ?? r}</option>
-            ))}
-          </select>
-        </div>
+        {fixedRole ? (
+          <p className="text-xs text-muted-foreground">
+            Rôle : <strong className="text-foreground">{ROLE_META[fixedRole as UserRole]?.label ?? fixedRole}</strong>
+          </p>
+        ) : (
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Rôle</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className={selectClass}
+            >
+              {["directeur", "responsable", "enseignant", "etudiant", "comptable"].map((r) => (
+                <option key={r} value={r}>{ROLE_META[r as UserRole]?.label ?? r}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {role === "etudiant" ? (
           <div>
             <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">CNE (liaison fiche)</label>
@@ -1957,35 +1968,43 @@ function SettingsPage() {
                         {u.email}
                       </span>
                     </span>
-                    <select
-                      value={u.role}
-                      onChange={(e) => {
-                        assignUserRole(u.id, e.target.value).then(() => {
-                          setUsersList((prev) =>
-                            prev.map((x) => (x.id === u.id ? { ...x, role: e.target.value } : x)),
-                          );
-                          toast.success(`Rôle de ${u.name} mis à jour`);
-                        }).catch(() => toast.error("Erreur lors du changement de rôle"));
-                      }}
-                      className={cn(
-                        "h-7 rounded-lg border border-brand/12 bg-card px-2 text-xs font-medium text-foreground outline-none",
-                        "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
-                      )}
-                    >
-                      {VISIBLE_ACCOUNT_ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {ROLE_META[r as UserRole]?.label ?? r}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      aria-label={`Supprimer ${u.name}`}
-                      onClick={() => setDeleteTarget({ type: "user", id: u.id, name: u.name })}
-                      className={cn(iconButtonDanger, "h-7 w-7")}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
+                    {role === "comptable" ? (
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {ROLE_META[u.role as UserRole]?.label ?? u.role}
+                      </span>
+                    ) : (
+                      <select
+                        value={u.role}
+                        onChange={(e) => {
+                          assignUserRole(u.id, e.target.value).then(() => {
+                            setUsersList((prev) =>
+                              prev.map((x) => (x.id === u.id ? { ...x, role: e.target.value } : x)),
+                            );
+                            toast.success(`Rôle de ${u.name} mis à jour`);
+                          }).catch(() => toast.error("Erreur lors du changement de rôle"));
+                        }}
+                        className={cn(
+                          "h-7 rounded-lg border border-brand/12 bg-card px-2 text-xs font-medium text-foreground outline-none",
+                          "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
+                        )}
+                      >
+                        {VISIBLE_ACCOUNT_ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {ROLE_META[r as UserRole]?.label ?? r}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {role === "comptable" ? null : (
+                      <button
+                        type="button"
+                        aria-label={`Supprimer ${u.name}`}
+                        onClick={() => setDeleteTarget({ type: "user", id: u.id, name: u.name })}
+                        className={cn(iconButtonDanger, "h-7 w-7")}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
                 ))
               )}
@@ -2062,7 +2081,7 @@ function SettingsPage() {
                 })}
               </div>
             ) : null}
-            {showNewUser ? <NewUserForm onClose={() => setShowNewUser(false)} onCreated={(u) => { setUsersList((prev) => [...prev, u]); setShowNewUser(false); reloadPendingInvites(); }} /> : null}
+            {showNewUser ? <NewUserForm onClose={() => setShowNewUser(false)} fixedRole={role === "comptable" ? "comptable" : undefined} onCreated={(u) => { setUsersList((prev) => [...prev, u]); setShowNewUser(false); reloadPendingInvites(); }} /> : null}
           </Carte>
         );
 

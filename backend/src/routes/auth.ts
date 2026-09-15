@@ -102,7 +102,7 @@ export async function authRoutes(app: FastifyInstance) {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role as "directeur" | "enseignant" | "responsable" | "etudiant",
+      role: user.role as "directeur" | "enseignant" | "responsable" | "etudiant" | "comptable",
     });
     return { token, user };
   });

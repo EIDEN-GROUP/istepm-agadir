@@ -108,7 +108,7 @@ export async function emailRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/send-receipt", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/send-receipt", { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable")] }, async (request) => {
     const input = receiptSchema.parse(request.body);
     const env = getEnv();
     const transporter = getTransporter();
