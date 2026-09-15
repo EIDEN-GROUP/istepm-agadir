@@ -25,7 +25,7 @@ const createUserSchema = z.object({
   password: z.string().min(8, "Mot de passe trop court (8 caractères min)"),
   name: z.string().min(1, "Nom requis"),
   role: z
-    .enum(["directeur", "enseignant", "responsable", "etudiant"])
+    .enum(["directeur", "enseignant", "responsable", "etudiant", "comptable"])
     .optional()
     .default("directeur"),
   filiere: z.string().optional(),

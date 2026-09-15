@@ -588,6 +588,8 @@ const [importOpen, setImportOpen] = useState(false);
         }
       />
 
+      {/* Espace enseignant : planning personnel déjà périmétré, pas de filtres. */}
+      {!estEnseignant ? (
       <FilterPanel
         search={search}
         onSearch={setSearch}
@@ -668,6 +670,7 @@ const [importOpen, setImportOpen] = useState(false);
           </>
         }
       />
+      ) : null}
 
       <section className={cn(softCard, "overflow-hidden")}>
         {/* Barre de navigation du calendrier */}

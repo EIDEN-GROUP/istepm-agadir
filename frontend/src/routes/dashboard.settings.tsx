@@ -1048,17 +1048,15 @@ function NewUserForm({
     // Compte étudiant : lie la fiche via le CNE (ou l'email côté backend).
     if (role === "etudiant" && cne.trim()) userData.cne = cne.trim();
 
-    createUser(userData).catch(() => {});
-
-    onCreated({
-      id: crypto.randomUUID(),
-      name: name.trim(),
-      email: email.trim(),
-      role,
-      createdAt: new Date().toISOString(),
-    });
-    toast.success(`Utilisateur "${name}" créé`);
-    setLoading(false);
+    try {
+      const created = await createUser(userData);
+      onCreated(created);
+      toast.success(`Utilisateur "${name}" créé`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Création impossible");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const selectClass = cn(

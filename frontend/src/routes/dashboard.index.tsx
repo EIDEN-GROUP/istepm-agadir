@@ -1263,8 +1263,7 @@ function DashboardEnseignant() {
             <Section title="Mon affectation">
               <AffectationEnseignant formateur={moi} />
             </Section>
-            <div className="grid gap-6 xl:grid-cols-2">
-              <Section title="Notifications"><ActiviteFeed /></Section>
+            <div className="grid gap-6 xl:grid-cols-1">
               <Section title="Mon calendrier (7 jours)" action={<SectionLink to="/dashboard/calendar">Voir tout</SectionLink>}>
                 <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
                   {calendrierProche.length ? calendrierProche.map((s) => (
