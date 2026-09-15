@@ -1450,7 +1450,7 @@ function isHiddenAccountRole(role: string): boolean {
 }
 
 /** Rôles visibles/éditables dans « Utilisateurs ». */
-const VISIBLE_ACCOUNT_ROLES = ["directeur", "responsable"];
+const VISIBLE_ACCOUNT_ROLES = ["directeur", "responsable", "comptable"];
 
 function SettingsPage() {
   const { role } = useAuth();
