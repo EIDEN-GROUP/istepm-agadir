@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -110,7 +110,6 @@ type SectionId =
   | "examens"
   | "bulletins"
   | "institut"
-  | "systeme"
   | "securite"
   | "cachet"
   | "structures";
@@ -146,7 +145,6 @@ const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
     "examens",
     "bulletins",
     "institut",
-    "systeme",
     "securite",
     "cachet",
     "structures",
@@ -175,7 +173,7 @@ const META: Record<
   examens: { titre: "Types d'examen", desc: "Natures d'épreuves évaluables", icone: ClipboardList, groupe: "Évaluation" },
   bulletins: { titre: "Configuration des bulletins", desc: "Barème, mentions et décisions", icone: FileText, groupe: "Évaluation" },
   institut: { titre: "Informations de l'institut", desc: "Identité et coordonnées", icone: Building2, groupe: "Administration" },
-  systeme: { titre: "Configuration système", desc: "Langue, devise et fuseau", icone: SlidersHorizontal, groupe: "Administration" },
+
   securite: { titre: "Sécurité", desc: "Mots de passe et sessions", icone: Lock, groupe: "Administration" },
   cachet: { titre: "Cachet officiel", desc: "Tampon apposé sur tous les PDF (bulletins, conventions, rapports)", icone: Stamp, groupe: "Administration" },
   structures: { titre: "Structures d'accueil", desc: "CHU, hôpitaux et cliniques partenaires", icone: Hospital, groupe: "Organisation pédagogique" },
@@ -1512,11 +1510,6 @@ function SettingsPage() {
     telephone: "+212 5 28 00 00 00",
     email: "contact@istpm-agadir.ma",
   });
-  const [systeme, setSysteme] = useState({
-    langue: "Français",
-    devise: "MAD",
-    fuseau: "Africa/Casablanca",
-  });
   const [securite, setSecurite] = useState({
     longueurMdp: "8",
     expirationSession: "60",
@@ -1554,12 +1547,6 @@ function SettingsPage() {
           setInstitut((p) => ({ ...p, telephone: data.institut_telephone as string }));
         if (typeof data.institut_email === "string")
           setInstitut((p) => ({ ...p, email: data.institut_email as string }));
-        if (typeof data.systeme_langue === "string")
-          setSysteme((p) => ({ ...p, langue: data.systeme_langue as string }));
-        if (typeof data.systeme_devise === "string")
-          setSysteme((p) => ({ ...p, devise: data.systeme_devise as string }));
-        if (typeof data.systeme_fuseau === "string")
-          setSysteme((p) => ({ ...p, fuseau: data.systeme_fuseau as string }));
         if (typeof data.securite_longueurMdp === "string")
           setSecurite((p) => ({ ...p, longueurMdp: data.securite_longueurMdp as string }));
         if (typeof data.securite_expirationSession === "string")
@@ -1877,7 +1864,15 @@ function SettingsPage() {
           <Carte
             id="formateurs"
             action={
-              <span className={toneBadge("neutral")}>{formateurs.length}</span>
+              <span className="flex items-center gap-2">
+                <span className={toneBadge("neutral")}>{formateurs.length}</span>
+                <Link
+                  to="/dashboard/formateurs"
+                  className={cn(ghostPill, "h-7 gap-1 px-2.5 text-[11px]")}
+                >
+                  Voir plus
+                </Link>
+              </span>
             }
           >
             <ul className="space-y-1.5">
@@ -2251,38 +2246,6 @@ function SettingsPage() {
                 onChange={(v) => { setInstitut({ ...institut, email: v }); persistSetting("institut_email", v); }}
               />
             </div>
-          </Carte>
-        );
-
-      case "systeme":
-        return (
-          <Carte id="systeme">
-            <div>
-              <ChampReglage
-                label="Langue par défaut"
-                value={systeme.langue}
-                onChange={(v) => { setSysteme({ ...systeme, langue: v }); persistSetting("systeme_langue", v); }}
-              />
-              <ChampReglage
-                label="Devise"
-                value={systeme.devise}
-                onChange={(v) => { setSysteme({ ...systeme, devise: v }); persistSetting("systeme_devise", v); }}
-              />
-              <ChampReglage
-                label="Fuseau horaire"
-                value={systeme.fuseau}
-                onChange={(v) => { setSysteme({ ...systeme, fuseau: v }); persistSetting("systeme_fuseau", v); }}
-              />
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              {etudiants.length} étudiant(s) · frais mensuels moyens{" "}
-              {fmtMAD(
-                Math.round(
-                  etudiants.reduce((s, e) => s + e.fraisMensuels, 0) /
-                    Math.max(1, etudiants.length),
-                ),
-              )}
-            </p>
           </Carte>
         );
 
