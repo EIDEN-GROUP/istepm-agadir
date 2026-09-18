@@ -224,6 +224,7 @@ export async function etudiantImportRoutes(app: FastifyInstance) {
       if (!row.niveau) errors.push("Niveau requis");
       else if (!(NIVEAUX as readonly string[]).includes(row.niveau)) errors.push(`Niveau « ${row.niveau} » invalide. Valeurs attendues : ${NIVEAUX.join(", ")}`);
       if (!row.annee) errors.push("Année requise");
+      else if (!/^\d{4}\/\d{4}$/.test(row.annee)) errors.push(`Année « ${row.annee} » invalide. Format attendu : AAAA/AAAA (ex. 2025/2026) — ce n'est pas le niveau d'étude`);
       if (!row.groupe) warnings.push("Groupe manquant (sera laissé vide)");
       if (row.statut && !matchLabel(row.statut, STATUTS_ETUDIANT, STATUT_LABELS)) errors.push(`Statut « ${row.statut} » invalide. Valeurs attendues : ${STATUTS_ETUDIANT.join(", ")}`);
       if (row.paiement && !matchLabel(row.paiement, STATUTS_PAIEMENT, PAIEMENT_LABELS)) errors.push(`Paiement « ${row.paiement} » invalide. Valeurs attendues : ${STATUTS_PAIEMENT.join(", ")}`);
