@@ -49,7 +49,7 @@ services:
         constraints: [node.role == manager]
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -69,7 +69,7 @@ services:
         constraints: [node.role == manager]
 
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     restart: no
     # Credentials via env (MC_HOST alias), never on the process command line.
     environment:
