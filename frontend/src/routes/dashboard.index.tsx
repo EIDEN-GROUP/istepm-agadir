@@ -1444,7 +1444,9 @@ function DashboardResponsable() {
   const chargeFormateurs = useMemo(() => formateurs.filter((f) => f.statut !== "en_conge").map((f) => ({ id: f.id, nom: `${f.prenom} ${f.nom}`, seances: seances.filter((s) => s.professeurId === f.id).length })).sort((a, b) => b.seances - a.seances), [formateurs, seances]);
   const occupationSalles = useMemo(() => { const s = [...new Set(seances.map((x) => x.salle))].sort(); return s.map((salle) => ({ salle, seancesCount: seances.filter((x) => x.salle === salle).length, aujourdhui: seancesAujourdhui.filter((x) => x.salle === salle).length })); }, [seances, seancesAujourdhui]);
   const sessionsParJour = useMemo(() => { const c = new Array(7).fill(0); seances.forEach((s) => c[new Date(s.date).getDay()]++); return JOURS.map((n, i) => ({ name: n, value: c[i] })); }, [seances]);
-  const workloadData = useMemo(() => { const max = Math.max(...chargeFormateurs.map((f) => f.seances), 1); return chargeFormateurs.map((f) => ({ name: f.nom.split(" ").pop() || f.nom, value: Math.round((f.seances / max) * 100), seances: f.seances })); }, [chargeFormateurs]);
+  // Plancher à 4% : un formateur avec 1-2 séances doit rester visible, pas
+  // disparaître en une barre invisible face à celui qui en a 100.
+  const workloadData = useMemo(() => { const max = Math.max(...chargeFormateurs.map((f) => f.seances), 1); return chargeFormateurs.map((f) => ({ name: f.nom.split(" ").pop() || f.nom, value: f.seances > 0 ? Math.max(4, Math.round((f.seances / max) * 100)) : 0, seances: f.seances })); }, [chargeFormateurs]);
   const maxCharge = Math.max(...chargeFormateurs.map((x) => x.seances), 1);
   const chargePager = usePagination(chargeFormateurs, chargeFormateurs.length);
   const maxOcc = Math.max(...occupationSalles.map((x) => x.seancesCount), 1);
@@ -1520,16 +1522,16 @@ function DashboardResponsable() {
         ) : (
           <Section title="Analyse">
             <div className="grid gap-4 lg:grid-cols-1 2xl:grid-cols-2">
-              <DonutChart title="Occupation des salles" height={220} data={occupationSalles.map((o) => ({ name: o.salle, value: o.seancesCount }))} />
+              <DonutChart title="Occupation des salles" height={340} data={occupationSalles.map((o) => ({ name: o.salle, value: o.seancesCount }))} />
               <HBarSeries
                 title="Charge des formateurs"
-                height={220}
+                height={340}
                 data={workloadData}
                 formatter={(value: number, _name: string, entry: { payload?: { seances?: number } }) => [`${entry.payload?.seances ?? value} séances`, "Charge"]}
               />
             </div>
             <AreaTrend title="Séances par jour" height={220} data={sessionsParJour} color="var(--chart-4)" />
-            
+
           </Section>
         )}
       </DashWorkspace>

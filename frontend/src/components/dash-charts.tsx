@@ -425,9 +425,9 @@ export function HBarSeries({
           horizontal={false}
         />
         <XAxis type="number" {...AXIS} />
-        <YAxis type="category" dataKey="name" width={64} {...AXIS} />
+        <YAxis type="category" dataKey="name" width={80} {...CATEGORY_AXIS} />
         <Tooltip contentStyle={dashTooltip} cursor={dashCursor} formatter={formatter} />
-        <Bar dataKey="value" maxBarSize={22} radius={[0, 6, 6, 0]}>
+        <Bar dataKey="value" maxBarSize={28} minPointSize={3} radius={[0, 6, 6, 0]}>
           {data.map((_, i) => (
             <Cell key={i} fill={`url(#${ids[i % ids.length]})`} />
           ))}
