@@ -1522,10 +1522,11 @@ function DashboardResponsable() {
         ) : (
           <Section title="Analyse">
             <div className="grid gap-4 lg:grid-cols-1 2xl:grid-cols-2">
-              <DonutChart title="Occupation des salles" height={340} data={occupationSalles.map((o) => ({ name: o.salle, value: o.seancesCount }))} />
+              <DonutChart title="Occupation des salles" height={340} palette={BRAND_CHART_COLORS} data={occupationSalles.map((o) => ({ name: o.salle, value: o.seancesCount }))} />
               <HBarSeries
                 title="Charge des formateurs"
                 height={340}
+                palette={BRAND_CHART_COLORS}
                 data={workloadData}
                 formatter={(value: number, _name: string, entry: { payload?: { seances?: number } }) => [`${entry.payload?.seances ?? value} séances`, "Charge"]}
               />

@@ -395,6 +395,7 @@ export function HBarSeries({
   data,
   height = 240,
   formatter,
+  palette = CHART_COLORS,
 }: {
   title: string;
   subtitle?: ReactNode;
@@ -405,9 +406,11 @@ export function HBarSeries({
     name: string,
     entry: { payload?: { seances?: number } },
   ) => [string, string];
+  /** Slice colour ramp (defaults to the teal `CHART_COLORS`). */
+  palette?: readonly string[];
 }) {
   const { ids, defs } = useGradients(
-    data.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+    data.map((_, i) => palette[i % palette.length]),
     true,
   );
   return (
