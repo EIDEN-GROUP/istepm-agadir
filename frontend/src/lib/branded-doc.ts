@@ -15,6 +15,7 @@ import {
   STATUT_PAIEMENT_LABEL,
   type Stage,
   type StatutPaiement,
+  type InstitutInfo,
 } from "@/lib/istpm-data";
 
 /* ------------------------------------------------------------------ */
@@ -246,6 +247,11 @@ function buildContentStream(
   logoAspect: number,
   hasStamp: boolean,
   stampAspect: number,
+  headerLines: [string, string] = [
+    "ISTPM Agadir - Institut specialise des techniques paramedicales",
+    "Techniques paramedicales",
+  ],
+  footerNote = "Document genere par la plateforme ISTPM Agadir - usage interne.",
 ): string {
   const ops: string[] = [];
   const PAGE_W = 595;
@@ -279,12 +285,12 @@ function buildContentStream(
   );
   ops.push(
     `${PDF.pale} rg BT /F1 9.5 Tf ${textX} 784 Td (${pdfText(
-      "ISTEPM Agadir - Institut specialise des techniques paramedicales",
+      headerLines[0],
     )}) Tj ET`,
   );
   ops.push(
     `${PDF.pale} rg BT /F1 9.5 Tf ${textX} 770 Td (${pdfText(
-      "Techniques paramedicales",
+      headerLines[1],
     )}) Tj ET`,
   );
 
@@ -347,7 +353,7 @@ function buildContentStream(
   ops.push(`${PDF.teal} rg ${LEFT} 96 ${RIGHT - LEFT} 2 re f`);
   ops.push(
     `${PDF.muted} rg BT /F1 8 Tf ${LEFT} 80 Td (${pdfText(
-      "Document genere par la plateforme ISTEPM Agadir - usage interne.",
+      footerNote,
     )}) Tj ET`,
   );
   ops.push(
@@ -359,10 +365,32 @@ function buildContentStream(
   return ops.join("\n");
 }
 
+/**
+ * En-tête et pied de page issus des Paramètres (Informations de l'institut).
+ * Sans institut renseigné, les libellés historiques sont conservés.
+ */
+function docHeaderFooter(institut?: InstitutInfo | null): [[string, string], string] {
+  const nom = institut?.nom?.trim();
+  if (!nom) {
+    return [
+      [
+        "ISTPM Agadir - Institut specialise des techniques paramedicales",
+        "Techniques paramedicales",
+      ],
+      "Document genere par la plateforme ISTPM Agadir - usage interne.",
+    ];
+  }
+  const ligne2 =
+    [institut?.ville?.trim(), institut?.telephone?.trim()].filter(Boolean).join(" - ") ||
+    "Techniques paramedicales";
+  return [[nom, ligne2], `Document genere par la plateforme ${nom} - usage interne.`];
+}
+
 export async function makeStageDocPdf(
   s: Stage,
   kind: Kind,
   stampDataUrl?: string | null,
+  institut?: InstitutInfo | null,
 ): Promise<Blob> {
   const logo = await loadLogo();
   const stampRaw = stampDataUrl ?? null;
@@ -376,6 +404,7 @@ export async function makeStageDocPdf(
     logo ? logo.w / logo.h : 1,
     !!stamp,
     stamp ? stamp.w / stamp.h : 1,
+    ...docHeaderFooter(institut),
   );
   const contentBytes = enc.encode(content);
 
@@ -483,6 +512,7 @@ export async function makePaiementDocPdf(
     statut: StatutPaiement;
   },
   stampDataUrl?: string | null,
+  institut?: InstitutInfo | null,
 ): Promise<Blob> {
   const logo = await loadLogo();
   const stampRaw = stampDataUrl ?? null;
@@ -522,6 +552,7 @@ export async function makePaiementDocPdf(
     logo ? logo.w / logo.h : 1,
     !!stamp,
     stamp ? stamp.w / stamp.h : 1,
+    ...docHeaderFooter(institut),
   );
   const contentBytes = enc.encode(content);
 

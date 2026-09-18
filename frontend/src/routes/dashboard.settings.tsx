@@ -485,7 +485,7 @@ function ChampReglage({
           value={value}
           readOnly={readOnly}
           onChange={(e) => onChange(e.target.value)}
-          className={cn(softInput, "h-8 w-44 text-end text-sm")}
+          className={cn(softInput, "h-8 w-44 text-start text-sm")}
         />
         {suffix ? (
           <span className="text-xs text-muted-foreground">{suffix}</span>
@@ -1217,6 +1217,15 @@ function GroupesSection({ semestresRegistre }: { semestresRegistre: string[] }) 
     setDialogOpen(true);
   };
 
+  // Adopte un groupe détecté (ligne « auto ») : pré-remplit le dialogue pour
+  // l'enregistrer comme groupe géré (création à la validation).
+  const openAdopt = (d: { name: string; count: number }) => {
+    setEditing(null);
+    setForm({ name: d.name, semester: active || semesters[0] || "", studentCount: d.count });
+    setErrors({});
+    setDialogOpen(true);
+  };
+
   const submit = async () => {
     if (!form.name.trim()) {
       setErrors({ name: "Nom du groupe obligatoire" });
@@ -1384,6 +1393,15 @@ function GroupesSection({ semestresRegistre }: { semestresRegistre: string[] }) 
                 <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand-dk">
                   auto
                 </span>
+                <button
+                  type="button"
+                  aria-label={`Modifier ${d.name}`}
+                  title="Enregistrer comme groupe géré"
+                  onClick={() => openAdopt(d)}
+                  className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-brand/10 hover:text-brand-dk"
+                >
+                  <PenLine className="h-3.5 w-3.5" />
+                </button>
               </span>
             </div>
           ))}

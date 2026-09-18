@@ -35,6 +35,7 @@ import {
   type Filiere,
   type Niveau,
   type StatutStage,
+  type InstitutInfo,
 } from "@/lib/istpm-data";
 import { sendEmailApi } from "@/lib/istpm-api";
 import { PersonAvatar } from "@/components/person-avatar";
@@ -108,8 +109,9 @@ async function downloadStageDoc(
   s: Stage,
   kind: "convention" | "rapport",
   stamp?: string | null,
+  institut?: InstitutInfo | null,
 ) {
-  const blob = await makeStageDocPdf(s, kind, stamp);
+  const blob = await makeStageDocPdf(s, kind, stamp, institut);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -473,7 +475,7 @@ function StagesAnalytics({
 
 function StagesPage() {
   const { role } = useAuth();
-  const { stages, etudiants, structuresAccueil, servicesStage, addStage, updateStage, deleteStage, addStructureAccueil, addServiceStage, photoDe } = useIstpm();
+  const { stages, etudiants, structuresAccueil, servicesStage, addStage, updateStage, deleteStage, addStructureAccueil, addServiceStage, photoDe, institut } = useIstpm();
   // Conventions are handled by student administration.
   const canManage = role === "directeur" || role === "responsable";
 
@@ -706,7 +708,7 @@ function StagesPage() {
                           className={cn(ghostPill, "gap-1.5 px-3.5 py-2 text-xs")}
                           onClick={() =>
                             s.conventionSignee
-                              ? (downloadStageDoc(s, "convention", stamp),
+                              ? (downloadStageDoc(s, "convention", stamp, institut),
                                 toast.success("Convention téléchargée (PDF)"))
                               : toast.error("Convention non encore signée")
                           }
@@ -717,7 +719,7 @@ function StagesPage() {
                           className={cn(ghostPill, "gap-1.5 px-3.5 py-2 text-xs")}
                           onClick={() =>
                             s.noteSoutenance !== undefined
-                              ? (downloadStageDoc(s, "rapport", stamp),
+                              ? (downloadStageDoc(s, "rapport", stamp, institut),
                                 toast.success("Rapport téléchargé (PDF)"))
                               : toast.error("Rapport de stage non encore déposé")
                           }
@@ -836,7 +838,7 @@ function StagesPage() {
                     const s = emailTarget!;
                     try {
                       const [blob, logoDataUrl] = await Promise.all([
-                        makeStageDocPdf(s, "convention", stamp),
+                        makeStageDocPdf(s, "convention", stamp, institut),
                         loadLogoDataUrl(),
                       ]);
                       const buf = await blob.arrayBuffer();

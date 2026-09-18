@@ -411,6 +411,37 @@ export const STATUT_BULLETIN_TONE: Record<StatutBulletin, BadgeTone> = {
   publie: "teal",
 };
 
+/** Identité de l'établissement (Paramètres › Informations de l'institut). */
+export type InstitutInfo = {
+  nom: string;
+  ville: string;
+  telephone: string;
+  email: string;
+};
+
+export const INSTITUT_DEFAUT: InstitutInfo = {
+  nom: "ISTPM Agadir",
+  ville: "Agadir",
+  telephone: "+212 5 28 00 00 00",
+  email: "contact@istpm-agadir.ma",
+};
+
+/** Barème et seuils des bulletins (Paramètres › Configuration des bulletins). */
+export type BulletinConfig = {
+  /** Échelle d'affichage des moyennes (20 par défaut). */
+  bareme: number;
+  /** Moyenne (et note module) minimale pour valider (10 par défaut). */
+  seuilAdmission: number;
+  /** Total de crédits visé par semestre (30 par défaut). */
+  creditsSemestre: number;
+};
+
+export const BULLETIN_DEFAUT: BulletinConfig = {
+  bareme: 20,
+  seuilAdmission: 10,
+  creditsSemestre: 30,
+};
+
 export type Bulletin = {
   id: string;
   etudiantId: string;

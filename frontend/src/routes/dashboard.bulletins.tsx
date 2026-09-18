@@ -16,6 +16,8 @@ import {
   MENTION_TONE,
   STATUT_BULLETIN_LABEL,
   STATUT_BULLETIN_TONE,
+  INSTITUT_DEFAUT,
+  type InstitutInfo,
   type Bulletin,
   type Decision,
   type SessionType,
@@ -75,7 +77,15 @@ const STATUTS: StatutBulletin[] = ["genere", "valide", "publie"];
  * dialog   "Enregistrer au format PDF" there produces the real document.
  * An iframe avoids the popup blocker that `window.open` would trip.
  */
-function printBulletin(b: Bulletin, groupe?: string, stampDataUrl?: string | null) {
+function printBulletin(
+  b: Bulletin,
+  groupe?: string,
+  stampDataUrl?: string | null,
+  opts?: { institut: InstitutInfo; bareme: number; seuilAdmission: number; creditsSemestre: number },
+) {
+  const institut = opts?.institut ?? INSTITUT_DEFAUT;
+  const bareme = opts?.bareme ?? 20;
+  const creditsObjectif = opts?.creditsSemestre ?? 30;
   const rows = b.notes
     .map(
       (n) =>
@@ -92,6 +102,11 @@ function printBulletin(b: Bulletin, groupe?: string, stampDataUrl?: string | nul
   const totalCoef = calcRows.reduce((s, r) => s + r.coef, 0);
   const sommePond = calcRows.reduce((s, r) => s + r.note * r.coef, 0);
   const moyCalc = totalCoef ? sommePond / totalCoef : 0;
+  const seuilPrint = opts?.seuilAdmission ?? 10;
+  const totalCreditsPrint = b.notes.reduce((s, n) => s + n.credits, 0);
+  const creditsValidesPrint = b.notes
+    .filter((n) => n.note >= seuilPrint)
+    .reduce((s, n) => s + n.credits, 0);
   const calcTableRows = calcRows
     .map(
       (r) =>
@@ -132,8 +147,8 @@ function printBulletin(b: Bulletin, groupe?: string, stampDataUrl?: string | nul
   .cachet .lbl{color:#556;font-size:10px;margin-top:2px;
                text-transform:uppercase;letter-spacing:.06em;}
 </style></head><body>
-<h1>ISTEPM Agadir    Bulletin de notes</h1>
-<div class="sub">Institut spécialisé des techniques paramédicales</div>
+<h1>${escapeHtml(institut.nom)}    Bulletin de notes</h1>
+<div class="sub">${escapeHtml([institut.ville, institut.telephone, institut.email].filter(Boolean).join(" · "))}</div>
 <div class="sum">
   <div><span>Étudiant</span><strong>${escapeHtml(b.prenom)} ${escapeHtml(b.nom)}</strong></div>
   <div><span>CNE</span><strong>${escapeHtml(b.cne)}</strong></div>
@@ -146,9 +161,10 @@ function printBulletin(b: Bulletin, groupe?: string, stampDataUrl?: string | nul
 <tr class="clin"><td>Évaluation clinique / pratique</td><td class="r">${b.evaluationClinique.toFixed(2)}</td><td class="r">2</td><td class="r">4</td></tr>
 </tbody></table>
 <div class="sum">
-  <div><span>Moyenne générale</span><strong>${b.moyenne.toFixed(2)} / 20</strong></div>
+  <div><span>Moyenne générale</span><strong>${b.moyenne.toFixed(2)} / ${bareme}</strong></div>
   <div><span>Mention</span><strong>${escapeHtml(b.mention)}</strong></div>
   <div><span>Décision</span><strong>${escapeHtml(b.decision)}</strong></div>
+  <div><span>Crédits validés</span><strong>${creditsValidesPrint} / ${totalCreditsPrint} (objectif ${creditsObjectif}/semestre)</strong></div>
 </div>
 <div class="calc">
   <h2>Méthode de calcul de la moyenne</h2>
@@ -160,7 +176,7 @@ function printBulletin(b: Bulletin, groupe?: string, stampDataUrl?: string | nul
     </tbody>
   </table>
   <div class="sum">
-    <div><span>Moyenne pondérée = ${sommePond.toFixed(2)} ÷ ${totalCoef}</span><strong>${moyCalc.toFixed(2)} / 20</strong></div>
+    <div><span>Moyenne pondérée = ${sommePond.toFixed(2)} ÷ ${totalCoef}</span><strong>${moyCalc.toFixed(2)} / ${bareme}</strong></div>
   </div>
   <p class="note">Chaque note est pondérée par son coefficient ; la moyenne est la somme des notes pondérées divisée par la somme des coefficients.</p>
 </div>
@@ -193,7 +209,7 @@ ${cachet}
 
 function BulletinsPage() {
   const { role } = useAuth();
-  const { bulletins, etudiants, formateurs, updateBulletin, publierBulletin, publierTousBulletins, photoDe } =
+  const { bulletins, etudiants, formateurs, updateBulletin, publierBulletin, publierTousBulletins, photoDe, bulletinConfig: cfg, institut } =
     useIstpm();
   // Publishing transcripts is a student-administration act.
   const canPublish = role === "directeur" || role === "responsable";
@@ -435,7 +451,7 @@ function BulletinsPage() {
                 <button
                   className={iconButton}
                   aria-label="Imprimer / PDF"
-                  onClick={() => printBulletin(b, etuById.get(b.etudiantId)?.groupe, stamp)}
+                  onClick={() => printBulletin(b, etuById.get(b.etudiantId)?.groupe, stamp, { institut, bareme: cfg.bareme, seuilAdmission: cfg.seuilAdmission, creditsSemestre: cfg.creditsSemestre })}
                 >
                   <FileDown className="h-3.5 w-3.5" />
                 </button>
@@ -553,14 +569,16 @@ function BulletinForm({
     evaluationClinique: initial.evaluationClinique as number | "",
   });
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  // Barème et seuil configurés (Paramètres › Configuration des bulletins).
+  const { bulletinConfig: cfg } = useIstpm();
 
   const submit = () => {
     if (
       f.evaluationClinique === "" ||
       f.evaluationClinique < 0 ||
-      f.evaluationClinique > 20
+      f.evaluationClinique > cfg.bareme
     ) {
-      setErrors({ evaluationClinique: "Note entre 0 et 20" });
+      setErrors({ evaluationClinique: `Note entre 0 et ${cfg.bareme}` });
       toast.error("Veuillez corriger les champs signalés");
       return;
     }
@@ -572,8 +590,8 @@ function BulletinForm({
     });
   };
 
-  // Shown as guidance: what the rules would decide from the recorded marks.
-  const suggestion = decisionFor(initial.moyenne, initial.notes);
+  // Shown as guidance: what the configured rules would decide.
+  const suggestion = decisionFor(initial.moyenne, initial.notes, cfg.seuilAdmission);
 
   return (
     <FormDialog
@@ -587,7 +605,7 @@ function BulletinForm({
         <div className="rounded-2xl bg-muted px-4 py-3 text-xs text-muted-foreground">
           Moyenne calculée&nbsp;:{" "}
           <strong className="text-foreground">
-            {initial.moyenne.toFixed(2)}/20
+            {initial.moyenne.toFixed(2)}/{cfg.bareme}
           </strong>{" "}
           · mention{" "}
           <strong className="text-foreground">
@@ -620,9 +638,9 @@ function BulletinForm({
       />
       <NumberField
         label="Évaluation clinique"
-        suffix="/20"
+        suffix={`/${cfg.bareme}`}
         min={0}
-        max={20}
+        max={cfg.bareme}
         step={0.25}
         value={f.evaluationClinique}
         onChange={(v) => {
@@ -648,11 +666,12 @@ function BulletinDetail({
   canPublish: boolean;
   onPublish: (b: Bulletin) => void;
 }) {
-  const { photoDe } = useIstpm();
+  const { photoDe, bulletinConfig: cfg, institut } = useIstpm();
   const stamp = useStamp();
   const totalCredits = b.notes.reduce((s, n) => s + n.credits, 0);
+  // Module validé à partir du seuil configuré (défaut 10).
   const creditsValides = b.notes
-    .filter((n) => n.note >= 10)
+    .filter((n) => n.note >= cfg.seuilAdmission)
     .reduce((s, n) => s + n.credits, 0);
 
   return (
@@ -684,7 +703,7 @@ function BulletinDetail({
         <div className="flex items-center justify-end gap-2">
           <button
             className={cn(ghostPill, "gap-1.5")}
-            onClick={() => printBulletin(b, groupe, stamp)}
+            onClick={() => printBulletin(b, groupe, stamp, { institut, bareme: cfg.bareme, seuilAdmission: cfg.seuilAdmission, creditsSemestre: cfg.creditsSemestre })}
           >
             <FileDown className="h-3.5 w-3.5" /> Imprimer / PDF
           </button>
@@ -708,12 +727,16 @@ function BulletinDetail({
           />
           <DetailField
             label="Moyenne générale"
-            value={`${b.moyenne.toFixed(2)} / 20`}
-            tone={b.moyenne < 10 ? "negative" : "positive"}
+            value={`${b.moyenne.toFixed(2)} / ${cfg.bareme}`}
+            tone={b.moyenne > 0 && b.moyenne < cfg.seuilAdmission ? "negative" : "positive"}
           />
           <DetailField
             label="Crédits validés"
             value={`${creditsValides} / ${totalCredits}`}
+          />
+          <DetailField
+            label="Objectif crédits"
+            value={`${cfg.creditsSemestre} / semestre`}
           />
         </DetailGrid>
       </DetailSection>
@@ -735,7 +758,7 @@ function BulletinDetail({
               <td
                 className={cn(
                   "px-3 py-2 text-right font-semibold tabular-nums",
-                  n.note < 10 ? "text-alert" : "text-brand-dk",
+                  n.note < cfg.seuilAdmission ? "text-alert" : "text-brand-dk",
                 )}
               >
                 {n.note.toFixed(2)}
@@ -757,7 +780,7 @@ function BulletinDetail({
             <td
               className={cn(
                 "px-3 py-2 text-right font-semibold tabular-nums",
-                b.evaluationClinique < 10 ? "text-alert" : "text-brand-dk",
+                b.evaluationClinique < cfg.seuilAdmission ? "text-alert" : "text-brand-dk",
               )}
             >
               {b.evaluationClinique.toFixed(2)}

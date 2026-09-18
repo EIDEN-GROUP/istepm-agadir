@@ -11,6 +11,8 @@ import { fetchStudentSemestres, exportEtudiantsCsv, createInvitation } from "@/l
 import {
   FILIERES,
   NIVEAUX,
+  ANNEES_ETUDE,
+  anneeEtude,
   STATUT_ETUDIANT_LABEL,
   STATUT_ETUDIANT_TONE,
   STATUT_PAIEMENT_LABEL,
@@ -82,7 +84,7 @@ const STATUTS_PAIEMENT: StatutPaiement[] = [
 
 function EtudiantsPage() {
   const { role } = useAuth();
-  const { etudiants, filieres: filieresApi, addEtudiant, updateEtudiant, deleteEtudiant, restoreEtudiant } = useIstpm();
+  const { etudiants, filieres: filieresApi, anneesUniversitaires: anneesRegistre, addEtudiant, updateEtudiant, deleteEtudiant, restoreEtudiant } = useIstpm();
   // Référentiel serveur, repli constant (jamais vide en pratique : amorcé en migration).
   const filieresOptions = filieresApi.length ? filieresApi : [...FILIERES];
   // Teachers get a read-only view; student administration is the responsable's
@@ -116,6 +118,7 @@ function EtudiantsPage() {
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
   const [niveau, setNiveau] = useState<string>(ALL);
+  const [annee, setAnnee] = useState<string>(ALL);
   const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
   const [groupe, setGroupe] = useState<string>(ALL);
   const [statut, setStatut] = useState<string>(ALL);
@@ -135,21 +138,27 @@ function EtudiantsPage() {
     for (const e of etudiants) {
       if (filiere !== ALL && e.filiere !== filiere) continue;
       if (niveau !== ALL && e.niveau !== niveau) continue;
+      if (annee !== ALL && anneeEtude(e.niveau) !== annee) continue;
       if (e.groupe) set.add(e.groupe);
     }
     return [...set].sort();
-  }, [etudiants, filiere, niveau, enseignantScope]);
+  }, [etudiants, filiere, niveau, annee, enseignantScope]);
   // Drop a group choice that no longer matches the filière/semestre.
   useEffect(() => {
     if (groupe !== ALL && !groupeOptions.includes(groupe)) setGroupe(ALL);
   }, [groupeOptions, groupe]);
 
-  // Années présentes dans les données (jamais de liste figée).
+  // Années scolaires : le réglage « Années universitaires » fait foi ; les
+  // années présentes dans les fiches complètent (jamais de liste figée).
   const anneesOptions = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(anneesRegistre);
     for (const e of etudiants) if (e.annee) set.add(e.annee);
     return [...set].sort().reverse();
-  }, [etudiants]);
+  }, [etudiants, anneesRegistre]);
+  // Drop un choix d'année devenu hors réglage/données.
+  useEffect(() => {
+    if (anneeScolaire !== ALL && !anneesOptions.includes(anneeScolaire)) setAnneeScolaire(ALL);
+  }, [anneesOptions, anneeScolaire]);
 
   // Pre-set scope filters for enseignant with assigned formateur. On garde le
   // semestre et le groupe sur « Tous » : la portée (filière + semestres
@@ -173,6 +182,13 @@ function EtudiantsPage() {
   const needsSelection = false;
 
   const [detail, setDetail] = useState<Etudiant | null>(null);
+  // Lien profond (ex. depuis le tableau de bord) : ?etudiantId=… ouvre la fiche.
+  const { etudiantId: detailId } = Route.useSearch();
+  useEffect(() => {
+    if (!detailId) return;
+    const found = etudiants.find((e) => e.id === detailId);
+    if (found) setDetail(found);
+  }, [detailId, etudiants]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Etudiant | null>(null);
   const [inviteInfo, setInviteInfo] = useState<{ email: string; inviteUrl: string; emailSent: boolean; emailError?: string | null } | null>(null);
@@ -207,6 +223,7 @@ function EtudiantsPage() {
       }
       if (filiere !== ALL && e.filiere !== filiere) return false;
       if (niveau !== ALL && e.niveau !== niveau) return false;
+      if (annee !== ALL && anneeEtude(e.niveau) !== annee) return false;
       if (anneeScolaire !== ALL && e.annee !== anneeScolaire) return false;
       if (groupe !== ALL && e.groupe !== groupe) return false;
       if (statut !== ALL && STATUT_ETUDIANT_LABEL[e.statut] !== statut)
@@ -216,11 +233,11 @@ function EtudiantsPage() {
         .toLowerCase()
         .includes(q);
     });
-  }, [etudiants, search, showArchived, enseignantScope, filiere, niveau, anneeScolaire, groupe, statut]);
+  }, [etudiants, search, showArchived, enseignantScope, filiere, niveau, annee, anneeScolaire, groupe, statut]);
 
   const pager = usePagination(
     filtered,
-    `${search}|${showArchived}|${filiere}|${niveau}|${anneeScolaire}|${groupe}|${statut}`,
+    `${search}|${showArchived}|${filiere}|${niveau}|${annee}|${anneeScolaire}|${groupe}|${statut}`,
   );
 
   const openCreate = () => {
@@ -328,6 +345,14 @@ function EtudiantsPage() {
                   allLabel: "Tous les semestres",
                 },
                 {
+                  id: "annee",
+                  label: "Niveau",
+                  value: annee,
+                  onChange: setAnnee,
+                  options: ANNEES_ETUDE,
+                  allLabel: "Tous les niveaux",
+                },
+                {
                     id: "anneeScolaire",
                     label: "Année scolaire",
                     value: anneeScolaire,
@@ -368,6 +393,14 @@ function EtudiantsPage() {
                   onChange: setNiveau,
                   options: NIVEAUX,
                   allLabel: isTeacher ? "Choisir un semestre" : "Tous les semestres",
+                },
+                {
+                  id: "annee",
+                  label: "Niveau",
+                  value: annee,
+                  onChange: setAnnee,
+                  options: ANNEES_ETUDE,
+                  allLabel: "Tous les niveaux",
                 },
                 {
                     id: "anneeScolaire",
@@ -648,6 +681,7 @@ function EtudiantsPage() {
           key={editing?.id ?? "new"}
           initial={editing}
           filieres={filieresOptions}
+          annees={anneesRegistre}
           existing={etudiants}
           onCancel={() => setFormOpen(false)}
           onSubmit={async (data) => {            if (editing) {
@@ -797,12 +831,15 @@ type FormState = {
 function EtudiantForm({
   initial,
   filieres,
+  annees,
   existing,
   onSubmit,
   onCancel,
 }: {
   initial: Etudiant | null;
   filieres: string[];
+  /** Années ouvertes (Paramètres › Années universitaires) pour le dropdown. */
+  annees: string[];
   existing: Etudiant[];
   onSubmit: (data: Omit<FormState, "fraisMensuels"> & {
     filiere: Filiere;
@@ -812,6 +849,11 @@ function EtudiantForm({
   onCancel: () => void;
 }) {
   const isNew = !initial;
+  // Dropdown : années ouvertes (+ l'année déjà saisie, même fermée depuis).
+  const anneeOptions =
+    initial?.annee && !annees.includes(initial.annee)
+      ? [initial.annee, ...annees]
+      : annees;
   const [f, setF] = useState<FormState>(() => ({
     cne: initial?.cne ?? "",
     // Suggest a matricule in the house format for new records.
@@ -824,7 +866,7 @@ function EtudiantForm({
     nom: initial?.nom ?? "",
     filiere: initial?.filiere ?? "",
     niveau: initial?.niveau ?? "",
-    annee: initial?.annee ?? "2025/2026",
+    annee: initial?.annee ?? [...annees].sort().reverse()[0] ?? "2025/2026",
     groupe: initial?.groupe ?? "",
     statut: initial?.statut ?? "inscrit",
     paiement: initial?.paiement ?? "en_attente",
@@ -1099,11 +1141,21 @@ function EtudiantForm({
         onChange={(v) => set("ville", v)}
         placeholder="Agadir"
       />
-      <TextField
-        label="Année universitaire"
-        value={f.annee}
-        onChange={(v) => set("annee", v)}
-      />
+      {anneeOptions.length ? (
+        <SelectField
+          label="Année universitaire"
+          value={f.annee}
+          onChange={(v) => set("annee", v)}
+          options={anneeOptions}
+          placeholder="Sélectionner l'année…"
+        />
+      ) : (
+        <TextField
+          label="Année universitaire"
+          value={f.annee}
+          onChange={(v) => set("annee", v)}
+        />
+      )}
       <NumberField
         label="Frais mensuels"
         required
@@ -1362,4 +1414,7 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
 
 export const Route = createFileRoute("/dashboard/etudiants")({
   component: EtudiantsPage,
+  validateSearch: (search: Record<string, unknown>): { etudiantId?: string } => ({
+    etudiantId: typeof search.etudiantId === "string" ? search.etudiantId : undefined,
+  }),
 });

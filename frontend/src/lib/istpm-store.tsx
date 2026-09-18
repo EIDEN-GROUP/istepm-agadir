@@ -43,6 +43,10 @@ import {
   type Decision,
   type ExamDocument,
   type StructureAccueil,
+  type InstitutInfo,
+  INSTITUT_DEFAUT,
+  type BulletinConfig,
+  BULLETIN_DEFAUT,
 } from "@/lib/istpm-data";
 import {
   fetchEtudiants as apiFetchEtudiants,
@@ -136,6 +140,12 @@ type Snapshot = {
   groupConfigs: GroupConfig[];
   /** Créneaux horaires, au format libellé des Paramètres (« 08:30 – 10:00 »). */
   creneaux: string[];
+  /** Années universitaires ouvertes (Paramètres › Années universitaires). */
+  anneesUniversitaires: string[];
+  /** Identité de l'établissement (Paramètres › Informations de l'institut). */
+  institut: InstitutInfo;
+  /** Barème et seuils des bulletins (Paramètres › Configuration). */
+  bulletinConfig: BulletinConfig;
   /** Jours chômés (fériés + vacances + exceptions) issus de l'API. */
   joursChomes: { date: string; nom: string; type: "ferie" | "vacances" }[];
 };
@@ -155,6 +165,9 @@ function emptySnapshot(): Snapshot {
     modules: [],
     groupConfigs: [],
     creneaux: [],
+    anneesUniversitaires: [],
+    institut: { ...INSTITUT_DEFAUT },
+    bulletinConfig: { ...BULLETIN_DEFAUT },
     joursChomes: [],
   };
 }
@@ -178,9 +191,9 @@ export function mentionFor(moy: number): Mention {
   return "Passable";
 }
 
-export function decisionFor(moy: number, notes: NoteModule[]): Decision {
-  if (moy < 10) return "Ajourné";
-  const echecs = notes.filter((n) => n.note < 10).length;
+export function decisionFor(moy: number, notes: NoteModule[], seuil = 10): Decision {
+  if (moy < seuil) return "Ajourné";
+  const echecs = notes.filter((n) => n.note < seuil).length;
   if (echecs === 0) return "Admis";
   return echecs <= 1 ? "Admis avec dette" : "Rattrapage";
 }
@@ -192,6 +205,18 @@ export function decisionFor(moy: number, notes: NoteModule[]): Decision {
 function num(v: unknown, fallback = 0): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
+}
+
+/** Réglage texte : chaîne non vide, sinon repli (jamais de vide affiché). */
+function texteReglage(v: unknown, fallback: string): string {
+  const s = String(v ?? "").trim();
+  return s ? s : fallback;
+}
+
+/** Réglage numérique strictement positif, sinon repli. */
+function nombreReglage(v: unknown, fallback: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
 function normNoteModule(n: Record<string, unknown>): NoteModule {
@@ -428,6 +453,12 @@ type IstpmCtx = {
   /** Créneaux exploitables, triés par heure de début. */
   creneaux: Creneau[];
   setCreneaux: (labels: string[]) => Promise<void>;
+  /** Années universitaires ouvertes (Paramètres › Années universitaires). */
+  anneesUniversitaires: string[];
+  /** Identité de l'établissement (Paramètres › Informations de l'institut). */
+  institut: InstitutInfo;
+  /** Barème et seuils des bulletins (Paramètres › Configuration). */
+  bulletinConfig: BulletinConfig;
   /** Jours chômés issus de l'API (fériés + vacances + exceptions). */
   joursChomes: { date: string; nom: string; type: "ferie" | "vacances" }[];
   /** Chargement initial en cours. */
@@ -661,6 +692,20 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         modules: (modulesRaw as unknown as Record<string, unknown>[]).map(normModule),
         groupConfigs: (groupsRaw as GroupConfig[]) ?? [],
         creneaux: Array.isArray(reglages.creneaux) ? (reglages.creneaux as string[]) : [],
+        anneesUniversitaires: Array.isArray(reglages.annees_universitaires)
+          ? (reglages.annees_universitaires as unknown[]).map(String)
+          : [],
+        institut: {
+          nom: texteReglage(reglages.institut_nom, INSTITUT_DEFAUT.nom),
+          ville: texteReglage(reglages.institut_ville, INSTITUT_DEFAUT.ville),
+          telephone: texteReglage(reglages.institut_telephone, INSTITUT_DEFAUT.telephone),
+          email: texteReglage(reglages.institut_email, INSTITUT_DEFAUT.email),
+        },
+        bulletinConfig: {
+          bareme: nombreReglage(reglages.bulletin_bareme, BULLETIN_DEFAUT.bareme),
+          seuilAdmission: nombreReglage(reglages.bulletin_seuilAdmission, BULLETIN_DEFAUT.seuilAdmission),
+          creditsSemestre: nombreReglage(reglages.bulletin_creditsSemestre, BULLETIN_DEFAUT.creditsSemestre),
+        },
         joursChomes: construireJoursChomes(
           holidaysRaw as HolidayRow[],
           vacationsRaw as VacationRow[],

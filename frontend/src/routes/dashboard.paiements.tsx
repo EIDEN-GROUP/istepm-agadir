@@ -701,7 +701,7 @@ function HistoriquePaiementsDialog({
   etudiant: Etudiant;
   onClose: () => void;
 }) {
-  const { updatePaiementMensuel } = useIstpm();
+  const { updatePaiementMensuel, institut } = useIstpm();
   // Cachet officiel servi par le backend, apposé sur les reçus PDF.
   const stamp = useStamp();
   const academicYear = getCurrentAcademicYear();
@@ -893,6 +893,7 @@ function HistoriquePaiementsDialog({
                                   statut: m.statut,
                                 },
                                 stamp,
+                                institut,
                               );
                               const url = URL.createObjectURL(blob);
                               const a = document.createElement("a");

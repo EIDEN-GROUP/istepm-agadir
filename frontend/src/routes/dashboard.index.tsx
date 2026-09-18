@@ -1,4 +1,4 @@
-﻿import { createFileRoute, Link } from "@tanstack/react-router";
+﻿import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, type ComponentType, useMemo, useRef, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -6,6 +6,8 @@ import {
   fetchStudentCalendar,
   fetchStudentRequests,
   fetchStudentNotifications,
+  fetchAllStudentRequests,
+  type StudentRequest,
 } from "@/lib/istpm-api";
 import { motion, animate, useInView } from "framer-motion";
 import {
@@ -28,6 +30,7 @@ import {
   CalendarRange,
   Search,
   Bell,
+  Inbox,
   PhoneCall,
   MessageSquare,
   Activity,
@@ -63,6 +66,7 @@ import {
 import { DetailShell, DetailSection } from "@/components/dash-page";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { DashTabs, DashTabPanel, type DashTab } from "@/components/dash-tabs";
+import { usePagination, TablePagination } from "@/components/table-pagination";
 import { AreaTrend, LineTrend, BarSeries, HBarSeries, DonutChart, GroupedBarSeries, type ChartDatum, type GroupedDatum } from "@/components/dash-charts";
 import {
   Bar,
@@ -933,6 +937,101 @@ function StudentAvatarList({ etudiants }: { etudiants: { id: string; prenom: str
   );
 }
 
+const DEMANDE_TONE = {
+  en_attente: "amber",
+  en_cours: "blue",
+} as const;
+const DEMANDE_LABEL: Record<"en_attente" | "en_cours", string> = {
+  en_attente: "En attente",
+  en_cours: "En cours",
+};
+
+type DemandeActive = StudentRequest & { statut: "en_attente" | "en_cours" };
+
+/**
+ * Demandes des étudiants en attente ou en cours, pour le responsable.
+ * Clic → file de traitement (espace étudiant, vue staff).
+ */
+function ResponsableDemandesList() {
+  const navigate = useNavigate();
+  const demandesQ = useQuery({
+    queryKey: ["student-requests-all"],
+    queryFn: () => fetchAllStudentRequests(),
+    retry: false,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const list: DemandeActive[] = useMemo(
+    () =>
+      (demandesQ.data ?? [])
+        .filter(
+          (d): d is DemandeActive =>
+            d.statut === "en_attente" || d.statut === "en_cours",
+        )
+        .slice()
+        .sort(
+          (a, b) =>
+            Number(a.statut === "en_cours") - Number(b.statut === "en_cours") ||
+            +new Date(b.createdAt) - +new Date(a.createdAt),
+        ),
+    [demandesQ.data],
+  );
+  const pager = usePagination(list, list.length);
+  if (demandesQ.isLoading) {
+    return (
+      <div className={cn(softCard, "px-5 py-10 text-center text-sm text-muted-foreground")}>
+        Chargement des demandes…
+      </div>
+    );
+  }
+  if (demandesQ.isError || !list.length) {
+    return (
+      <EmptyState icon={Inbox}>
+        {demandesQ.isError ? "Demandes indisponibles." : "Aucune demande en attente ou en cours."}
+      </EmptyState>
+    );
+  }
+  return (
+    <div className={cn(softCard, "overflow-hidden")}>
+      <div className="max-h-[380px] divide-y divide-brand/8 overflow-y-auto">
+        {pager.pageItems.map((d) => {
+          const who =
+            `${d.etudiantPrenom ?? ""} ${d.etudiantNom ?? ""}`.trim() || "Étudiant";
+          return (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => navigate({ to: "/dashboard/espace-etudiant" })}
+              className="group flex w-full items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-brand/8 sm:px-5"
+            >
+              <PersonAvatar name={who} photoUrl={d.etudiantPhotoUrl ?? undefined} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-foreground">
+                  {d.titre}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {who} · {fmtDate(d.createdAt)}
+                </span>
+              </span>
+              <span className={cn(toneBadge(DEMANDE_TONE[d.statut]), "shrink-0")}>
+                {DEMANDE_LABEL[d.statut]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <TablePagination
+        page={pager.page}
+        pageCount={pager.pageCount}
+        total={pager.total}
+        pageSize={pager.pageSize}
+        onPage={pager.setPage}
+        label="demandes"
+      />
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Director Dashboard                                                 */
 /* ------------------------------------------------------------------ */
@@ -1347,6 +1446,7 @@ function DashboardResponsable() {
   const sessionsParJour = useMemo(() => { const c = new Array(7).fill(0); seances.forEach((s) => c[new Date(s.date).getDay()]++); return JOURS.map((n, i) => ({ name: n, value: c[i] })); }, [seances]);
   const workloadData = useMemo(() => { const max = Math.max(...chargeFormateurs.map((f) => f.seances), 1); return chargeFormateurs.map((f) => ({ name: f.nom.split(" ").pop() || f.nom, value: Math.round((f.seances / max) * 100), seances: f.seances })); }, [chargeFormateurs]);
   const maxCharge = Math.max(...chargeFormateurs.map((x) => x.seances), 1);
+  const chargePager = usePagination(chargeFormateurs, chargeFormateurs.length);
   const maxOcc = Math.max(...occupationSalles.map((x) => x.seancesCount), 1);
   const SUPERVISOR_TABS: DashTab[] = [
     { label: "Vue d'ensemble", short: "Ensemble", icon: LayoutGrid },
@@ -1362,7 +1462,6 @@ function DashboardResponsable() {
           <div className="space-y-6">
             <KpiGrid>
               <KpiCard label="Séances aujourd&rsquo;hui" value={seancesAujourdhui.length} icon={Calendar} accent />
-              <KpiCard label="Formateurs actifs" value={dashboard.formateursActifs} hint={`sur ${formateurs.length} total`} tone="blue" icon={GraduationCap} />
               <KpiCard label="Salles occupées" value={sallesOccupees.length} icon={MapPin} />
               <KpiCard label="Salles disponibles" value={sallesLibres} tone={sallesLibres > 3 ? "teal" : "amber"} icon={Building2} />
               <KpiCard label="Conflits" value={conflits.length} tone={conflits.length ? "red" : "teal"} icon={AlertCircle} />
@@ -1371,7 +1470,9 @@ function DashboardResponsable() {
             <Section title="Aujourd&rsquo;hui" action={<SectionLink to="/dashboard/calendar">Voir le planning</SectionLink>}>
               <AujourdhuiTable seances={seancesAujourdhui} />
             </Section>
-            <Section title="Notifications"><ActiviteFeed /></Section>
+            <Section title="Demandes des étudiants" action={<SectionLink to="/dashboard/espace-etudiant">Tout traiter</SectionLink>}>
+              <ResponsableDemandesList />
+            </Section>
           </div>
         ) : tab === 1 ? (
           <div className="space-y-6">
@@ -1395,8 +1496,18 @@ function DashboardResponsable() {
             </Section>
             <div className="grid gap-6 xl:grid-cols-2">
               <Section title="Charge des formateurs">
-                <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
-                  {chargeFormateurs.map((f) => <MeterRow key={f.id} label={f.nom} ratio={f.seances / maxCharge} color={f.seances / maxCharge > 0.8 ? TONE_COLORS.red : f.seances / maxCharge > 0.5 ? TONE_COLORS.amber : TONE_COLORS.teal} detail={`${f.seances} séances`} />)}
+                <div className={cn(softCard, "overflow-hidden")}>
+                  <div className="max-h-[380px] divide-y divide-brand/8 overflow-y-auto">
+                    {chargePager.pageItems.map((f) => <MeterRow key={f.id} label={f.nom} ratio={f.seances / maxCharge} color={f.seances / maxCharge > 0.8 ? TONE_COLORS.red : f.seances / maxCharge > 0.5 ? TONE_COLORS.amber : TONE_COLORS.teal} detail={`${f.seances} séances`} />)}
+                  </div>
+                  <TablePagination
+                    page={chargePager.page}
+                    pageCount={chargePager.pageCount}
+                    total={chargePager.total}
+                    pageSize={chargePager.pageSize}
+                    onPage={chargePager.setPage}
+                    label="formateurs"
+                  />
                 </div>
               </Section>
               <Section title="Occupation des salles">
@@ -1634,6 +1745,7 @@ function DashboardComptable() {
                   stroke="var(--card)"
                   strokeWidth={2}
                   labelLine={false}
+                  label={({ percent }: { percent?: number }) => `${Math.round((percent ?? 0) * 100)} %`}
                 >
                   {resteData.map((_, i) => (
                     <Cell
