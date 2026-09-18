@@ -1446,7 +1446,16 @@ function DashboardResponsable() {
   const sessionsParJour = useMemo(() => { const c = new Array(7).fill(0); seances.forEach((s) => c[new Date(s.date).getDay()]++); return JOURS.map((n, i) => ({ name: n, value: c[i] })); }, [seances]);
   // Plancher à 4% : un formateur avec 1-2 séances doit rester visible, pas
   // disparaître en une barre invisible face à celui qui en a 100.
-  const workloadData = useMemo(() => { const max = Math.max(...chargeFormateurs.map((f) => f.seances), 1); return chargeFormateurs.map((f) => ({ name: f.nom.split(" ").pop() || f.nom, value: f.seances > 0 ? Math.max(4, Math.round((f.seances / max) * 100)) : 0, seances: f.seances })); }, [chargeFormateurs]);
+  // Un bar chart ne tient pas la charge de dizaines de formateurs : on ne
+  // trace que ceux qui ont une charge réelle (top 12), le reste (souvent la
+  // moitié du corps enseignant à 0 séance) n'apporterait qu'un mur de barres
+  // vides. Ils restent visibles dans la liste paginée de la Vue d'ensemble.
+  const workloadData = useMemo(() => {
+    const chiffres = chargeFormateurs.filter((f) => f.seances > 0).slice(0, 12);
+    const max = Math.max(...chiffres.map((f) => f.seances), 1);
+    return chiffres.map((f) => ({ name: f.nom.split(" ").pop() || f.nom, value: Math.max(4, Math.round((f.seances / max) * 100)), seances: f.seances }));
+  }, [chargeFormateurs]);
+  const formateursSansCharge = chargeFormateurs.length - workloadData.length;
   const maxCharge = Math.max(...chargeFormateurs.map((x) => x.seances), 1);
   const chargePager = usePagination(chargeFormateurs, chargeFormateurs.length);
   const maxOcc = Math.max(...occupationSalles.map((x) => x.seancesCount), 1);
@@ -1525,7 +1534,8 @@ function DashboardResponsable() {
               <DonutChart title="Occupation des salles" height={340} palette={BRAND_CHART_COLORS} data={occupationSalles.map((o) => ({ name: o.salle, value: o.seancesCount }))} />
               <HBarSeries
                 title="Charge des formateurs"
-                height={340}
+                subtitle={formateursSansCharge > 0 ? `Top ${workloadData.length} · ${formateursSansCharge} sans séance` : undefined}
+                height={Math.min(400, Math.max(220, workloadData.length * 34))}
                 palette={BRAND_CHART_COLORS}
                 data={workloadData}
                 formatter={(value: number, _name: string, entry: { payload?: { seances?: number } }) => [`${entry.payload?.seances ?? value} séances`, "Charge"]}
