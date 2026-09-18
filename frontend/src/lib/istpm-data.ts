@@ -172,12 +172,21 @@ export function getAcademicYearMonths(academicYear: string): string[] {
   });
 }
 
+/**
+ * Année universitaire couvrant une date donnée (année scolaire = septembre
+ * → juin sur deux années civiles) : janvier-août appartiennent à l'année
+ * commencée en septembre précédent, pas à `année/année+1`.
+ */
+export function academicYearOf(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const year = d.getFullYear();
+  const month = d.getMonth();
+  return month >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+}
+
 /** Détermine l'année universitaire courante à partir de la date du jour. */
 export function getCurrentAcademicYear(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  return month >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+  return academicYearOf(new Date());
 }
 
 /** Renvoie le mois académique correspondant à la date du jour. */

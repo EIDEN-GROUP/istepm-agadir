@@ -37,6 +37,7 @@ import {
   CRENEAUX,
   ANNEES_ETUDE,
   anneeEtude,
+  academicYearOf,
   bornesAnneeUniversitaire,
   TYPE_SEANCE_LABEL,
   couleurSeance,
@@ -1048,7 +1049,7 @@ function SeanceForm({
 }) {
   const anneeDe = (iso: string) => {
     const y = Number(iso.slice(0, 4));
-    return Number.isFinite(y) && y > 2000 ? `${y}/${y + 1}` : "";
+    return Number.isFinite(y) && y > 2000 ? academicYearOf(iso) : "";
   };
   const premierCreneau = creneauxProp[0]?.debut ?? CRENEAUX[0].debut;
   const [f, setF] = useState(() => ({
@@ -1526,7 +1527,7 @@ function validerLigne(
     /^\d{4}\/\d{4}$/.test(anneeRaw)
       ? anneeRaw
       : date.slice(0, 4)
-        ? `${date.slice(0, 4)}/${Number(date.slice(0, 4)) + 1}`
+        ? academicYearOf(date)
         : "";
 
   if (erreurs.length > 0) return { ok: false, erreurs };

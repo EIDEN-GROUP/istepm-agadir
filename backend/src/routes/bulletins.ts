@@ -193,21 +193,7 @@ export async function bulletinRoutes(app: FastifyInstance) {
         .set({ statut: "publie" })
         .where(eq(bulletins.id, id))
         .returning();
-    if (!bulletin) return reply.status(404).send({ error: "Bulletin introuvable" });
-    if (request.user.role === "etudiant") {
-      const own = await ownEtudiantId(request.user.id);
-      if (!own || bulletin.etudiantId !== own) {
-        return reply.status(404).send({ error: "Bulletin introuvable" });
-      }
-    } else if (request.user.role === "enseignant") {
-      const scope = await teacherScope(request.user.id);
-      const niveaux = scope ? [...new Set(scope.groupes.map((g) => g.split("-")[0]))] : [];
-      const inScope =
-        scope &&
-        (niveaux.length === 0 || niveaux.includes(bulletin.niveau)) &&
-        (!scope.departement || scope.departement === bulletin.filiere);
-      if (!inScope) return reply.status(404).send({ error: "Bulletin introuvable" });
-    }
+      if (!bulletin) return reply.status(404).send({ error: "Bulletin introuvable" });
       return bulletin;
     },
   );

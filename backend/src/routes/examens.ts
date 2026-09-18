@@ -110,8 +110,17 @@ function normaliseClasse(input: Record<string, unknown>) {
 }
 
 export async function examenRoutes(app: FastifyInstance) {
+  // Année universitaire = septembre → juin sur deux années civiles : un
+  // examen daté janvier-août appartient à l'année commencée en septembre
+  // précédent, pas à `année/année+1` de sa propre année civile.
+  function academicYearOf(date: Date): string {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    return month >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+  }
+
   function enrichExamen(row: typeof examens.$inferSelect) {
-    const annee = row.date ? `${new Date(row.date).getFullYear()}/${new Date(row.date).getFullYear() + 1}` : "";
+    const annee = row.date ? academicYearOf(new Date(row.date)) : "";
     const typeLabel = row.type.charAt(0).toUpperCase() + row.type.slice(1);
     return {
       ...row,
