@@ -569,44 +569,73 @@ function StagesPage() {
             allLabel: "Tous les statuts",
           },
         ]}
+        extra={
+          <>
+            <div className="space-y-1.5">
+              <label
+                className={cn(
+                  "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors",
+                  periodeDu ? "text-brand-dk" : "text-muted-foreground",
+                )}
+              >
+                Période du
+                {periodeDu ? (
+                  <span
+                    aria-hidden
+                    className="h-1.5 w-1.5 rounded-full bg-brand"
+                  />
+                ) : null}
+              </label>
+              <input
+                type="date"
+                value={periodeDu}
+                max={periodeAu || undefined}
+                onChange={(e) => setPeriodeDu(e.target.value)}
+                className="h-9 w-full rounded-xl border border-brand/20 bg-card px-2.5 text-xs font-normal text-foreground shadow-none transition-colors hover:border-brand/35 focus-visible:border-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
+                aria-label="Période du"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label
+                className={cn(
+                  "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors",
+                  periodeAu ? "text-brand-dk" : "text-muted-foreground",
+                )}
+              >
+                au
+                {periodeAu ? (
+                  <span
+                    aria-hidden
+                    className="h-1.5 w-1.5 rounded-full bg-brand"
+                  />
+                ) : null}
+              </label>
+              <input
+                type="date"
+                value={periodeAu}
+                min={periodeDu || undefined}
+                onChange={(e) => setPeriodeAu(e.target.value)}
+                className="h-9 w-full rounded-xl border border-brand/20 bg-card px-2.5 text-xs font-normal text-foreground shadow-none transition-colors hover:border-brand/35 focus-visible:border-brand focus-visible:ring-4 focus-visible:ring-brand/15"
+                aria-label="Période au"
+              />
+            </div>
+            {periodeDu || periodeAu ? (
+              <div className="sm:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPeriodeDu("");
+                    setPeriodeAu("");
+                  }}
+                  className="rounded-lg px-2 py-1 text-[11px] font-semibold text-brand-dk transition-colors hover:bg-brand/10"
+                >
+                  Réinitialiser la période
+                </button>
+              </div>
+            ) : null}
+          </>
+        }
       />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Période du
-          <input
-            type="date"
-            value={periodeDu}
-            max={periodeAu || undefined}
-            onChange={(e) => setPeriodeDu(e.target.value)}
-            className="h-9 rounded-xl border border-brand/20 bg-card px-2.5 text-xs font-normal text-foreground shadow-none transition-colors hover:border-brand/35 focus-visible:border-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
-            aria-label="Période du"
-          />
-        </label>
-        <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          au
-          <input
-            type="date"
-            value={periodeAu}
-            min={periodeDu || undefined}
-            onChange={(e) => setPeriodeAu(e.target.value)}
-            className="h-9 rounded-xl border border-brand/20 bg-card px-2.5 text-xs font-normal text-foreground shadow-none transition-colors hover:border-brand/35 focus-visible:border-brand focus-visible:ring-4 focus-visible:ring-brand/15"
-            aria-label="Période au"
-          />
-        </label>
-        {periodeDu || periodeAu ? (
-          <button
-            type="button"
-            onClick={() => {
-              setPeriodeDu("");
-              setPeriodeAu("");
-            }}
-            className="rounded-lg px-2 py-1 text-[11px] font-semibold text-brand-dk transition-colors hover:bg-brand/10"
-          >
-            Réinitialiser
-          </button>
-        ) : null}
-      </div>
 
       <DataTable
         minWidth="min-w-[1150px]"

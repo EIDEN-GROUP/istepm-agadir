@@ -119,6 +119,7 @@ export function FilterPanel({
   filters,
   summary,
   trailing,
+  extra,
 }: {
   search: string;
   onSearch: (v: string) => void;
@@ -126,6 +127,7 @@ export function FilterPanel({
   filters: FilterDef[];
   summary?: ReactNode;
   trailing?: ReactNode;
+  extra?: ReactNode;
 }) {
   const active = filters.filter((f) => f.value !== ALL);
   const hasSearch = search.trim() !== "";
@@ -207,6 +209,9 @@ export function FilterPanel({
             );
           })}
         </div>
+        {extra ? (
+          <div className="grid gap-3 sm:grid-cols-2">{extra}</div>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-brand/12 bg-muted/60 px-4 py-3 md:px-5">
