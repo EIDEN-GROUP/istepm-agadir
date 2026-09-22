@@ -22,6 +22,7 @@ import { useIstpm, useCurrentFormateur } from "@/lib/istpm-store";
 import {
   FILIERES,
   NIVEAUX,
+  libelleNiveau,
   DUREES_EXAMEN,
   TYPE_EXAMEN_LABEL,
   STATUT_EXAMEN_LABEL,
@@ -386,7 +387,7 @@ function InfosExamen({
           <DetailField label="Module" value={examen.module} full />
           <DetailField label="Filière" value={examen.filiere} full />
           <DetailField label="Groupe" value={examen.classe} />
-          <DetailField label="Niveau" value={examen.niveau} />
+          <DetailField label="Niveau" value={libelleNiveau(examen.niveau)} />
           <DetailField
             label="Année universitaire"
             value={examen.anneeUniversitaire}
@@ -687,7 +688,7 @@ function EspaceFormateur() {
               {TYPE_EXAMEN_LABEL[x.type]}
             </td>
             <td>{fmtDate(x.date)}</td>
-            <td>{x.niveau}</td>
+            <td>{libelleNiveau(x.niveau)}</td>
             <td>
               <span className={toneBadge(STATUT_EXAMEN_TONE[x.statut])}>
                 {STATUT_EXAMEN_LABEL[x.statut]}
@@ -1016,7 +1017,7 @@ function EspaceDirecteur() {
               {TYPE_EXAMEN_LABEL[x.type]}
             </td>
             <td>{fmtDate(x.date)}</td>
-            <td>{x.niveau}</td>
+            <td>{libelleNiveau(x.niveau)}</td>
             <td className={cellTruncate}>
               {nomFormateur(formateurs, x.createdBy)}
             </td>

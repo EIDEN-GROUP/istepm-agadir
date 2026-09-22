@@ -11,6 +11,7 @@ import {
 import {
   NIVEAUX,
   FILIERES,
+  libelleNiveau,
   fmtDate,
   type Etudiant,
   type Stage,
@@ -433,7 +434,7 @@ export function AffectationStagesDialog({
                             {e.prenom} {e.nom}
                           </span>
                           <span className="block truncate text-xs text-muted-foreground">
-                            {e.cne} · {e.niveau}
+                            {e.cne} · {libelleNiveau(e.niveau)}
                           </span>
                         </span>
                       </span>

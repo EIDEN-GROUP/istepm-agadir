@@ -35,6 +35,7 @@ import {
   NIVEAUX,
   FILIERES,
   CRENEAUX,
+  libelleNiveau,
   academicYearOf,
   bornesAnneeUniversitaire,
   TYPE_SEANCE_LABEL,
@@ -901,7 +902,7 @@ function SeanceDetail({
           >
             {TYPE_SEANCE_LABEL[seance.type]}
           </span>
-          <span className={toneBadge("blue")}>{seance.semestre}</span>
+          <span className={toneBadge("blue")}>{libelleNiveau(seance.semestre)}</span>
           {conflits.length ? (
             <span className={toneBadge("red")}>
               {conflits.length} conflit(s)
@@ -989,7 +990,7 @@ function SeanceDetail({
             }
           />
           <DetailField label="Filière" value={seance.filiere} full />
-          <DetailField label="Niveau" value={seance.semestre} />
+          <DetailField label="Niveau" value={libelleNiveau(seance.semestre)} />
           <DetailField
             label="Année universitaire"
             value={seance.anneeUniversitaire}

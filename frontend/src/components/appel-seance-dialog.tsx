@@ -17,7 +17,7 @@ import {
   avatarChip,
   initials,
 } from "@/lib/dash-ui";
-import { fmtDate, type Seance } from "@/lib/istpm-data";
+import { fmtDate, libelleNiveau, type Seance } from "@/lib/istpm-data";
 import { cn } from "@/lib/utils";
 
 type Ligne = { present: boolean; justifie: boolean };
@@ -180,7 +180,7 @@ export function AppelSeanceDialog({
                         {e.prenom} {e.nom}
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
-                        {e.cne} · {e.groupe || e.niveau}
+                        {e.cne} · {e.groupe || libelleNiveau(e.niveau)}
                       </span>
                     </span>
                     <button

@@ -12,6 +12,7 @@ import {
   NIVEAUX,
   DECISION_TONE,
   MENTION_TONE,
+  libelleNiveau,
   STATUT_BULLETIN_LABEL,
   STATUT_BULLETIN_TONE,
   INSTITUT_DEFAUT,
@@ -152,7 +153,7 @@ function printBulletin(
   <div><span>CNE</span><strong>${escapeHtml(b.cne)}</strong></div>
   <div><span>Filière</span><strong>${escapeHtml(b.filiere)}</strong></div>
   ${groupe ? `<div><span>Groupe</span><strong>${escapeHtml(groupe)}</strong></div>` : ""}
-  <div><span>Niveau / session</span><strong>${escapeHtml(b.niveau)}   session ${escapeHtml(b.session)}</strong></div>
+  <div><span>Niveau / session</span><strong>${escapeHtml(libelleNiveau(b.niveau))}   session ${escapeHtml(b.session)}</strong></div>
 </div>
 <table><thead><tr><th>Module</th><th class="r">Note</th><th class="r">Coef.</th><th class="r">Crédits</th></tr></thead>
 <tbody>${rows}
@@ -207,7 +208,7 @@ ${cachet}
 
 function BulletinsPage() {
   const { role } = useAuth();
-  const { bulletins, etudiants, formateurs, updateBulletin, publierBulletin, publierTousBulletins, photoDe, bulletinConfig: cfg, institut } =
+  const { bulletins, etudiants, updateBulletin, publierBulletin, publierTousBulletins, photoDe, bulletinConfig: cfg, institut } =
     useIstpm();
   // Publishing transcripts is a student-administration act.
   const canPublish = role === "directeur" || role === "responsable";
@@ -220,7 +221,6 @@ function BulletinsPage() {
   const [session, setSession] = useState<string>(ALL);
   const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
   const [groupe, setGroupe] = useState<string>(ALL);
-  const [formateur, setFormateur] = useState<string>(ALL);
   const [statut, setStatut] = useState<string>(ALL);
 
   const [detail, setDetail] = useState<Bulletin | null>(null);
@@ -245,9 +245,6 @@ function BulletinsPage() {
   useEffect(() => {
     if (groupe !== ALL && !groupeOptions.includes(groupe)) setGroupe(ALL);
   }, [groupeOptions, groupe]);
-  const formateursActifs = useMemo(() => formateurs.filter((f) => !f.archived), [formateurs]);
-  const formateurOptions = useMemo(() => formateursActifs.map((f) => `${f.prenom} ${f.nom}`), [formateursActifs]);
-  const modulesParFormateur = useMemo(() => new Map(formateursActifs.map((f) => [`${f.prenom} ${f.nom}`, new Set(f.modules)])), [formateursActifs]);
   const statutOptions = useMemo(() => STATUTS.map((s) => STATUT_BULLETIN_LABEL[s]), []);
 
   const filtered = useMemo(() => {
@@ -260,16 +257,12 @@ function BulletinsPage() {
       if (anneeScolaire !== ALL && etuById.get(b.etudiantId)?.annee !== anneeScolaire) return false;
       if (groupe !== ALL && etuById.get(b.etudiantId)?.groupe !== groupe) return false;
       if (statut !== ALL && STATUT_BULLETIN_LABEL[b.statut] !== statut) return false;
-      if (formateur !== ALL) {
-        const mods = modulesParFormateur.get(formateur);
-        if (!mods || !b.notes.some((n) => mods.has(n.module))) return false;
-      }
       if (!q) return true;
       return `${b.cne} ${b.prenom} ${b.nom}`.toLowerCase().includes(q);
     });
-  }, [bulletins, search, filiere, niveau, session, anneeScolaire, groupe, statut, formateur, etuById, modulesParFormateur]);
+  }, [bulletins, search, filiere, niveau, session, anneeScolaire, groupe, statut, etuById]);
 
-  const pager = usePagination(filtered, `${search}|${filiere}|${niveau}|${session}|${anneeScolaire}|${groupe}|${statut}|${formateur}`);
+  const pager = usePagination(filtered, `${search}|${filiere}|${niveau}|${session}|${anneeScolaire}|${groupe}|${statut}`);
 
   const aPublier = bulletins.filter((b) => b.statut !== "publie").length;
 
@@ -342,14 +335,6 @@ function BulletinsPage() {
             allLabel: "Tous les groupes",
           },
           {
-            id: "formateur",
-            label: "Formateur",
-            value: formateur,
-            onChange: setFormateur,
-            options: formateurOptions,
-            allLabel: "Tous les formateurs",
-          },
-          {
             id: "statut",
             label: "Statut",
             value: statut,
@@ -407,7 +392,7 @@ function BulletinsPage() {
               </span>
             </td>
             <td className="text-center tabular-nums text-muted-foreground">
-              {b.niveau}
+              {libelleNiveau(b.niveau)}
             </td>
             <td
               className={cn(
@@ -468,7 +453,7 @@ function BulletinsPage() {
                         void publierBulletin(b.id)
                           .then(() =>
                             toast.success(
-                              `Bulletin publié   ${b.prenom} ${b.nom} (${b.niveau})`,
+                              `Bulletin publié   ${b.prenom} ${b.nom} (${libelleNiveau(b.niveau)})`,
                             ),
                           )
                           .catch((err) =>
@@ -716,7 +701,7 @@ function BulletinDetail({
           <DetailField label="CNE" value={b.cne} />
           <DetailField label="Filière" value={b.filiere} />
           {groupe ? <DetailField label="Groupe" value={groupe} /> : null}
-          <DetailField label="Niveau" value={b.niveau} />
+          <DetailField label="Niveau" value={libelleNiveau(b.niveau)} />
           <DetailField
             label="Session"
             value={<span className="capitalize">{b.session}</span>}

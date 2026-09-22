@@ -36,6 +36,18 @@ export const FILIERE_COURT: Record<Filiere, string> = {
 export const NIVEAUX = ["1ère année", "2ème année", "3ème année"] as const;
 export type Niveau = (typeof NIVEAUX)[number];
 
+/**
+ * Libellé d'affichage d'un niveau : les anciens codes semestres (S1–S6,
+ * données historiques) sont lus comme leur année d'étude, toute autre valeur
+ * passe telle quelle (dont les 3 libellés officiels).
+ */
+export function libelleNiveau(v: string | null | undefined): string {
+  const m = /^S([1-6])$/i.exec(String(v ?? "").trim());
+  if (!m) return String(v ?? "");
+  const n = Number(m[1]);
+  return n <= 2 ? "1ère année" : n <= 4 ? "2ème année" : "3ème année";
+}
+
 /** CHU / hôpitaux / cliniques d'accueil (structures de stage réelles au Maroc). */
 export type StructureAccueil = {
   nom: string;

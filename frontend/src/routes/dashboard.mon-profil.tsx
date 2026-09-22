@@ -27,6 +27,7 @@ import {
   CalendarCheck,
 } from "lucide-react";
 import { ROLE_META, useAuth } from "@/lib/auth";
+import { libelleNiveau } from "@/lib/istpm-data";
 import { useIstpm } from "@/lib/istpm-store";
 import {
   fetchSettings,
@@ -383,7 +384,7 @@ function MonProfilPage() {
                   <Field
                     label="Niveau · groupe"
                     value={
-                      [etu.niveau, etu.groupe].filter(Boolean).join(" · ")
+                      [libelleNiveau(etu.niveau), etu.groupe].filter(Boolean).join(" · ")
                     }
                   />
                   <Field

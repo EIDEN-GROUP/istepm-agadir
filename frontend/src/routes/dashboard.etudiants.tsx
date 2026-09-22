@@ -11,6 +11,7 @@ import { fetchStudentSemestres, exportEtudiantsCsv, createInvitation } from "@/l
 import {
   FILIERES,
   NIVEAUX,
+  libelleNiveau,
   STATUT_ETUDIANT_LABEL,
   STATUT_ETUDIANT_TONE,
   STATUT_PAIEMENT_LABEL,
@@ -554,7 +555,7 @@ function EtudiantsPage() {
             <td className={cn("text-muted-foreground", cellTruncate)}>
               {e.filiere}
             </td>
-            <td className="text-center tabular-nums">{e.niveau}</td>
+            <td className="text-center tabular-nums">{libelleNiveau(e.niveau)}</td>
             <td>
               <span className={toneBadge(STATUT_ETUDIANT_TONE[e.statut])}>
                 {STATUT_ETUDIANT_LABEL[e.statut]}
@@ -1206,7 +1207,7 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
         <DetailGrid>
           <DetailField label="Matricule" value={e.matricule} />
           <DetailField label="Filière" value={e.filiere} />
-          <DetailField label="Niveau" value={e.niveau} />
+          <DetailField label="Niveau" value={libelleNiveau(e.niveau)} />
           <DetailField label="Groupe" value={e.groupe} />
           <DetailField label="Année universitaire" value={e.annee} />
           <DetailField

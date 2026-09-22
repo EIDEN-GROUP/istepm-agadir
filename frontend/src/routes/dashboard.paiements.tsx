@@ -11,6 +11,7 @@ import { makePaiementDocPdf } from "@/lib/branded-doc";
 import {
   FILIERES,
   NIVEAUX,
+  libelleNiveau,
   MOIS_ACADEMIQUE,
   STATUT_PAIEMENT_LABEL,
   STATUT_PAIEMENT_TONE,
@@ -300,7 +301,7 @@ function PaiementsPage() {
               {r.etudiant.filiere}
             </td>
             <td className="text-center tabular-nums text-muted-foreground">
-              {r.etudiant.niveau}
+              {libelleNiveau(r.etudiant.niveau)}
             </td>
             <td className="text-right font-semibold tabular-nums text-brand-dk">
               {fmtMAD(r.totalPaye)}
@@ -763,7 +764,7 @@ function HistoriquePaiementsDialog({
         >
           <DetailSection title="Synthèse">
             <DetailGrid>
-              <DetailField label="Niveau" value={etudiant.niveau} />
+              <DetailField label="Niveau" value={libelleNiveau(etudiant.niveau)} />
               <DetailField label="Groupe" value={etudiant.groupe} />
               <DetailField label="Téléphone" value={etudiant.telephone || "—"} />
               <DetailField label="E-mail" value={etudiant.email || "—"} />

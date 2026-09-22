@@ -41,6 +41,7 @@ import { useIstpm, useCurrentFormateur } from "@/lib/istpm-store";
 import {
   fmtMAD,
   fmtDate,
+  libelleNiveau,
   type ActiviteItem,
   type Seance,
   type Examen,
@@ -881,7 +882,7 @@ function BulletinsRecentsTable({ bulletins }: { bulletins: Bulletin[] }) {
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{b.prenom} {b.nom}</span>
               <span className="font-display text-sm font-bold text-foreground">{b.moyenne.toFixed(2)}</span>
             </div>
-            <p className="text-xs text-muted-foreground">{b.filiere} Â· {b.niveau}</p>
+            <p className="text-xs text-muted-foreground">{b.filiere} · {libelleNiveau(b.niveau)}</p>
             <div className="flex flex-wrap gap-1.5">
               <span className={toneBadge(dt(b.decision))}>{b.decision}</span>
               <span className={toneBadge(st(b.statut))}>{sl(b.statut)}</span>
@@ -905,7 +906,7 @@ function BulletinsRecentsTable({ bulletins }: { bulletins: Bulletin[] }) {
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{b.filiere}</td>
-                  <td className="whitespace-nowrap px-4 py-3">{b.niveau}</td>
+                  <td className="whitespace-nowrap px-4 py-3">{libelleNiveau(b.niveau)}</td>
                   <td className="whitespace-nowrap px-4 py-3 font-medium">{b.moyenne.toFixed(2)}</td>
                   <td className="whitespace-nowrap px-4 py-3"><span className={toneBadge(dt(b.decision))}>{b.decision}</span></td>
                   <td className="whitespace-nowrap px-4 py-3"><span className={toneBadge(st(b.statut))}>{sl(b.statut)}</span></td>
@@ -928,7 +929,7 @@ function StudentAvatarList({ etudiants }: { etudiants: { id: string; prenom: str
           <PersonAvatar name={`${e.prenom} ${e.nom}`} photoUrl={e.photoUrl} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium text-foreground">{e.prenom} {e.nom}</span>
-            <span className="block truncate text-xs text-muted-foreground">{e.filiere} Â· {e.niveau}</span>
+            <span className="block truncate text-xs text-muted-foreground">{e.filiere} · {libelleNiveau(e.niveau)}</span>
           </span>
           <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-brand" />
         </Link>

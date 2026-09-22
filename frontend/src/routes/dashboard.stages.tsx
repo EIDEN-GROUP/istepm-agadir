@@ -26,6 +26,7 @@ import {
 import {
   FILIERES,
   NIVEAUX,
+  libelleNiveau,
   STATUT_STAGE_LABEL,
   STATUT_STAGE_TONE,
   fmtDate,
@@ -724,7 +725,7 @@ function StagesPage() {
                       />
                     }
                     title={`${s.prenom} ${s.nom}`}
-                    subtitle={`${s.cne} · ${s.filiere} · ${s.niveau}`}
+                    subtitle={`${s.cne} · ${s.filiere} · ${libelleNiveau(s.niveau)}`}
                     badges={
                       <>
                         <span className={toneBadge(STATUT_STAGE_TONE[s.statut])}>
@@ -801,7 +802,7 @@ function StagesPage() {
                           full
                         />
                         <DetailField label="Service" value={s.service} />
-                        <DetailField label="Niveau" value={s.niveau} />
+                        <DetailField label="Niveau" value={libelleNiveau(s.niveau)} />
                         <DetailField label="Début" value={fmtDate(s.debut)} />
                         <DetailField label="Fin" value={fmtDate(s.fin)} />
                       </DetailGrid>
@@ -1160,7 +1161,7 @@ function StageForm({
           onChange={(v) => set("etudiantId", v)}
           options={etudiants.map((e) => ({
             value: e.id,
-            label: `${e.prenom} ${e.nom}   ${e.cne} (${e.niveau})`,
+            label: `${e.prenom} ${e.nom}   ${e.cne} (${libelleNiveau(e.niveau)})`,
           }))}
           error={errors.etudiantId}
         />

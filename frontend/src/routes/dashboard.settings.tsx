@@ -97,7 +97,6 @@ const GROUPE_META: Record<string, { short: string; icone: typeof Users }> = {
 
 type SectionId =
   | "annees"
-  | "semestres"
   | "groupes"
   | "modules"
   | "salles"
@@ -125,7 +124,6 @@ type SectionId =
 const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
   responsable: [
     "annees",
-    "semestres",
     "groupes",
     "modules",
     "salles",
@@ -140,7 +138,6 @@ const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
     "formateurs",
     "filieres",
     "annees",
-    "semestres",
     "groupes",
     "modules",
     "salles",
@@ -171,7 +168,6 @@ const META: Record<
   { titre: string; desc: string; icone: typeof Users | typeof Hospital; groupe: string }
 > = {
   annees: { titre: "Années universitaires", desc: "Années ouvertes à l'inscription", icone: CalendarRange, groupe: "Organisation pédagogique" },
-  semestres: { titre: "Niveaux", desc: "Découpage du cycle de formation", icone: LayoutGrid, groupe: "Organisation pédagogique" },
   groupes: { titre: "Groupes / classes", desc: "Groupes constitués par niveau", icone: Users, groupe: "Organisation pédagogique" },
   modules: { titre: "Modules", desc: "Modules enseignés par filière", icone: BookOpen, groupe: "Organisation pédagogique" },
   salles: { titre: "Salles", desc: "Salles, amphis et laboratoires", icone: DoorOpen, groupe: "Organisation pédagogique" },
@@ -1544,7 +1540,6 @@ function SettingsPage() {
 
   /* État local des réglages   non persisté côté serveur. */
   const [annees, setAnnees] = useState<string[]>([]);
-  const [semestres, setSemestres] = useState<string[]>([...NIVEAUX]);
   const [salles, setSalles] = useState<string[]>([]);
   const [nouvelleStructure, setNouvelleStructure] = useState("");
   /** Brouillons de capacité (nom → capacité) ; le store serveur fait foi. */
@@ -1598,10 +1593,6 @@ function SettingsPage() {
       .then((data) => {
         if (Array.isArray(data.annees_universitaires))
           setAnnees(data.annees_universitaires as string[]);
-        if (Array.isArray(data.niveaux))
-          setSemestres(data.niveaux as string[]);
-        else if (Array.isArray(data.semestres))
-          setSemestres(data.semestres as string[]);
         if (Array.isArray(data.salles))
           setSalles(data.salles as string[]);
         // `creneaux` est hydraté par le store, qui les partage avec le planning.
@@ -1835,19 +1826,8 @@ function SettingsPage() {
           </Carte>
         );
 
-      case "semestres":
-        return (
-          <Carte id="semestres">
-            <ListeEditable
-              valeurs={semestres}
-              onChange={(v) => { setSemestres(v); persistSetting("niveaux", v); }}
-              placeholder="1ère année"
-            />
-          </Carte>
-        );
-
       case "groupes":
-        return <GroupesSection semestresRegistre={semestres} />;
+        return <GroupesSection semestresRegistre={[...NIVEAUX]} />;
 
       case "salles":
         return (
@@ -2171,7 +2151,11 @@ function SettingsPage() {
               {rolesList.length === 0 ? (
                 <p className="py-3 text-center text-xs text-muted-foreground">Aucun rôle défini.</p>
               ) : (
-                rolesList.map((role) => (
+                rolesList
+                  // Hors directeur, la fiche `directeur` est masquée ici aussi
+                  // (le serveur la filtre déjà : double verrou).
+                  .filter((r) => role === "directeur" || r.name !== "directeur")
+                  .map((role) => (
                   <div key={role.id} className="rounded-xl border border-brand/12 overflow-hidden">
                     <div className="flex items-center justify-between gap-3 bg-brand/4 px-4 py-2.5">
                       <div className="min-w-0 flex-1">
@@ -2252,7 +2236,7 @@ function SettingsPage() {
             ) : null}
 
             <p className="mt-2 text-[11px] text-muted-foreground">
-              {rolesList.length} rôle(s) · Les rôles système ne peuvent pas être supprimés.
+              {rolesList.filter((r) => role === "directeur" || r.name !== "directeur").length} rôle(s) · Les rôles système ne peuvent pas être supprimés.
               {role === "directeur"
                 ? ""
                 : " Le rôle directeur est géré par un directeur."}
