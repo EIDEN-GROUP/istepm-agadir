@@ -21,8 +21,8 @@ const examenSchema = z.object({
   surveillants: z.array(z.string()).optional().default([]),
   statut: z.string().optional().default("planifie"),
   groupe: z.string().optional().default(""),
-  // Le front envoie la classe convoquée sous la forme « S2-A ». On en dérive
-  // le groupe (« A ») ci-dessous ; la colonne `classe` n'existe pas en base.
+  // Le front envoie la classe convoquée = le groupe tel quel (« G1 »).
+  // La colonne `classe` n'existe pas en base : on recopie vers `groupe`.
   classe: z.string().optional(),
   etudiantsConvoques: z.number().optional().default(0),
   composante: z.string().optional().default("Theorique"),
@@ -93,9 +93,10 @@ function ponderee(notes: { note: string; coef: string }[]): number {
 }
 
 /**
- * Le formulaire envoie `classe` (« S2-A »). La base ne stocke que `niveau` +
- * `groupe` : on extrait le groupe (« A »), en retirant le préfixe de semestre
- * s'il est présent, puis on supprime `classe` avant l'écriture.
+ * Le formulaire envoie `classe` (= le groupe, ex. « G1 »). La base ne stocke
+ * que `niveau` + `groupe` : on recopie tel quel (en retirant un éventuel
+ * préfixe « niveau- » hérité d'anciennes données), puis on supprime `classe`
+ * avant l'écriture.
  */
 function normaliseClasse(input: Record<string, unknown>) {
   const classe = typeof input.classe === "string" ? input.classe.trim() : "";
@@ -125,7 +126,7 @@ export async function examenRoutes(app: FastifyInstance) {
     return {
       ...row,
       titre: row.module ? `${typeLabel} \u2014 ${row.module}` : "",
-      classe: row.niveau && row.groupe ? `${row.niveau}-${row.groupe}` : "",
+      classe: row.groupe ?? "",
       anneeUniversitaire: annee,
       duree: row.duree ?? 120,
       createdBy: row.createdBy ?? "",

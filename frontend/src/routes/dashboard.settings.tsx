@@ -117,8 +117,10 @@ type SectionId =
 /**
  * Ce que chaque rôle peut administrer.
  *
- * Le responsable ne touche qu'à l'organisation pédagogique ; le directeur a
- * l'administration complète. L'enseignant n'accède pas du tout au module.
+ * Le responsable touche à l'organisation pédagogique + aux rôles (hors
+ * directeur) ; le directeur a l'administration complète ; le comptable et
+ * l'enseignant gèrent les rôles non-directeur. Le rôle est global : une fiche
+ * rôle s'applique à tous ses comptes, sans exception par utilisateur.
  */
 const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
   responsable: [
@@ -130,6 +132,7 @@ const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
     "creneaux",
     "planning",
     "structures",
+    "roles",
   ],
   directeur: [
     "utilisateurs",
@@ -149,19 +152,27 @@ const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
     "cachet",
     "structures",
   ],
-  enseignant: [],
+  enseignant: ["roles"],
   etudiant: [],
   // Le comptable ne voit que les comptes (création limitée au rôle comptable).
-  comptable: ["utilisateurs"],
+  comptable: ["utilisateurs", "roles"],
 };
+
+/**
+ * Noms de rôles canoniques (miroir du backend : toute autre valeur est
+ * refusée côté serveur). Création/édition via dropdown uniquement.
+ */
+const NOMS_ROLES = ["directeur", "responsable", "comptable", "enseignant", "etudiant"] as const;
+/** Noms gérables hors directeur (jamais `directeur`, jamais de saisie libre). */
+const NOMS_ROLES_GERES = ["responsable", "comptable", "enseignant"] as const;
 
 const META: Record<
   SectionId,
   { titre: string; desc: string; icone: typeof Users | typeof Hospital; groupe: string }
 > = {
   annees: { titre: "Années universitaires", desc: "Années ouvertes à l'inscription", icone: CalendarRange, groupe: "Organisation pédagogique" },
-  semestres: { titre: "Semestres", desc: "Découpage du cycle de formation", icone: LayoutGrid, groupe: "Organisation pédagogique" },
-  groupes: { titre: "Groupes / classes", desc: "Groupes constitués par semestre", icone: Users, groupe: "Organisation pédagogique" },
+  semestres: { titre: "Niveaux", desc: "Découpage du cycle de formation", icone: LayoutGrid, groupe: "Organisation pédagogique" },
+  groupes: { titre: "Groupes / classes", desc: "Groupes constitués par niveau", icone: Users, groupe: "Organisation pédagogique" },
   modules: { titre: "Modules", desc: "Modules enseignés par filière", icone: BookOpen, groupe: "Organisation pédagogique" },
   salles: { titre: "Salles", desc: "Salles, amphis et laboratoires", icone: DoorOpen, groupe: "Organisation pédagogique" },
   creneaux: { titre: "Créneaux horaires", desc: "Plages horaires de l'emploi du temps", icone: Clock, groupe: "Organisation pédagogique" },
@@ -778,12 +789,15 @@ function ModulesSection({ filieres }: { filieres: string[] }) {
 
 function RoleEditor({
   role,
+  nomsDisponibles,
   permGroups,
   permLabel,
   permIcon,
   onSave,
 }: {
   role: RoleRecord;
+  /** Noms proposés dans le dropdown (inclut toujours le nom actuel). */
+  nomsDisponibles: string[];
   permGroups: readonly { readonly label: string; readonly perms: readonly string[] }[];
   permLabel: Record<string, string>;
   permIcon: Record<string, ReactNode>;
@@ -813,7 +827,20 @@ function RoleEditor({
       <div className="mb-3 flex gap-2">
         <div className="flex-1">
           <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Nom</label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} className={cn(softInput, "h-8 text-sm")} />
+          <select
+            value={nomsDisponibles.includes(name) ? name : ""}
+            onChange={(e) => setName(e.target.value)}
+            className={cn(softInput, "h-8 w-full text-sm")}
+          >
+            {!nomsDisponibles.includes(name) && name ? (
+              <option value={name}>{name} (existant)</option>
+            ) : null}
+            {nomsDisponibles.map((n) => (
+              <option key={n} value={n}>
+                {ROLE_META[n as keyof typeof ROLE_META]?.label ?? n}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex-[2]">
           <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Description</label>
@@ -883,19 +910,22 @@ function RoleEditor({
 /* ------------------------------------------------------------------ */
 
 function NewRoleForm({
+  nomsDisponibles,
   permGroups,
   permLabel,
   permIcon,
   onClose,
   onCreated,
 }: {
+  /** Noms encore configurables (canoniques moins déjà existants). */
+  nomsDisponibles: string[];
   permGroups: readonly { readonly label: string; readonly perms: readonly string[] }[];
   permLabel: Record<string, string>;
   permIcon: Record<string, ReactNode>;
   onClose: () => void;
   onCreated: (role: RoleRecord) => void;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => nomsDisponibles[0] ?? "");
   const [description, setDescription] = useState("");
   const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -913,8 +943,8 @@ function NewRoleForm({
       const role = await createRole({ name: name.trim(), description, permissions });
       onCreated(role);
       toast.success(`Rôle "${name}" créé`);
-    } catch {
-      toast.error("Erreur lors de la création");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors de la création");
     } finally {
       setLoading(false);
     }
@@ -923,10 +953,26 @@ function NewRoleForm({
   return (
     <div className="mt-3 rounded-xl border border-brand/12 p-4">
       <h4 className="mb-3 text-xs font-bold text-foreground">Nouveau rôle</h4>
+      {nomsDisponibles.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Tous les rôles configurables existent déjà — modifiez une fiche existante.
+        </p>
+      ) : (
+      <>
       <div className="mb-3 flex gap-2">
         <div className="flex-1">
           <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Nom *</label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Assistant" className={cn(softInput, "h-8 text-sm")} />
+          <select
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={cn(softInput, "h-8 w-full text-sm")}
+          >
+            {nomsDisponibles.map((n) => (
+              <option key={n} value={n}>
+                {ROLE_META[n as keyof typeof ROLE_META]?.label ?? n}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex-[2]">
           <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Description</label>
@@ -978,6 +1024,8 @@ function NewRoleForm({
           {loading ? "Création..." : "Créer le rôle"}
         </button>
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -1318,7 +1366,7 @@ function GroupesSection({ semestresRegistre }: { semestresRegistre: string[] }) 
       <div className="space-y-1.5">
         {filtered.length === 0 && filteredDiscovered.length === 0 ? (
           <p className="py-3 text-center text-xs text-muted-foreground">
-            Aucun groupe pour ce semestre.
+            Aucun groupe pour ce niveau.
           </p>
         ) : (
           <>
@@ -1429,12 +1477,12 @@ function GroupesSection({ semestresRegistre }: { semestresRegistre: string[] }) 
         </FullWidth>
         <FullWidth>
           <ComboBoxField
-            label="Semestre"
+            label="Niveau"
             value={form.semester}
             onChange={(v) => setForm((f) => ({ ...f, semester: v }))}
             options={semesters.map((s) => ({ value: s, label: s }))}
-            placeholder="Sélectionner le semestre…"
-            searchPlaceholder="Rechercher un semestre…"
+            placeholder="Sélectionner le niveau…"
+            searchPlaceholder="Rechercher un niveau…"
             required
           />
         </FullWidth>
@@ -1550,7 +1598,9 @@ function SettingsPage() {
       .then((data) => {
         if (Array.isArray(data.annees_universitaires))
           setAnnees(data.annees_universitaires as string[]);
-        if (Array.isArray(data.semestres))
+        if (Array.isArray(data.niveaux))
+          setSemestres(data.niveaux as string[]);
+        else if (Array.isArray(data.semestres))
           setSemestres(data.semestres as string[]);
         if (Array.isArray(data.salles))
           setSalles(data.salles as string[]);
@@ -1790,8 +1840,8 @@ function SettingsPage() {
           <Carte id="semestres">
             <ListeEditable
               valeurs={semestres}
-              onChange={(v) => { setSemestres(v); persistSetting("semestres", v); }}
-              placeholder="S7"
+              onChange={(v) => { setSemestres(v); persistSetting("niveaux", v); }}
+              placeholder="1ère année"
             />
           </Carte>
         );
@@ -2098,7 +2148,12 @@ function SettingsPage() {
           </Carte>
         );
 
-      case "roles":
+      case "roles": {
+        // Noms canoniques proposés : directeur complet, les trois rôles
+        // gestionnaires sinon. Le rôle `directeur` reste invisible et
+        // intouchable hors directeur (garde serveur en renfort).
+        const baseNoms = role === "directeur" ? [...NOMS_ROLES] : [...NOMS_ROLES_GERES];
+        const configures = new Set(rolesList.map((r) => r.name));
         return (
           <Carte
             id="roles"
@@ -2152,6 +2207,7 @@ function SettingsPage() {
                     {editRole?.id === role.id ? (
                       <RoleEditor
                         role={role}
+                        nomsDisponibles={[...new Set([...baseNoms, role.name])]}
                         permGroups={PERM_GROUPS}
                         permLabel={PERM_LABEL}
                         permIcon={PERM_ICON}
@@ -2160,7 +2216,7 @@ function SettingsPage() {
                             setRolesList((prev) => prev.map((r) => (r.id === role.id ? updated : r)));
                             setEditRole(null);
                             toast.success(`Rôle "${role.name}" mis à jour`);
-                          }).catch(() => toast.error("Erreur lors de la mise à jour"));
+                          }).catch((err) => toast.error(err instanceof Error ? err.message : "Erreur lors de la mise à jour"));
                         }}
                       />
                     ) : (
@@ -2186,6 +2242,7 @@ function SettingsPage() {
 
             {showNewRole ? (
               <NewRoleForm
+                nomsDisponibles={baseNoms.filter((n) => !configures.has(n))}
                 permGroups={PERM_GROUPS}
                 permLabel={PERM_LABEL}
                 permIcon={PERM_ICON}
@@ -2196,9 +2253,13 @@ function SettingsPage() {
 
             <p className="mt-2 text-[11px] text-muted-foreground">
               {rolesList.length} rôle(s) · Les rôles système ne peuvent pas être supprimés.
+              {role === "directeur"
+                ? ""
+                : " Le rôle directeur est géré par un directeur."}
             </p>
           </Carte>
         );
+      }
 
       case "examens":
         return (
@@ -2231,7 +2292,7 @@ function SettingsPage() {
                 suffix="/20"
               />
               <ChampReglage
-                label="Crédits par semestre"
+                label="Crédits par niveau"
                 value={bulletin.creditsSemestre}
                 onChange={(v) => { setBulletin({ ...bulletin, creditsSemestre: v }); persistSetting("bulletin_creditsSemestre", v); }}
               />

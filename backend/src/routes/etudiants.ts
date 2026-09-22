@@ -460,11 +460,11 @@ export async function etudiantRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  /** Reconstitue un historique des semestres passés.
+  /** Reconstitue un historique des niveaux passés.
    *
    * Le modèle de données ne conserve pas les relevés antérieurs : cet
    * aperçu est dérivé du niveau courant et des notes existantes.
-   * Chaque semestre montre les modules notés avec leur note moyenne.
+   * Chaque niveau montre les modules notés avec leur note moyenne.
    */
   app.get(
     "/:id/semestres",
@@ -491,7 +491,7 @@ export async function etudiantRoutes(app: FastifyInstance) {
       }
 
       const NIVEAUX = [
-        "S1", "S2", "S3", "S4", "S5", "S6",
+        "1ère année", "2ème année", "3ème année",
       ] as const;
       const idx = NIVEAUX.indexOf(etudiant.niveau as typeof NIVEAUX[number]);
       if (idx <= 0) return [];

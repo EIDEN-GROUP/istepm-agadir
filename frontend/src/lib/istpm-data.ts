@@ -32,16 +32,9 @@ export const FILIERE_COURT: Record<Filiere, string> = {
   "Prothèse dentaire": "PROTH",
 };
 
-export const NIVEAUX = ["S1", "S2", "S3", "S4", "S5", "S6"] as const;
+/** Niveaux d'étude : 1ère, 2ème et 3ème année (remplace les semestres S1–S6). */
+export const NIVEAUX = ["1ère année", "2ème année", "3ème année"] as const;
 export type Niveau = (typeof NIVEAUX)[number];
-
-export const ANNEES_ETUDE = ["1ère année", "2ème année", "3ème année"] as const;
-export type AnneeEtude = (typeof ANNEES_ETUDE)[number];
-
-export function anneeEtude(niveau: Niveau): AnneeEtude {
-  const n = Number(niveau.slice(1));
-  return ANNEES_ETUDE[Math.min(Math.ceil(n / 2), 3) - 1];
-}
 
 /** CHU / hôpitaux / cliniques d'accueil (structures de stage réelles au Maroc). */
 export type StructureAccueil = {

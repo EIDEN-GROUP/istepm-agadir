@@ -11,8 +11,6 @@ import { fetchStudentSemestres, exportEtudiantsCsv, createInvitation } from "@/l
 import {
   FILIERES,
   NIVEAUX,
-  ANNEES_ETUDE,
-  anneeEtude,
   STATUT_ETUDIANT_LABEL,
   STATUT_ETUDIANT_TONE,
   STATUT_PAIEMENT_LABEL,
@@ -118,7 +116,6 @@ function EtudiantsPage() {
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
   const [niveau, setNiveau] = useState<string>(ALL);
-  const [annee, setAnnee] = useState<string>(ALL);
   const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
   const [groupe, setGroupe] = useState<string>(ALL);
   const [statut, setStatut] = useState<string>(ALL);
@@ -138,11 +135,10 @@ function EtudiantsPage() {
     for (const e of etudiants) {
       if (filiere !== ALL && e.filiere !== filiere) continue;
       if (niveau !== ALL && e.niveau !== niveau) continue;
-      if (annee !== ALL && anneeEtude(e.niveau) !== annee) continue;
       if (e.groupe) set.add(e.groupe);
     }
     return [...set].sort();
-  }, [etudiants, filiere, niveau, annee, enseignantScope]);
+  }, [etudiants, filiere, niveau, enseignantScope]);
   // Drop a group choice that no longer matches the filière/semestre.
   useEffect(() => {
     if (groupe !== ALL && !groupeOptions.includes(groupe)) setGroupe(ALL);
@@ -223,7 +219,6 @@ function EtudiantsPage() {
       }
       if (filiere !== ALL && e.filiere !== filiere) return false;
       if (niveau !== ALL && e.niveau !== niveau) return false;
-      if (annee !== ALL && anneeEtude(e.niveau) !== annee) return false;
       if (anneeScolaire !== ALL && e.annee !== anneeScolaire) return false;
       if (groupe !== ALL && e.groupe !== groupe) return false;
       if (statut !== ALL && STATUT_ETUDIANT_LABEL[e.statut] !== statut)
@@ -233,11 +228,11 @@ function EtudiantsPage() {
         .toLowerCase()
         .includes(q);
     });
-  }, [etudiants, search, showArchived, enseignantScope, filiere, niveau, annee, anneeScolaire, groupe, statut]);
+  }, [etudiants, search, showArchived, enseignantScope, filiere, niveau, anneeScolaire, groupe, statut]);
 
   const pager = usePagination(
     filtered,
-    `${search}|${showArchived}|${filiere}|${niveau}|${annee}|${anneeScolaire}|${groupe}|${statut}`,
+    `${search}|${showArchived}|${filiere}|${niveau}|${anneeScolaire}|${groupe}|${statut}`,
   );
 
   const openCreate = () => {
@@ -338,18 +333,10 @@ function EtudiantsPage() {
             ? [
                 {
                   id: "niveau",
-                  label: "Semestre",
+                  label: "Niveau",
                   value: niveau,
                   onChange: setNiveau,
                   options: enseignantScope.niveaux,
-                  allLabel: "Tous les semestres",
-                },
-                {
-                  id: "annee",
-                  label: "Niveau",
-                  value: annee,
-                  onChange: setAnnee,
-                  options: ANNEES_ETUDE,
                   allLabel: "Tous les niveaux",
                 },
                 {
@@ -388,19 +375,11 @@ function EtudiantsPage() {
                 },
                 {
                   id: "niveau",
-                  label: "Semestre",
+                  label: "Niveau",
                   value: niveau,
                   onChange: setNiveau,
                   options: NIVEAUX,
-                  allLabel: isTeacher ? "Choisir un semestre" : "Tous les semestres",
-                },
-                {
-                  id: "annee",
-                  label: "Niveau",
-                  value: annee,
-                  onChange: setAnnee,
-                  options: ANNEES_ETUDE,
-                  allLabel: "Tous les niveaux",
+                  allLabel: isTeacher ? "Choisir un niveau" : "Tous les niveaux",
                 },
                 {
                     id: "anneeScolaire",
@@ -436,7 +415,7 @@ function EtudiantsPage() {
           noFormateur ? (
             <>Sélectionnez un formateur dans le menu de navigation.</>
           ) : needsSelection ? (
-            <>Choisissez une filière, un semestre et un groupe (ou un module).</>
+            <>Choisissez une filière, un niveau et un groupe (ou un module).</>
           ) : enseignantScope ? (
             <div className="flex items-center gap-3">
               <span>
@@ -778,12 +757,12 @@ function SelectionPrompt({ scoped = false }: { scoped?: boolean }) {
       </span>
       <div className="max-w-sm space-y-1.5">
         <h3 className="font-display text-lg font-bold tracking-tight text-foreground">
-          {scoped ? "Choisissez un semestre et un groupe" : "Choisissez un groupe à afficher"}
+          {scoped ? "Choisissez un niveau et un groupe" : "Choisissez un groupe à afficher"}
         </h3>
         <p className="text-sm leading-relaxed text-muted-foreground">
           {scoped ? (
             <>
-              Choisissez un <strong className="font-semibold text-foreground">semestre</strong>,
+              Choisissez un <strong className="font-semibold text-foreground">niveau</strong>,
               un <strong className="font-semibold text-foreground">groupe</strong>{" "}
               (et éventuellement un <strong className="font-semibold text-foreground">module</strong>)
               {" "}ci-dessus pour afficher les étudiants que vous enseignez.
@@ -791,7 +770,7 @@ function SelectionPrompt({ scoped = false }: { scoped?: boolean }) {
           ) : (
             <>
               Sélectionnez une <strong className="font-semibold text-foreground">filière</strong>,
-              un <strong className="font-semibold text-foreground">semestre</strong> et un{" "}
+              un <strong className="font-semibold text-foreground">niveau</strong> et un{" "}
               <strong className="font-semibold text-foreground">groupe</strong> ci-dessus pour
               afficher la liste des étudiants concernés.
             </>
@@ -1060,7 +1039,7 @@ function EtudiantForm({
         />
       </FullWidth>
       <SelectField
-        label="Niveau / semestre"
+        label="Niveau"
         required
         value={f.niveau}
         onChange={(v) => set("niveau", v)}
@@ -1291,16 +1270,16 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
             ))}
           </DetailTable>
         ) : (
-          <DetailEmpty>Aucune note saisie pour ce semestre.</DetailEmpty>
+          <DetailEmpty>Aucune note saisie pour ce niveau.</DetailEmpty>
         )}
       </DetailSection>
 
-      <DetailSection title="Historique des semestres">
+      <DetailSection title="Historique des niveaux">
         {semestres.length ? (
           <DetailTable
             head={
               <>
-                <th className="px-3 py-2">Semestre</th>
+                <th className="px-3 py-2">Niveau</th>
                 <th className="px-3 py-2">Modules</th>
                 <th className="px-3 py-2">Notes</th>
                 <th className="px-3 py-2 text-right">Moyenne</th>

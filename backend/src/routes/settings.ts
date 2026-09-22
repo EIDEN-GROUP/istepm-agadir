@@ -113,7 +113,7 @@ export async function settingsRoutes(app: FastifyInstance) {
   /* ------------------------------------------------------------------ */
   const groupConfigSchema = z.object({
     name: z.string().min(1, "Nom du groupe requis"),
-    semester: z.string().min(1, "Semestre requis"),
+    semester: z.string().min(1, "Niveau requis"),
     studentCount: z.number().int().min(0).optional().default(0),
   });
 

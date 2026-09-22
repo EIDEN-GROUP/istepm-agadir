@@ -11,9 +11,9 @@ type Step = "upload" | "preview" | "confirming" | "result";
 
 /** Modèle CSV d'exemple pour l'import d'étudiants (entêtes + lignes types). */
 const EXEMPLE_ETUDIANTS_CSV = `cne,matricule,prenom,nom,filiere,niveau,annee,groupe,statut,paiement,telephone,email,dateNaissance,ville,fraisMensuels
-G134567890,ISTPM-23-0142,Salma,El Amrani,Infirmier polyvalent,S5,2025/2026,G1,inscrit,paye,+212 6 61 24 55 018,salma.elamrani@istpm.ma,2003-04-12,Agadir,3400
-J138245017,ISTPM-23-0155,Youssef,Ait Taleb,Infirmier en anesthesie-reanimation,S5,2025/2026,G1,inscrit,retard,+212 6 70 11 42 88,y.aittaleb@istpm.ma,2002-11-30,Inezgane,3800
-F145908712,ISTPM-24-0203,Imane,Benkirane,Sage-femme,S3,2025/2026,G2,inscrit,paye,+212 6 55 78 90 12,i.benkirane@istpm.ma,2004-02-18,Agadir,3200`;
+G134567890,ISTPM-23-0142,Salma,El Amrani,Infirmier polyvalent,3ème année,2025/2026,G1,inscrit,paye,+212 6 61 24 55 018,salma.elamrani@istpm.ma,2003-04-12,Agadir,3400
+J138245017,ISTPM-23-0155,Youssef,Ait Taleb,Infirmier en anesthesie-reanimation,3ème année,2025/2026,G1,inscrit,retard,+212 6 70 11 42 88,y.aittaleb@istpm.ma,2002-11-30,Inezgane,3800
+F145908712,ISTPM-24-0203,Imane,Benkirane,Sage-femme,2ème année,2025/2026,G2,inscrit,paye,+212 6 55 78 90 12,i.benkirane@istpm.ma,2004-02-18,Agadir,3200`;
 
 /** Télécharge le modèle CSV d'exemple d'import étudiants (réutilisé par la page). */
 export function downloadExempleEtudiantsCsv() {

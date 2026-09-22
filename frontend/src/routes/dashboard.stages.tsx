@@ -26,7 +26,6 @@ import {
 import {
   FILIERES,
   NIVEAUX,
-  anneeEtude,
   STATUT_STAGE_LABEL,
   STATUT_STAGE_TONE,
   fmtDate,
@@ -204,19 +203,17 @@ function StagesAnalytics({
         .filter((s) => s.statut !== "valide")
         .map((s) => s.etudiantId),
     );
+    // Fin de cycle : seuls les étudiants de 3ème année sans stage actif.
     return etudiants.filter(
-      (e) =>
-        (e.niveau === "S2" || e.niveau === "S4" || e.niveau === "S6") &&
-        !activeIds.has(e.id),
+      (e) => e.niveau === "3ème année" && !activeIds.has(e.id),
     );
   }, [etudiants, stages]);
 
-  // Les semestres éligibles (S2, S4, S6) sont les fins d'année d'étude : on les
-  // libelle par année (« 1ère année »…) plutôt que par code de semestre.
+  // Part de chaque niveau dans le vivier d'étudiants encore à placer en stage.
   const eligibleParNiveau = useMemo(
     () =>
-      (["S2", "S4", "S6"] as const).map((n) => ({
-        name: anneeEtude(n),
+      [...NIVEAUX].map((n) => ({
+        name: n,
         value: eligible.filter((e) => e.niveau === n).length,
       })),
     [eligible],
@@ -483,6 +480,9 @@ function StagesPage() {
   const [filiere, setFiliere] = useState<string>(ALL);
   const [structure, setStructure] = useState<string>(ALL);
   const [statut, setStatut] = useState<string>(ALL);
+  // Période : chevauchement avec [debut, fin] du stage, bornes optionnelles.
+  const [periodeDu, setPeriodeDu] = useState("");
+  const [periodeAu, setPeriodeAu] = useState("");
 
   const [detail, setDetail] = useState<Stage | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -502,14 +502,16 @@ function StagesPage() {
       if (structure !== ALL && s.structure !== structure) return false;
       if (statut !== ALL && STATUT_STAGE_LABEL[s.statut] !== statut)
         return false;
+      if (periodeDu && s.fin && s.fin < periodeDu) return false;
+      if (periodeAu && s.debut && s.debut > periodeAu) return false;
       if (!q) return true;
       return `${s.cne} ${s.prenom} ${s.nom} ${s.structure} ${s.service} ${s.encadrantClinique}`
         .toLowerCase()
         .includes(q);
     });
-  }, [stages, search, filiere, structure, statut]);
+  }, [stages, search, filiere, structure, statut, periodeDu, periodeAu]);
 
-  const pager = usePagination(filtered, `${search}|${filiere}|${structure}|${statut}`);
+  const pager = usePagination(filtered, `${search}|${filiere}|${structure}|${statut}|${periodeDu}|${periodeAu}`);
 
   return (
     <div className="space-y-6">
@@ -566,6 +568,43 @@ function StagesPage() {
           },
         ]}
       />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Période du
+          <input
+            type="date"
+            value={periodeDu}
+            max={periodeAu || undefined}
+            onChange={(e) => setPeriodeDu(e.target.value)}
+            className="h-9 rounded-xl border border-brand/20 bg-card px-2.5 text-xs font-normal text-foreground shadow-none transition-colors hover:border-brand/35 focus-visible:border-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15"
+            aria-label="Période du"
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          au
+          <input
+            type="date"
+            value={periodeAu}
+            min={periodeDu || undefined}
+            onChange={(e) => setPeriodeAu(e.target.value)}
+            className="h-9 rounded-xl border border-brand/20 bg-card px-2.5 text-xs font-normal text-foreground shadow-none transition-colors hover:border-brand/35 focus-visible:border-brand focus-visible:ring-4 focus-visible:ring-brand/15"
+            aria-label="Période au"
+          />
+        </label>
+        {periodeDu || periodeAu ? (
+          <button
+            type="button"
+            onClick={() => {
+              setPeriodeDu("");
+              setPeriodeAu("");
+            }}
+            className="rounded-lg px-2 py-1 text-[11px] font-semibold text-brand-dk transition-colors hover:bg-brand/10"
+          >
+            Réinitialiser
+          </button>
+        ) : null}
+      </div>
 
       <DataTable
         minWidth="min-w-[1150px]"

@@ -6,7 +6,7 @@ import { etudiants } from "@/db/schema/etudiants";
 import { settings } from "@/db/schema/settings";
 import { eq, or, sql } from "drizzle-orm";
 
-const NIVEAUX = ["S1", "S2", "S3", "S4", "S5", "S6"] as const;
+const NIVEAUX = ["1ère année", "2ème année", "3ème année"] as const;
 
 const STATUTS_ETUDIANT = ["inscrit", "en_attente", "diplome", "abandon"] as const;
 const STATUTS_PAIEMENT = ["paye", "en_attente", "retard", "impaye"] as const;

@@ -22,8 +22,6 @@ import { useIstpm, useCurrentFormateur } from "@/lib/istpm-store";
 import {
   FILIERES,
   NIVEAUX,
-  ANNEES_ETUDE,
-  anneeEtude,
   DUREES_EXAMEN,
   TYPE_EXAMEN_LABEL,
   STATUT_EXAMEN_LABEL,
@@ -117,14 +115,11 @@ function nomFormateur(formateurs: Formateur[], id: string) {
 }
 
 /**
- * Classe convoquée normalisée, ex. « S2-A ». Les fiches étudiants sont
- * incohérentes : certaines portent le groupe brut (« A »), d'autres déjà
- * préfixé (« S2-A »). On ne préfixe donc qu'une seule fois — sinon la liste
- * affichait « S2-S2-A » et la convocation ne trouvait personne.
+ * Classe convoquée = le groupe tel quel (« G1 », « A »…), associé à un niveau
+ * (1ère/2ème/3ème année) porté séparément par l'examen et la fiche étudiant.
  */
-function classeLabel(niveau: string, groupe: string) {
-  if (!groupe) return "";
-  return groupe.startsWith(`${niveau}-`) ? groupe : `${niveau}-${groupe}`;
+function classeLabel(groupe: string) {
+  return groupe;
 }
 
 /** Pastille d'état du sujet déposé. */
@@ -391,7 +386,7 @@ function InfosExamen({
           <DetailField label="Module" value={examen.module} full />
           <DetailField label="Filière" value={examen.filiere} full />
           <DetailField label="Groupe" value={examen.classe} />
-          <DetailField label="Semestre" value={examen.niveau} />
+          <DetailField label="Niveau" value={examen.niveau} />
           <DetailField
             label="Année universitaire"
             value={examen.anneeUniversitaire}
@@ -485,14 +480,14 @@ function EspaceFormateur() {
     return [...set].sort().reverse();
   }, [examens]);
 
-  /** Classes réelles (séances + couples niveau-groupe des étudiants) : la
-   *  convocation compare `${niveau}-${groupe}` à l'identique — la saisie
-   *  libre produisait des classes vides. */
+  /** Classes réelles (groupes des séances et des étudiants) : la convocation
+   *  compare le groupe à l'identique — la saisie libre produisait des classes
+   *  vides. */
   const classesDisponibles = useMemo(() => {
     const set = new Set<string>();
     for (const s of seances) if (s.groupe.trim()) set.add(s.groupe.trim());
     for (const e of etudiants) {
-      if (e.niveau && e.groupe) set.add(classeLabel(e.niveau, e.groupe));
+      if (e.groupe) set.add(classeLabel(e.groupe));
     }
     return [...set].sort();
   }, [seances, etudiants]);
@@ -501,20 +496,20 @@ function EspaceFormateur() {
   const effectifsClasse = useMemo(() => {
     const map: Record<string, number> = {};
     for (const e of etudiants) {
-      if (!e.niveau || !e.groupe || e.statut === "abandon") continue;
-      const k = classeLabel(e.niveau, e.groupe);
+      if (!e.groupe || e.statut === "abandon") continue;
+      const k = classeLabel(e.groupe);
       map[k] = (map[k] ?? 0) + 1;
     }
     return map;
   }, [etudiants]);
 
-  // Le formateur connecté : ses examens seulement. Résolu depuis le profil
-  // sélectionné (référentiel hydraté) ; sans fiche liée, la liste est vide.
+  // Le formateur connecté : ses examens seulement. Sans fiche liée, la liste
+  // est vide (le compte doit être lié).
   const moi = useCurrentFormateur();
   const moiId = moi?.id ?? "";
 
-  // Groupes réellement encadrés par le formateur connecté (« S2-A »…), pour
-  // restreindre les sélecteurs Semestre / Groupe à son affectation.
+  // Groupes réellement encadrés par le formateur connecté, pour restreindre
+  // les sélecteurs Niveau / Groupe à son affectation.
   const mesGroupes = useMemo(
     () => [...new Set((moi?.groupes ?? []).filter(Boolean))].sort(),
     [moi],
@@ -622,11 +617,11 @@ function EspaceFormateur() {
           },
           {
             id: "semestre",
-            label: "Semestre",
+            label: "Niveau",
             value: niveau,
             onChange: setNiveau,
             options: NIVEAUX,
-            allLabel: "Tous les semestres",
+            allLabel: "Tous les niveaux",
           },
           {
             id: "sujet",
@@ -692,7 +687,7 @@ function EspaceFormateur() {
               {TYPE_EXAMEN_LABEL[x.type]}
             </td>
             <td>{fmtDate(x.date)}</td>
-            <td>{anneeEtude(x.niveau)}</td>
+            <td>{x.niveau}</td>
             <td>
               <span className={toneBadge(STATUT_EXAMEN_TONE[x.statut])}>
                 {STATUT_EXAMEN_LABEL[x.statut]}
@@ -847,20 +842,27 @@ function EspaceDirecteur() {
   const [module, setModule] = useState<string>(ALL);
   const [classe, setClasse] = useState<string>(ALL);
   const [semestre, setSemestre] = useState<string>(ALL);
-  const [annee, setAnnee] = useState<string>(ALL);
   const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
 
   const [detail, setDetail] = useState<Examen | null>(null);
   const [preview, setPreview] = useState<Examen | null>(null);
 
-  // Listes de filtres dérivées des examens réellement présents.
+  // Listes de filtres dérivées des examens réellement présents. Les groupes
+  // suivent le niveau choisi.
   const modules = useMemo(
     () => [...new Set(examens.map((x) => x.module))].sort(),
     [examens],
   );
   const classes = useMemo(
-    () => [...new Set(examens.map((x) => x.classe))].sort(),
-    [examens],
+    () =>
+      [
+        ...new Set(
+          examens
+            .filter((x) => semestre === ALL || x.niveau === semestre)
+            .map((x) => x.classe),
+        ),
+      ].sort(),
+    [examens, semestre],
   );
   const profs = useMemo(() => {
     const ids = new Set(examens.map((x) => x.createdBy));
@@ -870,6 +872,11 @@ function EspaceDirecteur() {
       .sort();
   }, [examens, formateurs]);
 
+  // Le groupe choisi ne colle plus au niveau : on le remet à zéro.
+  useEffect(() => {
+    if (classe !== ALL && !classes.includes(classe)) setClasse(ALL);
+  }, [classes, classe]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return examens.filter((x) => {
@@ -878,7 +885,6 @@ function EspaceDirecteur() {
       if (module !== ALL && x.module !== module) return false;
       if (classe !== ALL && x.classe !== classe) return false;
       if (semestre !== ALL && x.niveau !== semestre) return false;
-      if (annee !== ALL && anneeEtude(x.niveau) !== annee) return false;
       if (anneeScolaire !== ALL && x.anneeUniversitaire !== anneeScolaire)
         return false;
       if (!q) return true;
@@ -887,11 +893,11 @@ function EspaceDirecteur() {
         .toLowerCase()
         .includes(q);
     });
-  }, [examens, formateurs, search, prof, module, classe, semestre, annee, anneeScolaire]);
+  }, [examens, formateurs, search, prof, module, classe, semestre, anneeScolaire]);
 
   const pager = usePagination(
     filtered,
-    `${search}|${prof}|${module}|${classe}|${semestre}|${annee}|${anneeScolaire}`,
+    `${search}|${prof}|${module}|${classe}|${semestre}|${anneeScolaire}`,
   );
 
   const avecSujet = filtered.filter((x) => x.document).length;
@@ -939,18 +945,10 @@ function EspaceDirecteur() {
           },
           {
             id: "semestre",
-            label: "Semestre",
+            label: "Niveau",
             value: semestre,
             onChange: setSemestre,
             options: NIVEAUX,
-            allLabel: "Tous les semestres",
-          },
-          {
-            id: "annee",
-            label: "Niveau",
-            value: annee,
-            onChange: setAnnee,
-            options: ANNEES_ETUDE,
             allLabel: "Tous les niveaux",
           },
           {
@@ -1018,7 +1016,7 @@ function EspaceDirecteur() {
               {TYPE_EXAMEN_LABEL[x.type]}
             </td>
             <td>{fmtDate(x.date)}</td>
-            <td>{anneeEtude(x.niveau)}</td>
+            <td>{x.niveau}</td>
             <td className={cellTruncate}>
               {nomFormateur(formateurs, x.createdBy)}
             </td>
@@ -1164,39 +1162,46 @@ function ExamenForm({
   const [removeExisting, setRemoveExisting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
-  /* Référentiel des modules (Paramètres › Modules) : chaque module connaît sa
-     filière, ce qui permet de la pré-remplir à la sélection. */
-  const { modules: modulesReg } = useIstpm();
+  /* Référentiels serveur : modules (filière auto) et groupes (niveau via le
+     registre des groupes, jamais par préfixe). */
+  const { modules: modulesReg, groupConfigs: groupesReg } = useIstpm();
 
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => {
     setF((prev) => ({ ...prev, [k]: v }));
     setErrors((prev) => ({ ...prev, [k]: undefined }));
   };
 
-  /** Semestres enseignés par le formateur (préfixe de ses groupes). Repli sur
-   *  la liste complète si son affectation est vide. */
-  const semestreOptions = useMemo(() => {
-    const s = [
+  /** Niveaux du formateur, lus dans le registre des groupes (repli : tout). */
+  const niveauOptions = useMemo(() => {
+    const lies = [
       ...new Set(
-        mesGroupes.map((g) => g.split("-")[0]).filter((x) => /^S\d$/.test(x)),
+        groupesReg
+          .filter((g) => mesGroupes.includes(g.name))
+          .map((g) => g.semester)
+          .filter(Boolean),
       ),
     ].sort();
-    return s.length ? s : [...NIVEAUX];
-  }, [mesGroupes]);
+    return lies.length ? lies : [...NIVEAUX];
+  }, [mesGroupes, groupesReg]);
 
-  /** Groupes proposés : ceux du formateur (filtrés par le semestre choisi),
-   *  sinon les classes réelles de l'établissement. La valeur déjà portée par
+  /** Groupes proposés : ceux du formateur rattachés au niveau choisi (via le
+   *  registre), sinon les classes réelles. Les groupes hors registre sont
+   *  toujours conservés (niveau indéterminable). La valeur déjà portée par
    *  un examen en édition est toujours conservée. */
+  const niveauDuGroupe = (nom: string): string | null =>
+    groupesReg.find((g) => g.name === nom)?.semester ?? null;
   const groupeOptions = useMemo(() => {
     const base = mesGroupes.length ? mesGroupes : classesDisponibles;
-    const list = base.filter(
-      (g) => !f.niveau || !/^S\d-/.test(g) || g.startsWith(`${f.niveau}-`),
-    );
+    const list = base.filter((g) => {
+      if (!f.niveau) return true;
+      const n = niveauDuGroupe(g);
+      return n === null || n === f.niveau;
+    });
     if (initial?.classe && !list.includes(initial.classe)) list.push(initial.classe);
     return [...new Set(list)].sort();
-  }, [mesGroupes, classesDisponibles, f.niveau, initial]);
+  }, [mesGroupes, classesDisponibles, groupesReg, f.niveau, initial]);
 
-  // Le groupe choisi ne colle plus au semestre : on le remet à zéro.
+  // Le groupe choisi ne colle plus au niveau : on le remet à zéro.
   useEffect(() => {
     setF((prev) =>
       prev.classe && !groupeOptions.includes(prev.classe)
@@ -1229,7 +1234,7 @@ function ExamenForm({
     const next: Record<string, string> = {};
     if (!f.module.trim()) next.module = "Module obligatoire";
     if (!f.filiere) next.filiere = "Filière obligatoire";
-    if (!f.niveau) next.niveau = "Semestre obligatoire";
+    if (!f.niveau) next.niveau = "Niveau obligatoire";
     if (!f.classe.trim()) next.classe = "Groupe obligatoire";
     else if (!groupeOptions.includes(f.classe.trim()))
       next.classe = "Groupe inconnu : choisissez une classe existante";
@@ -1304,11 +1309,11 @@ function ExamenForm({
         />
       </FullWidth>
       <SelectField
-        label="Semestre"
+        label="Niveau"
         required
         value={f.niveau}
         onChange={(v) => set("niveau", v as Niveau)}
-        options={semestreOptions}
+        options={niveauOptions}
         error={errors.niveau}
       />
       <SelectField
@@ -1436,15 +1441,15 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
   const [examenId, setExamenId] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
 
-  // La classe convoquée = les étudiants dont le groupe correspond à celui de
-  // l'examen sélectionné (ex. « S5-G1 »).
+  // La classe convoquée = les étudiants du groupe et du niveau de l'examen.
   const examen = examens.find((x) => x.id === examenId);
   const convoques = useMemo(
     () =>
       examen
         ? etudiants.filter(
             (e) =>
-              classeLabel(e.niveau, e.groupe) === examen.classe &&
+              e.groupe === examen.classe &&
+              e.niveau === examen.niveau &&
               e.statut !== "abandon",
           )
         : [],
@@ -1457,7 +1462,8 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
     const roster = ex
       ? etudiants.filter(
           (e) =>
-            classeLabel(e.niveau, e.groupe) === ex.classe &&
+            e.groupe === ex.classe &&
+            e.niveau === ex.niveau &&
             e.statut !== "abandon",
         )
       : [];
@@ -1533,7 +1539,7 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
           etudiantId: e.id,
           etudiant: `${e.prenom} ${e.nom}`,
           cne: e.cne,
-          groupe: classeLabel(e.niveau, e.groupe),
+          groupe: e.groupe,
           module: n.module,
           examen: n.examen,
           note: n.note,

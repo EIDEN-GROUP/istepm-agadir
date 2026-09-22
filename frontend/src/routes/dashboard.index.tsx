@@ -1255,21 +1255,22 @@ function DashboardDirecteur() {
 /* ------------------------------------------------------------------ */
 
 /**
- * Récapitulatif de ce qu'un formateur enseigne : filière, semestres (déduits
- * du préfixe de ses groupes, ex. « S5-G1 » → « S5 »), groupes et modules.
+ * Récapitulatif de ce qu'un formateur enseigne : filière, niveaux (lus dans
+ * le registre des groupes), groupes et modules.
  * Lecture seule — l'affectation est gérée dans Formateurs par la direction.
  */
 function AffectationEnseignant({ formateur }: { formateur: Formateur }) {
-  const semestres = useMemo(
+  const { groupConfigs } = useIstpm();
+  const niveaux = useMemo(
     () =>
       [
         ...new Set(
-          formateur.groupes
-            .map((g) => g.split("-")[0]?.trim())
-            .filter((s): s is string => !!s && /^S\d$/i.test(s)),
+          groupConfigs
+            .filter((g) => formateur.groupes.includes(g.name))
+            .map((g) => g.semester),
         ),
       ].sort(),
-    [formateur.groupes],
+    [formateur.groupes, groupConfigs],
   );
 
   const lignes: {
@@ -1278,7 +1279,7 @@ function AffectationEnseignant({ formateur }: { formateur: Formateur }) {
     tone: "teal" | "blue" | "neutral";
   }[] = [
     { label: "Filière", items: formateur.departement ? [formateur.departement] : [], tone: "teal" },
-    { label: "Semestres", items: semestres, tone: "blue" },
+    { label: "Niveaux", items: niveaux, tone: "blue" },
     { label: "Groupes", items: [...formateur.groupes].sort(), tone: "neutral" },
     { label: "Modules", items: [...formateur.modules].sort(), tone: "teal" },
   ];
@@ -1322,21 +1323,26 @@ function AffectationEnseignant({ formateur }: { formateur: Formateur }) {
 
 function DashboardEnseignant() {
   const { tab, setTab, direction } = useTabs();
-  const { seances, examens, bulletins, etudiants } = useIstpm();
+  const { seances, examens, bulletins, etudiants, groupConfigs } = useIstpm();
   const moi = useCurrentFormateur();
   const mesExamens = useMemo(() => (moi ? examens.filter((x) => moi.modules.includes(x.module)) : []), [examens, moi]);
   const seancesAujourdhui = useMemo(() => seances.filter((s) => s.date === today && s.professeurId === moi?.id), [seances, moi?.id]);
   const mesSeances = useMemo(() => seances.filter((s) => s.professeurId === moi?.id).slice().sort((a, b) => (a.date < b.date ? -1 : 1)), [seances, moi?.id]);
-  // Tous les étudiants de la filière du formateur dans les semestres qu'il
-  // enseigne (préfixe de ses groupes : « S5-G1 » → « S5 »), sans restriction de
-  // sous-groupe — le professeur voit ainsi l'intégralité de ses promotions.
+  // Tous les étudiants de la filière du formateur dans ses niveaux (lus dans
+  // le registre des groupes) ou directement dans ses groupes — le professeur
+  // voit ainsi l'intégralité de ses promotions.
   const mesEtudiants = useMemo(() => {
     if (!moi) return [];
-    const niveaux = new Set(moi.groupes.map((g) => g.split("-")[0]));
-    return etudiants.filter(
-      (e) => !e.archived && e.filiere === moi.departement && niveaux.has(e.niveau),
+    const niveaux = new Set(
+      groupConfigs.filter((g) => moi.groupes.includes(g.name)).map((g) => g.semester),
     );
-  }, [etudiants, moi]);
+    return etudiants.filter(
+      (e) =>
+        !e.archived &&
+        e.filiere === moi.departement &&
+        (niveaux.has(e.niveau) || moi.groupes.includes(e.groupe)),
+    );
+  }, [etudiants, moi, groupConfigs]);
   const mesBulletins = useMemo(() => (moi ? bulletins.filter((b) => moi.modules.some((m) => b.notes?.some((n) => n.module === m))) : []), [bulletins, moi]);
   const calendrierProche = useMemo(() => mesSeances.filter((s) => s.date >= today).slice(0, 8), [mesSeances]);
   if (!moi) return <EmptyState icon={GraduationCap}>Aucun formateur enregistré.</EmptyState>;

@@ -11,9 +11,7 @@ import { makePaiementDocPdf } from "@/lib/branded-doc";
 import {
   FILIERES,
   NIVEAUX,
-  ANNEES_ETUDE,
   MOIS_ACADEMIQUE,
-  anneeEtude,
   STATUT_PAIEMENT_LABEL,
   STATUT_PAIEMENT_TONE,
   fmtDate,
@@ -230,8 +228,8 @@ function PaiementsPage() {
             options: FILIERES, allLabel: "Toutes les filières",
           },
           {
-            id: "semestre", label: "Semestre", value: semestre, onChange: setSemestre,
-            options: NIVEAUX, allLabel: "Tous les semestres",
+            id: "semestre", label: "Niveau", value: semestre, onChange: setSemestre,
+            options: NIVEAUX, allLabel: "Tous les niveaux",
           },
           {
             id: "anneeScolaire", label: "Année scolaire", value: anneeScolaire, onChange: setAnneeScolaire,
@@ -266,8 +264,7 @@ function PaiementsPage() {
           <>
             <th>Étudiant</th>
             <th>Filière</th>
-            <th className="text-center">Semestre</th>
-            <th>Année</th>
+            <th className="text-center">Niveau</th>
             <th className="text-right">Total réglé</th>
             <th className="text-right">Reste dû</th>
             <th>Statut</th>
@@ -304,9 +301,6 @@ function PaiementsPage() {
             </td>
             <td className="text-center tabular-nums text-muted-foreground">
               {r.etudiant.niveau}
-            </td>
-            <td className="text-muted-foreground">
-              {anneeEtude(r.etudiant.niveau)}
             </td>
             <td className="text-right font-semibold tabular-nums text-brand-dk">
               {fmtMAD(r.totalPaye)}
@@ -769,8 +763,7 @@ function HistoriquePaiementsDialog({
         >
           <DetailSection title="Synthèse">
             <DetailGrid>
-              <DetailField label="Semestre" value={etudiant.niveau} />
-              <DetailField label="Année" value={anneeEtude(etudiant.niveau)} />
+              <DetailField label="Niveau" value={etudiant.niveau} />
               <DetailField label="Groupe" value={etudiant.groupe} />
               <DetailField label="Téléphone" value={etudiant.telephone || "—"} />
               <DetailField label="E-mail" value={etudiant.email || "—"} />

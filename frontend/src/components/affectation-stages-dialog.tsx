@@ -9,14 +9,13 @@ import {
   RotateCcw,
 } from "lucide-react";
 import {
-  ANNEES_ETUDE,
+  NIVEAUX,
   FILIERES,
-  anneeEtude,
   fmtDate,
   type Etudiant,
   type Stage,
   type StructureAccueil,
-  type AnneeEtude,
+  type Niveau,
   type Filiere,
 } from "@/lib/istpm-data";
 import {
@@ -50,7 +49,7 @@ export type Affectation = { etudiant: Etudiant; structure: string; debut: string
 /**
  * Affectation groupée des étudiants aux structures d'accueil.
  *
- * Parcours en cinq étapes : période (Début → Fin) → année → filière → groupe →
+ * Parcours en cinq étapes : période (Début → Fin) → niveau → filière → groupe →
  * liste des étudiants non encore affectés à un stage. La période choisie en
  * premier est appliquée à tous les stages créés. Chaque étudiant peut être
  * rattaché individuellement à une structure (dans la limite de sa capacité),
@@ -86,7 +85,7 @@ export function AffectationStagesDialog({
   const [step, setStep] = useState(0);
   const [debut, setDebut] = useState("");
   const [fin, setFin] = useState("");
-  const [annee, setAnnee] = useState<AnneeEtude | "">("");
+  const [niveau, setNiveau] = useState<Niveau | "">("");
   const [filiere, setFiliere] = useState<Filiere | "">("");
   const [groupe, setGroupe] = useState<string>("");
   // étudiantId → nom de structure choisie ("" = pas encore affecté).
@@ -122,29 +121,29 @@ export function AffectationStagesDialog({
     for (const f of FILIERES) set.add(f);
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [etudiants]);  const groupesDisponibles = useMemo(() => {
-    if (!annee || !filiere) return [];
+    if (!niveau || !filiere) return [];
     const set = new Set<string>();
     for (const e of etudiants) {
-      if (anneeEtude(e.niveau) === annee && e.filiere === filiere && e.groupe) {
+      if (e.niveau === niveau && e.filiere === filiere && e.groupe) {
         set.add(e.groupe);
       }
     }
     return [...set].sort();
-  }, [etudiants, annee, filiere]);
+  }, [etudiants, niveau, filiere]);
 
-  // Étudiants non encore affectés correspondant à année + filière + groupe.
+  // Étudiants non encore affectés correspondant à niveau + filière + groupe.
   const etudiantsNonAffectes = useMemo(() => {
-    if (!annee || !filiere || !groupe) return [];
+    if (!niveau || !filiere || !groupe) return [];
     return etudiants
       .filter(
         (e) =>
-          anneeEtude(e.niveau) === annee &&
+          e.niveau === niveau &&
           e.filiere === filiere &&
           e.groupe === groupe &&
           !idsAvecStage.has(e.id),
       )
       .sort((a, b) => `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`));
-  }, [etudiants, annee, filiere, groupe, idsAvecStage]);
+  }, [etudiants, niveau, filiere, groupe, idsAvecStage]);
 
   /** Places restantes d'une structure, en tenant compte des choix en cours
    *  (hors l'étudiant courant, dont on veut conserver l'option sélectionnée). */
@@ -226,13 +225,13 @@ export function AffectationStagesDialog({
 
   const peutSuivant =
     (step === 0 && debut && fin && !dateError) ||
-    (step === 1 && annee) ||
+    (step === 1 && niveau) ||
     (step === 2 && filiere) ||
     (step === 3 && groupe);
 
   const titres = [
     "Période du stage",
-    "Choisir l'année",
+    "Choisir le niveau",
     "Choisir la filière",
     "Choisir le groupe",
     "Affecter les étudiants",
@@ -256,7 +255,7 @@ export function AffectationStagesDialog({
                   {fmtDate(debut)} → {fmtDate(fin)}
                 </span>
               ) : null}
-              {annee ? <span className={toneBadge("teal")}>{annee}</span> : null}
+              {niveau ? <span className={toneBadge("teal")}>{niveau}</span> : null}
               {filiere ? <span className={toneBadge("teal")}>{filiere}</span> : null}
               {groupe ? <span className={toneBadge("teal")}>Groupe {groupe}</span> : null}
             </>
@@ -315,17 +314,17 @@ export function AffectationStagesDialog({
 
           {step === 1 ? (
             <SelectField
-              label="Année d'étude"
+              label="Niveau"
               required
-              value={annee}
+              value={niveau}
               onChange={(v) => {
-                setAnnee(v);
+                setNiveau(v as Niveau);
                 setFiliere("");
                 setGroupe("");
                 setAssign({});
               }}
-              options={ANNEES_ETUDE}
-              placeholder="Choisir une année…"
+              options={NIVEAUX}
+              placeholder="Choisir un niveau…"
             />
           ) : null}
 
@@ -359,7 +358,7 @@ export function AffectationStagesDialog({
               />
             ) : (
               <p className="text-sm text-muted-foreground">
-                Aucun groupe pour {annee} · {filiere}.
+                Aucun groupe pour {niveau} · {filiere}.
               </p>
             )
           ) : null}

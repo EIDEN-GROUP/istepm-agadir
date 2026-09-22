@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Eye, FileDown, Send, Pencil, SendHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -10,8 +10,6 @@ import { useIstpm, mentionFor, decisionFor } from "@/lib/istpm-store";
 import {
   FILIERES,
   NIVEAUX,
-  ANNEES_ETUDE,
-  anneeEtude,
   DECISION_TONE,
   MENTION_TONE,
   STATUT_BULLETIN_LABEL,
@@ -164,7 +162,7 @@ function printBulletin(
   <div><span>Moyenne générale</span><strong>${b.moyenne.toFixed(2)} / ${bareme}</strong></div>
   <div><span>Mention</span><strong>${escapeHtml(b.mention)}</strong></div>
   <div><span>Décision</span><strong>${escapeHtml(b.decision)}</strong></div>
-  <div><span>Crédits validés</span><strong>${creditsValidesPrint} / ${totalCreditsPrint} (objectif ${creditsObjectif}/semestre)</strong></div>
+  <div><span>Crédits validés</span><strong>${creditsValidesPrint} / ${totalCreditsPrint} (objectif ${creditsObjectif}/niveau)</strong></div>
 </div>
 <div class="calc">
   <h2>Méthode de calcul de la moyenne</h2>
@@ -220,7 +218,6 @@ function BulletinsPage() {
   const [filiere, setFiliere] = useState<string>(ALL);
   const [niveau, setNiveau] = useState<string>(ALL);
   const [session, setSession] = useState<string>(ALL);
-  const [annee, setAnnee] = useState<string>(ALL);
   const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
   const [groupe, setGroupe] = useState<string>(ALL);
   const [formateur, setFormateur] = useState<string>(ALL);
@@ -239,7 +236,15 @@ function BulletinsPage() {
     for (const e of etudiants) if (e.annee) set.add(e.annee);
     return [...set].sort().reverse();
   }, [etudiants]);
-  const groupeOptions = useMemo(() => [...new Set(etudiants.map((e) => e.groupe))].sort(), [etudiants]);
+  // Groupes liés au niveau choisi (issus des fiches, jamais figés).
+  const groupeOptions = useMemo(
+    () => [...new Set(etudiants.filter((e) => niveau === ALL || e.niveau === niveau).map((e) => e.groupe))].sort(),
+    [etudiants, niveau],
+  );
+  // Le groupe choisi ne colle plus au niveau : on le remet à zéro.
+  useEffect(() => {
+    if (groupe !== ALL && !groupeOptions.includes(groupe)) setGroupe(ALL);
+  }, [groupeOptions, groupe]);
   const formateursActifs = useMemo(() => formateurs.filter((f) => !f.archived), [formateurs]);
   const formateurOptions = useMemo(() => formateursActifs.map((f) => `${f.prenom} ${f.nom}`), [formateursActifs]);
   const modulesParFormateur = useMemo(() => new Map(formateursActifs.map((f) => [`${f.prenom} ${f.nom}`, new Set(f.modules)])), [formateursActifs]);
@@ -251,7 +256,6 @@ function BulletinsPage() {
       if (filiere !== ALL && b.filiere !== filiere) return false;
       if (niveau !== ALL && b.niveau !== niveau) return false;
       if (session !== ALL && b.session !== session) return false;
-      if (annee !== ALL && anneeEtude(b.niveau) !== annee) return false;
       // Le bulletin ne porte pas l'année scolaire : elle vient de l'étudiant.
       if (anneeScolaire !== ALL && etuById.get(b.etudiantId)?.annee !== anneeScolaire) return false;
       if (groupe !== ALL && etuById.get(b.etudiantId)?.groupe !== groupe) return false;
@@ -263,9 +267,9 @@ function BulletinsPage() {
       if (!q) return true;
       return `${b.cne} ${b.prenom} ${b.nom}`.toLowerCase().includes(q);
     });
-  }, [bulletins, search, filiere, niveau, session, annee, anneeScolaire, groupe, statut, formateur, etuById, modulesParFormateur]);
+  }, [bulletins, search, filiere, niveau, session, anneeScolaire, groupe, statut, formateur, etuById, modulesParFormateur]);
 
-  const pager = usePagination(filtered, `${search}|${filiere}|${niveau}|${session}|${annee}|${anneeScolaire}|${groupe}|${statut}|${formateur}`);
+  const pager = usePagination(filtered, `${search}|${filiere}|${niveau}|${session}|${anneeScolaire}|${groupe}|${statut}|${formateur}`);
 
   const aPublier = bulletins.filter((b) => b.statut !== "publie").length;
 
@@ -307,11 +311,11 @@ function BulletinsPage() {
           },
           {
             id: "niveau",
-            label: "Semestre",
+            label: "Niveau",
             value: niveau,
             onChange: setNiveau,
             options: NIVEAUX,
-            allLabel: "Tous les semestres",
+            allLabel: "Tous les niveaux",
           },
           {
             id: "session",
@@ -320,14 +324,6 @@ function BulletinsPage() {
             onChange: setSession,
             options: SESSIONS,
             allLabel: "Toutes les sessions",
-          },
-          {
-            id: "annee",
-            label: "Niveau",
-            value: annee,
-            onChange: setAnnee,
-            options: ANNEES_ETUDE,
-            allLabel: "Tous les niveaux",
           },
           {
             id: "anneeScolaire",
@@ -736,7 +732,7 @@ function BulletinDetail({
           />
           <DetailField
             label="Objectif crédits"
-            value={`${cfg.creditsSemestre} / semestre`}
+            value={`${cfg.creditsSemestre} / niveau`}
           />
         </DetailGrid>
       </DetailSection>

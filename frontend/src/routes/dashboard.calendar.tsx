@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Plus,
   ChevronLeft,
@@ -35,8 +35,6 @@ import {
   NIVEAUX,
   FILIERES,
   CRENEAUX,
-  ANNEES_ETUDE,
-  anneeEtude,
   academicYearOf,
   bornesAnneeUniversitaire,
   TYPE_SEANCE_LABEL,
@@ -206,7 +204,6 @@ function PlanningPage() {
   const [groupe, setGroupe] = useState<string>(ALL);
   const [salle, setSalle] = useState<string>(ALL);
   const [module, setModule] = useState<string>(ALL);
-  const [annee, setAnnee] = useState<string>(ALL);
   const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
 
   const [detail, setDetail] = useState<Seance | null>(null);
@@ -255,7 +252,6 @@ const [importOpen, setImportOpen] = useState(false);
       if (groupe !== ALL && s.groupe !== groupe) return false;
       if (salle !== ALL && s.salle !== salle) return false;
       if (module !== ALL && s.module !== module) return false;
-      if (annee !== ALL && anneeEtude(s.semestre) !== annee) return false;
       if (anneeScolaire !== ALL && s.anneeUniversitaire !== anneeScolaire)
         return false;
       if (!q) return true;
@@ -263,7 +259,7 @@ const [importOpen, setImportOpen] = useState(false);
         .toLowerCase()
         .includes(q);
     });
-  }, [visibles, search, prof, groupe, salle, module, annee, anneeScolaire, nomProf]);
+  }, [visibles, search, prof, groupe, salle, module, anneeScolaire, nomProf]);
 
   /* --------------- Navigation temporelle --------------- */
 
@@ -404,7 +400,7 @@ const [importOpen, setImportOpen] = useState(false);
       "Groupe",
       "Salle",
       "Formateur",
-      "Semestre",
+      "Niveau",
       "Année universitaire",
     ];
     const lignes = filtrees
@@ -443,8 +439,8 @@ const [importOpen, setImportOpen] = useState(false);
   const exportExempleCsv = () => {
     const entetes = [...COLONNES_IMPORT];
     const exemples = [
-      ["2025-10-06", "08:30", "10:00", "Soins infirmiers en médecine", "Infirmier polyvalent", "Cours", "S5-G1", "Amphi A", "Yassine El Amrani", "S5", "2025/2026", "Séance d'ouverture"],
-      ["2025-10-06", "10:15", "11:45", "Réanimation et soins intensifs", "Infirmier polyvalent", "TP", "S5-G2", "Labo simulation 2", "Salma Benali", "S5", "2025/2026", ""],
+      ["2025-10-06", "08:30", "10:00", "Soins infirmiers en médecine", "Infirmier polyvalent", "Cours", "G1", "Amphi A", "Yassine El Amrani", "1ère année", "2025/2026", "Séance d'ouverture"],
+      ["2025-10-06", "10:15", "11:45", "Réanimation et soins intensifs", "Infirmier polyvalent", "TP", "G2", "Labo simulation 2", "Salma Benali", "1ère année", "2025/2026", ""],
     ];
     const csv = [
       entetes.join(","),
@@ -545,14 +541,6 @@ const [importOpen, setImportOpen] = useState(false);
             onChange: setModule,
             options: modules,
             allLabel: "Tous les modules",
-          },
-          {
-            id: "annee",
-            label: "Niveau",
-            value: annee,
-            onChange: setAnnee,
-            options: ANNEES_ETUDE,
-            allLabel: "Tous les niveaux",
           },
           {
             id: "anneeScolaire",
@@ -1001,7 +989,7 @@ function SeanceDetail({
             }
           />
           <DetailField label="Filière" value={seance.filiere} full />
-          <DetailField label="Semestre" value={seance.semestre} />
+          <DetailField label="Niveau" value={seance.semestre} />
           <DetailField
             label="Année universitaire"
             value={seance.anneeUniversitaire}
@@ -1073,6 +1061,23 @@ function SeanceForm({
     setErrors((p) => ({ ...p, [k]: undefined }));
   };
 
+  // Groupes liés au niveau choisi (via le registre des groupes ; les groupes
+  // hors registre restent proposés, niveau indéterminable).
+  const { groupConfigs } = useIstpm();
+  const groupesLies = useMemo(() => {
+    if (!f.semestre) return groupes;
+    const lies = new Set(
+      groupConfigs.filter((g) => g.semester === f.semestre).map((g) => g.name),
+    );
+    const connus = new Set(groupConfigs.map((g) => g.name));
+    const list = groupes.filter((g) => !connus.has(g) || lies.has(g));
+    return f.groupe && !list.includes(f.groupe) ? [...list, f.groupe] : list;
+  }, [groupes, groupConfigs, f.semestre, f.groupe]);
+  useEffect(() => {
+    if (f.groupe && !groupesLies.includes(f.groupe)) set("groupe", "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupesLies]);
+
   // Conflits recalculés à chaque frappe : l'avertissement apparaît avant
   // l'enregistrement, pas après.
   const conflits = useMemo(() => {
@@ -1098,7 +1103,7 @@ function SeanceForm({
     if (!f.filiere) next.filiere = "Filière (département) obligatoire";
     if (!f.groupe) next.groupe = "Groupe obligatoire";
     if (!f.salle) next.salle = "Salle obligatoire";
-    if (!f.semestre) next.semestre = "Semestre obligatoire";
+    if (!f.semestre) next.semestre = "Niveau obligatoire";
     if (!f.date) next.date = "Date obligatoire";
     if (minutesDepuisMinuit(f.fin) <= minutesDepuisMinuit(f.debut))
       next.fin = "La fin doit suivre le début";
@@ -1215,7 +1220,7 @@ function SeanceForm({
         required
         value={f.groupe}
         onChange={(v) => set("groupe", v)}
-        options={groupes}
+        options={groupesLies}
         error={errors.groupe}
       />
       <SelectField
@@ -1227,7 +1232,7 @@ function SeanceForm({
         error={errors.salle}
       />
       <SelectField
-        label="Semestre"
+        label="Niveau"
         required
         value={f.semestre}
         onChange={(v) => set("semestre", v)}
@@ -1294,8 +1299,8 @@ const COLONNES_IMPORT = [
   "Type",
   "Groupe",
   "Salle",
-  "Formateur",
-  "Semestre",
+      "Formateur",
+      "Niveau",
   "Année universitaire",
   "Notes",
 ] as const;
@@ -1321,8 +1326,8 @@ const AUTO_MAP: Record<string, string> = {
   professeur: "Formateur",
   enseignant: "Formateur",
   prof: "Formateur",
-  semestre: "Semestre",
-  niveau: "Semestre",
+  semestre: "Niveau",
+  niveau: "Niveau",
   "année universitaire": "Année universitaire",
   "annee universitaire": "Année universitaire",
   année: "Année universitaire",
@@ -1454,7 +1459,7 @@ function validerLigne(
   const formateurRaw = get("Formateur");
   const filiereRaw = get("Filière");
   const typeRaw = get("Type");
-  const semestreRaw = get("Semestre");
+  const semestreRaw = get("Niveau");
   const anneeRaw = get("Année universitaire");
   const notes = get("Notes");
 
@@ -1512,16 +1517,10 @@ function validerLigne(
   }
 
   let semestre = semestreRaw;
-  if (semestre && !NIVEAUX.includes(semestre as any)) {
-    const match = semestre.match(/[Ss][1-6]/);
-    if (match) semestre = match[0].toUpperCase();
-    else erreurs.push(`Semestre invalide: "${semestre}" (attendu S1–S6)`);
+  if (semestre && !(NIVEAUX as readonly string[]).includes(semestre)) {
+    erreurs.push(`Niveau invalide: "${semestre}" (attendu ${NIVEAUX.join(", ")})`);
   }
-  if (!semestre && groupe) {
-    const match = groupe.match(/[Ss][1-6]/);
-    if (match) semestre = match[0].toUpperCase();
-  }
-  if (!semestre) erreurs.push("Semestre manquant (non déduit du groupe)");
+  if (!semestre) erreurs.push("Niveau manquant");
 
   const anneeUniversitaire =
     /^\d{4}\/\d{4}$/.test(anneeRaw)
