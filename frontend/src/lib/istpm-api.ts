@@ -729,6 +729,11 @@ export function fetchRole(id: string) {
   return api.get<RoleRecord>(`/roles/${id}`);
 }
 
+/** Permissions effectives du compte (fiche rôle ou repli historique). */
+export function fetchMyPermissions() {
+  return api.get<{ permissions: string[]; source: "record" | "fallback" }>("/roles/mine");
+}
+
 export function createRole(data: { name: string; description?: string; permissions?: string[] }) {
   return api.post<RoleRecord>("/roles", data);
 }

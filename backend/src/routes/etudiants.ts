@@ -10,6 +10,8 @@ import { historiquePaiements } from "@/db/schema/historique-paiements";
 import { stages } from "@/db/schema/stages";
 import { bulletins } from "@/db/schema/bulletins";
 import { ownEtudiantId, teacherScope, etudiantInScope } from "@/lib/scope";
+import { requirePerm } from "@/lib/permissions";
+import { codesHistoriques, stripPrefixe, libelleNiveauBackend } from "@/lib/niveaux";
 import { escCsvCell as escCsv } from "@/lib/csv";
 import { eq, desc, sql, or, and, inArray } from "drizzle-orm";
 
@@ -83,7 +85,9 @@ export async function etudiantRoutes(app: FastifyInstance) {
       result = result.where(eq(etudiants.filiere, query.filiere));
     }
     if (query.niveau) {
-      result = result.where(eq(etudiants.niveau, query.niveau));
+      // Données neuves comme historiques (voir liste principale).
+      const variantes = [query.niveau, ...codesHistoriques(query.niveau)];
+      result = result.where(inArray(etudiants.niveau, variantes));
     }
     if (query.statut) {
       result = result.where(eq(etudiants.statut, query.statut));
@@ -152,8 +156,14 @@ export async function etudiantRoutes(app: FastifyInstance) {
         .limit(1);
       if (formateur) {
         if (formateur.groupes.length > 0) {
-          const g = formateur.groupes;
-          result = result.where(sql`${etudiants.groupe} = ANY(${g}::text[])`);
+          // Données neuves comme historiques : on matche le libellé nu en
+          // plus de la valeur brute (« S5-G1 » ≡ « G1 »).
+          const elargis = [
+            ...new Set(
+              formateur.groupes.flatMap((g) => [g, stripPrefixe(g)]),
+            ),
+          ];
+          result = result.where(sql`${etudiants.groupe} = ANY(${elargis}::text[])`);
         }
         if (formateur.departement) {
           result = result.where(eq(etudiants.filiere, formateur.departement));
@@ -184,7 +194,9 @@ export async function etudiantRoutes(app: FastifyInstance) {
     }
 
     if (query.niveau) {
-      result = result.where(eq(etudiants.niveau, query.niveau));
+      // Données neuves comme historiques (voir ci-dessus).
+      const variantes = [query.niveau, ...codesHistoriques(query.niveau)];
+      result = result.where(inArray(etudiants.niveau, variantes));
     }
 
     if (query.statut) {
@@ -349,7 +361,7 @@ export async function etudiantRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")], bodyLimit: 2_000_000 }, async (request, reply) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.write")], bodyLimit: 2_000_000 }, async (request, reply) => {
     const input = etudiantSchema.parse(request.body);
     const db = getDb();
 
@@ -410,7 +422,7 @@ export async function etudiantRoutes(app: FastifyInstance) {
     }
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")], bodyLimit: 2_000_000 }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.write")], bodyLimit: 2_000_000 }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = etudiantSchema.partial().parse(request.body);
     const db = getDb();
@@ -446,14 +458,14 @@ export async function etudiantRoutes(app: FastifyInstance) {
     return etudiant;
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.delete")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.update(etudiants).set({ archived: true }).where(eq(etudiants.id, id));
     return { ok: true };
   });
 
-  app.post("/:id/restore", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/:id/restore", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.write")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.update(etudiants).set({ archived: false }).where(eq(etudiants.id, id));
@@ -493,7 +505,9 @@ export async function etudiantRoutes(app: FastifyInstance) {
       const NIVEAUX = [
         "1ère année", "2ème année", "3ème année",
       ] as const;
-      const idx = NIVEAUX.indexOf(etudiant.niveau as typeof NIVEAUX[number]);
+      // Données historiques en codes S1–S6 : on raisonne sur le libellé année.
+      const niveauNorm = libelleNiveauBackend(etudiant.niveau);
+      const idx = (NIVEAUX as readonly string[]).indexOf(niveauNorm);
       if (idx <= 0) return [];
 
       const notes = await db

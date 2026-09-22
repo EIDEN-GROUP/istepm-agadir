@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
+import { requirePerm } from "@/lib/permissions";
 import { getDb } from "@/db";
 import { etudiants } from "@/db/schema/etudiants";
 import { paiementsMensuels } from "@/db/schema/paiements-mensuels";
@@ -71,7 +72,7 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
     return rows;
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable")] }, async (request, reply) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable"), requirePerm("paiements.write")] }, async (request, reply) => {
     const input = paiementMensuelSchema.parse(request.body);
     const db = getDb();
 
@@ -156,7 +157,7 @@ export async function paiementIstpmRoutes(app: FastifyInstance) {
     };
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable"), requirePerm("paiements.write")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = updateMensuelSchema.parse(request.body);
     const db = getDb();

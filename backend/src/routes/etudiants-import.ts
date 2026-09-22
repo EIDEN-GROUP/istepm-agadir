@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
+import { requirePerm } from "@/lib/permissions";
 import { getDb } from "@/db";
 import { etudiants } from "@/db/schema/etudiants";
 import { settings } from "@/db/schema/settings";
@@ -136,7 +137,7 @@ function isValidPhone(phone: string): boolean {
 }
 
 export async function etudiantImportRoutes(app: FastifyInstance) {
-  app.post("/import/preview", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.post("/import/preview", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.write")] }, async (request, reply) => {
     const { csvText } = z.object({ csvText: z.string().min(1, "CSV text is required") }).parse(request.body);
 
     if (csvText.length > 10 * 1024 * 1024) {
@@ -265,7 +266,7 @@ export async function etudiantImportRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post("/import/execute", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.post("/import/execute", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.write")] }, async (request, reply) => {
     const schema = z.object({
       rows: z.array(z.object({
         cne: z.string(),

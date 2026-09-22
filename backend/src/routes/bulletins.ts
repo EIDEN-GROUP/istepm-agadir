@@ -5,6 +5,8 @@ import { getDb } from "@/db";
 import { bulletins } from "@/db/schema/bulletins";
 import { notesEtudiant } from "@/db/schema/notes-etudiant";
 import { ownEtudiantId, teacherScope } from "@/lib/scope";
+import { requirePerm } from "@/lib/permissions";
+import { codesHistoriques } from "@/lib/niveaux";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 
 const bulletinSchema = z.object({
@@ -64,7 +66,9 @@ export async function bulletinRoutes(app: FastifyInstance) {
       result = result.where(eq(bulletins.filiere, query.filiere));
     }
     if (query.niveau) {
-      result = result.where(eq(bulletins.niveau, query.niveau));
+      // Données neuves comme historiques (codes S équivalents inclus).
+      const variantes = [query.niveau, ...codesHistoriques(query.niveau)];
+      result = result.where(inArray(bulletins.niveau, variantes));
     }
     if (query.statut) {
       result = result.where(eq(bulletins.statut, query.statut));
@@ -141,7 +145,7 @@ export async function bulletinRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("bulletins.write")] }, async (request) => {
     const input = bulletinSchema.parse(request.body);
     const db = getDb();
     const [bulletin] = await db
@@ -155,7 +159,7 @@ export async function bulletinRoutes(app: FastifyInstance) {
     return bulletin;
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("bulletins.write")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = bulletinUpdateSchema.parse(request.body);
     const db = getDb();
@@ -175,7 +179,7 @@ export async function bulletinRoutes(app: FastifyInstance) {
     return bulletin;
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("bulletins.delete")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(bulletins).where(eq(bulletins.id, id));
@@ -184,7 +188,7 @@ export async function bulletinRoutes(app: FastifyInstance) {
 
   app.post(
     "/:id/publier",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("bulletins.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();
@@ -200,7 +204,7 @@ export async function bulletinRoutes(app: FastifyInstance) {
 
   app.post(
     "/publier-tout",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("bulletins.write")] },
     async () => {
       const db = getDb();
       const result = await db

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
+import { requirePerm } from "@/lib/permissions";
 import { getDb } from "@/db";
 import { users } from "@/db/schema/users";
 import { eq } from "drizzle-orm";
@@ -197,7 +198,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post(
     "/register",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.write")] },
     async (request, reply) => {
       const input = createUserSchema.parse(request.body);
       const existing = await findByEmail(input.email);
@@ -209,13 +210,13 @@ export async function authRoutes(app: FastifyInstance) {
     },
   );
 
-  app.get("/users", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async () => {
+  app.get("/users", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.read")] }, async () => {
     return listAllUsers();
   });
 
   app.put(
     "/users/:id",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const input = updateUserSchema.parse(request.body);
@@ -229,7 +230,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.delete(
     "/users/:id",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.delete")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       await deleteUser(id);
@@ -239,7 +240,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.put(
     "/users/:id/role",
-    { preHandler: [authenticate, requireRole("directeur")] },
+    { preHandler: [authenticate, requireRole("directeur"), requirePerm("users.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const { role } = assignRoleSchema.parse(request.body);

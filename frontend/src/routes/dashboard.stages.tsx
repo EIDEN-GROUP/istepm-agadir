@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
+import { useCan } from "@/lib/permissions";
 import { useStamp } from "@/lib/stamp";
 import {
   makeStageDocPdf,
@@ -474,8 +475,8 @@ function StagesAnalytics({
 function StagesPage() {
   const { role } = useAuth();
   const { stages, etudiants, structuresAccueil, servicesStage, addStage, updateStage, deleteStage, addStructureAccueil, addServiceStage, photoDe, institut } = useIstpm();
-  // Conventions are handled by student administration.
-  const canManage = role === "directeur" || role === "responsable";
+  // Conventions are handled by student administration (fiche rôle tranche).
+  const canManage = useCan("stages.write", role === "directeur" || role === "responsable");
 
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);

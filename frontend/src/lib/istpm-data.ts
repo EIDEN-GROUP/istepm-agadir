@@ -42,10 +42,36 @@ export type Niveau = (typeof NIVEAUX)[number];
  * passe telle quelle (dont les 3 libellés officiels).
  */
 export function libelleNiveau(v: string | null | undefined): string {
-  const m = /^S([1-6])$/i.exec(String(v ?? "").trim());
+  const t = String(v ?? "").trim();
+  const m = /^S([1-6])$/i.exec(t);
   if (!m) return String(v ?? "");
-  const n = Number(m[1]);
-  return n <= 2 ? "1ère année" : n <= 4 ? "2ème année" : "3ème année";
+  return ANNEE_DE_CODE[`S${m[1]}`] ?? String(v ?? "");
+}
+
+/**
+ * Groupe normalisé pour les comparaisons (filtres, convocations) : retire un
+ * éventuel préfixe « S5- » hérité des anciennes données. Idempotent : les
+ * libellés neufs passent inchangés.
+ */
+export function normGroupe(g: string | null | undefined): string {
+  const t = String(g ?? "").trim();
+  const m = /^S[1-6]-(.+)$/i.exec(t);
+  return m ? m[1].trim() : t;
+}
+
+/** Table historique S1–S6 → année d'étude (données d'avant la refonte). */
+const ANNEE_DE_CODE: Record<string, string> = {
+  S1: "1ère année",
+  S2: "1ère année",
+  S3: "2ème année",
+  S4: "2ème année",
+  S5: "3ème année",
+  S6: "3ème année",
+};
+
+/** Année d'étude d'un code semestre historique (« S5 » → « 3ème année »). */
+export function anneeDeCode(code: string): string | null {
+  return ANNEE_DE_CODE[String(code ?? "").trim().toUpperCase()] ?? null;
 }
 
 /** CHU / hôpitaux / cliniques d'accueil (structures de stage réelles au Maroc). */

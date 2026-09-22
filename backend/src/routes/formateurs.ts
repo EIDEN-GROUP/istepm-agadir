@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
+import { requirePerm } from "@/lib/permissions";
 import { getDb, getPool } from "@/db";
 import { formateurs } from "@/db/schema/formateurs";
 import { eq, desc, asc, sql, or } from "drizzle-orm";
@@ -87,7 +88,7 @@ export async function formateurRoutes(app: FastifyInstance) {
     return formateur;
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("formateurs.write")] }, async (request) => {
     const input = formateurSchema.parse(request.body);
     const db = getDb();
     const [formateur] = await db
@@ -97,7 +98,7 @@ export async function formateurRoutes(app: FastifyInstance) {
     return formateur;
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("formateurs.write")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = formateurSchema.partial().parse(request.body);
     const db = getDb();
@@ -130,7 +131,7 @@ export async function formateurRoutes(app: FastifyInstance) {
     }).optional(),
   });
 
-  app.post("/:id/archive", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.post("/:id/archive", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("formateurs.write")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = archiveSchema.parse(request.body);
     const db = getDb();
@@ -193,7 +194,7 @@ export async function formateurRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/:id/restore", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.post("/:id/restore", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("formateurs.write")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [formateur] = await db
@@ -207,7 +208,7 @@ export async function formateurRoutes(app: FastifyInstance) {
 
   // Suppression logique comme les étudiants : l'historique (notes saisies,
   // séances, disponibilités) survit ; restauration via POST /:id/restore.
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("formateurs.delete")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.update(formateurs).set({ archived: true }).where(eq(formateurs.id, id));

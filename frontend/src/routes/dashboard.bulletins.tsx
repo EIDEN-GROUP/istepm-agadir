@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { escapeHtml } from "@/lib/escape-html";
 import { useStamp } from "@/lib/stamp";
 import { useIstpm, mentionFor, decisionFor } from "@/lib/istpm-store";
+import { useCan } from "@/lib/permissions";
 import {
   FILIERES,
   NIVEAUX,
@@ -210,8 +211,8 @@ function BulletinsPage() {
   const { role } = useAuth();
   const { bulletins, etudiants, updateBulletin, publierBulletin, publierTousBulletins, photoDe, bulletinConfig: cfg, institut } =
     useIstpm();
-  // Publishing transcripts is a student-administration act.
-  const canPublish = role === "directeur" || role === "responsable";
+  // Publishing transcripts is a student-administration act (fiche rôle tranche).
+  const canPublish = useCan("bulletins.write", role === "directeur" || role === "responsable");
   // Cachet officiel servi par le backend, apposé sur les bulletins imprimés.
   const stamp = useStamp();
 

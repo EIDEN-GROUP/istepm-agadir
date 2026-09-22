@@ -18,11 +18,13 @@ import {
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { useIstpm, useCurrentFormateur } from "@/lib/istpm-store";
+import { useIstpm, useCurrentFormateur, niveauDuGroupe } from "@/lib/istpm-store";
+import { useCan } from "@/lib/permissions";
 import {
   FILIERES,
   NIVEAUX,
   libelleNiveau,
+  normGroupe,
   DUREES_EXAMEN,
   TYPE_EXAMEN_LABEL,
   STATUT_EXAMEN_LABEL,
@@ -113,14 +115,6 @@ const ETAT_SUJET = ["Déposé", "Manquant"] as const;
 function nomFormateur(formateurs: Formateur[], id: string) {
   const f = formateurs.find((x) => x.id === id);
   return f ? `${f.prenom} ${f.nom}` : " ";
-}
-
-/**
- * Classe convoquée = le groupe tel quel (« G1 », « A »…), associé à un niveau
- * (1ère/2ème/3ème année) porté séparément par l'examen et la fiche étudiant.
- */
-function classeLabel(groupe: string) {
-  return groupe;
 }
 
 /** Pastille d'état du sujet déposé. */
@@ -481,14 +475,14 @@ function EspaceFormateur() {
     return [...set].sort().reverse();
   }, [examens]);
 
-  /** Classes réelles (groupes des séances et des étudiants) : la convocation
-   *  compare le groupe à l'identique — la saisie libre produisait des classes
-   *  vides. */
+  /** Classes réelles (groupes des séances et des étudiants, normalisés) :
+   *  la convocation compare à l'identique — la saisie libre produisait des
+   *  classes vides. */
   const classesDisponibles = useMemo(() => {
     const set = new Set<string>();
-    for (const s of seances) if (s.groupe.trim()) set.add(s.groupe.trim());
+    for (const s of seances) if (s.groupe.trim()) set.add(normGroupe(s.groupe));
     for (const e of etudiants) {
-      if (e.groupe) set.add(classeLabel(e.groupe));
+      if (e.groupe) set.add(normGroupe(e.groupe));
     }
     return [...set].sort();
   }, [seances, etudiants]);
@@ -498,16 +492,17 @@ function EspaceFormateur() {
     const map: Record<string, number> = {};
     for (const e of etudiants) {
       if (!e.groupe || e.statut === "abandon") continue;
-      const k = classeLabel(e.groupe);
+      const k = normGroupe(e.groupe);
       map[k] = (map[k] ?? 0) + 1;
     }
     return map;
   }, [etudiants]);
 
   // Le formateur connecté : ses examens seulement. Sans fiche liée, la liste
-  // est vide (le compte doit être lié).
+  // est vide (le compte doit être lié). L'écriture suit la fiche rôle.
   const moi = useCurrentFormateur();
   const moiId = moi?.id ?? "";
+  const peutEcrire = useCan("examens.write", true);
 
   // Groupes réellement encadrés par le formateur connecté, pour restreindre
   // les sélecteurs Niveau / Groupe à son affectation.
@@ -543,7 +538,7 @@ function EspaceFormateur() {
     const q = search.trim().toLowerCase();
     return mesExamens.filter((x) => {
       if (type !== ALL && TYPE_EXAMEN_LABEL[x.type] !== type) return false;
-      if (niveau !== ALL && x.niveau !== niveau) return false;
+      if (niveau !== ALL && libelleNiveau(x.niveau) !== niveau) return false;
       if (sujet !== ALL && (sujet === "Déposé") !== !!x.document) return false;
       if (!q) return true;
       return `${x.titre} ${x.module} ${x.classe} ${x.salle}`
@@ -569,15 +564,17 @@ function EspaceFormateur() {
                   {sansSujet} sans sujet déposé
                 </span>
               ) : null}
-              <button
-                className={primaryPill}
-                onClick={() => {
-                  setEditing(null);
-                  setFormOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4" /> Nouvel examen
-              </button>
+              {peutEcrire ? (
+                <button
+                  className={primaryPill}
+                  onClick={() => {
+                    setEditing(null);
+                    setFormOpen(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4" /> Nouvel examen
+                </button>
+              ) : null}
             </>
           ) : null
         }
@@ -706,23 +703,27 @@ function EspaceFormateur() {
                 >
                   <Eye className="h-3.5 w-3.5" />
                 </button>
-                <button
-                  className={iconButton}
-                  aria-label="Modifier"
-                  onClick={() => {
-                    setEditing(x);
-                    setFormOpen(true);
-                  }}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  className={iconButtonDanger}
-                  aria-label="Supprimer"
-                  onClick={() => setToDelete(x)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {peutEcrire ? (
+                  <>
+                    <button
+                      className={iconButton}
+                      aria-label="Modifier"
+                      onClick={() => {
+                        setEditing(x);
+                        setFormOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      className={iconButtonDanger}
+                      aria-label="Supprimer"
+                      onClick={() => setToDelete(x)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                ) : null}
               </div>
             </td>
           </motion.tr>
@@ -849,7 +850,7 @@ function EspaceDirecteur() {
   const [preview, setPreview] = useState<Examen | null>(null);
 
   // Listes de filtres dérivées des examens réellement présents. Les groupes
-  // suivent le niveau choisi.
+  // suivent le niveau choisi (comparés normalisés).
   const modules = useMemo(
     () => [...new Set(examens.map((x) => x.module))].sort(),
     [examens],
@@ -859,8 +860,8 @@ function EspaceDirecteur() {
       [
         ...new Set(
           examens
-            .filter((x) => semestre === ALL || x.niveau === semestre)
-            .map((x) => x.classe),
+            .filter((x) => semestre === ALL || libelleNiveau(x.niveau) === semestre)
+            .map((x) => normGroupe(x.classe)),
         ),
       ].sort(),
     [examens, semestre],
@@ -884,8 +885,8 @@ function EspaceDirecteur() {
       if (prof !== ALL && nomFormateur(formateurs, x.createdBy) !== prof)
         return false;
       if (module !== ALL && x.module !== module) return false;
-      if (classe !== ALL && x.classe !== classe) return false;
-      if (semestre !== ALL && x.niveau !== semestre) return false;
+      if (classe !== ALL && normGroupe(x.classe) !== classe) return false;
+      if (semestre !== ALL && libelleNiveau(x.niveau) !== semestre) return false;
       if (anneeScolaire !== ALL && x.anneeUniversitaire !== anneeScolaire)
         return false;
       if (!q) return true;
@@ -1172,13 +1173,15 @@ function ExamenForm({
     setErrors((prev) => ({ ...prev, [k]: undefined }));
   };
 
-  /** Niveaux du formateur, lus dans le registre des groupes (repli : tout). */
+  /** Niveaux du formateur, lus dans le registre des groupes (repli : tout).
+   *  Comparés normalisés : données neuves comme historiques. */
   const niveauOptions = useMemo(() => {
+    const normes = mesGroupes.map(normGroupe);
     const lies = [
       ...new Set(
         groupesReg
-          .filter((g) => mesGroupes.includes(g.name))
-          .map((g) => g.semester)
+          .filter((g) => normes.includes(normGroupe(g.name)))
+          .map((g) => libelleNiveau(g.semester))
           .filter(Boolean),
       ),
     ].sort();
@@ -1189,13 +1192,11 @@ function ExamenForm({
    *  registre), sinon les classes réelles. Les groupes hors registre sont
    *  toujours conservés (niveau indéterminable). La valeur déjà portée par
    *  un examen en édition est toujours conservée. */
-  const niveauDuGroupe = (nom: string): string | null =>
-    groupesReg.find((g) => g.name === nom)?.semester ?? null;
   const groupeOptions = useMemo(() => {
     const base = mesGroupes.length ? mesGroupes : classesDisponibles;
     const list = base.filter((g) => {
       if (!f.niveau) return true;
-      const n = niveauDuGroupe(g);
+      const n = niveauDuGroupe(g, groupesReg);
       return n === null || n === f.niveau;
     });
     if (initial?.classe && !list.includes(initial.classe)) list.push(initial.classe);
@@ -1439,18 +1440,21 @@ function ExamenForm({
  */
 function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
   const { etudiants, addNote, updateExamen, deleteNote: supprimerNote } = useIstpm();
+  // Même règle que la création d'examens (repli : saisie autorisée).
+  const peutEcrire = useCan("examens.write", true);
   const [examenId, setExamenId] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
 
-  // La classe convoquée = les étudiants du groupe et du niveau de l'examen.
+  // La classe convoquée = les étudiants du groupe ET du niveau de l'examen
+  // (comparés normalisés : données neuves comme historiques).
   const examen = examens.find((x) => x.id === examenId);
   const convoques = useMemo(
     () =>
       examen
         ? etudiants.filter(
             (e) =>
-              e.groupe === examen.classe &&
-              e.niveau === examen.niveau &&
+              normGroupe(e.groupe) === normGroupe(examen.classe) &&
+              libelleNiveau(e.niveau) === libelleNiveau(examen.niveau) &&
               e.statut !== "abandon",
           )
         : [],
@@ -1463,8 +1467,8 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
     const roster = ex
       ? etudiants.filter(
           (e) =>
-            e.groupe === ex.classe &&
-            e.niveau === ex.niveau &&
+            normGroupe(e.groupe) === normGroupe(ex.classe) &&
+            libelleNiveau(e.niveau) === libelleNiveau(ex.niveau) &&
             e.statut !== "abandon",
         )
       : [];
@@ -1637,11 +1641,13 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
                     </tr>
                   ))}
                 </DetailTable>
-                <div className="flex justify-end">
-                  <button className={primaryPill} onClick={enregistrer}>
-                    <Save className="h-4 w-4" /> Enregistrer les notes
-                  </button>
-                </div>
+                {peutEcrire ? (
+                  <div className="flex justify-end">
+                    <button className={primaryPill} onClick={enregistrer}>
+                      <Save className="h-4 w-4" /> Enregistrer les notes
+                    </button>
+                  </div>
+                ) : null}
               </>
             ) : (
               <DetailEmpty>
@@ -1703,13 +1709,15 @@ function SaisieNotesPanel({ examens }: { examens: Examen[] }) {
             </td>
             <td className="text-center">
               <div className={rowActions}>
-                <button
-                  className={iconButtonDanger}
-                  aria-label="Supprimer la note"
-                  onClick={() => removeNote(r.etudiantId, r.module)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {peutEcrire ? (
+                  <button
+                    className={iconButtonDanger}
+                    aria-label="Supprimer la note"
+                    onClick={() => removeNote(r.etudiantId, r.module)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
               </div>
             </td>
           </motion.tr>

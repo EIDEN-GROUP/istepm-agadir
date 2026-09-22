@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { notesEtudiant } from "@/db/schema/notes-etudiant";
 import { etudiants } from "@/db/schema/etudiants";
 import { teacherScope, etudiantInScope } from "@/lib/scope";
+import { requirePerm } from "@/lib/permissions";
 import { eq, and } from "drizzle-orm";
 
 const createNoteSchema = z.object({
@@ -44,7 +45,7 @@ async function recalculerMoyenne(db: ReturnType<typeof getDb>, etudiantId: strin
 export async function noteRoutes(app: FastifyInstance) {
   app.post(
     "/",
-    { preHandler: [authenticate, requireRole("directeur", "enseignant", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "enseignant", "responsable"), requirePerm("examens.write")] },
     async (request, reply) => {
       const input = createNoteSchema.parse(request.body);
       const db = getDb();
@@ -107,7 +108,7 @@ export async function noteRoutes(app: FastifyInstance) {
 
   app.delete(
     "/:id",
-    { preHandler: [authenticate, requireRole("directeur", "enseignant", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "enseignant", "responsable"), requirePerm("examens.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();

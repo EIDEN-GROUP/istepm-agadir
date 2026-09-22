@@ -6,12 +6,15 @@ INSERT INTO "roles" ("name", "description", "permissions", "is_system") VALUES
    '["etudiants.read", "etudiants.write", "etudiants.delete", "formateurs.read", "formateurs.write", "formateurs.delete", "examens.read", "examens.write", "examens.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "paiements.read", "paiements.write", "paiements.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read"]'::jsonb,
    true),
   ('responsable', 'Gestion pédagogique et organisationnelle',
-   '["etudiants.read", "etudiants.write", "formateurs.read", "formateurs.write", "examens.read", "examens.write", "bulletins.read", "bulletins.write", "stages.read", "stages.write", "paiements.read", "paiements.write", "settings.read", "settings.write", "dashboard.read"]'::jsonb,
+   '["etudiants.read", "etudiants.write", "etudiants.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "paiements.read", "paiements.write", "paiements.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read"]'::jsonb,
    true),
   ('enseignant', 'Accès limité à ses modules, séances, et saisie de notes',
-   '["etudiants.read", "examens.read", "examens.write", "bulletins.read", "dashboard.read"]'::jsonb,
+   '["etudiants.read", "examens.read", "examens.write", "examens.delete", "bulletins.read", "roles.read", "roles.manage", "dashboard.read"]'::jsonb,
    true)
-ON CONFLICT ("name") DO NOTHING;
+ON CONFLICT ("name") DO UPDATE SET
+  "description" = EXCLUDED."description",
+  "permissions" = EXCLUDED."permissions",
+  "is_system" = EXCLUDED."is_system";
 
 -- Comptes de test (mots de passe faibles — recette uniquement).
 -- direction@istpm-agadir.ma / directeur123 · enseignant@… / enseignant123 · responsable@… / responsable123

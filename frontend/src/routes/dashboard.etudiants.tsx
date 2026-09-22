@@ -4,7 +4,8 @@ import { Plus, Pencil, Eye, Download, Archive, RotateCcw, Upload, ListFilter, Ch
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { useIstpm, useCurrentFormateur, type NouvelEtudiant } from "@/lib/istpm-store";
+import { useIstpm, useCurrentFormateur, niveauDuGroupe, type NouvelEtudiant } from "@/lib/istpm-store";
+import { useCan } from "@/lib/permissions";
 import { ImportEtudiantsDialog, downloadExempleEtudiantsCsv } from "@/components/import-etudiants-dialog";
 import { InviteLinkBanner } from "@/components/invite-link-banner";
 import { fetchStudentSemestres, exportEtudiantsCsv, createInvitation } from "@/lib/istpm-api";
@@ -12,6 +13,7 @@ import {
   FILIERES,
   NIVEAUX,
   libelleNiveau,
+  normGroupe,
   STATUT_ETUDIANT_LABEL,
   STATUT_ETUDIANT_TONE,
   STATUT_PAIEMENT_LABEL,
@@ -83,12 +85,12 @@ const STATUTS_PAIEMENT: StatutPaiement[] = [
 
 function EtudiantsPage() {
   const { role } = useAuth();
-  const { etudiants, filieres: filieresApi, anneesUniversitaires: anneesRegistre, addEtudiant, updateEtudiant, deleteEtudiant, restoreEtudiant } = useIstpm();
+  const { etudiants, filieres: filieresApi, anneesUniversitaires: anneesRegistre, groupConfigs, addEtudiant, updateEtudiant, deleteEtudiant, restoreEtudiant } = useIstpm();
   // Référentiel serveur, repli constant (jamais vide en pratique : amorcé en migration).
   const filieresOptions = filieresApi.length ? filieresApi : [...FILIERES];
   // Teachers get a read-only view; student administration is the responsable's
-  // and the directeur's job.
-  const canEdit = role === "directeur" || role === "responsable";
+  // and the directeur's job (sauf fiche rôle contraire : `useCan` tranche).
+  const canEdit = useCan("etudiants.write", role === "directeur" || role === "responsable");
 
   // Teachers start from an explicit selection (filière + semestre + groupe)
   // rather than the full roster, so the view stays focused on one class.
@@ -100,11 +102,15 @@ function EtudiantsPage() {
   const enseignantScope = useMemo(() => {
     if (!isTeacher) return null;
     if (!currentFormateur) return null;
-    // Semestres enseignés par le formateur, déduits du préfixe de ses groupes
-    // (« S5-G1 » → « S5 »). Le formateur voit TOUS les étudiants de sa filière
-    // dans ces semestres, quel que soit le sous-groupe (G1/G2).
+    // Niveaux enseignés, lus dans le registre des groupes (repli : préfixe
+    // historique). Le formateur voit TOUS les étudiants de sa filière dans
+    // ces niveaux, quel que soit le sous-groupe (G1/G2).
     const niveaux = [
-      ...new Set(currentFormateur.groupes.map((g) => g.split("-")[0])),
+      ...new Set(
+        currentFormateur.groupes
+          .map((g) => niveauDuGroupe(g, groupConfigs))
+          .filter((n): n is string => n !== null),
+      ),
     ];
     return {
       filiere: currentFormateur.departement,
@@ -112,7 +118,7 @@ function EtudiantsPage() {
       groupes: currentFormateur.groupes,
       modules: currentFormateur.modules,
     };
-  }, [isTeacher, currentFormateur]);
+  }, [isTeacher, currentFormateur, groupConfigs]);
 
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);
@@ -122,24 +128,30 @@ function EtudiantsPage() {
   const [statut, setStatut] = useState<string>(ALL);
   const [moduleFilter, setModuleFilter] = useState<string>(ALL);
 
-  // Groups relevant to the current filière / semestre choice, so the teacher's
-  // group picker only offers real classes.
+  // Groupes : libellés normalisés (anciens « S5-G1 » et « G1 » fusionnés),
+  // restreints au niveau choisi (comparé normalisé lui aussi).
   const groupeOptions = useMemo(() => {
     // Un formateur ne choisit que parmi SES groupes encadrés (filtrés par le
-    // semestre sélectionné) — pas tous les groupes de l'établissement.
+    // niveau sélectionné) — pas tous les groupes de l'établissement.
     if (enseignantScope) {
-      return [...new Set(enseignantScope.groupes)]
-        .filter((g) => niveau === ALL || g.split("-")[0] === niveau)
+      return [...new Set(enseignantScope.groupes.map(normGroupe))]
+        .filter(
+          (g) =>
+            niveau === ALL ||
+            enseignantScope.groupes.some(
+              (raw) => normGroupe(raw) === g && (niveauDuGroupe(raw, groupConfigs) ?? niveau) === niveau,
+            ),
+        )
         .sort();
     }
     const set = new Set<string>();
     for (const e of etudiants) {
       if (filiere !== ALL && e.filiere !== filiere) continue;
-      if (niveau !== ALL && e.niveau !== niveau) continue;
-      if (e.groupe) set.add(e.groupe);
+      if (niveau !== ALL && libelleNiveau(e.niveau) !== niveau) continue;
+      if (e.groupe) set.add(normGroupe(e.groupe));
     }
     return [...set].sort();
-  }, [etudiants, filiere, niveau, enseignantScope]);
+  }, [etudiants, filiere, niveau, enseignantScope, groupConfigs]);
   // Drop a group choice that no longer matches the filière/semestre.
   useEffect(() => {
     if (groupe !== ALL && !groupeOptions.includes(groupe)) setGroupe(ALL);
@@ -210,18 +222,19 @@ function EtudiantsPage() {
     return etudiants.filter((e) => {
       if (!showArchived && e.archived) return false;
       // Enseignant scope: only show students in assigned filiere & groupes
+      // (comparaisons normalisées : données neuves comme historiques).
       if (enseignantScope) {
         if (e.filiere !== enseignantScope.filiere) return false;
         if (
           enseignantScope.niveaux.length > 0 &&
-          !enseignantScope.niveaux.includes(e.niveau)
+          !enseignantScope.niveaux.includes(libelleNiveau(e.niveau))
         )
           return false;
       }
       if (filiere !== ALL && e.filiere !== filiere) return false;
-      if (niveau !== ALL && e.niveau !== niveau) return false;
+      if (niveau !== ALL && libelleNiveau(e.niveau) !== niveau) return false;
       if (anneeScolaire !== ALL && e.annee !== anneeScolaire) return false;
-      if (groupe !== ALL && e.groupe !== groupe) return false;
+      if (groupe !== ALL && normGroupe(e.groupe) !== groupe) return false;
       if (statut !== ALL && STATUT_ETUDIANT_LABEL[e.statut] !== statut)
         return false;
       if (!q) return true;

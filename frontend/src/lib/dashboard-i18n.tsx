@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { UserRole } from "@/lib/auth";
 import type { NavEntry, NavGroup, NavItem } from "@/components/dash-sidebar";
+import { usePermissions } from "@/lib/permissions";
 import { fr as dateFnsFr, ar as dateFnsAr } from "date-fns/locale";
 import frDashboard from "@/locales/dashboard/fr.json";
 import arDashboard from "@/locales/dashboard/ar.json";
@@ -183,11 +184,40 @@ const COMMON_ROUTES: readonly string[] = ["/dashboard/mon-profil"];
 export function canAccess(role: UserRole | null, to: string): boolean {
   if (!role) return false;
   if (COMMON_ROUTES.includes(to)) return true;
-  return NAV_BY_ROLE[role].includes(to);
+  return (NAV_BY_ROLE[role] ?? []).includes(to);
+}
+
+/**
+ * Page → permission de lecture. Seules ces 7 rubriques suivent les fiches
+ * rôles ; le reste (accueil, planning, espace étudiant, profil, finance)
+ * reste gouverné par `NAV_BY_ROLE`.
+ */
+export const ROUTE_READ_PERM: Record<string, string> = {
+  "/dashboard/etudiants": "etudiants.read",
+  "/dashboard/formateurs": "formateurs.read",
+  "/dashboard/examens": "examens.read",
+  "/dashboard/bulletins": "bulletins.read",
+  "/dashboard/stages": "stages.read",
+  "/dashboard/paiements": "paiements.read",
+  "/dashboard/settings": "settings.read",
+};
+
+/** Variante tenant compte des permissions effectives (sinon `canAccess`). */
+export function canAccessWithPerms(
+  role: UserRole | null,
+  to: string,
+  can: (perm: string) => boolean,
+): boolean {
+  if (!role) return false;
+  if (COMMON_ROUTES.includes(to)) return true;
+  const perm = ROUTE_READ_PERM[to];
+  if (perm) return can(perm);
+  return (NAV_BY_ROLE[role] ?? []).includes(to);
 }
 
 export function useDashboardNav(role: UserRole | null) {
   const { t } = useDashboardI18n();
+  const { can, loading: permsLoading } = usePermissions();
 
   const nav: NavEntry[] = useMemo(() => {
     const item = (
@@ -303,20 +333,29 @@ export function useDashboardNav(role: UserRole | null) {
     ];
 
     if (!role) return all;
-    const allowed = NAV_BY_ROLE[role];
+
+    // Rubriques du catalogue : la fiche rôle tranche (repli historique
+    // pendant le chargement pour éviter tout flash). Le reste suit NAV_BY_ROLE.
+    const legacy = NAV_BY_ROLE[role] ?? [];
+    const visible = (to: string): boolean => {
+      const perm = ROUTE_READ_PERM[to];
+      if (!perm) return legacy.includes(to);
+      if (permsLoading) return legacy.includes(to);
+      return can(perm);
+    };
 
     // Groups are filtered by their children, and drop out entirely when the
     // role can reach none of them.
     return all.reduce<NavEntry[]>((acc, entry) => {
       if (!isGroupEntry(entry)) {
-        if (allowed.includes(entry.to)) acc.push(entry);
+        if (visible(entry.to)) acc.push(entry);
         return acc;
       }
-      const children = entry.children.filter((c) => allowed.includes(c.to));
-      if (children.length) acc.push({ ...entry, children });
+      const children = entry.children.filter((c) => visible(c.to));
+      if (children.length) acc.push(entry);
       return acc;
     }, []);
-  }, [t.nav, t.navShort, role]);
+  }, [t.nav, t.navShort, role, can, permsLoading]);
 
   return { nav, brand: t.shell.brand };
 }

@@ -3,7 +3,8 @@ import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { WifiOff, RefreshCw } from "lucide-react";
 import { DashSidebarShell } from "@/components/dash-sidebar";
-import { useDashboardI18n, useDashboardNav, canAccess } from "@/lib/dashboard-i18n";
+import { useDashboardI18n, useDashboardNav, canAccessWithPerms } from "@/lib/dashboard-i18n";
+import { usePermissions } from "@/lib/permissions";
 import { getStoredRole, useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
 
@@ -28,14 +29,17 @@ function DashboardLayout() {
   const { syncFailed, refresh } = useIstpm();
 
   // RBAC UI : renvoie un rôle vers ses destinations autorisées
-  // (ex. un étudiant sur /dashboard/etudiants → son espace).
+  // (ex. un étudiant sur /dashboard/etudiants → son espace). Attend les
+  // permissions effectives (fiches rôles) avant de rediriger.
+  const { can, loading: permsLoading } = usePermissions();
   useEffect(() => {
-    if (!role) return;
+    if (!role || permsLoading) return;
     const clean = pathname.endsWith("/") && pathname !== "/" ? pathname.slice(0, -1) : pathname;
-    if (!canAccess(role, clean)) {
-      navigate({ to: role === "etudiant" ? "/dashboard/espace-etudiant" : "/dashboard" });
+    if (!canAccessWithPerms(role, clean, can)) {
+      const home = role === "etudiant" ? "/dashboard/espace-etudiant" : "/dashboard";
+      navigate({ to: canAccessWithPerms(role, home, can) ? home : "/dashboard/mon-profil" });
     }
-  }, [role, pathname, navigate]);
+  }, [role, pathname, navigate, can, permsLoading]);
 
   return (
     <DashSidebarShell brand={brand} nav={nav} dir={dir}>

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm } from "@/lib/istpm-store";
+import { useCan } from "@/lib/permissions";
 import { useStamp } from "@/lib/stamp";
 import { PersonAvatar } from "@/components/person-avatar";
 import { makePaiementDocPdf } from "@/lib/branded-doc";
@@ -105,7 +106,7 @@ function PaiementsPage() {
     for (const e of etudiants) if (e.annee) set.add(e.annee);
     return [...set].sort().reverse();
   }, [etudiants]);
-  const canEdit = role === "directeur" || role === "responsable" || role === "comptable";
+  const canEdit = useCan("paiements.write", role === "directeur" || role === "responsable" || role === "comptable");
 
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);

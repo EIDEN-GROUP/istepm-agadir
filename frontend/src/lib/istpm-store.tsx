@@ -43,6 +43,7 @@ import {
   type Decision,
   type ExamDocument,
   type StructureAccueil,
+  libelleNiveau,
   type InstitutInfo,
   INSTITUT_DEFAUT,
   type BulletinConfig,
@@ -1787,6 +1788,19 @@ export function useIstpm() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useIstpm must be used within an IstpmProvider");
   return ctx;
+}
+
+/**
+ * Niveau d'un groupe : registre des groupes d'abord (nom → semestre),
+ * préfixe historique « SX- » sinon, `null` si indéterminable. Fonctionne sur
+ * données neuves comme historiques.
+ */
+export function niveauDuGroupe(nom: string, groupConfigs: GroupConfig[]): string | null {
+  const found = groupConfigs.find((g) => g.name === nom);
+  if (found?.semester) return libelleNiveau(found.semester);
+  const m = /^S([1-6])-/i.exec(nom.trim());
+  if (m) return libelleNiveau(`S${m[1]}`);
+  return null;
 }
 
 /**

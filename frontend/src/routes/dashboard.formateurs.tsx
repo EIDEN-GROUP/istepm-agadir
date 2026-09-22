@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useIstpm, type NouveauFormateur } from "@/lib/istpm-store";
+import { useCan } from "@/lib/permissions";
 import { createUser, createInvitation } from "@/lib/istpm-api";
 import { ImportCsvDialog, type ImportColumn } from "@/components/import-csv";
 import { InviteLinkBanner } from "@/components/invite-link-banner";
@@ -73,7 +74,7 @@ function FormateursPage() {
   const { role } = useAuth();
   const { formateurs, modules, seances, etudiants, filieres: filieresApi, addFormateur, updateFormateur, archiveFormateur, restoreFormateur } =
     useIstpm();
-  const canEdit = role === "directeur" || role === "responsable";
+  const canEdit = useCan("formateurs.write", role === "directeur" || role === "responsable");
   const filieresOptions = filieresApi.length ? filieresApi : [...FILIERES];
 
   /** Options du sélecteur : registre des modules (Paramètres › Modules),

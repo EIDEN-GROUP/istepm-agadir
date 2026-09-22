@@ -4,6 +4,7 @@ import { authenticate, requireRole } from "@/middleware/auth";
 import { getDb } from "@/db";
 import { roles } from "@/db/schema/roles";
 import { eq } from "drizzle-orm";
+import { PERMISSIONS_LIST, rolePermissions, requirePerm } from "@/lib/permissions";
 
 const createRoleSchema = z.object({
   name: z.string().min(1, "Nom requis"),
@@ -31,19 +32,6 @@ function estDirecteur(request: { user: { role: string } }): boolean {
   return request.user.role === "directeur";
 }
 
-const PERMISSIONS_LIST = [
-  "etudiants.read", "etudiants.write", "etudiants.delete",
-  "formateurs.read", "formateurs.write", "formateurs.delete",
-  "examens.read", "examens.write", "examens.delete",
-  "bulletins.read", "bulletins.write", "bulletins.delete",
-  "stages.read", "stages.write", "stages.delete",
-  "paiements.read", "paiements.write", "paiements.delete",
-  "settings.read", "settings.write",
-  "users.read", "users.write", "users.delete",
-  "roles.read", "roles.manage",
-  "dashboard.read",
-] as const;
-
 export { PERMISSIONS_LIST };
 export type Permission = (typeof PERMISSIONS_LIST)[number];
 
@@ -66,7 +54,7 @@ export async function roleRoutes(app: FastifyInstance) {
     return role;
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole(...ROLE_MANAGERS)] }, async (request, reply) => {
+  app.post("/", { preHandler: [authenticate, requireRole(...ROLE_MANAGERS), requirePerm("roles.manage")] }, async (request, reply) => {
     const input = createRoleSchema.parse(request.body);
     const nom = input.name.trim();
     if (!(ROLE_NAMES as readonly string[]).includes(nom)) {
@@ -82,7 +70,7 @@ export async function roleRoutes(app: FastifyInstance) {
     return role;
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole(...ROLE_MANAGERS)] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole(...ROLE_MANAGERS), requirePerm("roles.manage")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = updateRoleSchema.parse(request.body);
     const db = getDb();
@@ -109,7 +97,7 @@ export async function roleRoutes(app: FastifyInstance) {
     return updated;
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole(...ROLE_MANAGERS)] }, async (request, reply) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole(...ROLE_MANAGERS), requirePerm("roles.manage")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [existing] = await db.select().from(roles).where(eq(roles.id, id)).limit(1);
@@ -124,5 +112,15 @@ export async function roleRoutes(app: FastifyInstance) {
 
   app.get("/permissions/list", { preHandler: [authenticate] }, async () => {
     return PERMISSIONS_LIST;
+  });
+
+  // Permissions effectives du compte connecté (fiche ou repli historique).
+  // L'UI pilote nav et boutons dessus ; 404 = aucun repli connu.
+  app.get("/mine", { preHandler: [authenticate] }, async (request, reply) => {
+    const { permissions, source } = await rolePermissions(request.user.role);
+    if (permissions.length === 0 && source === "fallback") {
+      return reply.status(404).send({ error: "Aucune permission" });
+    }
+    return { permissions, source };
   });
 }

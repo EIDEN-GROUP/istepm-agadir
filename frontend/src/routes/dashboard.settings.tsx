@@ -38,6 +38,7 @@ import {
   type StructureAccueil,
 } from "@/lib/istpm-data";
 import { useIstpm } from "@/lib/istpm-store";
+import { useCan } from "@/lib/permissions";
 import { useStamp, saveStampImage, clearStampImage, prepareStampFromFile } from "@/lib/stamp";
 import {
   fetchSettings,
@@ -1514,6 +1515,8 @@ const VISIBLE_ACCOUNT_ROLES = ["directeur", "responsable", "comptable"];
 
 function SettingsPage() {
   const { role } = useAuth();
+  // Gestion des rôles gouvernée par la fiche (repli : directeur seul).
+  const peutRoles = useCan("roles.manage", role === "directeur");
   const {
     etudiants,
     formateurs,
@@ -1535,7 +1538,7 @@ function SettingsPage() {
     setCreneaux,
   } = useIstpm();
 
-  const autorisees = role ? SECTIONS_PAR_ROLE[role] : [];
+  const autorisees = role ? (SECTIONS_PAR_ROLE[role] ?? []) : [];
   const peut = (id: SectionId) => autorisees.includes(id);
 
   /* État local des réglages   non persisté côté serveur. */
@@ -2138,13 +2141,15 @@ function SettingsPage() {
           <Carte
             id="roles"
             action={
-              <button
-                type="button"
-                onClick={() => setShowNewRole(true)}
-                className={cn(ghostPill, "h-7 gap-1 px-2.5 text-[11px]")}
-              >
-                <Plus className="h-3 w-3" /> Nouveau rôle
-              </button>
+              peutRoles ? (
+                <button
+                  type="button"
+                  onClick={() => setShowNewRole(true)}
+                  className={cn(ghostPill, "h-7 gap-1 px-2.5 text-[11px]")}
+                >
+                  <Plus className="h-3 w-3" /> Nouveau rôle
+                </button>
+              ) : undefined
             }
           >
             <div className="space-y-3">
@@ -2168,14 +2173,16 @@ function SettingsPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setEditRole(editRole?.id === role.id ? null : role)}
-                          className={cn(ghostPill, "h-7 gap-1 px-2 text-[11px]")}
-                        >
-                          {editRole?.id === role.id ? "Fermer" : "Modifier"}
-                        </button>
-                        {!role.isSystem ? (
+                        {peutRoles ? (
+                          <button
+                            type="button"
+                            onClick={() => setEditRole(editRole?.id === role.id ? null : role)}
+                            className={cn(ghostPill, "h-7 gap-1 px-2 text-[11px]")}
+                          >
+                            {editRole?.id === role.id ? "Fermer" : "Modifier"}
+                          </button>
+                        ) : null}
+                        {!role.isSystem && peutRoles ? (
                           <button
                             type="button"
                             aria-label={`Supprimer ${role.name}`}

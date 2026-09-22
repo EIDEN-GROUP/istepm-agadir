@@ -1,9 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
+import { requirePerm } from "@/lib/permissions";
 import { getDb } from "@/db";
 import { stages } from "@/db/schema/stages";
-import { eq, desc, sql, or } from "drizzle-orm";
+import { codesHistoriques } from "@/lib/niveaux";
+import { eq, desc, sql, or, inArray } from "drizzle-orm";
 
 const stageSchema = z.object({
   etudiantId: z.string().uuid(),
@@ -52,7 +54,9 @@ export async function stageRoutes(app: FastifyInstance) {
       result = result.where(eq(stages.filiere, query.filiere));
     }
     if (query.niveau) {
-      result = result.where(eq(stages.niveau, query.niveau));
+      // Données neuves comme historiques (codes S équivalents inclus).
+      const variantes = [query.niveau, ...codesHistoriques(query.niveau)];
+      result = result.where(inArray(stages.niveau, variantes));
     }
     if (query.statut) {
       result = result.where(eq(stages.statut, query.statut));
@@ -84,7 +88,7 @@ export async function stageRoutes(app: FastifyInstance) {
     return stage;
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("stages.write")] }, async (request) => {
     const raw = stageSchema.parse(request.body);
     const input = cleanStageInput(raw);
     const db = getDb();
@@ -101,7 +105,7 @@ export async function stageRoutes(app: FastifyInstance) {
     return stage;
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("stages.write")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const raw = stageSchema.partial().parse(request.body);
     const input = cleanStageInput(raw);
@@ -125,7 +129,7 @@ export async function stageRoutes(app: FastifyInstance) {
     return stage;
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("stages.delete")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(stages).where(eq(stages.id, id));
@@ -134,7 +138,7 @@ export async function stageRoutes(app: FastifyInstance) {
 
   app.post(
     "/:id/valider",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("stages.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();

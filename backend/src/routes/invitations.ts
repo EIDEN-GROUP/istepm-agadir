@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authenticate, requireRole } from "@/middleware/auth";
+import { requirePerm } from "@/lib/permissions";
 import { getDb } from "@/db";
 import { emailLogs } from "@/db/schema/email-logs";
 
@@ -48,7 +49,7 @@ export async function invitationRoutes(app: FastifyInstance) {
   // pas seulement masqué dans l'UI).
   app.post(
     "/",
-    { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable")] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable"), requirePerm("users.write")] },
     async (request, reply) => {
       const input = createInviteSchema.parse(request.body);
       if (request.user.role === "comptable" && input.role !== "comptable") {
@@ -85,7 +86,7 @@ export async function invitationRoutes(app: FastifyInstance) {
   // Renvoyer : nouveau lien 24 h (staff).
   app.post(
     "/:userId/resend",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.write")] },
     async (request, reply) => {
       const { userId } = request.params as { userId: string };
       const result = await resendInvite(userId);
@@ -101,7 +102,7 @@ export async function invitationRoutes(app: FastifyInstance) {
   // Révoquer : tue le lien, le compte reste verrouillé (staff).
   app.delete(
     "/:userId",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.write")] },
     async (request) => {
       const { userId } = request.params as { userId: string };
       return revokeInvite(userId);
