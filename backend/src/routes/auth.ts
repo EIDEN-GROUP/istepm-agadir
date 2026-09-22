@@ -42,15 +42,19 @@ const updateUserSchema = z.object({
 });
 
 /**
- * Modification self-service du compte courant. Le nom et le rôle sont
- * volontairement absents : seul un directeur/responsable les change.
- * Changer l'email ou le mot de passe exige `currentPassword` ; changer la
- * seule photo ne le demande pas.
+ * Modification self-service du compte courant. Le rôle est volontairement
+ * absent : seul un directeur le change. Le nom est modifiable par la
+ * direction elle-même (directeur/responsable) ; les autres profils le font
+ * changer via une demande au secrétariat.
+ * Changer l'email ou le mot de passe exige `currentPassword` ; changer le
+ * seul nom ou la seule photo ne le demande pas (ni credential d'accès).
  */
 const PHOTO_MAX = 3_000_000; // ~2 Mo d'image en base64
 const updateSelfSchema = z
   .object({
     email: z.string().email("Email invalide").optional(),
+    /** Nom affiché — réservé directeur/responsable (garde ci-dessous). */
+    name: z.string().trim().min(1, "Nom requis").max(100).optional(),
     currentPassword: z.string().min(1).optional(),
     newPassword: z
       .string()
@@ -72,6 +76,7 @@ const updateSelfSchema = z
   .refine(
     (d) =>
       d.email !== undefined ||
+      d.name !== undefined ||
       d.newPassword !== undefined ||
       d.photoUrl !== undefined,
     { message: "Aucune modification fournie" },
@@ -135,6 +140,15 @@ export async function authRoutes(app: FastifyInstance) {
         });
       }
 
+      // Le nom n'est modifiable en self-service que par la direction.
+      const nextName = input.name?.trim();
+      const nameChanged = !!nextName && nextName !== me.name;
+      if (nameChanged && me.role !== "directeur" && me.role !== "responsable") {
+        return reply.status(403).send({
+          error: "Votre nom est géré par la direction.",
+        });
+      }
+
       const nextEmail = input.email?.trim().toLowerCase();
       const emailChanged = !!nextEmail && nextEmail !== me.email.toLowerCase();
       const passwordChanged = input.newPassword !== undefined;
@@ -167,12 +181,13 @@ export async function authRoutes(app: FastifyInstance) {
         }
       }
 
-      if (!emailChanged && !passwordChanged && !photoChanged) {
+      if (!emailChanged && !nameChanged && !passwordChanged && !photoChanged) {
         return reply.status(400).send({ error: "Aucune modification fournie" });
       }
 
       const updated = await updateSelfProfile(me.id, {
         email: emailChanged ? nextEmail : undefined,
+        name: nameChanged ? nextName : undefined,
         newPassword: input.newPassword,
         photoUrl: photoChanged ? input.photoUrl : undefined,
       });
@@ -190,7 +205,8 @@ export async function authRoutes(app: FastifyInstance) {
           | "directeur"
           | "enseignant"
           | "responsable"
-          | "etudiant",
+          | "etudiant"
+          | "comptable",
       });
       return { token, user: updated };
     },

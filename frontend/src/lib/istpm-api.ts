@@ -1161,6 +1161,8 @@ export function fetchAuthMe() {
 
 export interface UpdateMyProfileInput {
   email?: string;
+  /** Nom affiché — accepté seulement pour directeur/responsable (403 sinon). */
+  name?: string;
   /** Requis seulement pour changer l'email ou le mot de passe. */
   currentPassword?: string;
   newPassword?: string;
@@ -1168,7 +1170,7 @@ export interface UpdateMyProfileInput {
   photoUrl?: string;
 }
 
-/** Modification self-service du compte courant (email / mot de passe / photo). */
+/** Modification self-service du compte courant (nom direction, email / mot de passe / photo). */
 export function updateMyProfile(input: UpdateMyProfileInput) {
   return api.patch<{
     token: string;

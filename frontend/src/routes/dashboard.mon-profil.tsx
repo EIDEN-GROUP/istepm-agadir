@@ -7,8 +7,9 @@
  *
  * Édition self-service :
  *   · photo   → tout le monde, sans mot de passe
+ *   · nom     → directeur/responsable, sans mot de passe
  *   · e-mail / mot de passe → confirmation par le mot de passe actuel
- *   · le nom et le rôle restent gérés par la direction
+ *   · le rôle reste géré par la direction
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState, type ReactNode } from "react";
@@ -93,6 +94,11 @@ const INPUT_LABEL =
 
 function EditCard({ onDone }: { onDone: () => void }) {
   const { user, applyAccountUpdate } = useAuth();
+  // La direction gère elle-même son nom affiché ; les autres profils le font
+  // changer via une demande au secrétariat.
+  const canEditName =
+    user?.role === "directeur" || user?.role === "responsable";
+  const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -116,20 +122,25 @@ function EditCard({ onDone }: { onDone: () => void }) {
   if (!user) return null;
 
   const emailChanged = email.trim().toLowerCase() !== user.email.toLowerCase();
+  const nameChanged =
+    canEditName && name.trim() !== "" && name.trim() !== user.name;
   const wantsNewPassword = newPassword.length > 0;
-  const nothingToDo = !emailChanged && !wantsNewPassword;
+  const nothingToDo = !emailChanged && !nameChanged && !wantsNewPassword;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     if (nothingToDo) return setErr("Aucune modification à enregistrer.");
-    if (!currentPassword)
+    if (nameChanged && !name.trim())
+      return setErr("Le nom ne peut pas être vide.");
+    if (!currentPassword && (emailChanged || wantsNewPassword))
       return setErr("Saisissez votre mot de passe actuel pour confirmer.");
     if (wantsNewPassword && newPassword.length < 8)
       return setErr("Le nouveau mot de passe doit faire au moins 8 caractères.");
     mut.mutate({
       email: emailChanged ? email.trim().toLowerCase() : undefined,
-      currentPassword,
+      name: nameChanged ? name.trim() : undefined,
+      currentPassword: emailChanged || wantsNewPassword ? currentPassword : undefined,
       newPassword: wantsNewPassword ? newPassword : undefined,
     });
   };
@@ -138,11 +149,24 @@ function EditCard({ onDone }: { onDone: () => void }) {
     <form onSubmit={submit} className={cn(softCard, "space-y-4 p-6")}>
       <p className={eyebrowClass}>Modifier mes identifiants</p>
       <p className="rounded-xl bg-brand/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-        Seuls l'e-mail et le mot de passe sont modifiables. Le nom et le rôle
-        sont gérés par la direction. La photo se change directement sur l'image.
+        {canEditName
+          ? "Le nom, l'e-mail et le mot de passe sont modifiables. Le rôle est géré par la direction. La photo se change directement sur l'image."
+          : "Seuls l'e-mail et le mot de passe sont modifiables. Le nom et le rôle sont gérés par la direction. La photo se change directement sur l'image."}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
+        {canEditName ? (
+          <label className="block space-y-1 sm:col-span-2">
+            <span className={INPUT_LABEL}>Nom affiché</span>
+            <input
+              type="text"
+              autoComplete="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={INPUT}
+            />
+          </label>
+        ) : null}
         <label className="block space-y-1 sm:col-span-2">
           <span className={INPUT_LABEL}>E-mail</span>
           <input
@@ -422,8 +446,10 @@ function MonProfilPage() {
 
             <p className="flex items-start gap-1.5 rounded-xl bg-brand/6 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
               <BadgeCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-dk" />
-              {roleMeta.description}. Le nom et le rôle sont gérés par la
-              direction. Signalez toute erreur via une demande.
+              {roleMeta.description}.{" "}
+              {user.role === "directeur" || user.role === "responsable"
+                ? "Le rôle est géré par la direction. Signalez toute erreur via une demande."
+                : "Le nom et le rôle sont gérés par la direction. Signalez toute erreur via une demande."}
             </p>
 
             {isEtudiant && studentQuery.isError ? (

@@ -174,17 +174,18 @@ export async function deleteUser(id: string) {
 }
 
 /**
- * Mise à jour self-service d'un compte : l'utilisateur ne peut changer que son
- * email et son mot de passe (jamais son nom ni son rôle). L'appelant a déjà
- * vérifié le mot de passe actuel et l'unicité de l'email.
+ * Mise à jour self-service d'un compte : email, mot de passe et photo pour
+ * tous ; nom en plus pour directeur/responsable (vérifié par l'appelant).
+ * Le rôle n'est jamais modifiable ici.
  */
 export async function updateSelfProfile(
   id: string,
-  data: { email?: string; newPassword?: string; photoUrl?: string },
+  data: { email?: string; name?: string; newPassword?: string; photoUrl?: string },
 ): Promise<UserResult | null> {
   const db = getDb();
   const values: Record<string, unknown> = { updatedAt: new Date() };
   if (data.email !== undefined) values.email = data.email;
+  if (data.name !== undefined) values.name = data.name;
   if (data.photoUrl !== undefined) values.photoUrl = data.photoUrl;
   if (data.newPassword !== undefined)
     values.passwordHash = await hashPassword(data.newPassword);
