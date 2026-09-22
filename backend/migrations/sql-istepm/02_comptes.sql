@@ -3,13 +3,16 @@
 -- Rôles par défaut.
 INSERT INTO "roles" ("name", "description", "permissions", "is_system") VALUES
   ('directeur', 'Accès complet à l''ensemble du système',
-   '["etudiants.read", "etudiants.write", "etudiants.delete", "formateurs.read", "formateurs.write", "formateurs.delete", "examens.read", "examens.write", "examens.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "paiements.read", "paiements.write", "paiements.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read"]'::jsonb,
+   '["etudiants.read", "etudiants.write", "etudiants.delete", "formateurs.read", "formateurs.write", "formateurs.delete", "examens.read", "examens.write", "examens.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "paiements.read", "paiements.write", "paiements.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read", "settings.annees.read", "settings.annees.write", "settings.groupes.read", "settings.groupes.write", "settings.modules.read", "settings.modules.write", "settings.salles.read", "settings.salles.write", "settings.creneaux.read", "settings.creneaux.write", "settings.planning.read", "settings.planning.write", "settings.filieres.read", "settings.filieres.write", "settings.examens.read", "settings.examens.write", "settings.bulletins.read", "settings.bulletins.write", "settings.institut.read", "settings.institut.write", "settings.securite.read", "settings.securite.write", "settings.cachet.read", "settings.cachet.write", "settings.structures.read", "settings.structures.write"]'::jsonb,
    true),
   ('responsable', 'Gestion pédagogique et organisationnelle',
-   '["etudiants.read", "etudiants.write", "etudiants.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "paiements.read", "paiements.write", "paiements.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read"]'::jsonb,
+   '["etudiants.read", "etudiants.write", "etudiants.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "paiements.read", "paiements.write", "paiements.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read", "settings.annees.read", "settings.annees.write", "settings.groupes.read", "settings.groupes.write", "settings.modules.read", "settings.modules.write", "settings.salles.read", "settings.salles.write", "settings.creneaux.read", "settings.creneaux.write", "settings.planning.read", "settings.planning.write", "settings.structures.read", "settings.structures.write"]'::jsonb,
    true),
   ('enseignant', 'Accès limité à ses modules, séances, et saisie de notes',
    '["etudiants.read", "examens.read", "examens.write", "examens.delete", "bulletins.read", "roles.read", "roles.manage", "dashboard.read"]'::jsonb,
+   true),
+  ('comptable', 'Gestion des paiements et de la comptabilité',
+   '["paiements.read", "paiements.write", "etudiants.read", "users.write", "roles.read", "roles.manage", "dashboard.read"]'::jsonb,
    true)
 ON CONFLICT ("name") DO UPDATE SET
   "description" = EXCLUDED."description",

@@ -1,11 +1,14 @@
 # Jeu de données ISTPM — SQL (remplace `backend/scripts/seed-istpm.ts`)
 
 Contenu transcrit à l'identique du seed historique (`seed-istpm.ts`, supprimé :
-source de vérité unique = ces fichiers) : **3 rôles, 3 comptes, 7 filières,
+source de vérité unique = ces fichiers) : **4 rôles, 3 comptes, 7 filières,
 14 étudiants, 38 notes, 30 paiements, 8 formateurs, 10 examens, 10 bulletins,
 9 stages, 10 séances, présences, 6 notes d'examen, vacances/fériés,
 disponibilités, planifications, notifications, rendez-vous, centres, employés,
 clients CRM + factures, support, divers**.
+
+> Le rôle `comptable` est livré sans compte : créez-le depuis
+> Paramètres › Utilisateurs (rôle Comptable) ou par invitation.
 
 > Données de démonstration (personnes fictives). Ne pas charger en production
 > réelle — usage : recette, VPS de préproduction, restauration d'un
