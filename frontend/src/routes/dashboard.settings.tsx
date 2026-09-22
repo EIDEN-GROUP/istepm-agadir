@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useRef, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
@@ -24,6 +24,7 @@ import {
   Hospital,
   Stamp,
   Upload,
+  ChevronDown,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -38,7 +39,7 @@ import {
   type StructureAccueil,
 } from "@/lib/istpm-data";
 import { useIstpm } from "@/lib/istpm-store";
-import { useCan } from "@/lib/permissions";
+import { useCan, usePermissions } from "@/lib/permissions";
 import { useStamp, saveStampImage, clearStampImage, prepareStampFromFile } from "@/lib/stamp";
 import {
   fetchSettings,
@@ -187,6 +188,54 @@ const META: Record<
   structures: { titre: "Structures d'accueil", desc: "CHU, hôpitaux et cliniques partenaires", icone: Hospital, groupe: "Organisation pédagogique" },
 };
 
+/**
+ * Rubriques Paramètres pilotables finement par fiche rôle
+ * (`settings.<rubrique>.read/write`, « Détail par rubrique » dans l'éditeur
+ * de rôle). `utilisateurs`/`roles` gardent `users.*`/`roles.*` et
+ * `formateurs` garde `formateurs.*` : hors liste ici, donc non détaillées.
+ * Miroir exact du backend (`SETTINGS_SECTIONS`).
+ */
+const SECTIONS_REGLABLES: SectionId[] = [
+  "annees",
+  "groupes",
+  "modules",
+  "salles",
+  "creneaux",
+  "planning",
+  "filieres",
+  "examens",
+  "bulletins",
+  "institut",
+  "securite",
+  "cachet",
+  "structures",
+];
+
+/** Les 26 permissions fines (lecture + écriture par rubrique réglable). */
+const SECTION_PERMS: string[] = SECTIONS_REGLABLES.flatMap((s) => [
+  `settings.${s}.read`,
+  `settings.${s}.write`,
+]);
+
+/** Ordre d'affichage des cartes (celui du directeur, complet). */
+const ORDRE_SECTIONS: SectionId[] = [
+  "utilisateurs",
+  "roles",
+  "formateurs",
+  "filieres",
+  "annees",
+  "groupes",
+  "modules",
+  "salles",
+  "creneaux",
+  "examens",
+  "bulletins",
+  "institut",
+  "securite",
+  "cachet",
+  "structures",
+];
+
 /* ------------------------------------------------------------------ */
 /*  Blocs réutilisables                                                */
 /* ------------------------------------------------------------------ */
@@ -194,10 +243,13 @@ const META: Record<
 function Carte({
   id,
   action,
+  readOnly,
   children,
 }: {
   id: SectionId;
   action?: ReactNode;
+  /** Lecture seule (fiche rôle : `read` sans `write`) : actions masquées, champs figés. */
+  readOnly?: boolean;
   children: ReactNode;
 }) {
   const m = META[id];
@@ -216,9 +268,21 @@ function Carte({
             <p className="mt-0.5 text-xs text-muted-foreground">{m.desc}</p>
           </div>
         </div>
-        {action}
+        {readOnly ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand/8 px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+            <Eye className="h-3 w-3" /> Lecture seule
+          </span>
+        ) : (
+          action
+        )}
       </div>
-      {children}
+      {readOnly ? (
+        <fieldset disabled className="contents">
+          {children}
+        </fieldset>
+      ) : (
+        children
+      )}
     </section>
   );
 }
@@ -228,7 +292,7 @@ function Carte({
  * Réservé au directeur (la section n'est listée que pour ce rôle).
  * Source unique : le serveur (`settings.stamp_image`) — jamais de localStorage.
  */
-function StampSection() {
+function StampSection({ readOnly }: { readOnly?: boolean }) {
   const stamp = useStamp();
   const qc = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -272,7 +336,7 @@ function StampSection() {
   };
 
   return (
-    <Carte id="cachet">
+    <Carte id="cachet" readOnly={readOnly}>
       <div className="space-y-4">
         <p className="text-xs text-muted-foreground">
           L'image est apposée automatiquement en bas des documents PDF générés
@@ -530,7 +594,7 @@ const EMPTY_MODULE_FORM: ModuleForm = {
  * La liste des filières provient du même référentiel que le reste de
  * l'application ; un module ne peut être enregistré sans filière associée.
  */
-function ModulesSection({ filieres }: { filieres: string[] }) {
+function ModulesSection({ filieres, readOnly }: { filieres: string[]; readOnly?: boolean }) {
   const { modules, addModule, updateModule, deleteModule } = useIstpm();
   const [filtre, setFiltre] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -620,6 +684,7 @@ function ModulesSection({ filieres }: { filieres: string[] }) {
   return (
     <Carte
       id="modules"
+      readOnly={readOnly}
       action={
         <div className="flex items-center gap-2">
           <span className={toneBadge("neutral")}>{modules.length}</span>
@@ -781,6 +846,145 @@ function ModulesSection({ filieres }: { filieres: string[] }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Détail par rubrique (groupe Paramètres uniquement)                 */
+/* ------------------------------------------------------------------ */
+
+type NiveauRubrique = "masque" | "voir" | "modifier";
+
+const NIVEAUX_RUBRIQUE: { id: NiveauRubrique; label: string }[] = [
+  { id: "masque", label: "Masqué" },
+  { id: "voir", label: "Voir" },
+  { id: "modifier", label: "Voir et modifier" },
+];
+
+/**
+ * Bouton « Détail par rubrique » du groupe Paramètres : pour chaque rubrique
+ * réglable, Masqué / Voir / Voir et modifier. Une fiche sans permission fine
+ * suit l'ancien régime (défauts = matrice historique du rôle) ; dès qu'on
+ * touche au détail, la matrice complète est matérialisée en explicite pour
+ * ne rien révoquer par accident. Les toggles globaux Voir/Écrire restent
+ * requis pour enregistrer (clé API, garde serveur inchangée).
+ */
+function DetailRubriques({
+  roleName,
+  permissions,
+  setPermissions,
+}: {
+  /** Nom du rôle édité (défauts = visibilité actuelle de ce rôle). */
+  roleName: string;
+  permissions: string[];
+  setPermissions: Dispatch<SetStateAction<string[]>>;
+}) {
+  const [open, setOpen] = useState(false);
+  const explicite = permissions.some((p) => SECTION_PERMS.includes(p));
+
+  const niveau = (s: SectionId): NiveauRubrique => {
+    if (permissions.includes(`settings.${s}.write`)) return "modifier";
+    if (permissions.includes(`settings.${s}.read`)) return "voir";
+    if (!explicite) {
+      return (SECTIONS_PAR_ROLE[roleName as UserRole] ?? []).includes(s)
+        ? "modifier"
+        : "masque";
+    }
+    return "masque";
+  };
+
+  const visibles = SECTIONS_REGLABLES.filter((s) => niveau(s) !== "masque").length;
+
+  const choisir = (s: SectionId, nv: NiveauRubrique) => {
+    setPermissions((prev) => {
+      let next = prev.filter(
+        (p) => p !== `settings.${s}.read` && p !== `settings.${s}.write`,
+      );
+      if (!next.some((p) => SECTION_PERMS.includes(p))) {
+        // Première touche : on fige les droits actuels en explicite…
+        for (const d of SECTIONS_REGLABLES) {
+          if ((SECTIONS_PAR_ROLE[roleName as UserRole] ?? []).includes(d)) {
+            next.push(`settings.${d}.read`, `settings.${d}.write`);
+          }
+        }
+        // …puis on retire la rubrique touchée pour lui appliquer son niveau.
+        next = next.filter(
+          (p) => p !== `settings.${s}.read` && p !== `settings.${s}.write`,
+        );
+      }
+      if (nv !== "masque") next.push(`settings.${s}.read`);
+      if (nv === "modifier") next.push(`settings.${s}.write`);
+      // Cohérence avec la clé API : une rubrique visible exige le Voir
+      // global, une rubrique modifiable exige l'Écrire global (le serveur
+      // refuse l'enregistrement sans eux). On ne retire jamais ces globaux
+      // ici : d'autres lectures (hydratation…) en dépendent aussi.
+      if (
+        next.some((p) => SECTION_PERMS.includes(p) && p.endsWith(".read")) &&
+        !next.includes("settings.read")
+      ) {
+        next.push("settings.read");
+      }
+      if (
+        next.some((p) => SECTION_PERMS.includes(p) && p.endsWith(".write")) &&
+        !next.includes("settings.write")
+      ) {
+        next.push("settings.write");
+      }
+      return [...new Set(next)];
+    });
+  };
+
+  return (
+    <div className="mt-1.5 border-t border-brand/8 pt-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-brand-dk transition-colors hover:bg-brand/10"
+      >
+        <ChevronDown className={cn("h-3 w-3 transition-transform", open && "rotate-180")} />
+        Détail par rubrique
+        <span className="font-normal text-muted-foreground">
+          ({visibles}/{SECTIONS_REGLABLES.length})
+        </span>
+      </button>
+      {open ? (
+        <div className="mt-1.5 space-y-1">
+          {SECTIONS_REGLABLES.map((s) => {
+            const nv = niveau(s);
+            return (
+              <div key={s} className="flex items-center justify-between gap-2 rounded-md bg-brand/4 px-2 py-1">
+                <span className="min-w-0 truncate text-[10px] font-medium text-foreground">
+                  {META[s].titre}
+                </span>
+                <span className="flex shrink-0 gap-0.5" role="group" aria-label={META[s].titre}>
+                  {NIVEAUX_RUBRIQUE.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => choisir(s, o.id)}
+                      aria-pressed={nv === o.id}
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[9px] font-semibold transition-colors",
+                        nv === o.id
+                          ? "bg-brand/25 text-brand-dk"
+                          : "text-muted-foreground hover:bg-brand/10",
+                      )}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </span>
+              </div>
+            );
+          })}
+          <p className="px-1 text-[9px] leading-relaxed text-muted-foreground">
+            Choisir « Voir » coche le Voir du groupe, « Voir et modifier »
+            coche Voir + Écrire (requis pour enregistrer).
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Role editor sub-component                                           */
 /* ------------------------------------------------------------------ */
 
@@ -847,16 +1051,19 @@ function RoleEditor({
 
       <label className="mb-1.5 block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Permissions</label>
       <div className="grid gap-1.5 sm:grid-cols-2">
-        {permGroups.map((g) => (
+        {permGroups.map((g) => {
+          // Le groupe Paramètres pilote aussi ses 13 rubriques détaillées.
+          const cibles = g.label === "Paramètres" ? [...g.perms, ...SECTION_PERMS] : [...g.perms];
+          return (
           <div key={g.label} className="rounded-lg border border-brand/8 bg-brand/3 p-2">
             <button
               type="button"
-              onClick={() => selectAll(g.perms)}
+              onClick={() => selectAll(cibles)}
               className="mb-1 block text-[11px] font-bold text-foreground hover:text-brand-dk transition-colors"
             >
               {g.label}
               <span className="ml-1.5 text-[9px] text-muted-foreground">
-                {g.perms.every((p) => permissions.includes(p)) ? "✓" : "(sélectionner)"}
+                {cibles.every((p) => permissions.includes(p)) ? "✓" : "(sélectionner)"}
               </span>
             </button>
             <div className="flex flex-wrap gap-1">
@@ -881,8 +1088,12 @@ function RoleEditor({
                 );
               })}
             </div>
+            {g.label === "Paramètres" ? (
+              <DetailRubriques roleName={name} permissions={permissions} setPermissions={setPermissions} />
+            ) : null}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="mt-3 flex justify-end gap-2">
@@ -1004,6 +1215,9 @@ function NewRoleForm({
                 );
               })}
             </div>
+            {g.label === "Paramètres" ? (
+              <DetailRubriques roleName={name} permissions={permissions} setPermissions={setPermissions} />
+            ) : null}
           </div>
         ))}
       </div>
@@ -1211,7 +1425,7 @@ function NewUserForm({
 /*  Groupes / classes  registre des groupes avec comptage d'étudiants  */
 /* ------------------------------------------------------------------ */
 
-function GroupesSection({ semestresRegistre }: { semestresRegistre: string[] }) {
+function GroupesSection({ semestresRegistre, readOnly }: { semestresRegistre: string[]; readOnly?: boolean }) {
   const { groupConfigs, addGroupConfig, updateGroupConfig, deleteGroupConfig, etudiants } = useIstpm();
   const [activeSemester, setActiveSemester] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1319,6 +1533,7 @@ function GroupesSection({ semestresRegistre }: { semestresRegistre: string[] }) 
   return (
     <Carte
       id="groupes"
+      readOnly={readOnly}
       action={
         <div className="flex items-center gap-2">
           <span className={toneBadge("neutral")}>{groupConfigs.length}</span>
@@ -1467,7 +1682,7 @@ function GroupesSection({ semestresRegistre }: { semestresRegistre: string[] }) 
             label="Nom du groupe"
             value={form.name}
             onChange={(v) => setForm((f) => ({ ...f, name: v }))}
-            placeholder="S2-C"
+            placeholder="G1"
             error={errors.name}
             required
           />
@@ -1517,6 +1732,8 @@ function SettingsPage() {
   const { role } = useAuth();
   // Gestion des rôles gouvernée par la fiche (repli : directeur seul).
   const peutRoles = useCan("roles.manage", role === "directeur");
+  // Permissions fines des rubriques Paramètres (aucune => ancien régime).
+  const { can, loading: permsLoading } = usePermissions();
   const {
     etudiants,
     formateurs,
@@ -1538,7 +1755,33 @@ function SettingsPage() {
     setCreneaux,
   } = useIstpm();
 
-  const autorisees = role ? (SECTIONS_PAR_ROLE[role] ?? []) : [];
+  const carteHistorique = role ? (SECTIONS_PAR_ROLE[role] ?? []) : [];
+  /** Fiche avec réglage fin (au moins une permission `settings.<rubrique>.*`). */
+  const reglageFin = SECTION_PERMS.some((p) => can(p));
+
+  /**
+   * Visibilité d'une rubrique : fiche fine si présente, sinon matrice
+   * historique (et pendant le chargement — jamais de verrouillage sur panne).
+   * Directeur : toujours complet. `utilisateurs`/`roles`/`formateurs` gardent
+   * leur gouvernance existante (`users.*`, `roles.*`, directeur seul).
+   */
+  const sectionVisible = (id: SectionId): boolean => {
+    if (!role) return false;
+    if (role === "directeur") return true;
+    if (!SECTIONS_REGLABLES.includes(id)) return carteHistorique.includes(id);
+    if (permsLoading || !reglageFin) return carteHistorique.includes(id);
+    return can(`settings.${id}.read`);
+  };
+  /** Édition d'une rubrique visible (lecture seule sinon). */
+  const sectionModifiable = (id: SectionId): boolean => {
+    if (!role) return false;
+    if (role === "directeur") return true;
+    if (!SECTIONS_REGLABLES.includes(id)) return true;
+    if (permsLoading || !reglageFin) return carteHistorique.includes(id);
+    return can(`settings.${id}.write`);
+  };
+
+  const autorisees = ORDRE_SECTIONS.filter(sectionVisible);
   const peut = (id: SectionId) => autorisees.includes(id);
 
   /* État local des réglages   non persisté côté serveur. */
@@ -1820,7 +2063,7 @@ function SettingsPage() {
     switch (id) {
       case "annees":
         return (
-          <Carte id="annees">
+          <Carte id="annees" readOnly={!sectionModifiable("annees")}>
             <ListeEditable
               valeurs={annees}
               onChange={(v) => { setAnnees(v); persistSetting("annees_universitaires", v); }}
@@ -1830,11 +2073,11 @@ function SettingsPage() {
         );
 
       case "groupes":
-        return <GroupesSection semestresRegistre={[...NIVEAUX]} />;
+        return <GroupesSection semestresRegistre={[...NIVEAUX]} readOnly={!sectionModifiable("groupes")} />;
 
       case "salles":
         return (
-          <Carte id="salles">
+          <Carte id="salles" readOnly={!sectionModifiable("salles")}>
             <ListeEditable
               valeurs={salles}
               onChange={(v) => { setSalles(v); persistSetting("salles", v); }}
@@ -1845,7 +2088,7 @@ function SettingsPage() {
 
       case "creneaux":
         return (
-          <Carte id="creneaux">
+          <Carte id="creneaux" readOnly={!sectionModifiable("creneaux")}>
             {/* `setCreneaux` du store écrit aussi le réglage côté serveur. */}
             <ListeEditable
               valeurs={creneaux}
@@ -1865,11 +2108,11 @@ function SettingsPage() {
         );
 
       case "modules":
-        return <ModulesSection filieres={filieres} />;
+        return <ModulesSection filieres={filieres} readOnly={!sectionModifiable("modules")} />;
 
       case "planning":
         return (
-          <Carte id="planning">
+          <Carte id="planning" readOnly={!sectionModifiable("planning")}>
             <div>
               <ChampReglage
                 label="Jours ouvrés"
@@ -1892,7 +2135,7 @@ function SettingsPage() {
 
       case "filieres":
         return (
-          <Carte id="filieres">
+          <Carte id="filieres" readOnly={!sectionModifiable("filieres")}>
             <ListeEditable
               valeurs={filieres}
               onChange={async (v) => {
@@ -2254,7 +2497,7 @@ function SettingsPage() {
 
       case "examens":
         return (
-          <Carte id="examens">
+          <Carte id="examens" readOnly={!sectionModifiable("examens")}>
             <ListeEditable
               valeurs={typesExamen}
               onChange={(v) => { setTypesExamen(v); persistSetting("types_examen", v); }}
@@ -2268,7 +2511,7 @@ function SettingsPage() {
 
       case "bulletins":
         return (
-          <Carte id="bulletins">
+          <Carte id="bulletins" readOnly={!sectionModifiable("bulletins")}>
             <div>
               <ChampReglage
                 label="Barème"
@@ -2293,7 +2536,7 @@ function SettingsPage() {
 
       case "institut":
         return (
-          <Carte id="institut">
+          <Carte id="institut" readOnly={!sectionModifiable("institut")}>
             <div>
               <ChampReglage
                 label="Nom"
@@ -2321,7 +2564,7 @@ function SettingsPage() {
 
       case "securite":
         return (
-          <Carte id="securite">
+          <Carte id="securite" readOnly={!sectionModifiable("securite")}>
             <div>
               <ChampReglage
                 label="Longueur minimale du mot de passe"
@@ -2343,11 +2586,11 @@ function SettingsPage() {
         );
 
       case "cachet":
-        return <StampSection />;
+        return <StampSection readOnly={!sectionModifiable("cachet")} />;
 
       case "structures":
         return (
-          <Carte id="structures">
+          <Carte id="structures" readOnly={!sectionModifiable("structures")}>
             <div className="space-y-3">
               {structuresAccueil.map((s) => (
                 <div key={s.nom} className="flex items-center gap-2 rounded-xl border border-brand/12 bg-card px-3 py-2">

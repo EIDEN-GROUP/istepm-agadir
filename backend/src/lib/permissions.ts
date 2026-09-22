@@ -3,6 +3,31 @@ import { getDb } from "@/db";
 import { roles } from "@/db/schema/roles";
 import { eq } from "drizzle-orm";
 
+/**
+ * Rubriques Paramètres pilotables finement par fiche rôle
+ * (`settings.<rubrique>.read/write`). Seules ces 13 rubriques sont
+ * détaillées ; `utilisateurs`/`roles` gardent `users.*`/`roles.*`, et
+ * `formateurs` garde `formateurs.*`. Miroir exact côté front
+ * (`SECTIONS_REGLABLES`, Paramètres › Rôles › « Détail par rubrique »).
+ * Application interface uniquement : l'API garde les gardes globales
+ * `settings.read/write` (le `write` global reste requis pour enregistrer).
+ */
+export const SETTINGS_SECTIONS = [
+  "annees",
+  "groupes",
+  "modules",
+  "salles",
+  "creneaux",
+  "planning",
+  "filieres",
+  "examens",
+  "bulletins",
+  "institut",
+  "securite",
+  "cachet",
+  "structures",
+] as const;
+
 /** Catalogue des permissions (10 rubriques gérées dans Paramètres › Rôles). */
 export const PERMISSIONS_LIST = [
   "etudiants.read", "etudiants.write", "etudiants.delete",
@@ -15,6 +40,10 @@ export const PERMISSIONS_LIST = [
   "users.read", "users.write", "users.delete",
   "roles.read", "roles.manage",
   "dashboard.read",
+  ...SETTINGS_SECTIONS.flatMap((s) => [
+    `settings.${s}.read`,
+    `settings.${s}.write`,
+  ]),
 ] as const;
 
 /**
@@ -38,6 +67,14 @@ export const ROLE_FALLBACKS: Record<string, string[]> = {
     "stages.read", "stages.write", "stages.delete",
     "paiements.read", "paiements.write", "paiements.delete",
     "settings.read", "settings.write",
+    // Rubriques vues aujourd'hui (organisation pédagogique), en édition.
+    "settings.annees.read", "settings.annees.write",
+    "settings.groupes.read", "settings.groupes.write",
+    "settings.modules.read", "settings.modules.write",
+    "settings.salles.read", "settings.salles.write",
+    "settings.creneaux.read", "settings.creneaux.write",
+    "settings.planning.read", "settings.planning.write",
+    "settings.structures.read", "settings.structures.write",
     "users.read", "users.write", "users.delete",
     "roles.read", "roles.manage",
     "dashboard.read",
