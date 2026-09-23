@@ -1068,7 +1068,7 @@ function SeanceForm({
   const groupesLies = useMemo(() => {
     if (!f.semestre) return groupes;
     const lies = new Set(
-      groupConfigs.filter((g) => g.semester === f.semestre).map((g) => g.name),
+      groupConfigs.filter((g) => (g.semesters ?? []).includes(f.semestre)).map((g) => g.name),
     );
     const connus = new Set(groupConfigs.map((g) => g.name));
     const list = groupes.filter((g) => !connus.has(g) || lies.has(g));

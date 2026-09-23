@@ -18,7 +18,7 @@ import {
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { useIstpm, useCurrentFormateur, niveauDuGroupe } from "@/lib/istpm-store";
+import { useIstpm, useCurrentFormateur, niveauxDuGroupe } from "@/lib/istpm-store";
 import { useCan } from "@/lib/permissions";
 import {
   FILIERES,
@@ -1181,7 +1181,7 @@ function ExamenForm({
       ...new Set(
         groupesReg
           .filter((g) => normes.includes(normGroupe(g.name)))
-          .map((g) => libelleNiveau(g.semester))
+          .flatMap((g) => (g.semesters ?? []).map((s) => libelleNiveau(s)))
           .filter(Boolean),
       ),
     ].sort();
@@ -1196,8 +1196,8 @@ function ExamenForm({
     const base = mesGroupes.length ? mesGroupes : classesDisponibles;
     const list = base.filter((g) => {
       if (!f.niveau) return true;
-      const n = niveauDuGroupe(g, groupesReg);
-      return n === null || n === f.niveau;
+      const ns = niveauxDuGroupe(g, groupesReg);
+      return ns.length === 0 || ns.includes(f.niveau);
     });
     if (initial?.classe && !list.includes(initial.classe)) list.push(initial.classe);
     return [...new Set(list)].sort();

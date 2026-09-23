@@ -512,8 +512,8 @@ type IstpmCtx = {
   archiveFormateur: (id: string, groupReassignments: Array<{ groupName: string; targetFormateurId: string }>, filiereReassignment?: { targetFormateurId: string }) => Promise<void>;
   restoreFormateur: (id: string) => Promise<void>;
 
-  addGroupConfig: (data: { name: string; semester: string; studentCount?: number }) => Promise<GroupConfig>;
-  updateGroupConfig: (id: string, patch: { name?: string; semester?: string; studentCount?: number }) => Promise<GroupConfig>;
+  addGroupConfig: (data: { name: string; semesters: string[]; studentCount?: number }) => Promise<GroupConfig>;
+  updateGroupConfig: (id: string, patch: { name?: string; semesters?: string[]; studentCount?: number }) => Promise<GroupConfig>;
   deleteGroupConfig: (id: string) => Promise<void>;
 
   /** `createdBy` reçoit `auteurId`   l'auteur est toujours enregistré. */
@@ -923,7 +923,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   /* ---------------- Group Configs ---------------- */
 
   const addGroupConfig = useCallback(
-    async (data: { name: string; semester: string; studentCount?: number }) => {
+    async (data: { name: string; semesters: string[]; studentCount?: number }) => {
       const saved = await apiCreateGroupConfig(data);
       const config = saved as unknown as GroupConfig;
       setSnap((s) => ({ ...s, groupConfigs: [...s.groupConfigs, config] }));
@@ -933,7 +933,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   );
 
   const updateGroupConfig = useCallback(
-    async (id: string, patch: { name?: string; semester?: string; studentCount?: number }) => {
+    async (id: string, patch: { name?: string; semesters?: string[]; studentCount?: number }) => {
       const saved = await apiUpdateGroupConfig(id, patch);
       const config = saved as unknown as GroupConfig;
       setSnap((s) => ({
@@ -1791,16 +1791,31 @@ export function useIstpm() {
 }
 
 /**
- * Niveau d'un groupe : registre des groupes d'abord (nom → semestre),
+ * Niveau d'un groupe : registre des groupes d'abord (nom → premier niveau),
  * préfixe historique « SX- » sinon, `null` si indéterminable. Fonctionne sur
  * données neuves comme historiques.
  */
 export function niveauDuGroupe(nom: string, groupConfigs: GroupConfig[]): string | null {
   const found = groupConfigs.find((g) => g.name === nom);
-  if (found?.semester) return libelleNiveau(found.semester);
+  const premier = found?.semesters?.[0];
+  if (premier) return libelleNiveau(premier);
   const m = /^S([1-6])-/i.exec(nom.trim());
   if (m) return libelleNiveau(`S${m[1]}`);
   return null;
+}
+
+/**
+ * TOUS les niveaux d'un groupe (un groupe géré peut couvrir plusieurs
+ * années). Registre d'abord, préfixe historique sinon, `[]` si indéterminable.
+ */
+export function niveauxDuGroupe(nom: string, groupConfigs: GroupConfig[]): string[] {
+  const found = groupConfigs.find((g) => g.name === nom);
+  if (found?.semesters?.length) {
+    return [...new Set(found.semesters.map((s) => libelleNiveau(s)))];
+  }
+  const m = /^S([1-6])-/i.exec(nom.trim());
+  if (m) return [libelleNiveau(`S${m[1]}`)];
+  return [];
 }
 
 /**

@@ -1071,6 +1071,9 @@ function DashboardDirecteur() {
     [seances, chargeDu, chargeA],
   );
   const chargeFormateurs = useMemo(() => formateurs.filter((f) => f.statut !== "en_conge").map((f) => ({ id: f.id, nom: `${f.prenom} ${f.nom}`, seances: seancesPeriode.filter((s) => s.professeurId === f.id).length, groupes: f.groupes.length, modules: f.modules.length })).sort((a, b) => b.seances - a.seances), [formateurs, seancesPeriode]);
+  // Pagination : la liste s'allonge avec l'effectif (même motif que le
+  // responsable). La clé renvoie en page 1 quand la période change.
+  const chargePager = usePagination(chargeFormateurs, `${chargeDu}|${chargeA}|${chargeFormateurs.length}`);
   const derniersEtudiants = useMemo(
     () => etudiants.filter((e) => !e.archived).slice().reverse().slice(0, 6),
     [etudiants],
@@ -1181,7 +1184,15 @@ function DashboardDirecteur() {
               action={<DateRangeFilter du={chargeDu} a={chargeA} onDu={setChargeDu} onA={setChargeA} />}
             >
               <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
-                {chargeFormateurs.map((f) => { const r = Math.min(f.seances / 8, 1); return <MeterRow key={f.id} label={f.nom} ratio={r} color={r > 0.75 ? TONE_COLORS.red : r > 0.5 ? TONE_COLORS.amber : TONE_COLORS.teal} detail={`${f.seances} séances Â· ${f.groupes} grp Â· ${f.modules} mod`} onClick={() => setChargeSel({ id: f.id, nom: f.nom })} />; })}
+                {chargePager.pageItems.map((f) => { const r = Math.min(f.seances / 8, 1); return <MeterRow key={f.id} label={f.nom} ratio={r} color={r > 0.75 ? TONE_COLORS.red : r > 0.5 ? TONE_COLORS.amber : TONE_COLORS.teal} detail={`${f.seances} séances Â· ${f.groupes} grp Â· ${f.modules} mod`} onClick={() => setChargeSel({ id: f.id, nom: f.nom })} />; })}
+                <TablePagination
+                  page={chargePager.page}
+                  pageCount={chargePager.pageCount}
+                  total={chargePager.total}
+                  pageSize={chargePager.pageSize}
+                  onPage={chargePager.setPage}
+                  label="formateurs"
+                />
               </div>
             </Section>
           </div>
@@ -1268,7 +1279,7 @@ function AffectationEnseignant({ formateur }: { formateur: Formateur }) {
         ...new Set(
           groupConfigs
             .filter((g) => formateur.groupes.includes(g.name))
-            .map((g) => g.semester),
+            .flatMap((g) => g.semesters ?? []),
         ),
       ].sort(),
     [formateur.groupes, groupConfigs],
@@ -1335,7 +1346,7 @@ function DashboardEnseignant() {
   const mesEtudiants = useMemo(() => {
     if (!moi) return [];
     const niveaux = new Set(
-      groupConfigs.filter((g) => moi.groupes.includes(g.name)).map((g) => g.semester),
+      groupConfigs.filter((g) => moi.groupes.includes(g.name)).flatMap((g) => g.semesters ?? []),
     );
     return etudiants.filter(
       (e) =>

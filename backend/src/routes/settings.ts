@@ -114,20 +114,37 @@ export async function settingsRoutes(app: FastifyInstance) {
   /* ------------------------------------------------------------------ */
   const groupConfigSchema = z.object({
     name: z.string().min(1, "Nom du groupe requis"),
-    semester: z.string().min(1, "Niveau requis"),
+    /** Niveaux couverts (un groupe peut s'étendre sur plusieurs années). */
+    semesters: z.array(z.string().min(1)).min(1, "Au moins un niveau").optional(),
+    /** Ancien format mono-niveau, accepté puis normalisé (compatibilité). */
+    semester: z.string().min(1).optional(),
     studentCount: z.number().int().min(0).optional().default(0),
   });
 
+  /** Normalise l'entrée (nouveau `semesters` ou legacy `semester`). */
+  function normaliseNiveaux(input: { semesters?: string[]; semester?: string }): string[] | undefined {
+    if (input.semesters !== undefined) return [...new Set(input.semesters)];
+    if (input.semester !== undefined) return [input.semester];
+    return undefined;
+  }
+
   app.get("/groups", { preHandler: [authenticate] }, async () => {
     const db = getDb();
-    return db.select().from(groupConfigs).orderBy(asc(groupConfigs.semester), asc(groupConfigs.name));
+    return db.select().from(groupConfigs).orderBy(asc(groupConfigs.name));
   });
 
   app.post("/groups", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const input = groupConfigSchema.parse(request.body);
+    const semesters = normaliseNiveaux(input);
+    if (!semesters || semesters.length === 0) {
+      return reply.status(400).send({ error: "Au moins un niveau requis" });
+    }
     const db = getDb();
     try {
-      const [config] = await db.insert(groupConfigs).values(input).returning();
+      const [config] = await db
+        .insert(groupConfigs)
+        .values({ name: input.name, semesters, studentCount: input.studentCount ?? 0 })
+        .returning();
       return config;
     } catch {
       return reply.status(409).send({ error: "Ce groupe existe déjà" });
@@ -139,9 +156,15 @@ export async function settingsRoutes(app: FastifyInstance) {
     const input = groupConfigSchema.partial().parse(request.body);
     const db = getDb();
     const values: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(input)) {
-      if (val !== undefined) values[key] = val;
+    if (input.name !== undefined) values.name = input.name;
+    const semesters = normaliseNiveaux(input);
+    if (semesters !== undefined) {
+      if (semesters.length === 0) {
+        return reply.status(400).send({ error: "Au moins un niveau requis" });
+      }
+      values.semesters = semesters;
     }
+    if (input.studentCount !== undefined) values.studentCount = input.studentCount;
     const [updated] = await db
       .update(groupConfigs)
       .set(values)

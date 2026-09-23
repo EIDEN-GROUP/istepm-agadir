@@ -294,7 +294,8 @@ export const STATUT_FORMATEUR_TONE: Record<StatutFormateur, BadgeTone> = {
 export type GroupConfig = {
   id: string;
   name: string;
-  semester: string;
+  /** Niveaux couverts (un groupe peut s'étendre sur plusieurs années). */
+  semesters: string[];
   studentCount: number;
 };
 

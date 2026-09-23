@@ -4,7 +4,7 @@ import { Plus, Pencil, Eye, Download, Archive, RotateCcw, Upload, ListFilter, Ch
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { useIstpm, useCurrentFormateur, niveauDuGroupe, type NouvelEtudiant } from "@/lib/istpm-store";
+import { useIstpm, useCurrentFormateur, niveauxDuGroupe, type NouvelEtudiant } from "@/lib/istpm-store";
 import { useCan } from "@/lib/permissions";
 import { ImportEtudiantsDialog, downloadExempleEtudiantsCsv } from "@/components/import-etudiants-dialog";
 import { InviteLinkBanner } from "@/components/invite-link-banner";
@@ -25,6 +25,7 @@ import {
   type Niveau,
   type StatutEtudiant,
   type StatutPaiement,
+  type GroupConfig,
 } from "@/lib/istpm-data";
 import { PersonAvatar } from "@/components/person-avatar";
 import { downscaleImage } from "@/lib/image";
@@ -107,9 +108,9 @@ function EtudiantsPage() {
     // ces niveaux, quel que soit le sous-groupe (G1/G2).
     const niveaux = [
       ...new Set(
-        currentFormateur.groupes
-          .map((g) => niveauDuGroupe(g, groupConfigs))
-          .filter((n): n is string => n !== null),
+        currentFormateur.groupes.flatMap((g) =>
+          niveauxDuGroupe(g, groupConfigs),
+        ),
       ),
     ];
     return {
@@ -138,9 +139,11 @@ function EtudiantsPage() {
         .filter(
           (g) =>
             niveau === ALL ||
-            enseignantScope.groupes.some(
-              (raw) => normGroupe(raw) === g && (niveauDuGroupe(raw, groupConfigs) ?? niveau) === niveau,
-            ),
+            enseignantScope.groupes.some((raw) => {
+              if (normGroupe(raw) !== g) return false;
+              const ns = niveauxDuGroupe(raw, groupConfigs);
+              return ns.length === 0 || ns.includes(niveau);
+            }),
         )
         .sort();
     }
@@ -676,6 +679,7 @@ function EtudiantsPage() {
           filieres={filieresOptions}
           annees={anneesRegistre}
           existing={etudiants}
+          groupConfigs={groupConfigs}
           onCancel={() => setFormOpen(false)}
           onSubmit={async (data) => {            if (editing) {
               try {
@@ -826,6 +830,7 @@ function EtudiantForm({
   filieres,
   annees,
   existing,
+  groupConfigs,
   onSubmit,
   onCancel,
 }: {
@@ -834,6 +839,8 @@ function EtudiantForm({
   /** Années ouvertes (Paramètres › Années universitaires) pour le dropdown. */
   annees: string[];
   existing: Etudiant[];
+  /** Registre des groupes (Paramètres › Groupes) pour le dropdown. */
+  groupConfigs: GroupConfig[];
   onSubmit: (data: Omit<FormState, "fraisMensuels"> & {
     filiere: Filiere;
     niveau: Niveau;
@@ -897,6 +904,44 @@ function EtudiantForm({
       (e) => e.id !== initial?.id && !e.archived && e.email.trim().toLowerCase() === v,
     ) ?? null;
   }, [f.email, existing, initial]);
+
+  // Groupes du niveau choisi : registre des groupes (comparé normalisé)
+  // + groupes réels des fiches existantes. Sans niveau : tous les groupes.
+  const niveauNorm = f.niveau ? libelleNiveau(f.niveau) : "";
+  const groupesNiveau = useMemo(() => {
+    const set = new Set<string>();
+    for (const g of groupConfigs) {
+      const ns = (g.semesters ?? []).map((s) => libelleNiveau(s));
+      if (niveauNorm && !ns.includes(niveauNorm)) continue;
+      if (g.name.trim()) set.add(normGroupe(g.name));
+    }
+    for (const e of existing) {
+      if (e.archived) continue;
+      if (niveauNorm && libelleNiveau(e.niveau) !== niveauNorm) continue;
+      if (e.groupe.trim()) set.add(normGroupe(e.groupe));
+    }
+    return [...set].sort();
+  }, [groupConfigs, existing, niveauNorm]);
+  // Le groupe choisi ne colle plus au niveau : on le remet à zéro (jamais au
+  // premier rendu, pour ne pas effacer la valeur d'une fiche en édition).
+  const premierRendu = useRef(true);
+  useEffect(() => {
+    if (premierRendu.current) {
+      premierRendu.current = false;
+      return;
+    }
+    if (f.groupe && !groupesNiveau.includes(normGroupe(f.groupe))) {
+      set("groupe", "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupesNiveau]);
+  const groupeOptions = useMemo(() => {
+    if (f.groupe && !groupesNiveau.includes(normGroupe(f.groupe))) {
+      return [...groupesNiveau, f.groupe.trim()].sort();
+    }
+    return groupesNiveau;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupesNiveau]);
 
   const photoInput = useRef<HTMLInputElement>(null);
   const onPhoto = async (file: File | undefined) => {
@@ -1060,11 +1105,12 @@ function EtudiantForm({
         options={NIVEAUX}
         error={errors.niveau}
       />
-      <TextField
+      <SelectField
         label="Groupe"
         value={f.groupe}
         onChange={(v) => set("groupe", v)}
-        placeholder="G1"
+        options={groupeOptions}
+        placeholder={niveauNorm ? `Choisir dans ${niveauNorm}…` : "Choisir un groupe…"}
       />
       <SelectField
         label="Statut"

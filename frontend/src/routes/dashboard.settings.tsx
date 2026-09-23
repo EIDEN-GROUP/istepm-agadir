@@ -5,6 +5,7 @@ import {
   Plus,
   Trash2,
   Save,
+  Check,
   Users,
   ShieldCheck,
   GraduationCap,
@@ -1430,7 +1431,7 @@ function GroupesSection({ semestresRegistre, readOnly }: { semestresRegistre: st
   const [activeSemester, setActiveSemester] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<GroupConfig | null>(null);
-  const [form, setForm] = useState({ name: "", semester: "", studentCount: 0 });
+  const [form, setForm] = useState({ name: "", semesters: [] as string[], studentCount: 0 });
   const [errors, setErrors] = useState<{ name?: string }>({});
   const [toDelete, setToDelete] = useState<GroupConfig | null>(null);
 
@@ -1453,34 +1454,35 @@ function GroupesSection({ semestresRegistre, readOnly }: { semestresRegistre: st
   // Semestres = registre « Semestres » + valeurs réellement utilisées.
   // (Le registre seul restait vide et le dialogue n'offrait aucun choix.)
   const semesters = useMemo(
-    () => [...new Set([...semestresRegistre, ...groupConfigs.map((g) => g.semester), ...discovered.flatMap((d) => d.niveaux)])].sort(),
+    () => [...new Set([...semestresRegistre, ...groupConfigs.flatMap((g) => g.semesters ?? []), ...discovered.flatMap((d) => d.niveaux)])].sort(),
     [semestresRegistre, groupConfigs, discovered],
   );
   const active = activeSemester || semesters[0] || "";
-  const filtered = groupConfigs.filter((g) => g.semester === active);
+  const filtered = groupConfigs.filter((g) => (g.semesters ?? []).includes(active));
   const filteredDiscovered = discovered.filter(
     (d) => d.niveaux.includes(active) && !groupConfigs.some((g) => g.name === d.name),
   );
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", semester: active || semesters[0] || "", studentCount: 0 });
+    setForm({ name: "", semesters: active ? [active] : [], studentCount: 0 });
     setErrors({});
     setDialogOpen(true);
   };
 
   const openEdit = (g: GroupConfig) => {
     setEditing(g);
-    setForm({ name: g.name, semester: g.semester, studentCount: g.studentCount });
+    setForm({ name: g.name, semesters: [...(g.semesters ?? [])], studentCount: g.studentCount });
     setErrors({});
     setDialogOpen(true);
   };
 
   // Adopte un groupe détecté (ligne « auto ») : pré-remplit le dialogue pour
-  // l'enregistrer comme groupe géré (création à la validation).
-  const openAdopt = (d: { name: string; count: number }) => {
+  // l'enregistrer comme groupe géré (création à la validation), avec tous
+  // les niveaux où il apparaît déjà.
+  const openAdopt = (d: { name: string; count: number; niveaux: string[] }) => {
     setEditing(null);
-    setForm({ name: d.name, semester: active || semesters[0] || "", studentCount: d.count });
+    setForm({ name: d.name, semesters: [...d.niveaux], studentCount: d.count });
     setErrors({});
     setDialogOpen(true);
   };
@@ -1490,11 +1492,15 @@ function GroupesSection({ semestresRegistre, readOnly }: { semestresRegistre: st
       setErrors({ name: "Nom du groupe obligatoire" });
       return;
     }
+    if (form.semesters.length === 0) {
+      toast.error("Sélectionnez au moins un niveau");
+      return;
+    }
     if (editing) {
       try {
         await updateGroupConfig(editing.id, {
           name: form.name.trim(),
-          semester: form.semester,
+          semesters: form.semesters,
           studentCount: Number(form.studentCount) || 0,
         });
         toast.success("Groupe mis à jour");
@@ -1506,7 +1512,7 @@ function GroupesSection({ semestresRegistre, readOnly }: { semestresRegistre: st
       try {
         await addGroupConfig({
           name: form.name.trim(),
-          semester: form.semester,
+          semesters: form.semesters,
           studentCount: Number(form.studentCount) || 0,
         });
         toast.success(`Groupe ajouté   ${form.name.trim()}`);
@@ -1563,7 +1569,7 @@ function GroupesSection({ semestresRegistre, readOnly }: { semestresRegistre: st
           >
             {s}
             <span className="ml-1 text-[10px] opacity-60">
-              {groupConfigs.filter((g) => g.semester === s).length +
+              {groupConfigs.filter((g) => (g.semesters ?? []).includes(s)).length +
                 discovered.filter(
                   (d) =>
                     d.niveaux.includes(s) &&
@@ -1673,7 +1679,7 @@ function GroupesSection({ semestresRegistre, readOnly }: { semestresRegistre: st
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         title={editing ? "Modifier le groupe" : "Nouveau groupe"}
-        subtitle="Définissez le nom et le semestre du groupe."
+        subtitle="Définissez le nom et les niveaux du groupe."
         submitLabel={editing ? "Enregistrer" : "Ajouter"}
         onSubmit={submit}
       >
@@ -1688,15 +1694,49 @@ function GroupesSection({ semestresRegistre, readOnly }: { semestresRegistre: st
           />
         </FullWidth>
         <FullWidth>
-          <ComboBoxField
-            label="Niveau"
-            value={form.semester}
-            onChange={(v) => setForm((f) => ({ ...f, semester: v }))}
-            options={semesters.map((s) => ({ value: s, label: s }))}
-            placeholder="Sélectionner le niveau…"
-            searchPlaceholder="Rechercher un niveau…"
-            required
-          />
+          <span className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Niveaux <span className="text-alert">*</span>
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {semesters.map((s) => {
+              const on = form.semesters.includes(s);
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() =>
+                    setForm((f) => ({
+                      ...f,
+                      semesters: on
+                        ? f.semesters.filter((x) => x !== s)
+                        : [...f.semesters, s],
+                    }))
+                  }
+                  aria-pressed={on}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    on
+                      ? "border-brand/50 bg-brand/10 text-brand-dk"
+                      : "border-brand/15 bg-card text-muted-foreground hover:border-brand/35 hover:text-foreground",
+                  )}
+                >
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "grid h-3.5 w-3.5 place-items-center rounded border",
+                      on ? "border-brand bg-brand text-white" : "border-muted-foreground/40",
+                    )}
+                  >
+                    {on ? <Check className="h-2.5 w-2.5" /> : null}
+                  </span>
+                  {s}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Un groupe peut couvrir plusieurs années (ex. G1 en 1ère et 2ème année).
+          </p>
         </FullWidth>
         <NumberField
           label="Nombre d'étudiants"
