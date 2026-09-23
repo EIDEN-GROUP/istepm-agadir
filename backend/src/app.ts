@@ -42,6 +42,7 @@ import { noteRoutes } from "@/routes/notes";
 import { agentRoutes } from "@/routes/agent";
 import { aiConvoRoutes } from "@/routes/ai-convos";
 import { featureTicketRoutes } from "@/routes/feature-tickets";
+import { inscriptionRoutes } from "@/routes/inscriptions";
 import { ensureBucket } from "@/lib/minio";
 
 export async function buildApp() {
@@ -147,6 +148,7 @@ export async function buildApp() {
   await app.register(agentRoutes, { prefix: "/api/agent" });
   await app.register(aiConvoRoutes, { prefix: "/api/ai" });
   await app.register(featureTicketRoutes, { prefix: "/api/feature-tickets" });
+  await app.register(inscriptionRoutes, { prefix: "/api/inscriptions" });
 
   return app;
 }

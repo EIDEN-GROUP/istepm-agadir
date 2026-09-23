@@ -38,5 +38,6 @@ export { reminders } from "./reminders";
 export { modules } from "./modules";
 export { groupConfigs } from "./groupConfigs";
 export { studentRequests } from "./student-requests";
+export { inscriptionRequests, rendezVous } from "./inscription-requests";
 export { featureTickets } from "./feature-tickets";
 export { aiConversations } from "./ai-conversations";

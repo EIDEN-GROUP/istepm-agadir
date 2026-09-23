@@ -17,6 +17,7 @@ import { calendarExceptions } from "@/db/schema/calendar-exceptions";
 import { attendance } from "@/db/schema/attendance";
 import { historiquePaiements } from "@/db/schema/historique-paiements";
 import { eq, and, ne, desc, gte, lte, sql, count } from "drizzle-orm";
+import { escHtml, notifyBestEffort } from "@/lib/notify";
 
 const createRequestSchema = z.object({
   type: z.enum(["libre", "predefini"]).optional().default("libre"),
@@ -303,6 +304,30 @@ export async function studentRoutes(app: FastifyInstance) {
         .where(eq(studentRequests.id, id))
         .returning();
       if (!updated) return reply.status(404).send({ error: "Demande introuvable" });
+      // Notification e-mail best-effort (la cloche applicative reste première).
+      const [fiche] = await db
+        .select({ email: etudiants.email, prenom: etudiants.prenom, nom: etudiants.nom })
+        .from(etudiants)
+        .where(eq(etudiants.id, updated.etudiantId))
+        .limit(1);
+      if (fiche?.email) {
+        const statutLabel =
+          input.statut === "traite" ? "traitée" : input.statut === "rejete" ? "rejetée" : "bien reçue";
+        await notifyBestEffort(
+          fiche.email,
+          `ISTEPM Agadir · Votre demande « ${updated.titre} »`,
+          `<p>Bonjour ${escHtml(fiche.prenom)} ${escHtml(fiche.nom)},</p>` +
+            `<p>Votre demande « <strong>${escHtml(updated.titre)}</strong> » a été ${statutLabel}.</p>` +
+            (input.reponse
+              ? `<p><strong>Réponse :</strong><br>${escHtml(input.reponse).replace(/\n/g, "<br>")}</p>`
+              : "") +
+            `<p>Cordialement,<br>L'équipe ISTEPM Agadir</p>`,
+          `Bonjour ${fiche.prenom} ${fiche.nom},\nVotre demande « ${updated.titre} » a été ${statutLabel}.\n` +
+            (input.reponse ? `Réponse : ${input.reponse}\n` : "") +
+            `Cordialement,\nL'équipe ISTEPM Agadir`,
+          "demande-reponse",
+        );
+      }
       return updated;
     },
   );

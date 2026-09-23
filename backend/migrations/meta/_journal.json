@@ -176,6 +176,20 @@
       "when": 1786420000000,
       "tag": "0024_recu_sequence",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790166462695,
+      "tag": "0025_youthful_nitro",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790173475257,
+      "tag": "0026_acoustic_blacklash",
+      "breakpoints": true
     }
   ]
 }

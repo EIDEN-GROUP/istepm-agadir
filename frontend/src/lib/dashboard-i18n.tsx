@@ -21,6 +21,7 @@ import {
   Wallet,
   Settings,
   Inbox,
+  UserPlus,
 } from "lucide-react";
 import type { UserRole } from "@/lib/auth";
 import type { NavEntry, NavGroup, NavItem } from "@/components/dash-sidebar";
@@ -133,6 +134,7 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
     "/dashboard/stages",
     "/dashboard/paiements",
     "/dashboard/espace-etudiant",
+    "/dashboard/inscriptions",
     "/dashboard/settings",
   ],
   enseignant: [
@@ -152,6 +154,7 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
     "/dashboard/stages",
     "/dashboard/paiements",
     "/dashboard/espace-etudiant",
+    "/dashboard/inscriptions",
     "/dashboard/settings",
   ],
   // L'étudiant ne voit que son tableau de bord et son espace personnel
@@ -275,7 +278,7 @@ export function useDashboardNav(role: UserRole | null) {
       ),
       item("/dashboard/stages", t.nav.stages, t.navShort.stages, Stethoscope),
       // L'étudiant a une entrée de rail par section (pas de menu déroulant) ;
-      // le staff n'a que « Demandes étudiants ».
+      // le staff a le groupe « Espace étudiant » (demandes + inscriptions).
       ...(role === "etudiant"
         ? [
             item(
@@ -310,12 +313,25 @@ export function useDashboardNav(role: UserRole | null) {
             ),
           ]
         : [
-            item(
-              "/dashboard/espace-etudiant",
-              "Demandes étudiants",
-              "Demandes",
-              Inbox,
-            ),
+            {
+              id: "espace-etudiant",
+              label: "Espace étudiant",
+              icon: Inbox,
+              children: [
+                item(
+                  "/dashboard/espace-etudiant",
+                  "Demandes des étudiants",
+                  "Demandes",
+                  Inbox,
+                ),
+                item(
+                  "/dashboard/inscriptions",
+                  "Demandes d'inscription",
+                  "Inscriptions",
+                  UserPlus,
+                ),
+              ],
+            },
           ]),
       item(
         "/dashboard/paiements",

@@ -95,11 +95,11 @@ export function fetchGroupConfigs() {
   return api.get<GroupConfig[]>("/settings/groups");
 }
 
-export function createGroupConfig(data: { name: string; semester: string; studentCount?: number }) {
+export function createGroupConfig(data: { name: string; semesters: string[]; studentCount?: number }) {
   return api.post<GroupConfig>("/settings/groups", data);
 }
 
-export function updateGroupConfig(id: string, data: { name?: string; semester?: string; studentCount?: number }) {
+export function updateGroupConfig(id: string, data: { name?: string; semesters?: string[]; studentCount?: number }) {
   return api.put<GroupConfig>(`/settings/groups/${id}`, data);
 }
 
@@ -1196,6 +1196,54 @@ export function fetchAllStudentRequests(params?: { statut?: string; search?: str
 
 export function updateStudentRequest(id: string, data: { statut: StudentRequest["statut"]; reponse?: string }) {
   return api.patch<StudentRequest>(`/student/requests/${id}`, data);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Demandes d'inscription (landing page + traitement staff)           */
+/* ------------------------------------------------------------------ */
+
+export type StatutInscription = "en_attente" | "en_cours" | "traite" | "rejete";
+
+export interface RendezVous {
+  id: string;
+  inscriptionId: string;
+  date: string;
+  heure: string;
+  message: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface InscriptionRequest {
+  id: string;
+  prenom: string;
+  nom: string;
+  telephone: string;
+  email: string;
+  filiere: string;
+  niveau: string;
+  message: string;
+  statut: StatutInscription;
+  reponse: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Dernier rendez-vous proposé (liste staff), sinon null. */
+  rendezVous?: RendezVous | null;
+}
+
+/** File staff des demandes d'inscription (recherche + filtre statut). */
+export function fetchInscriptions(params?: { statut?: string; search?: string }) {
+  return api.get<InscriptionRequest[]>("/inscriptions", params as Record<string, string | undefined>);
+}
+
+/** Réponse staff (motif exigé en cas de rejet) — notifie le candidat. */
+export function updateInscription(id: string, data: { statut: StatutInscription; reponse?: string }) {
+  return api.patch<InscriptionRequest>(`/inscriptions/${id}`, data);
+}
+
+/** Rendez-vous staff (passe en « en cours ») — notifie le candidat. */
+export function createRendezVous(id: string, data: { date: string; heure?: string; message?: string }) {
+  return api.post<RendezVous>(`/inscriptions/${id}/rendez-vous`, data);
 }
 
 export interface StudentNotification {
