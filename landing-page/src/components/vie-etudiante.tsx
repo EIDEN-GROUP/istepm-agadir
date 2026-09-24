@@ -1,6 +1,6 @@
 import { Fragment } from "react";
-import vieAtelier from "@/assets/images/sections/vie-atelier.jpg";
-import vieCampus from "@/assets/images/sections/vie-campus.jpg";
+import vieAtelier from "@/assets/images/sections/vie-atelier.jpeg";
+import vieCampus from "@/assets/images/sections/vie-campus.png";
 import vieFacade from "@/assets/images/sections/vie-facade.jpg";
 import { BracketHead } from "@/components/bracket-head";
 import { Photo } from "@/components/photo";

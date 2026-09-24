@@ -2,7 +2,7 @@ import pourquoiImg from "@/assets/images/sections/pourquoi.jpg";
 import { BracketHead } from "@/components/bracket-head";
 import { Photo } from "@/components/photo";
 import { Reveal } from "@/components/reveal";
-import { BtnIc, Icon } from "@/lib/ui";
+import { BtnIc, Icon, cx } from "@/lib/ui";
 
 type Reason = { icon: string; tile?: string; title: string; text: string; validate?: string };
 
@@ -45,11 +45,21 @@ const RIGHT: Reason[] = [
   },
 ];
 
-function ReasonList({ items }: { items: Reason[] }) {
+/**
+ * Colonne de raisons, de part et d’autre de la photo. Chaque raison glisse depuis son côté, l’une après l’autre
+ * (gauche 1, droite 1, gauche 2…), puis une flèche dessinée à la main (celle du hero) se trace vers la photo.
+ */
+function ReasonList({ items, side }: { items: Reason[]; side: "left" | "right" }) {
   return (
-    <ul className="why__col">
+    <ul className={cx("why__col", `why__col--${side}`)}>
       {items.map((r, i) => (
-        <Reveal as="li" key={r.title} className="why__item" delay={i || undefined} data-validate={r.validate}>
+        <Reveal
+          as="li"
+          key={r.title}
+          className="why__item"
+          delay={i * 2 + (side === "right" ? 1 : 0)}
+          data-validate={r.validate}
+        >
           <span className={r.tile ?? "tile"}>
             <Icon name={r.icon} />
           </span>
@@ -57,6 +67,10 @@ function ReasonList({ items }: { items: Reason[] }) {
             <h3>{r.title}</h3>
             <p>{r.text}</p>
           </div>
+          <svg className="why__arrow" viewBox="0 0 60 44" aria-hidden="true">
+            <path pathLength={1} d="M3 5c16 1 31 9 39 29" />
+            <path pathLength={1} d="M33 30.5l9 4.5 3-9.5" />
+          </svg>
         </Reveal>
       ))}
     </ul>
@@ -77,7 +91,7 @@ export function Pourquoi() {
           }
         />
         <div className="why__grid">
-          <ReasonList items={LEFT} />
+          <ReasonList items={LEFT} side="left" />
           <Photo
             className="why__photo"
             src={pourquoiImg}
@@ -85,7 +99,7 @@ export function Pourquoi() {
             motif="hand-heart"
             brief="Photo · Formatrice et étudiants, geste de soin"
           />
-          <ReasonList items={RIGHT} />
+          <ReasonList items={RIGHT} side="right" />
         </div>
         <Reveal className="why__cta">
           <p>Faites le premier pas vers votre futur métier.</p>

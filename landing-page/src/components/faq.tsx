@@ -1,7 +1,10 @@
-import type { ReactNode } from "react";
+import { useRef, type MouseEvent, type ReactNode } from "react";
 import { BracketHead } from "@/components/bracket-head";
 import { Reveal } from "@/components/reveal";
-import { BtnIc, Icon, PHONE, PHONE_LABEL } from "@/lib/ui";
+import { BtnIc, Icon, PHONE, PHONE_LABEL, reduceMotion } from "@/lib/ui";
+
+/** Temps laissé à la question ouverte pour se refermer avant d’ouvrir la suivante (≈ transition de `::details-content`). */
+const CLOSE_FIRST_MS = 320;
 
 const QUESTIONS: { topic: string; q: string; a: ReactNode; validate?: string }[] = [
   {
@@ -55,6 +58,18 @@ const QUESTIONS: { topic: string; q: string; a: ReactNode; validate?: string }[]
 ];
 
 export function Faq() {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  /** Une seule réponse ouverte : la question déjà ouverte se referme d’abord, puis la nouvelle s’ouvre. */
+  const openAlone = (e: MouseEvent<HTMLElement>) => {
+    const item = e.currentTarget.parentElement as HTMLDetailsElement;
+    const other = listRef.current?.querySelector<HTMLDetailsElement>(".faq-item[open]");
+    if (item.open || !other || other === item) return;
+    e.preventDefault();
+    other.open = false;
+    setTimeout(() => (item.open = true), reduceMotion ? 0 : CLOSE_FIRST_MS);
+  };
+
   return (
     <section className="section section--flush-top" id="faq" aria-labelledby="faq-title">
       <div className="container">
@@ -84,10 +99,17 @@ export function Faq() {
               </div>
             </div>
           </Reveal>
-          <div className="faq__list">
+          <div className="faq__list" ref={listRef}>
             {QUESTIONS.map((item, i) => (
-              <Reveal as="details" key={item.q} className="faq-item" delay={Math.min(i, 3)} data-validate={item.validate}>
-                <summary>
+              <Reveal
+                as="details"
+                key={item.q}
+                name="faq"
+                className="faq-item"
+                delay={Math.min(i, 3)}
+                data-validate={item.validate}
+              >
+                <summary onClick={openAlone}>
                   <span className="faq-item__index brk" aria-hidden="true">
                     {i + 1}
                   </span>

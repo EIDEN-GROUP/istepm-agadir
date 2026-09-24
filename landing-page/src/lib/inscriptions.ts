@@ -22,7 +22,7 @@ export const FALLBACK_FILIERES = [
 ];
 
 /** Valeurs acceptées par le serveur, à l’identique. */
-export const NIVEAUX = ["Terminale (bac en cours)", "Baccalauréat obtenu", "Bac +1 / Bac +2", "Licence ou plus", "Autre"];
+export const NIVEAUX = ["Qualifiant", "Niveau bac", "Baccalauréat obtenu", "Bac +2", "Licence ou plus"];
 
 const CACHE_KEY = "istepm:filieres";
 const CACHE_TTL = 60 * 60 * 1000;

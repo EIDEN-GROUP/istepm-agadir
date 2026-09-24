@@ -6,13 +6,16 @@ import { Formations } from "@/components/formations";
 import { Hero } from "@/components/hero";
 import { IconSprite } from "@/components/icon-sprite";
 import { Institut } from "@/components/institut";
+import { Loader } from "@/components/loader";
 import { MobileCta } from "@/components/mobile-cta";
 import { Pourquoi } from "@/components/pourquoi";
 import type { PreinscriptionHandle } from "@/components/preinscription-form";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Temoignages } from "@/components/temoignages";
+import { ToTop } from "@/components/to-top";
 import { VieEtudiante } from "@/components/vie-etudiante";
+import "@/lib/smooth-scroll";
 import { Icon } from "@/lib/ui";
 
 export default function App() {
@@ -31,6 +34,7 @@ export default function App() {
     <>
       <a className="skip-link" href="#contenu">Aller au contenu</a>
       <IconSprite />
+      <Loader />
 
       <div className="review-banner" role="status">
         <Icon name="clipboard" />
@@ -53,6 +57,7 @@ export default function App() {
 
       <SiteFooter />
       <MobileCta />
+      <ToTop />
     </>
   );
 }

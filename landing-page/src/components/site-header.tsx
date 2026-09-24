@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { BtnIc, Icon, PHONE } from "@/lib/ui";
+import { lockScroll } from "@/lib/smooth-scroll";
+import { BtnIc, FACEBOOK_URL, INSTAGRAM_URL, Icon, PHONE, PHONE_LABEL, delay } from "@/lib/ui";
 
 const NAV = [
   { id: "institut", label: "Institut" },
@@ -13,16 +14,31 @@ const MOBILE_NAV = [
   { id: "institut", label: "Institut" },
   { id: "formations", label: "Formations" },
   { id: "vie-etudiante", label: "Vie étudiante" },
+  { id: "admission", label: "Admission" },
   { id: "faq", label: "Questions fréquentes" },
   { id: "contact", label: "Contact" },
 ];
+
+/** Parties de la page rendues inertes pendant que le tiroir est ouvert (le focus reste dans le menu). */
+const BEHIND_DRAWER = "#contenu, .site-header, .footer";
 
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const menuBtn = useRef<HTMLButtonElement>(null);
+  const closeBtn = useRef<HTMLButtonElement>(null);
+  /** Fermeture au clavier ou par la croix : le focus revient sur le bouton du menu. */
+  const refocus = useRef(false);
 
-  /* Header : état « scrollé » (classe sur <html>, lue par le CSS du header et du menu) */
+  /** Ouvre / ferme le tiroir ; le défilement est bloqué tout de suite (un lien #ancre peut défiler juste après). */
+  const toggleMenu = (open: boolean, returnFocus = false) => {
+    refocus.current = returnFocus;
+    setMenuOpen(open);
+    lockScroll(open);
+    document.documentElement.classList.toggle("menu-open", open);
+  };
+
+  /* Header : état « scrollé » (classe sur <html>, lue par le CSS du header) */
   useEffect(() => {
     const root = document.documentElement;
     const onScroll = () => root.classList.toggle("is-scrolled", window.scrollY > 24);
@@ -31,17 +47,17 @@ export function SiteHeader() {
     return () => removeEventListener("scroll", onScroll);
   }, []);
 
-  /* Menu mobile */
+  /* Tiroir ouvert : le reste de la page devient inerte et le focus entre dans le menu ; à la fermeture, il revient. */
   useEffect(() => {
-    document.documentElement.classList.toggle("menu-open", menuOpen);
+    document.querySelectorAll<HTMLElement>(BEHIND_DRAWER).forEach((el) => (el.inert = menuOpen));
+    if (menuOpen) closeBtn.current?.focus();
+    else if (refocus.current) menuBtn.current?.focus();
   }, [menuOpen]);
 
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setMenuOpen(false);
-      menuBtn.current?.focus();
+      if (e.key === "Escape") toggleMenu(false, true);
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
@@ -50,13 +66,13 @@ export function SiteHeader() {
   useEffect(() => {
     const mq = matchMedia("(min-width: 1081px)");
     const onChange = (e: MediaQueryListEvent) => {
-      if (e.matches) setMenuOpen(false);
+      if (e.matches) toggleMenu(false);
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  /* Lien actif dans la navigation */
+  /* Lien actif : la section qui occupe le milieu de l’écran (aucun lien si elle n’est pas dans le menu). */
   useEffect(() => {
     if (!("IntersectionObserver" in window)) return;
     const spy = new IntersectionObserver(
@@ -67,14 +83,12 @@ export function SiteHeader() {
       },
       { rootMargin: "-45% 0px -50% 0px" },
     );
-    ["top", ...NAV.map((n) => n.id)].forEach((id) => {
-      const s = document.getElementById(id);
-      if (s) spy.observe(s);
-    });
+    document.querySelectorAll("#contenu > section[id]").forEach((s) => spy.observe(s));
     return () => spy.disconnect();
   }, []);
 
-  const closeMenu = () => setMenuOpen(false);
+  const closeMenu = () => toggleMenu(false);
+  const linkClass = (id: string) => (activeId === id ? "is-active" : undefined);
 
   return (
     <>
@@ -84,13 +98,10 @@ export function SiteHeader() {
             <svg className="brand__mark" viewBox="150 -4 865 780" aria-hidden="true">
               <use href="#em" />
             </svg>
-            {/* <span className="brand__txt">
-              <small>Institut Spécialisé des Techniques Paramédicales</small>
-            </span> */}
           </a>
           <div className="nav-links">
             {NAV.map((n) => (
-              <a key={n.id} href={`#${n.id}`} className={activeId === n.id ? "is-active" : undefined}>
+              <a key={n.id} href={`#${n.id}`} className={linkClass(n.id)} aria-current={activeId === n.id || undefined}>
                 {n.label}
               </a>
             ))}
@@ -99,7 +110,7 @@ export function SiteHeader() {
             <a className="icon-btn nav-call" href={`tel:${PHONE}`} aria-label="Appeler l’ISTEPM au 05 28 23 55 11">
               <Icon name="phone" />
             </a>
-            <a className="btn btn--red btn--sm" href="#admission">
+            <a className="btn btn--red btn--sm nav-cta" href="#admission">
               S’inscrire
               <BtnIc />
             </a>
@@ -109,27 +120,79 @@ export function SiteHeader() {
               type="button"
               aria-expanded={menuOpen}
               aria-controls="mobile-menu"
-              aria-label={menuOpen ? "Fermer le menu" : "Ouvrir le menu"}
-              onClick={() => setMenuOpen((open) => !open)}
+              aria-label="Ouvrir le menu"
+              onClick={() => toggleMenu(true)}
             >
-              <Icon name="menu" className="i-menu" />
-              <Icon name="x" className="i-close" />
+              <Icon name="menu" />
             </button>
           </div>
         </nav>
       </header>
-      <nav className="mobile-menu" id="mobile-menu" aria-label="Menu mobile" inert={!menuOpen}>
-        {MOBILE_NAV.map((n) => (
-          <a key={n.id} href={`#${n.id}`} onClick={closeMenu}>
-            {n.label}
-            <Icon name="arrow-right" />
+
+      {/* Menu mobile : tiroir latéral (liens numérotés, inscription, coordonnées) sur un voile qui ferme au clic. */}
+      <div className="drawer-backdrop" aria-hidden="true" onClick={closeMenu} />
+      <aside
+        className="drawer"
+        id="mobile-menu"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        inert={!menuOpen}
+        data-lenis-prevent
+      >
+        <div className="drawer__head">
+          <a className="drawer__brand" href="#top" aria-label="ISTEPM Agadir, retour en haut de page" onClick={closeMenu}>
+            <svg viewBox="0 0 1100.48 953.38" aria-hidden="true">
+              <use href="#em" />
+              <use href="#em-letters" />
+            </svg>
           </a>
-        ))}
-        <a className="btn btn--red" href="#admission" onClick={closeMenu}>
+          <button ref={closeBtn} className="drawer__close" type="button" aria-label="Fermer le menu" onClick={() => toggleMenu(false, true)}>
+            <Icon name="x" />
+          </button>
+        </div>
+
+        <p className="drawer__tag brk">Menu</p>
+        <nav aria-label="Menu mobile">
+          <ol className="drawer__links">
+            {MOBILE_NAV.map((n, i) => (
+              <li key={n.id} style={delay(i)}>
+                <a href={`#${n.id}`} className={linkClass(n.id)} aria-current={activeId === n.id || undefined} onClick={closeMenu}>
+                  <span className="drawer__n" aria-hidden="true">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="drawer__label">{n.label}</span>
+                  <Icon name="arrow-up-right" />
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+
+        <a className="btn btn--red drawer__cta" href="#admission" onClick={closeMenu}>
           Commencer ma pré-inscription
           <BtnIc />
         </a>
-      </nav>
+
+        <div className="drawer__contact">
+          <a href={`tel:${PHONE}`}>
+            <small>Téléphone</small>
+            <b className="nowrap">{PHONE_LABEL}</b>
+          </a>
+          <p>
+            <small>Adresse</small>
+            <b>49, rue Abdellah Guenoune, Cité Salam, Agadir</b>
+          </p>
+          <p className="drawer__social">
+            <a href={INSTAGRAM_URL} target="_blank" rel="noopener">
+              Instagram
+            </a>
+            <a href={FACEBOOK_URL} target="_blank" rel="noopener">
+              Facebook
+            </a>
+          </p>
+        </div>
+      </aside>
     </>
   );
 }

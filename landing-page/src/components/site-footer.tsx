@@ -18,7 +18,7 @@ const FORMATION_LINKS = [
 
 export function SiteFooter() {
   return (
-    <footer className="footer">
+    <footer className="footer section--dark on-dark">
       <div className="container">
         <div className="footer__cta">
           <Reveal as="a" className="footer__cta-link" href="#admission">
@@ -33,7 +33,7 @@ export function SiteFooter() {
                 S’inscrire
                 <BtnIc />
               </a>
-              <a className="btn btn--outline" href={`tel:${PHONE}`}>
+              <a className="btn btn--ghost" href={`tel:${PHONE}`}>
                 <span className="nowrap">{PHONE_LABEL}</span>
               </a>
             </div>
@@ -106,10 +106,6 @@ export function SiteFooter() {
           <nav aria-label="Liens légaux" data-validate="Pages légales à créer">
             <a href="#">Mentions légales</a>
             <a href="#">Confidentialité</a>
-            <a className="to-top" href="#top">
-              Haut de page
-              <Icon name="arrow-up" />
-            </a>
           </nav>
         </div>
       </div>

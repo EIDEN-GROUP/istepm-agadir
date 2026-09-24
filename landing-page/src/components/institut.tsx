@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import salleCours from "@/assets/images/salle-cours.png";
-import sallePratique from "@/assets/images/salle-pratique.png";
+import salleCours from "@/assets/images/sections/salle-cours.png";
+import sallePratique from "@/assets/images/sections/salle-pratique.png";
 import { BracketHead } from "@/components/bracket-head";
 import { Reveal } from "@/components/reveal";
 import { Icon } from "@/lib/ui";

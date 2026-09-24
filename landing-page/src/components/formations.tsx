@@ -46,7 +46,6 @@ export function FormationContent({ f, index, onPick, titleAs: Title = "h3" }: Fo
   );
 }
 
-/** Colonne du carrousel de la section : la fiche, révélée au scroll et ciblable par #f-…. */
 function FormationCol({ f, index, onPick }: { f: Formation; index: number } & PickProps) {
   return (
     <Reveal as="article" className="fcol" id={f.id} delay={(index - 1) % 4}>
@@ -91,7 +90,9 @@ export function Formations({ onPick }: PickProps) {
           spaceBetween={20}
           breakpoints={{
             641: { slidesPerView: 2, spaceBetween: 24 },
-            1101: { slidesPerView: 4, spaceBetween: 28 },
+            // 3 fiches de 1101 à 1399 px : colonnes plus larges, fiches moins hautes (la section tient dans l’écran)
+            1101: { slidesPerView: 3, spaceBetween: 28 },
+            1400: { slidesPerView: 3, spaceBetween: 28 },
           }}
           speed={700}
           rewind
@@ -112,13 +113,9 @@ export function Formations({ onPick }: PickProps) {
             </SwiperSlide>
           ))}
         </Swiper>
-
-        <Reveal className="help-bar">
-          <p>
-            <Icon name="compass" />
-            Vous hésitez entre deux formations&#8239;? L’équipe d’admission vous aide à choisir.
-          </p>
-          <a className="btn btn--sm btn--light" href="#admission" onClick={() => onPick("Je ne sais pas encore")}>
+         <Reveal className="cta__bar">
+          <p>Vous hésitez entre deux formations&#8239;? L’équipe d’admission vous aide à choisir.</p>
+          <a className="btn btn--red" href="#admission">
             Être conseillé(e)
             <BtnIc />
           </a>

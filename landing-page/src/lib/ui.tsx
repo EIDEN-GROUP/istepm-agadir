@@ -3,7 +3,7 @@ import type { CSSProperties, SVGProps } from "react";
 /** Joint les classes CSS en ignorant les valeurs vides. */
 export const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(" ");
 
-/** Délai d'animation échelonné (`--d`), lu par les règles `[data-reveal]` et `[data-hero]`. */
+/** Délai d'animation échelonné (`--d`), lu par les règles `[data-reveal]` et les liens du menu mobile. */
 export const delay = (d: number) => ({ "--d": d }) as CSSProperties;
 
 /** Lu une fois au chargement : coupe l’autoplay des carrousels. */

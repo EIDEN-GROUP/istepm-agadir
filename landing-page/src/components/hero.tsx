@@ -4,10 +4,11 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import "swiper/css/pagination";
-import heroImg from "@/assets/images/hero.png";
+import heroImg from "@/assets/images/sections/hero.png";
 import { FormationContent, type PickProps } from "@/components/formations";
+import { Reveal } from "@/components/reveal";
 import { FORMATIONS } from "@/lib/formations";
-import { BtnIc, FACEBOOK_URL, INSTAGRAM_URL, Icon, PHONE, PHONE_LABEL, cx, delay, reduceMotion } from "@/lib/ui";
+import { BtnIc, FACEBOOK_URL, INSTAGRAM_URL, Icon, PHONE, PHONE_LABEL, cx, reduceMotion } from "@/lib/ui";
 
 const PULSE =
   "M0 54 L548.0 54 Q556.8 46.3 565.6 54 L572.2 54 L575.5 60.6 L582.1 20.0 L588.7 68.3 L593.1 54 L605.2 54 Q616.2 40.8 629.4 54 L705.0 54 Q713.8 46.3 722.6 54 L729.2 54 L732.5 60.6 L739.1 20.0 L745.7 68.3 L750.1 54 L762.2 54 Q773.2 40.8 786.4 54 L862.0 54 Q870.8 46.3 879.6 54 L886.2 54 L889.5 60.6 L896.1 20.0 L902.7 68.3 L907.1 54 L919.2 54 Q930.2 40.8 943.4 54 L1440 54";
@@ -36,18 +37,18 @@ export function Hero({ onPick }: PickProps) {
         </div>
 
         <div className="hero__content">
-          <span className="chip chip--glass hero__kicker" data-hero="" style={delay(0)}>
+          <Reveal as="span" className="chip chip--glass hero__kicker" delay={0}>
             <Icon name="graduation-cap" />
             Institut Spécialisé des Techniques Paramédicales · Agadir
-          </span>
-          <h1 className="display" id="hero-title" data-hero="" style={delay(1)}>
+          </Reveal>
+          <Reveal as="h1" className="display" id="hero-title" delay={1}>
             Préparez votre <span className="accent">avenir</span> dans les métiers de la santé.
-          </h1>
-          <p className="hero__lead" data-hero="" style={delay(2)}>
+          </Reveal>
+          <Reveal as="p" className="hero__lead" delay={2}>
             Infirmier, sage-femme, aide-soignant : formez-vous à Agadir dans un institut qui relie la théorie à la
             pratique, du premier cours jusqu’au terrain.
-          </p>
-          <div className="hero__actions" data-hero="" style={delay(3)}>
+          </Reveal>
+          <Reveal className="hero__actions" delay={3}>
             <a className="btn btn--red" href="#admission">
               S’inscrire
               <BtnIc />
@@ -55,10 +56,10 @@ export function Hero({ onPick }: PickProps) {
             <a className="btn btn--ghost" href="#formations">
               Découvrir les formations
             </a>
-          </div>
+          </Reveal>
         </div>
 
-        <aside className="hero__side" data-hero="" style={delay(4)} aria-label="Aperçu des formations">
+        <Reveal as="aside" className="hero__side" delay={4} aria-label="Aperçu des formations">
           <p className="hero__note" aria-hidden="true">
             <span className="hero__note-txt">Du cours au terrain</span>
             {/* Nouvelle clé à chaque formation : la flèche se redessine vers la fiche. */}
@@ -96,7 +97,7 @@ export function Hero({ onPick }: PickProps) {
               ))}
             </Swiper>
           </div>
-        </aside>
+        </Reveal>
 
         <div className="hero__meta">
           {/* <svg className="hero__pulse" aria-hidden="true" viewBox="0 0 1440 92" preserveAspectRatio="none">
@@ -104,18 +105,18 @@ export function Hero({ onPick }: PickProps) {
             <path className="blip" pathLength={1} vectorEffect="non-scaling-stroke" d={PULSE} />
           </svg> */}
           {INFOS.map((info, i) => (
-            <a
+            <Reveal
+              as="a"
               key={info.label}
               className="cinfo__item"
               href={info.href}
-              data-hero=""
-              style={delay(5 + i)}
+              delay={5 + i}
               {...(info.external ? { target: "_blank", rel: "noopener" } : {})}
             >
               <small>{info.label}</small>
               <b className={info.nowrap ? "nowrap" : undefined}>{info.value}</b>
               <Icon name="arrow-up-right" className="cinfo__arrow" aria-hidden="true" />
-            </a>
+            </Reveal>
           ))}
         </div>
       </div>

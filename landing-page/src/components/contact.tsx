@@ -2,13 +2,11 @@ import { BracketHead } from "@/components/bracket-head";
 import { Reveal } from "@/components/reveal";
 import { BtnIc, FACEBOOK_URL, INSTAGRAM_URL, Icon, PHONE, PHONE_LABEL } from "@/lib/ui";
 
-/** Position de l’institut (fiche Google Maps : maps.app.goo.gl/h4DLL9w3AAUtMJ8d8). */
 const GEO = "30.403307,-9.5511623";
 const PLACE_URL = "https://maps.app.goo.gl/h4DLL9w3AAUtMJ8d8";
-const DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${GEO}`;
-const MAP_EMBED_URL = `https://www.google.com/maps?q=${GEO}&z=16&output=embed`;
+const DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${GEO}&hl=fr`;
+const MAP_EMBED_URL = `https://www.google.com/maps?q=${GEO}&z=16&output=embed&hl=fr&gl=ma`;
 
-/** Colonne d’info : petit libellé + valeur, séparée par un filet vertical. */
 function InfoItem({ href, label, value, delay, external, validate, nowrap }: {
   href: string;
   label: string;
