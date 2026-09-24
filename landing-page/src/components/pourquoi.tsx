@@ -4,95 +4,110 @@ import { Photo } from "@/components/photo";
 import { Reveal } from "@/components/reveal";
 import { BtnIc, Icon, cx } from "@/lib/ui";
 
-type Reason = { icon: string; tile?: string; title: string; text: string; validate?: string };
+type Tone = "teal" | "deep" | "ink" | "red";
+type Reason = { icon: string; tone: Tone; title: string; text: string; validate?: string };
 
+/* Colonne de gauche : trois branches qui partent du cœur (la photo) vers l’extérieur. */
 const LEFT: Reason[] = [
   {
     icon: "stethoscope",
+    tone: "teal",
     title: "Apprendre par la pratique",
     text: "Salles de travaux pratiques, mises en situation et gestes répétés jusqu’à la maîtrise.",
   },
   {
     icon: "users",
+    tone: "deep",
     title: "Un encadrement de proximité",
     text: "Une équipe pédagogique disponible, qui suit chaque étudiant tout au long de son parcours.",
     validate: "À confirmer : organisation de l’encadrement",
   },
   {
     icon: "hospital",
+    tone: "ink",
     title: "Le terrain pendant la formation",
     text: "Des stages en milieu de soins pour appliquer ses acquis, selon le parcours.",
   },
 ];
 
+/* Colonne de droite : trois autres branches, symétriques. */
 const RIGHT: Reason[] = [
   {
     icon: "shield-check",
-    tile: "tile tile--red",
+    tone: "red",
     title: "Des filières reconnues",
     text: "Les formations Infirmier polyvalent et Sage-femme sont accréditées par l’État.",
     validate: "Accréditation à confirmer",
   },
   {
     icon: "compass",
+    tone: "teal",
     title: "Une vraie préparation au métier",
-    text: "Posture, éthique, communication avec le patient : se préparer à la réalité du terrain.",
+    text: "Posture, éthique, communication avec le patient : se préparer à la réalité du terrain.",
   },
   {
     icon: "map-pin",
+    tone: "deep",
     title: "Se former au cœur du Souss",
     text: "Un campus à Agadir, pour étudier près de chez soi sans quitter la région.",
   },
 ];
 
-function ReasonList({ items, side }: { items: Reason[]; side: "left" | "right" }) {
+const TILE: Record<Tone, string> = {
+  teal: "tile",
+  deep: "tile tile--deep",
+  ink: "tile tile--ink",
+  red: "tile tile--red",
+};
+
+/** Connecteur tracé à la main entre le cœur et un nœud (haut / milieu / bas). */
+function Link({ pos }: { pos: "top" | "middle" | "bottom" }) {
+  return (
+    <svg className={cx("why__link", `why__link--${pos}`)} viewBox="0 0 108 88" aria-hidden="true">
+      {pos === "top" && (
+        <>
+          <path className="why__link-line" pathLength={1} d="M100 66C71 61 44 36 15 27" />
+          <path className="why__link-head" pathLength={1} d="M15 27l12.5 1.5M15 27l4 11.5" />
+        </>
+      )}
+      {pos === "middle" && (
+        <>
+          <path className="why__link-line" pathLength={1} d="M100 46C69 41 45 50 15 44" />
+          <path className="why__link-head" pathLength={1} d="M15 44l12-4M15 44l9.5 7.5" />
+        </>
+      )}
+      {pos === "bottom" && (
+        <>
+          <path className="why__link-line" pathLength={1} d="M100 22C71 27 44 52 15 61" />
+          <path className="why__link-head" pathLength={1} d="M15 61l12.5-1.5M15 61l4-11.5" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/** Une branche = un nœud (raison) relié au cœur par son connecteur. */
+function Branch({ items, side }: { items: Reason[]; side: "left" | "right" }) {
   return (
     <ul className={cx("why__col", `why__col--${side}`)}>
       {items.map((r, i) => {
-        const arrowPosition =
-          i === 0 ? "why__arrow--top" :
-          i === 1 ? "why__arrow--middle" :
-          "why__arrow--bottom";
-
+        const pos = i === 0 ? "top" : i === 1 ? "middle" : "bottom";
         return (
           <Reveal
             as="li"
             key={r.title}
-            className="why__item"
+            className={cx("why__node", `why__node--${r.tone}`)}
             delay={i * 2 + (side === "right" ? 1 : 0)}
             data-validate={r.validate}
           >
-            <span className={r.tile ?? "tile"}>
+            <span className={TILE[r.tone]}>
               <Icon name={r.icon} />
             </span>
-
-            <div>
+            <div className="why__node-body">
               <h3>{r.title}</h3>
               <p>{r.text}</p>
             </div>
-
-            <svg className={cx("why__arrow", arrowPosition)} viewBox="0 0 60 44" aria-hidden="true">
-              {i === 0 && (
-                <>
-                  <path pathLength={1} d="M3 5c17 0 31 8 40 26" />
-                  <path pathLength={1} d="M34 27l9 4 2-10" />
-                </>
-              )}
-
-              {i === 1 && (
-                <>
-                  <path pathLength={1} d="M3 22h40" />
-                  <path pathLength={1} d="M35 15l8 7-8 7" />
-                </>
-              )}
-
-              {i === 2 && (
-                <>
-                  <path pathLength={1} d="M3 39c17 0 31-8 40-26" />
-                  <path pathLength={1} d="M34 13l9-4 2 10" />
-                </>
-              )}
-            </svg>
+            <Link pos={pos} />
           </Reveal>
         );
       })}
@@ -114,15 +129,17 @@ export function Pourquoi() {
           }
         />
         <div className="why__grid">
-          <ReasonList items={LEFT} side="left" />
-          <Photo
-            className="why__photo"
-            src={pourquoiImg}
-            alt="Geste de soin : une soignante gantée auprès d’un patient"
-            motif="hand-heart"
-            brief="Photo · Formatrice et étudiants, geste de soin"
-          />
-          <ReasonList items={RIGHT} side="right" />
+          <Branch items={LEFT} side="left" />
+          <div className="why__hub">
+            <Photo
+              className="why__photo"
+              src={pourquoiImg}
+              alt="Geste de soin : une soignante gantée auprès d’un patient"
+              motif="hand-heart"
+              brief="Photo · Formatrice et étudiants, geste de soin"
+            />
+          </div>
+          <Branch items={RIGHT} side="right" />
         </div>
         <Reveal className="why__cta">
           <p>Faites le premier pas vers votre futur métier.</p>
