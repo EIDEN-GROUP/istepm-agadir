@@ -324,18 +324,46 @@ h1,h2,h3,h4{margin:0;font-family:var(--f-display);font-weight:600;letter-spacing
 .why__grid{--why-gap:clamp(24px,4vw,60px);display:grid;grid-template-columns:1fr minmax(0,1.02fr) 1fr;gap:var(--why-gap);align-items:center}
 .why__col{display:grid;gap:clamp(12px,2.8vh,44px)}
 .why__item{position:relative;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start}
-/* Les raisons glissent depuis leur côté, l’une après l’autre (gauche 1, droite 1, gauche 2…),
-   puis la flèche dessinée à la main (celle du hero) se trace vers la photo ; elles repartent en sortant de l’écran. */
+/* La photo reste plantée au centre ; chaque raison émerge de son côté de la photo vers
+   l’extérieur (et y retourne à la sortie), l’une après l’autre, sa flèche se traçant avec elle. */
 .why__item,.js .why__item[data-reveal]{transition:opacity .9s var(--ease) calc(var(--d,0)*170ms),transform 1.1s var(--ease) calc(var(--d,0)*170ms)}
-.js .why__col--left .why__item[data-reveal]{transform:translateX(-64px)}
-.js .why__col--right .why__item[data-reveal]{transform:translateX(64px)}
+.js .why__col--left .why__item[data-reveal]{transform:translateX(80px)}
+.js .why__col--right .why__item[data-reveal]{transform:translateX(-80px)}
 .js .why__item[data-reveal].is-in{transform:none}
-.why__arrow{position:absolute;top:-4px;width:calc(var(--why-gap) - 6px);height:auto;aspect-ratio:60/44;overflow:visible;fill:none;stroke:var(--teal-600);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
-.why__col--left .why__arrow{right:calc(3px - var(--why-gap))}
-.why__col--right .why__arrow{left:calc(3px - var(--why-gap));transform:scaleX(-1)}
-.why__arrow path{stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .25s}
-.why__item.is-in .why__arrow path{stroke-dashoffset:0;transition:stroke-dashoffset .9s var(--ease) calc(var(--d,0)*170ms + .55s)}
-.why__item.is-in .why__arrow path+path{transition-duration:.35s;transition-delay:calc(var(--d,0)*170ms + 1.35s)}
+.js .why__photo[data-reveal]{transform:none}
+.why__arrow {
+  position: absolute;
+  width: 80px;
+  height: 58px;
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.why__col--left .why__arrow { right: -70px; }
+.why__col--right .why__arrow { left: -70px; transform: scaleX(-1); }
+
+/* Décalées, convergentes vers la photo : une en haut, une au milieu, une en bas. */
+.why__arrow--top { top: 0; }
+.why__arrow--middle { top: calc(50% - 29px); }
+.why__arrow--bottom { bottom: 0; }
+
+/* Tracé main levée : se dessine à l'entrée, s'efface à la sortie (dans les deux sens du scroll). */
+.why__arrow path {
+  stroke-dasharray: 1;
+  transition: stroke-dashoffset .6s var(--ease) calc(.25s + var(--d, 0) * 170ms);
+}
+.why__arrow path + path { transition-delay: calc(.55s + var(--d, 0) * 170ms); }
+.js .why__arrow path { stroke-dashoffset: 1; }
+.why__item.is-in .why__arrow path { stroke-dashoffset: 0; }
+
+/* Icône : petit « pop » à l'entrée, se rétracte à la sortie (scroll). */
+.why__item .tile { transition: transform .6s cubic-bezier(.34, 1.45, .6, 1) calc(var(--d, 0) * 170ms); }
+.js .why__item[data-reveal] .tile { transform: scale(.45); }
+.js .why__item[data-reveal].is-in .tile { transform: none; }
 .why__item h3{font:600 17.5px/1.25 var(--f-display);letter-spacing:-.02em;margin:3px 0 6px}
 .why__item p{font-size:clamp(13.5px,1.9vh,14.5px);color:var(--muted)}
 .why__photo{height:clamp(240px,calc(100svh - 400px),520px);min-height:0}
@@ -571,8 +599,8 @@ textarea.control{height:auto;min-height:clamp(72px,9vh,104px);padding:12px 16px;
    8. FOOTER
    ========================================================= */
 /* Fond sombre de .section--dark (comme l’Admission), textes clairs */
-.footer{padding-top:clamp(56px,6vw,88px)}
-.footer__cta{display:grid;gap:24px;padding-bottom:clamp(40px,5vw,64px);border-bottom:1px solid rgba(255,255,255,.12)}
+.footer{padding-top:clamp(50px,6vw,40px)}
+.footer__cta{display:grid;padding-bottom:clamp(40px,5vw,30px);border-bottom:1px solid rgba(255,255,255,.12)}
 .footer__cta-link{display:flex;justify-content:space-between;align-items:flex-end;gap:24px}
 .footer__cta-link .h2{max-width:14ch;transition:color .35s var(--ease)}
 .footer__cta-link:hover .h2{color:var(--teal-200)}
@@ -583,11 +611,11 @@ textarea.control{height:auto;min-height:clamp(72px,9vh,104px);padding:12px 16px;
 .footer__grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:36px 16px;padding-block:clamp(44px,5vw,64px)}
 .footer__brand{display:grid;gap:16px;align-content:start;justify-items:start;padding-right:16px}
 .footer__logo{display:grid;place-items:center;width:88px;height:88px;border-radius:22px}
-.footer__logo svg{width:100%;height:auto}
-.footer__brand p{color:rgba(255,255,255,.66);font-size:14px;max-width:34ch}
+.footer__logo svg{width:100%;height:auto;filter: brightness(100);}
+.footer__brand p{color:rgba(255,255,255);font-size:14px;max-width:34ch}
 .footer h3{font:600 11.5px/1.2 var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--teal-300);margin-bottom:14px}
 .footer li a,.footer li span{display:inline-block;padding:5px 0;font-size:14.5px}
-.footer li span{color:rgba(255,255,255,.66)}
+.footer li span{color:rgba(255,255,255)}
 .footer li a{color:#fff;background:linear-gradient(currentColor,currentColor) 0 calc(100% - 3px)/0 1px no-repeat;transition:color .25s,background-size .4s var(--ease)}
 .footer li a:hover{color:var(--teal-300);background-size:100% 1px}
 .footer li a,.footer__bottom a{font-family:var(--f-button)}
@@ -768,6 +796,7 @@ html{scrollbar-gutter:stable}
   .cmap{min-height:clamp(260px,50svh,440px)}
   .cmap__bar{align-self:stretch}
   .cmap__bar .btn{flex:1}
+  .footer__cta{gap:50px}
   .footer__cta-link{align-items:flex-start}
   .footer__cta-row .row{width:100%}
   .footer__cta-row .row .btn{flex:1}

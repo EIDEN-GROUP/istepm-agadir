@@ -45,34 +45,57 @@ const RIGHT: Reason[] = [
   },
 ];
 
-/**
- * Colonne de raisons, de part et d’autre de la photo. Chaque raison glisse depuis son côté, l’une après l’autre
- * (gauche 1, droite 1, gauche 2…), puis une flèche dessinée à la main (celle du hero) se trace vers la photo.
- */
 function ReasonList({ items, side }: { items: Reason[]; side: "left" | "right" }) {
   return (
     <ul className={cx("why__col", `why__col--${side}`)}>
-      {items.map((r, i) => (
-        <Reveal
-          as="li"
-          key={r.title}
-          className="why__item"
-          delay={i * 2 + (side === "right" ? 1 : 0)}
-          data-validate={r.validate}
-        >
-          <span className={r.tile ?? "tile"}>
-            <Icon name={r.icon} />
-          </span>
-          <div>
-            <h3>{r.title}</h3>
-            <p>{r.text}</p>
-          </div>
-          <svg className="why__arrow" viewBox="0 0 60 44" aria-hidden="true">
-            <path pathLength={1} d="M3 5c16 1 31 9 39 29" />
-            <path pathLength={1} d="M33 30.5l9 4.5 3-9.5" />
-          </svg>
-        </Reveal>
-      ))}
+      {items.map((r, i) => {
+        const arrowPosition =
+          i === 0 ? "why__arrow--top" :
+          i === 1 ? "why__arrow--middle" :
+          "why__arrow--bottom";
+
+        return (
+          <Reveal
+            as="li"
+            key={r.title}
+            className="why__item"
+            delay={i * 2 + (side === "right" ? 1 : 0)}
+            data-validate={r.validate}
+          >
+            <span className={r.tile ?? "tile"}>
+              <Icon name={r.icon} />
+            </span>
+
+            <div>
+              <h3>{r.title}</h3>
+              <p>{r.text}</p>
+            </div>
+
+            <svg className={cx("why__arrow", arrowPosition)} viewBox="0 0 60 44" aria-hidden="true">
+              {i === 0 && (
+                <>
+                  <path pathLength={1} d="M3 5c17 0 31 8 40 26" />
+                  <path pathLength={1} d="M34 27l9 4 2-10" />
+                </>
+              )}
+
+              {i === 1 && (
+                <>
+                  <path pathLength={1} d="M3 22h40" />
+                  <path pathLength={1} d="M35 15l8 7-8 7" />
+                </>
+              )}
+
+              {i === 2 && (
+                <>
+                  <path pathLength={1} d="M3 39c17 0 31-8 40-26" />
+                  <path pathLength={1} d="M34 13l9-4 2 10" />
+                </>
+              )}
+            </svg>
+          </Reveal>
+        );
+      })}
     </ul>
   );
 }
