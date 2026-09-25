@@ -85,7 +85,7 @@ function LoginPage() {
         >
           <div className="login-zellige absolute inset-0 opacity-[0.22]" />
           <img
-            src="/login-student-hero-bg.png"
+            src="/login-student-hero.png"
             alt=""
             width={960}
             height={1280}
