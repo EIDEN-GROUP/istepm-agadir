@@ -4,7 +4,10 @@
  * Le serveur envoie les e-mails et range la demande dans le tableau de bord : ici, on collecte et on envoie.
  * L’origine de la landing doit être autorisée en CORS côté serveur, sinon le navigateur bloque les appels.
  */
-const ORIGIN = (import.meta.env.VITE_INSCRIPTIONS_API || "https://istepm-agadir.eiden-group.com").replace(/\/$/, "");
+// En dev, chemin relatif : le proxy de Vite (vite.config.ts) relaie vers l’API, sans blocage CORS sur localhost.
+const ORIGIN = (
+  import.meta.env.VITE_INSCRIPTIONS_API || (import.meta.env.DEV ? "" : "https://istepm-agadir.eiden-group.com")
+).replace(/\/$/, "");
 const API = `${ORIGIN}/api/inscriptions`;
 
 /**

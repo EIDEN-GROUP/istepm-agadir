@@ -86,7 +86,7 @@ export function Formations({ onPick }: PickProps) {
         <Swiper
           className="fswiper"
           modules={[A11y, Autoplay, Keyboard, Pagination]}
-          slidesPerView={1.15}
+          slidesPerView={1}
           spaceBetween={20}
           breakpoints={{
             641: { slidesPerView: 2, spaceBetween: 24 },

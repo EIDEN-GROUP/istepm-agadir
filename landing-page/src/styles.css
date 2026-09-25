@@ -307,6 +307,8 @@ h1,h2,h3,h4{margin:0;font-family:var(--f-display);font-weight:600;letter-spacing
 .js .fcol[data-reveal].is-in .fcol__disc{clip-path:inset(0)}
 .fcol.is-in .fcol__disc img{transform:none}
 .fcol:hover .fcol__disc img{scale:1.07}
+/* Section Formations : photo plus grande (le hero garde sa taille) */
+.fswiper .fcol__disc{width:160px;height:300px}
 .fcol__body{display:flex;flex-direction:column;gap:clamp(5px,1vh,8px);min-width:0;height:100%;padding-top:2px}
 .fcol__index{font:500 13px/1.2 var(--f-body);letter-spacing:.08em;color:var(--teal-600)}
 .fcol__title{margin-top:6px;font:500 clamp(1.15rem,.95rem + .55vw,1.45rem)/1.08 var(--f-display);letter-spacing:-.03em;color:var(--ink);text-wrap:balance;transition:color .3s}
@@ -333,22 +335,24 @@ h1,h2,h3,h4{margin:0;font-family:var(--f-display);font-weight:600;letter-spacing
 .why__photo{width:100%;height:clamp(240px,calc(100svh - 400px),520px);min-height:0;border-radius:var(--r-lg);box-shadow:0 0 0 6px #fff,0 0 0 7px var(--teal-100),var(--sh-md)}
 
 /* ── Un nœud : la carte d’une raison ── */
-.why__node{position:relative;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;padding:clamp(14px,1.8vh,18px) clamp(15px,1.5vw,19px);border-radius:var(--r-md);background:var(--n-bg);border:1px solid var(--n-line);box-shadow:var(--sh-sm)}
+.why__node{position:relative;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;padding:clamp(14px,1.8vh,18px) clamp(15px,1.5vw,19px);border-radius:var(--r-md);background:var(--n-bg);box-shadow:var(--sh-sm)}
 .why__node h3{font:600 16.5px/1.22 var(--f-display);letter-spacing:-.02em;margin:2px 0 5px}
 .why__node p{font-size:clamp(13px,1.75vh,14px);line-height:1.5;color:var(--muted)}
-/* Teintes de marque, alternées d’un nœud à l’autre (fond, liseré, couleur du trait). */
-.why__node--teal{--n-bg:linear-gradient(#fff,#F2FAF9);--n-line:var(--teal-100);--n-stroke:var(--teal-600)}
-.why__node--deep{--n-bg:linear-gradient(#fff,#EEF7F5);--n-line:#CFE8E4;--n-stroke:var(--teal-700)}
-.why__node--ink{--n-bg:linear-gradient(#fff,#F1F5F5);--n-line:var(--line);--n-stroke:#3F6E70}
-.why__node--red{--n-bg:linear-gradient(#fff,#FEF4F4);--n-line:#F7D3D4;--n-stroke:var(--red)}
+/* Une teinte propre à chaque carte : fond en dégradé clair translucide, trait de la même teinte en plus foncé. */
+.why__col--left .why__node:nth-child(1){--n-bg:linear-gradient(135deg,rgba(64,190,158,.30),rgba(64,190,158,.12));--n-stroke:#2F8F78}
+.why__col--left .why__node:nth-child(2){--n-bg:linear-gradient(135deg,rgba(234,172,56,.32),rgba(234,172,56,.12));--n-stroke:#B07A1E}
+.why__col--left .why__node:nth-child(3){--n-bg:linear-gradient(135deg,rgba(156,108,236,.28),rgba(156,108,236,.10));--n-stroke:#6A4BC0}
+.why__col--right .why__node:nth-child(1){--n-bg:linear-gradient(135deg,rgba(232,110,116,.22),rgba(232,110,116,.06));--n-stroke:#C4474F}
+.why__col--right .why__node:nth-child(2){--n-bg:linear-gradient(135deg,rgba(86,150,236,.28),rgba(86,150,236,.10));--n-stroke:#3A6FB5}
+.why__col--right .why__node:nth-child(3){--n-bg:linear-gradient(135deg,rgba(128,180,86,.26),rgba(128,180,86,.08));--n-stroke:#5C8A34}
 
 /* Apparition : le nœud émerge du cœur vers son côté, la vignette « pop », le trait se dessine. */
-.why__node,.js .why__node[data-reveal]{transition:opacity .9s var(--ease) calc(var(--d,0)*170ms),transform 1.05s var(--ease) calc(var(--d,0)*170ms),box-shadow .4s var(--ease),border-color .4s var(--ease)}
+.why__node,.js .why__node[data-reveal]{transition:opacity .9s var(--ease) calc(var(--d,0)*170ms),transform 1.05s var(--ease) calc(var(--d,0)*170ms),box-shadow .4s var(--ease)}
 .js .why__col--left .why__node[data-reveal]{transform:translateX(64px)}
 .js .why__col--right .why__node[data-reveal]{transform:translateX(-64px)}
 .js .why__node[data-reveal].is-in{transform:none}
 .js .why__hub[data-reveal]{transform:none}
-.why__node:hover{box-shadow:var(--sh-md);border-color:color-mix(in srgb,var(--n-stroke) 40%,var(--n-line))}
+.why__node:hover{box-shadow:var(--sh-md)}
 .why__node .tile{transition:transform .6s cubic-bezier(.34,1.45,.6,1) calc(var(--d,0)*170ms)}
 .js .why__node[data-reveal] .tile{transform:scale(.5)}
 .js .why__node[data-reveal].is-in .tile{transform:none}
@@ -370,6 +374,7 @@ h1,h2,h3,h4{margin:0;font-family:var(--f-display);font-weight:600;letter-spacing
 
 /* ── Vie étudiante ───────────────────────────────── */
 /* 2 rangées dont la hauteur suit l’écran : grande photo à gauche, photos puis cartes à droite */
+  #vie-etudiante{padding-bottom:100px}
 .gallery{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:repeat(2,minmax(clamp(170px,calc(50svh - 200px),300px),auto));gap:16px}
 .g-a{grid-column:1/6;grid-row:1/3}
 .g-b{grid-column:6/9;grid-row:1}
@@ -783,8 +788,7 @@ html{scrollbar-gutter:stable}
 }
 @media (max-width:640px){
   :root{--max:100%;--nav-space:76px}
-  /* Téléphone : galerie empilée ; dense : les deux photos « demi-largeur » se mettent côte à côte, sans trou */
-  .gallery{grid-template-columns:1fr 1fr;grid-template-rows:none;grid-auto-rows:auto;grid-auto-flow:dense}
+   .gallery{grid-template-columns:1fr 1fr;grid-template-rows:none;grid-auto-rows:auto;grid-auto-flow:dense}
   .gallery .g-a{grid-column:1/-1;grid-row:auto;min-height:clamp(200px,26svh,340px)}
   .gallery .g-b,.gallery .g-c{grid-column:span 1;grid-row:auto;min-height:clamp(160px,20svh,240px)}
   .g-d,.g-e{grid-column:1/-1;grid-row:auto}
