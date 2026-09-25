@@ -7,6 +7,7 @@ import {
   CONFIRMATION_DOCS,
   buildConfirmationHtml,
   buildConfirmationText,
+  buildStaffNotificationHtml,
   confirmationSubject,
 } from "@/lib/inscription-mail";
 import type { InscriptionMailRow } from "@/lib/inscription-mail";
@@ -76,5 +77,40 @@ describe("buildConfirmationHtml", () => {
   it("omet la ligne Message quand vide", () => {
     const html = buildConfirmationHtml({ ...ROW, message: "" });
     expect(html).not.toContain(">Message</td>");
+  });
+});
+
+describe("buildStaffNotificationHtml", () => {
+  it("garde tous les champs du dépôt, au style du site", () => {
+    const html = buildStaffNotificationHtml(ROW);
+    expect(html).toContain("#17353A");
+    expect(html).toContain("#067C7A");
+    for (const label of ["Prénom", "Nom", "Téléphone", "E-mail", "Filière", "Niveau", "Message"]) {
+      expect(html).toContain(`>${label}</div>`);
+    }
+    for (const v of [ROW.prenom, ROW.nom, ROW.telephone, ROW.email, ROW.filiere, ROW.niveau]) {
+      expect(html).toContain(v);
+    }
+    expect(html).toContain("Bonjour,<br>Je souhaite des précisions.");
+    expect(html).toContain('href="tel:0612345678"');
+    expect(html).toContain('href="mailto:yasmine.e2e@example.com"');
+  });
+
+  it("échappe les valeurs candidat (anti-injection)", () => {
+    const html = buildStaffNotificationHtml({
+      ...ROW,
+      prenom: "<script>alert(1)</script>",
+      telephone: "06\"><img src=x>",
+      message: "<b>gras</b>",
+    });
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("&lt;b&gt;gras&lt;/b&gt;");
+  });
+
+  it("omet le bloc Message quand vide", () => {
+    const html = buildStaffNotificationHtml({ ...ROW, message: "" });
+    expect(html).not.toContain(">Message</div>");
   });
 });

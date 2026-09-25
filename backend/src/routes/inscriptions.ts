@@ -10,6 +10,7 @@ import { escHtml, notifyBestEffort } from "@/lib/notify";
 import {
   buildConfirmationHtml,
   buildConfirmationText,
+  buildStaffNotificationHtml,
   confirmationSubject,
 } from "@/lib/inscription-mail";
 
@@ -141,15 +142,7 @@ export async function inscriptionRoutes(app: FastifyInstance) {
       const db = getDb();
       const [row] = await db.insert(inscriptionRequests).values(input).returning();
       const env = getEnv();
-      const ligne = (k: string, v: string) => `<p><strong>${k} :</strong> ${escHtml(v)}</p>`;
-      const html =
-        ligne("Prénom", row.prenom) +
-        ligne("Nom", row.nom) +
-        ligne("Téléphone", row.telephone) +
-        ligne("E-mail", row.email) +
-        ligne("Filière", row.filiere) +
-        ligne("Niveau", row.niveau) +
-        (row.message ? `<p><strong>Message :</strong><br>${escHtml(row.message).replace(/\n/g, "<br>")}</p>` : "");
+      const html = buildStaffNotificationHtml(row);
       const text =
         `Prénom : ${row.prenom}\nNom : ${row.nom}\nTéléphone : ${row.telephone}\n` +
         `E-mail : ${row.email}\nFilière : ${row.filiere}\nNiveau : ${row.niveau}\n` +

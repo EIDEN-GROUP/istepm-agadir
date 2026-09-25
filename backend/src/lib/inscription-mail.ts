@@ -127,3 +127,78 @@ export function buildConfirmationHtml(row: InscriptionMailRow): string {
     `</table></td></tr></table></body></html>`
   );
 }
+
+/**
+ * Notification staff à chaque dépôt (ADMIN_EMAIL).
+ *
+ * Contenu inchangé (Prénom, Nom, Téléphone, E-mail, Filière, Niveau, Message
+ * si présent), habillé au style de la landing : bande encre en dégradé
+ * (`.section--dark`), étiquette `[ … ]` sarcelle (`.bhead__tag`), colonnes
+ * d'info de la section Contact (`.cinfo__item`), message sur fond
+ * `--teal-50` (`.docs`). Marque en texte, sans image : Gmail n'affiche pas
+ * le SVG. Les colonnes s'empilent sous 520px (clients qui lisent <style>).
+ */
+export function buildStaffNotificationHtml(row: InscriptionMailRow): string {
+  const font = `font-family:Poppins,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;`;
+  const prenom = escHtml(row.prenom);
+  const nom = escHtml(row.nom);
+  const link = (href: string, label: string) =>
+    `<a href="${href}" style="color:#067C7A;text-decoration:none;">${label}</a>`;
+  const field = (label: string, value: string) =>
+    `<td class="col" width="50%" valign="top" style="padding:0 0 22px;">` +
+    `<div style="border-left:1px solid #DCE9E8;padding:2px 12px 4px 16px;">` +
+    `<div style="${font}font-size:11px;line-height:1.2;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#536A6E;">${label}</div>` +
+    `<div style="margin-top:6px;${font}font-size:15px;line-height:1.45;font-weight:600;color:#17353A;word-break:break-word;">${value}</div>` +
+    `</div></td>`;
+  const message = row.message
+    ? `<tr><td class="px" style="padding:0 32px 8px;">` +
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#EAF7F6;border-radius:12px;">` +
+      `<tr><td style="padding:16px 18px 18px;">` +
+      `<div style="${font}font-size:11px;line-height:1.2;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#067C7A;">Message</div>` +
+      `<div style="margin-top:8px;${font}font-size:14px;line-height:1.6;color:#17353A;">${escHtml(row.message).replace(/\n/g, "<br>")}</div>` +
+      `</td></tr></table></td></tr>`
+    : "";
+
+  return (
+    `<!doctype html><html lang="fr"><head><meta charset="utf-8">` +
+    `<meta name="viewport" content="width=device-width,initial-scale=1">` +
+    `<meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light">` +
+    `<style>@media only screen and (max-width:520px){` +
+    `.px{padding-left:20px!important;padding-right:20px!important}` +
+    `.col{display:block!important;width:100%!important}` +
+    `.h1{font-size:24px!important}}</style>` +
+    `</head><body style="margin:0;padding:0;background-color:#F0F5F5;">` +
+    `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">` +
+    `${prenom} ${nom} · ${escHtml(row.filiere)} · ${escHtml(row.niveau)}</div>` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F0F5F5;">` +
+    `<tr><td align="center" style="padding:32px 12px;">` +
+    `<table role="presentation" width="600" cellpadding="0" cellspacing="0" ` +
+    `style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #DCE9E8;border-radius:14px;overflow:hidden;">` +
+    // Bande encre (site : .section--dark, dégradé 150deg).
+    `<tr><td class="px" style="background-color:#17353A;` +
+    `background-image:linear-gradient(150deg,#1B4146 0%,#17353A 45%,#0E2629 100%);padding:24px 32px 30px;">` +
+    `<div style="${font}font-size:15px;line-height:1.2;font-weight:700;letter-spacing:-.01em;color:#ffffff;">` +
+    `ISTEPM <span style="font-weight:600;color:#7FD3CF;">Agadir</span></div>` +
+    `<div style="margin-top:34px;${font}font-size:12px;line-height:1.2;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#7FD3CF;">` +
+    `[&nbsp;Demande d’inscription&nbsp;]</div>` +
+    `<h1 class="h1" style="margin:12px 0 0;${font}font-size:28px;line-height:1.1;font-weight:600;letter-spacing:-.03em;color:#ffffff;">` +
+    `${prenom} ${nom}</h1>` +
+    `<div style="margin-top:18px;width:36px;height:3px;border-radius:3px;background-color:#E52329;font-size:0;line-height:0;">&nbsp;</div>` +
+    `</td></tr>` +
+    // Coordonnées (site : .cinfo__item, 2 colonnes).
+    `<tr><td class="px" style="padding:30px 32px 8px;">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">` +
+    `<tr>${field("Prénom", prenom)}${field("Nom", nom)}</tr>` +
+    `<tr>${field("Téléphone", link(`tel:${escHtml(row.telephone.replace(/[^\d+]/g, ""))}`, escHtml(row.telephone)))}` +
+    `${field("E-mail", link(`mailto:${escHtml(row.email)}`, escHtml(row.email)))}</tr>` +
+    `<tr>${field("Filière", escHtml(row.filiere))}${field("Niveau", escHtml(row.niveau))}</tr>` +
+    `</table></td></tr>` +
+    message +
+    // Pied de page.
+    `<tr><td class="px" style="padding:22px 32px 24px;">` +
+    `<p style="margin:0;padding-top:16px;border-top:1px solid #E8F0EF;${font}font-size:12px;line-height:1.5;color:#536A6E;">` +
+    `Institut Spécialisé des Techniques Paramédicales — Cité Salam, Agadir</p>` +
+    `</td></tr>` +
+    `</table></td></tr></table></body></html>`
+  );
+}
