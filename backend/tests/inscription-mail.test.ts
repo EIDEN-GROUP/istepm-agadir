@@ -49,11 +49,15 @@ describe("buildConfirmationText", () => {
 });
 
 describe("buildConfirmationHtml", () => {
-  it("reprend le design du site (encre, sarcelle, logo)", () => {
+  it("reprend le design du site (encre, sarcelle, rouge, logo)", () => {
     const html = buildConfirmationHtml(ROW);
     expect(html).toContain("#17353A");
     expect(html).toContain("#067C7A");
-    expect(html).toContain("https://istepm-agadir.eiden-group.com/istpm-logo.svg");
+    expect(html).toContain("#E52329");
+    // PNG : Gmail n'affiche pas les images SVG.
+    expect(html).toContain("https://istepm-agadir.eiden-group.com/istpm-logo-blanc.png");
+    expect(html).not.toContain(".svg");
+    expect(html).toContain('href="tel:+212528235511"');
     expect(html).toContain("Demande bien reçue, Yasmine !");
     expect(html).toContain("Sage-femme");
     expect(html).toContain("05 28 23 55 11");
