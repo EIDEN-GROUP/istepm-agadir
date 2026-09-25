@@ -4,7 +4,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import "swiper/css/pagination";
-import heroImg from "@/assets/images/sections/hero.png";
+import heroImg from "@/assets/images/sections/istpm image hero.png";
 import { FormationContent, type PickProps } from "@/components/formations";
 import { Reveal } from "@/components/reveal";
 import { FORMATIONS } from "@/lib/formations";
