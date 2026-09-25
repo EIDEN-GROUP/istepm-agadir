@@ -7,6 +7,11 @@ import { settings } from "@/db/schema/settings";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { getEnv } from "@/config/env";
 import { escHtml, notifyBestEffort } from "@/lib/notify";
+import {
+  buildConfirmationHtml,
+  buildConfirmationText,
+  confirmationSubject,
+} from "@/lib/inscription-mail";
 
 /**
  * Demandes d'inscription de la landing page + traitement staff.
@@ -14,8 +19,8 @@ import { escHtml, notifyBestEffort } from "@/lib/notify";
  * Public (sans jeton) : `GET /filieres` et `GET /niveaux` (référentiels des
  * selects) et `POST /` (dépôt, limité comme /send-demo). Tout le reste exige
  * directeur/responsable. E-mails best-effort (gabarits fixes côté serveur,
- * jamais de relais libre) : staff à chaque dépôt, candidat à chaque
- * réponse / rendez-vous.
+ * jamais de relais libre) : staff à chaque dépôt, confirmation au candidat
+ * à chaque dépôt, candidat à chaque réponse / rendez-vous.
  *
  * Niveaux : la liste éditable vit dans settings (`niveaux_etudes`, gérée dans
  * Paramètres comme les filières). `NIVEAUX_INSCRIPTION` reste la valeur de
@@ -156,6 +161,14 @@ export async function inscriptionRoutes(app: FastifyInstance) {
         html,
         text,
         "inscription",
+      );
+      // Confirmation au candidat (gabarit fixe côté serveur, design du site).
+      await notifyBestEffort(
+        input.email,
+        confirmationSubject(row),
+        buildConfirmationHtml(row),
+        buildConfirmationText(row),
+        "inscription-confirmation",
       );
       return reply.status(201).send({ ok: true, id: row.id });
     },
