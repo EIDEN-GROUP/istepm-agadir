@@ -11,11 +11,16 @@ import { escHtml, notifyBestEffort } from "@/lib/notify";
 /**
  * Demandes d'inscription de la landing page + traitement staff.
  *
- * Public (sans jeton) : `GET /filieres` (référentiel du select) et
- * `POST /` (dépôt, limité comme /send-demo). Tout le reste exige
+ * Public (sans jeton) : `GET /filieres` et `GET /niveaux` (référentiels des
+ * selects) et `POST /` (dépôt, limité comme /send-demo). Tout le reste exige
  * directeur/responsable. E-mails best-effort (gabarits fixes côté serveur,
  * jamais de relais libre) : staff à chaque dépôt, candidat à chaque
  * réponse / rendez-vous.
+ *
+ * Niveaux : la liste éditable vit dans settings (`niveaux_etudes`, gérée dans
+ * Paramètres comme les filières). `NIVEAUX_INSCRIPTION` reste la valeur de
+ * repli historique (jamais modifiée) : le dépôt accepte l'union des deux
+ * pour ne jamais rejeter une demande existante.
  */
 export const NIVEAUX_INSCRIPTION = [
   "Terminale (bac en cours)",
@@ -25,13 +30,16 @@ export const NIVEAUX_INSCRIPTION = [
   "Autre",
 ] as const;
 
+/** Clé settings du référentiel éditable des niveaux d'études. */
+export const NIVEAUX_ETUDES_KEY = "niveaux_etudes";
+
 const depotSchema = z.object({
   prenom: z.string().trim().min(1, "Prénom requis").max(100),
   nom: z.string().trim().min(1, "Nom requis").max(100),
   telephone: z.string().trim().min(1, "Téléphone requis").max(30),
   email: z.string().trim().email("E-mail invalide").max(150),
   filiere: z.string().trim().min(1, "Filière requise"),
-  niveau: z.enum(NIVEAUX_INSCRIPTION),
+  niveau: z.string().trim().min(1, "Niveau requis").max(100),
   message: z.string().trim().max(2000).optional().default(""),
 });
 
@@ -68,10 +76,47 @@ async function filieresReference(): Promise<string[]> {
   return Array.isArray(v) ? (v as unknown[]).filter((x): x is string => typeof x === "string") : [];
 }
 
+/**
+ * Niveaux d'études de référence (clé settings `niveaux_etudes`, éditée dans
+ * Paramètres comme les filières). Vide = non initialisé (voir migration
+ * 0027 qui scelle les valeurs historiques) : l'appelant replie alors sur
+ * `NIVEAUX_INSCRIPTION`.
+ */
+async function niveauxEtudesReference(): Promise<string[]> {
+  const db = getDb();
+  const [row] = await db
+    .select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, NIVEAUX_ETUDES_KEY))
+    .limit(1);
+  const v = row?.value;
+  return Array.isArray(v) ? (v as unknown[]).filter((x): x is string => typeof x === "string") : [];
+}
+
+/** Niveaux acceptés au dépôt : union (éditable + repli historique), sans doublons. */
+async function niveauxAcceptes(): Promise<string[]> {
+  const dynamiques = await niveauxEtudesReference();
+  if (dynamiques.length === 0) return [...NIVEAUX_INSCRIPTION];
+  const vus = new Set<string>();
+  const union: string[] = [];
+  for (const n of [...dynamiques, ...NIVEAUX_INSCRIPTION]) {
+    if (!vus.has(n)) {
+      vus.add(n);
+      union.push(n);
+    }
+  }
+  return union;
+}
+
 export async function inscriptionRoutes(app: FastifyInstance) {
   // Référentiel public du select Filière (landing page, sans jeton).
   app.get("/filieres", async () => {
     return { filieres: await filieresReference() };
+  });
+
+  // Référentiel public du select Niveau d'études (landing page, sans jeton).
+  app.get("/niveaux", async () => {
+    return { niveaux: await niveauxAcceptes() };
   });
 
   // Dépôt public (landing page) : gabarit fixe, anti-relais, anti-spam.
@@ -83,6 +128,10 @@ export async function inscriptionRoutes(app: FastifyInstance) {
       const filieres = await filieresReference();
       if (!filieres.includes(input.filiere)) {
         return reply.status(400).send({ error: "Filière inconnue" });
+      }
+      const niveaux = await niveauxAcceptes();
+      if (!niveaux.includes(input.niveau)) {
+        return reply.status(400).send({ error: "Niveau d'études inconnu" });
       }
       const db = getDb();
       const [row] = await db.insert(inscriptionRequests).values(input).returning();

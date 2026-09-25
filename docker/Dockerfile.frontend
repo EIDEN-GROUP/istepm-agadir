@@ -1,0 +1,44 @@
+# Image de production fusionnée : landing page (/) + CRM (/login, /dashboard…).
+#
+# Contexte de build : racine du dépôt (les deux `dist/` sont construits AVANT,
+# en CI comme dans deploy.sh, car `dist/` est gitignoré) :
+#   docker build -t ... -f docker/Dockerfile.frontend .
+#
+# Contenu servi :
+#   /usr/share/nginx/html/index.html      → landing (racine)
+#   /usr/share/nginx/html/assets/*        → assets landing
+#   /usr/share/nginx/html/crm-index.html  → CRM (routes /login, /dashboard…)
+#   /usr/share/nginx/html/crm-assets/*    → assets CRM (assetsDir dédié)
+#   autres fichiers racine                → publics fusionnés (logos, favicons)
+# Routage : voir docker/nginx.frontend-merged.conf.
+FROM nginx:1.27-alpine
+
+# Remove default nginx config
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Merged routing (landing at /, CRM at /login, /dashboard/*, …)
+COPY docker/nginx.frontend-merged.conf /etc/nginx/conf.d/default.conf
+
+# 1. Landing à la racine (index.html + /assets + favicons + istpm-logo.svg).
+COPY landing-page/dist/ /usr/share/nginx/html/
+
+# 2. CRM : entrée renommée + assets dédiés (sans écraser la landing).
+COPY frontend/dist/index.html /usr/share/nginx/html/crm-index.html
+COPY frontend/dist/crm-assets/ /usr/share/nginx/html/crm-assets/
+
+# 3. Fichiers publics du CRM absents de la landing (logos, visuel login).
+#    `istpm-logo.svg` existe dans les deux (contenu identique) : copié une
+#    seule fois via la landing, pas de conflit.
+COPY frontend/dist/call-qr.svg /usr/share/nginx/html/call-qr.svg
+COPY frontend/dist/istpm-logo-mark.svg /usr/share/nginx/html/istpm-logo-mark.svg
+COPY frontend/dist/login-student-hero.png /usr/share/nginx/html/login-student-hero.png
+COPY ["frontend/dist/istpm-logo transparent blanc.svg", "/usr/share/nginx/html/istpm-logo transparent blanc.svg"]
+
+# NOTE: a non-root attempt (USER nginx + pid /tmp/nginx.pid) was reverted —
+# it crashed on boot (duplicate "pid" directive vs base nginx.conf, and port
+# 80 can't bind without CAP_NET_BIND_SERVICE). Proper fix needs listen 8080
+# + compose target 8080. Kept root until then (matches pre-hardening image).
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

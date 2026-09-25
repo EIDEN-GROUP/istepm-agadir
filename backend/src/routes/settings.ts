@@ -241,6 +241,70 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   /* ------------------------------------------------------------------ */
+  /* Niveaux d'études (référentiel du formulaire d'inscription,          */
+  /* édité dans Paramètres comme les filières). Clé `niveaux_etudes`.    */
+  /* ------------------------------------------------------------------ */
+
+  app.get("/niveaux-etudes", { preHandler: [authenticate] }, async () => {
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "niveaux_etudes"))
+      .limit(1);
+    return row?.value ?? [];
+  });
+
+  app.post("/niveaux-etudes", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+    const { nom } = z.object({ nom: z.string().min(1) }).parse(request.body);
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "niveaux_etudes"))
+      .limit(1);
+
+    const list: string[] = (row?.value as string[]) ?? [];
+    if (list.includes(nom)) {
+      return reply.status(409).send({ error: "Ce niveau d'études existe déjà" });
+    }
+    list.push(nom);
+    list.sort();
+
+    if (row) {
+      await db
+        .update(settings)
+        .set({ value: list })
+        .where(eq(settings.key, "niveaux_etudes"));
+    } else {
+      await db.insert(settings).values({ key: "niveaux_etudes", value: list });
+    }
+    return { niveaux: list };
+  });
+
+  app.delete("/niveaux-etudes/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+    const { nom } = request.params as { nom: string };
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, "niveaux_etudes"))
+      .limit(1);
+    if (!row) return reply.status(404).send({ error: "Aucun niveau d'études enregistré" });
+
+    const list: string[] = (row.value as string[]) ?? [];
+    const idx = list.indexOf(nom);
+    if (idx === -1) return reply.status(404).send({ error: "Niveau d'études introuvable" });
+    list.splice(idx, 1);
+
+    await db
+      .update(settings)
+      .set({ value: list })
+      .where(eq(settings.key, "niveaux_etudes"));
+    return { niveaux: list };
+  });
+
+  /* ------------------------------------------------------------------ */
   /* Stage services (lieux de stage libres, créables depuis le front)     */
   /* ------------------------------------------------------------------ */
   function asStrings(v: unknown): string[] {

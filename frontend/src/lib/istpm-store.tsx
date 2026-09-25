@@ -88,6 +88,9 @@ import {
   createFiliereApi,
   fetchFilieres as apiFetchFilieres,
   deleteFiliereApi,
+  fetchNiveauxEtudes as apiFetchNiveauxEtudes,
+  createNiveauEtudesApi,
+  deleteNiveauEtudesApi,
   createStructureApi,
   updateStructureApi,
   deleteStructureApi,
@@ -134,6 +137,8 @@ type Snapshot = {
   stages: Stage[];
   seances: Seance[];
   filieres: string[];
+  /** Niveaux d'études du formulaire d'inscription (Paramètres, comme les filières). */
+  niveauxEtudes: string[];
   structuresAccueil: StructureAccueil[];
   /** Services de stage libres (créables depuis le formulaire de stage). */
   servicesStage: string[];
@@ -161,6 +166,7 @@ function emptySnapshot(): Snapshot {
     stages: [],
     seances: [],
     filieres: [],
+    niveauxEtudes: [],
     structuresAccueil: [],
     servicesStage: [],
     modules: [],
@@ -444,6 +450,8 @@ type IstpmCtx = {
   stages: Stage[];
   seances: Seance[];
   filieres: string[];
+  /** Niveaux d'études du formulaire d'inscription (Paramètres, comme les filières). */
+  niveauxEtudes: string[];
   structuresAccueil: StructureAccueil[];
   /** Services de stage libres (créables depuis le formulaire de stage). */
   servicesStage: string[];
@@ -565,6 +573,9 @@ type IstpmCtx = {
   addFiliere: (nom: string) => Promise<void>;
   deleteFiliere: (nom: string) => Promise<void>;
 
+  addNiveauEtudes: (nom: string) => Promise<void>;
+  deleteNiveauEtudes: (nom: string) => Promise<void>;
+
   addStructureAccueil: (nom: string, capacite?: number) => Promise<void>;
   updateStructureAccueil: (oldName: string, body: { nouveauNom?: string; capacite?: number }) => Promise<void>;
   deleteStructureAccueil: (nom: string) => Promise<void>;
@@ -639,6 +650,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         exceptionsRaw,
         modulesRaw,
         filieresRaw,
+        niveauxEtudesRaw,
         groupsRaw,
       ] = await Promise.all([
         isStudent ? [] : apiFetchEtudiants({ archived: "all" }),
@@ -656,6 +668,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         apiFetchExceptions().catch(() => [] as CalendarExceptionRow[]),
         fetchModulesApi().catch(() => [] as ModuleRecord[]),
         apiFetchFilieres().catch(() => [] as string[]),
+        apiFetchNiveauxEtudes().catch(() => [] as string[]),
         apiFetchGroupConfigs().catch(() => [] as GroupConfig[]),
       ]);
 
@@ -688,6 +701,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           id: String(s.id ?? ""),
         })),
         filieres: (filieresRaw as string[]).map(String),
+        niveauxEtudes: (niveauxEtudesRaw as string[]).map(String),
         structuresAccueil: (structuresRaw as StructureAccueil[]) ?? [],
         servicesStage: [...(servicesRaw as string[])].sort((a, b) => a.localeCompare(b)),
         modules: (modulesRaw as unknown as Record<string, unknown>[]).map(normModule),
@@ -1300,6 +1314,18 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     setSnap((s) => ({ ...s, filieres }));
   }, []);
 
+  const addNiveauEtudes = useCallback(async (nom: string) => {
+    const clean = nom.trim();
+    if (!clean) return;
+    const { niveaux } = await createNiveauEtudesApi(clean);
+    setSnap((s) => ({ ...s, niveauxEtudes: niveaux }));
+  }, []);
+
+  const deleteNiveauEtudes = useCallback(async (nom: string) => {
+    const { niveaux } = await deleteNiveauEtudesApi(nom);
+    setSnap((s) => ({ ...s, niveauxEtudes: niveaux }));
+  }, []);
+
   /* ---------------- Structures d'accueil ---------------- */
 
   const addStructureAccueil = useCallback(async (nom: string, capacite = 5) => {
@@ -1770,6 +1796,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     deleteNote,
     addFiliere,
     deleteFiliere,
+    addNiveauEtudes,
+    deleteNiveauEtudes,
     addStructureAccueil,
     updateStructureAccueil,
     deleteStructureAccueil,

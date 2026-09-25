@@ -17,12 +17,12 @@ echo ""
 # ── 0. Registry config ──────────────────────────────────────
 REGISTRY="ghcr.io/eiden-group/istepm-agadir"
 
-# ── 1. Build or pull frontend image ──────────────────────────
+# ── 1. Build or pull frontend image (landing + CRM, même domaine) ──
 if docker pull "$REGISTRY/school-crm-frontend:latest" >/dev/null 2>&1; then
   echo "→ Pulling frontend image..."
   docker pull "$REGISTRY/school-crm-frontend:latest"
 else
-  echo "→ Building frontend..."
+  echo "→ Building frontend (landing + CRM)..."
   DOMAIN="$(grep -m1 '^DOMAIN=' .env.production 2>/dev/null | cut -d= -f2-)"
   DOMAIN="${DOMAIN:-localhost}"
   VITE_API_URL="https://${DOMAIN}/api"
@@ -30,7 +30,12 @@ else
   npm ci
   VITE_API_URL="$VITE_API_URL" npm run build
   cd ..
-  docker build -t "$REGISTRY/school-crm-frontend:latest" -f frontend/Dockerfile frontend/
+  # Landing : même origine que l'API → build relatif (pas de VITE_INSCRIPTIONS_API).
+  cd landing-page
+  npm ci
+  npm run build
+  cd ..
+  docker build -t "$REGISTRY/school-crm-frontend:latest" -f docker/Dockerfile.frontend .
 fi
 
 # ── 2. Build or pull backend image ──────────────────────────

@@ -11,7 +11,7 @@ import {
 import { flushSync } from "react-dom";
 import admissionImg from "@/assets/images/sections/admission-form.jpg";
 import { Reveal } from "@/components/reveal";
-import { FALLBACK_FILIERES, NIVEAUX, fetchFilieres, matchFiliere, submitInscription } from "@/lib/inscriptions";
+import { FALLBACK_FILIERES, FALLBACK_NIVEAUX, fetchFilieres, fetchNiveaux, matchFiliere, matchNiveau, submitInscription } from "@/lib/inscriptions";
 import { BtnIc, Icon, PHONE, PHONE_LABEL, cx } from "@/lib/ui";
 
 type Values = {
@@ -103,6 +103,7 @@ export function PreinscriptionCard({ ref }: { ref?: Ref<PreinscriptionHandle> })
   const [values, setValues] = useState<Values>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [filieres, setFilieres] = useState(FALLBACK_FILIERES);
+  const [niveaux, setNiveaux] = useState(FALLBACK_NIVEAUX);
   const [step, setStep] = useState<Step>(1);
   /** Sens du dernier changement d’étape, pour l’animation d’entrée (aucune au premier affichage). */
   const [dir, setDir] = useState<"next" | "back">();
@@ -113,7 +114,7 @@ export function PreinscriptionCard({ ref }: { ref?: Ref<PreinscriptionHandle> })
   const titleRef = useRef<HTMLHeadingElement>(null);
   const successRef = useRef<HTMLDivElement>(null);
 
-  /* Filières officielles, affichées telles quelles (le serveur refuse toute autre valeur) ; sinon, liste de secours. */
+  /* Référentiels officiels, affichés tels quels (le serveur refuse toute autre valeur) ; sinon, listes de secours. */
   useEffect(() => {
     let alive = true;
     fetchFilieres()
@@ -121,6 +122,13 @@ export function PreinscriptionCard({ ref }: { ref?: Ref<PreinscriptionHandle> })
         if (!alive) return;
         setFilieres(list);
         setValues((v) => (v.formation && !list.includes(v.formation) ? { ...v, formation: matchFiliere(v.formation, list) ?? "" } : v));
+      })
+      .catch(() => {});
+    fetchNiveaux()
+      .then((list) => {
+        if (!alive) return;
+        setNiveaux(list);
+        setValues((v) => (v.niveau && !list.includes(v.niveau) ? { ...v, niveau: matchNiveau(v.niveau, list) ?? "" } : v));
       })
       .catch(() => {});
     return () => {
@@ -374,7 +382,7 @@ export function PreinscriptionCard({ ref }: { ref?: Ref<PreinscriptionHandle> })
                       onChange={(e) => change("niveau", e.target.value, true)}
                     >
                       <option value="">Choisir…</option>
-                      {NIVEAUX.map((n) => (
+                      {niveaux.map((n) => (
                         <option key={n}>{n}</option>
                       ))}
                     </select>

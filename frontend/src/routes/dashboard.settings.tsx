@@ -109,6 +109,7 @@ type SectionId =
   | "roles"
   | "formateurs"
   | "filieres"
+  | "niveaux_etudes"
   | "examens"
   | "bulletins"
   | "institut"
@@ -140,6 +141,7 @@ const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
     "roles",
     "formateurs",
     "filieres",
+    "niveaux_etudes",
     "annees",
     "groupes",
     "modules",
@@ -177,6 +179,7 @@ const META: Record<
   creneaux: { titre: "Créneaux horaires", desc: "Plages horaires de l'emploi du temps", icone: Clock, groupe: "Organisation pédagogique" },
   planning: { titre: "Configuration du planning", desc: "Jours ouvrés et amplitude horaire", icone: SlidersHorizontal, groupe: "Organisation pédagogique" },
   filieres: { titre: "Filières / départements", desc: "Filières du cursus paramédical", icone: GraduationCap, groupe: "Structure de l'institut" },
+  niveaux_etudes: { titre: "NIVEAUX D'ETUDES", desc: "Niveaux proposés dans le formulaire d'inscription", icone: GraduationCap, groupe: "Structure de l'institut" },
   formateurs: { titre: "Formateurs", desc: "Corps enseignant et grades", icone: GraduationCap, groupe: "Structure de l'institut" },
   utilisateurs: { titre: "Utilisateurs", desc: "Comptes ayant accès au CRM", icone: Users, groupe: "Administration" },
   roles: { titre: "Rôles & permissions", desc: "Droits accordés à chaque profil", icone: ShieldCheck, groupe: "Administration" },
@@ -204,6 +207,7 @@ const SECTIONS_REGLABLES: SectionId[] = [
   "creneaux",
   "planning",
   "filieres",
+  "niveaux_etudes",
   "examens",
   "bulletins",
   "institut",
@@ -212,7 +216,7 @@ const SECTIONS_REGLABLES: SectionId[] = [
   "structures",
 ];
 
-/** Les 26 permissions fines (lecture + écriture par rubrique réglable). */
+/** Les 28 permissions fines (lecture + écriture par rubrique réglable). */
 const SECTION_PERMS: string[] = SECTIONS_REGLABLES.flatMap((s) => [
   `settings.${s}.read`,
   `settings.${s}.write`,
@@ -224,6 +228,7 @@ const ORDRE_SECTIONS: SectionId[] = [
   "roles",
   "formateurs",
   "filieres",
+  "niveaux_etudes",
   "annees",
   "groupes",
   "modules",
@@ -1781,6 +1786,9 @@ function SettingsPage() {
     filieres,
     addFiliere,
     deleteFiliere,
+    niveauxEtudes,
+    addNiveauEtudes,
+    deleteNiveauEtudes,
     structuresAccueil,
     groupConfigs,
     addGroupConfig,
@@ -2189,6 +2197,26 @@ function SettingsPage() {
                 }
               }}
               placeholder="Orthoptie"
+            />
+          </Carte>
+        );
+
+      case "niveaux_etudes":
+        return (
+          <Carte id="niveaux_etudes" readOnly={!sectionModifiable("niveaux_etudes")}>
+            <ListeEditable
+              valeurs={niveauxEtudes}
+              onChange={async (v) => {
+                const added = v.filter((x) => !niveauxEtudes.includes(x));
+                const removed = niveauxEtudes.filter((x) => !v.includes(x));
+                try {
+                  for (const nom of added) await addNiveauEtudes(nom);
+                  for (const nom of removed) await deleteNiveauEtudes(nom);
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+                }
+              }}
+              placeholder="Baccalauréat obtenu"
             />
           </Carte>
         );

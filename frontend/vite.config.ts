@@ -9,4 +9,10 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  build: {
+    // Dossier d'assets dédié : l'image de production sert AUSSI la landing
+    // page (dossier /assets/) depuis la même racine nginx. Sans ceci, les
+    // deux builds Vite écriraient dans /assets/ et pourraient se mélanger.
+    assetsDir: "crm-assets",
+  },
 });

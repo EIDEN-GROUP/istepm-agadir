@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 
 /**
  * Rubriques Paramètres pilotables finement par fiche rôle
- * (`settings.<rubrique>.read/write`). Seules ces 13 rubriques sont
+ * (`settings.<rubrique>.read/write`). Seules ces 14 rubriques sont
  * détaillées ; `utilisateurs`/`roles` gardent `users.*`/`roles.*`, et
  * `formateurs` garde `formateurs.*`. Miroir exact côté front
  * (`SECTIONS_REGLABLES`, Paramètres › Rôles › « Détail par rubrique »).
@@ -20,6 +20,7 @@ export const SETTINGS_SECTIONS = [
   "creneaux",
   "planning",
   "filieres",
+  "niveaux_etudes",
   "examens",
   "bulletins",
   "institut",

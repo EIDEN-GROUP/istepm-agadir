@@ -476,6 +476,18 @@ export function deleteFiliereApi(nom: string) {
   return api.delete<{ filieres: string[] }>(`/settings/filieres/${nom}`);
 }
 
+export function fetchNiveauxEtudes() {
+  return api.get<string[]>("/settings/niveaux-etudes");
+}
+
+export function createNiveauEtudesApi(nom: string) {
+  return api.post<{ niveaux: string[] }>("/settings/niveaux-etudes", { nom });
+}
+
+export function deleteNiveauEtudesApi(nom: string) {
+  return api.delete<{ niveaux: string[] }>(`/settings/niveaux-etudes/${nom}`);
+}
+
 import type { StructureAccueil } from "@/lib/istpm-data";
 
 export function fetchStructuresApi() {

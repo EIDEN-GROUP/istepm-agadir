@@ -69,9 +69,39 @@ jobs:
           VITE_API_URL: https://${{ env.DOMAIN }}/api
 
       - run: test -f dist/index.html
+      - run: test -d dist/crm-assets
+
+  landing:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./landing-page
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: landing-page/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run lint
+        continue-on-error: true
+
+      - name: Audit dependencies (high+ reported, non-blocking)
+        run: npm audit --omit=dev --audit-level=high || echo "::warning::npm audit found high/critical vulnerabilities — see SECURITY.md"
+        continue-on-error: true
+
+      # Même origine que l'API en production : build relatif, sans
+      # VITE_INSCRIPTIONS_API (le formulaire appelle /api/inscriptions).
+      - run: npm run build
+
+      - run: test -f dist/index.html
 
   docker-build:
-    needs: [backend, frontend]
+    needs: [backend, frontend, landing]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -95,7 +125,7 @@ jobs:
             ${{ env.REGISTRY }}/eiden-group/istepm-agadir/school-crm-api:latest
             ${{ env.REGISTRY }}/eiden-group/istepm-agadir/school-crm-api:${{ github.sha }}
 
-      - name: Build frontend SPA
+      - name: Build CRM SPA
         run: |
           cd frontend
           npm ci
@@ -103,10 +133,18 @@ jobs:
         env:
           VITE_API_URL: https://${{ env.DOMAIN }}/api
 
-      - name: Build and push frontend image
+      # Même origine que l'API : relatif, sans VITE_INSCRIPTIONS_API.
+      - name: Build landing SPA
+        run: |
+          cd landing-page
+          npm ci
+          npm run build
+
+      - name: Build and push frontend image (landing + CRM)
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
+          context: .
+          file: ./docker/Dockerfile.frontend
           push: true
           tags: |
             ${{ env.REGISTRY }}/eiden-group/istepm-agadir/school-crm-frontend:latest

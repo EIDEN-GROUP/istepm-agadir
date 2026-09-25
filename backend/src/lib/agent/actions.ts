@@ -724,6 +724,37 @@ const ACTIONS: ActionDefinition[] = [
       { name: "nom", type: "string", description: "Nom de la filière", required: true },
     ],
   },
+  {
+    name: "get_niveaux_etudes",
+    description: "Lister les niveaux d'études (formulaire d'inscription)",
+    method: "GET",
+    path: "/api/settings/niveaux-etudes",
+    category: "Paramètres",
+    requiredRoles: [],
+    params: [],
+  },
+  {
+    name: "create_niveau_etudes",
+    description: "Ajouter un niveau d'études",
+    method: "POST",
+    path: "/api/settings/niveaux-etudes",
+    category: "Paramètres",
+    requiredRoles: ["directeur", "responsable"],
+    params: [
+      { name: "nom", type: "string", description: "Libellé du niveau d'études", required: true },
+    ],
+  },
+  {
+    name: "delete_niveau_etudes",
+    description: "Supprimer un niveau d'études",
+    method: "DELETE",
+    path: "/api/settings/niveaux-etudes/:nom",
+    category: "Paramètres",
+    requiredRoles: ["directeur", "responsable"],
+    params: [
+      { name: "nom", type: "string", description: "Libellé du niveau d'études", required: true },
+    ],
+  },
 
   // ── Events ─────────────────────────────────────────────────────────
   {
