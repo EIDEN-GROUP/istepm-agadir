@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Bell,
+  BookOpen,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -1133,6 +1134,19 @@ export function SeanceDetail({
                 </span>
               </span>
             }
+          />
+          <DetailField
+            label="Module"
+            value={
+              <span className="inline-flex items-center gap-1.5">
+                <BookOpen className="h-3.5 w-3.5 text-brand" />
+                {seance.module}
+                {volumeCible > 0 ? (
+                  <span className="text-xs text-muted-foreground">· {volumeCible} h au programme</span>
+                ) : null}
+              </span>
+            }
+            full
           />
           <DetailField label="Filière" value={seance.filiere} full />
           <DetailField label="Niveau" value={libelleNiveau(seance.semestre)} />
