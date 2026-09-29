@@ -39,7 +39,7 @@ import {
   type Decision,
   type ExamDocument,
   type StructureAccueil,
-  type SubStage,
+  type StageRef,
   normalizeStructure,
   libelleNiveau,
   type InstitutInfo,
@@ -94,6 +94,7 @@ import {
   fetchStructuresApi as apiFetchStructures,
   serviceHeuresDepuisReglages,
   programmeStagesDepuisReglages,
+  type ProgrammeRow,
   fetchStageServicesApi as apiFetchStageServices,
   createStageServiceApi as apiCreateStageService,
   updateStageServiceApi as apiUpdateStageService,
@@ -143,7 +144,7 @@ type Snapshot = {
   /** Heures indicatives par service (carnet IP) : pré-remplit l'ajout de sous-stage. */
   servicesHeures: Record<string, number>;
   /** Programme de référence des carnets (lignes filière-tagguées) : pré-remplit heures + filières. */
-  programmeStages: SubStage[];
+  programmeStages: ProgrammeRow[];
   modules: ModuleRecord[];
   groupConfigs: GroupConfig[];
   /** Créneaux horaires, au format libellé des Paramètres (« 08:30 – 10:00 »). */
@@ -400,7 +401,7 @@ type IstpmCtx = {
   /** Heures indicatives par service (carnet IP) : pré-remplit l'ajout de sous-stage. */
   servicesHeures: Record<string, number>;
   /** Programme de référence des carnets (lignes filière-tagguées) : pré-remplit heures + filières. */
-  programmeStages: SubStage[];
+  programmeStages: ProgrammeRow[];
   modules: ModuleRecord[];
   groupConfigs: GroupConfig[];
   /** Libellés bruts des créneaux, tels qu'édités dans les Paramètres. */
@@ -487,7 +488,7 @@ type IstpmCtx = {
   deleteNiveauEtudes: (nom: string) => Promise<void>;
 
   addStructureAccueil: (nom: string, capacite?: number) => Promise<void>;
-  updateStructureAccueil: (oldName: string, body: { nouveauNom?: string; capacite?: number; subStages?: SubStage[] }) => Promise<void>;
+  updateStructureAccueil: (oldName: string, body: { nouveauNom?: string; capacite?: number; stages?: StageRef[] }) => Promise<void>;
   deleteStructureAccueil: (nom: string) => Promise<void>;
 
   /** Persiste un service de stage libre (dropdown créable). */
@@ -1190,7 +1191,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateStructureAccueil = useCallback(
-    async (oldName: string, body: { nouveauNom?: string; capacite?: number; subStages?: SubStage[] }) => {
+    async (oldName: string, body: { nouveauNom?: string; capacite?: number; stages?: StageRef[] }) => {
       const { structures } = await updateStructureApi(oldName, body);
       setSnap((s) => ({ ...s, structuresAccueil: structures }));
     },

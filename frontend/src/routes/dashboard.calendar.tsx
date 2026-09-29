@@ -20,6 +20,7 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  Bell,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -77,6 +78,7 @@ import {
 } from "@/lib/dash-ui";
 import { escCsvCell } from "@/lib/csv";
 import { ApiError } from "@/lib/api";
+import { createNotificationApi } from "@/lib/istpm-api";
 import {
   PageHeader,
   FilterPanel,
@@ -763,6 +765,7 @@ const [importOpen, setImportOpen] = useState(false);
               conflits={conflitsSeance(detail, detail.id)}
               canEdit={canEdit}
               ownerId={moiFormateur?.id ?? null}
+              profUserId={formateurs.find((f) => f.id === (seances.find((x) => x.id === detail.id) ?? detail).professeurId)?.userId ?? null}
               onEdit={(s) => {
                 setEditing(s);
                 setPrefill(null);
@@ -886,6 +889,7 @@ export function SeanceDetail({
   onDelete,
   onAppel,
   ownerId,
+  profUserId,
   validation,
 }: {
   seance: Seance;
@@ -897,6 +901,8 @@ export function SeanceDetail({
   onAppel: (s: Seance) => void;
   /** Fiche formateur du compte connecté (workflow enseignant). */
   ownerId?: string | null;
+  /** Compte lié du formateur de la séance (alerte direction). */
+  profUserId?: string | null;
   /** Force le bloc de validation direction (ex. dialogue de charge). Défaut : suit `canEdit`. */
   validation?: "direction" | null;
 }) {
@@ -904,8 +910,17 @@ export function SeanceDetail({
   const { updateSeance, attachSeanceDocument, removeSeanceDocument } = useIstpm();
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMsg, setAlertMsg] = useState("");
   const isDirection = validation !== undefined ? validation === "direction" : canEdit;
   const isOwner = !!ownerId && seance.professeurId === ownerId && !isDirection;
+  // Alerte direction : séance passée, ni compte-rendu ni marquage, jamais validée.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const enRetard =
+    isDirection &&
+    seance.date < todayIso &&
+    (seance.statut === "planifie" || seance.statut === "en_cours") &&
+    !seance.documentId;
 
   const erreurServeur = (err: unknown, repli: string) =>
     err instanceof ApiError && err.message ? err.message : err instanceof Error ? err.message : repli;
@@ -943,6 +958,35 @@ export function SeanceDetail({
     }
   };
 
+  const envoyerAlerte = async () => {
+    const message = alertMsg.trim();
+    if (!message) {
+      toast.error("Écrivez le message d'alerte");
+      return;
+    }
+    if (!profUserId) {
+      toast.error("Formateur sans compte lié : alerte impossible");
+      return;
+    }
+    setBusy(true);
+    try {
+      await createNotificationApi({
+        userId: profUserId,
+        type: "seance-alerte",
+        title: "Compte-rendu manquant",
+        message: `Séance « ${seance.module} » du ${fmtDate(seance.date)} : ${message}`,
+        link: "/dashboard/calendar",
+      });
+      toast.success("Alerte envoyée à l'enseignant");
+      setAlertOpen(false);
+      setAlertMsg("");
+    } catch (err) {
+      toast.error(erreurServeur(err, "Envoi impossible"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const ligneStatut =
     seance.statut === "valide"
       ? "Validée par la direction."
@@ -976,26 +1020,32 @@ export function SeanceDetail({
         </>
       }
       footer={
-        canEdit && (
+        (canEdit || isOwner) && (
           <div className="flex items-center justify-end gap-2">
-            <button
-              className={cn(ghostPill, "gap-1.5")}
-              onClick={() => onAppel(seance)}
-            >
-              <ClipboardCheck className="h-3.5 w-3.5" /> Appel
-            </button>
-            <button
-              className={cn(ghostPill, "gap-1.5")}
-              onClick={() => onEdit(seance)}
-            >
-              <Pencil className="h-3.5 w-3.5" /> Modifier
-            </button>
-            <button
-              className="inline-flex items-center gap-2 rounded-full bg-alert px-5 py-2.5 text-sm font-bold text-white transition hover:bg-alert-dk"
-              onClick={() => onDelete(seance)}
-            >
-              <Trash2 className="h-4 w-4" /> Supprimer
-            </button>
+            {isOwner ? (
+              <button
+                className={cn(ghostPill, "gap-1.5")}
+                onClick={() => onAppel(seance)}
+              >
+                <ClipboardCheck className="h-3.5 w-3.5" /> Appel
+              </button>
+            ) : null}
+            {canEdit ? (
+              <>
+                <button
+                  className={cn(ghostPill, "gap-1.5")}
+                  onClick={() => onEdit(seance)}
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Modifier
+                </button>
+                <button
+                  className="inline-flex items-center gap-2 rounded-full bg-alert px-5 py-2.5 text-sm font-bold text-white transition hover:bg-alert-dk"
+                  onClick={() => onDelete(seance)}
+                >
+                  <Trash2 className="h-4 w-4" /> Supprimer
+                </button>
+              </>
+            ) : null}
           </div>
         )
       }
@@ -1096,6 +1146,57 @@ export function SeanceDetail({
         />
       </DetailSection>
 
+      {enRetard ? (
+        <DetailSection title="Alerte enseignant">
+          {!alertOpen ? (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">
+                Séance passée sans compte-rendu ni marquage. Prévenez l'enseignant par notification.
+              </p>
+              <button
+                type="button"
+                onClick={() => setAlertOpen(true)}
+                className={cn(ghostPill, "h-8 gap-1.5 px-3 text-xs")}
+              >
+                <Bell className="h-3.5 w-3.5" /> Alerter l'enseignant
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground" htmlFor="alerte-msg">
+                Message *
+              </label>
+              <textarea
+                id="alerte-msg"
+                value={alertMsg}
+                onChange={(e) => setAlertMsg(e.target.value)}
+                rows={3}
+                placeholder="Merci de déposer le compte-rendu…"
+                className="w-full rounded-xl border border-brand/15 bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-brand/40"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={busy || !alertMsg.trim()}
+                  onClick={() => void envoyerAlerte()}
+                  className={cn(primaryPill, "h-8 px-4 text-xs disabled:opacity-60")}
+                >
+                  {busy ? "Envoi…" : "Envoyer l'alerte"}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => { setAlertOpen(false); setAlertMsg(""); }}
+                  className={cn(ghostPill, "h-8 px-3 text-xs")}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          )}
+        </DetailSection>
+      ) : null}
+
       <DetailSection title="Notes">
         <DetailEmpty>
           {seance.notes ?? "Aucune note pour cette séance."}
@@ -1138,6 +1239,13 @@ function SeanceForm({
     const y = Number(iso.slice(0, 4));
     return Number.isFinite(y) && y > 2000 ? academicYearOf(iso) : "";
   };
+  // Modules de la filière choisie (registre Paramètres › Modules).
+  const { modules: modulesRegistre } = useIstpm();
+  const modulesDeFiliere = (fil: string) =>
+    modulesRegistre
+      .filter((m) => !fil || m.filiere === fil)
+      .map((m) => m.nom)
+      .sort((a, b) => a.localeCompare(b));
   const premierCreneau = creneauxProp[0]?.debut ?? CRENEAUX[0].debut;
   const [f, setF] = useState(() => ({
     module: initial?.module ?? "",
@@ -1271,16 +1379,6 @@ function SeanceForm({
       ) : null}
 
       <FullWidth>
-        <TextField
-          label="Module"
-          required
-          value={f.module}
-          onChange={(v) => set("module", v)}
-          placeholder="Soins infirmiers en médecine"
-          error={errors.module}
-        />
-      </FullWidth>
-      <FullWidth>
         <SelectField
           label="Formateur"
           required
@@ -1310,9 +1408,31 @@ function SeanceForm({
           label="Filière (département)"
           required
           value={f.filiere}
-          onChange={(v) => set("filiere", v as Filiere)}
+          onChange={(v) => {
+            // La filière pilote les modules : un module hors filière est vidé.
+            setF((p) => {
+              const mods = modulesDeFiliere(v);
+              return {
+                ...p,
+                filiere: v as Filiere,
+                module: mods.some((m) => m === p.module) ? p.module : "",
+              };
+            });
+            setErrors((p) => ({ ...p, filiere: undefined, module: undefined }));
+          }}
           options={filieres}
           error={errors.filiere}
+        />
+      </FullWidth>
+      <FullWidth>
+        <SelectField
+          label="Module"
+          required
+          value={f.module}
+          onChange={(v) => set("module", v)}
+          options={modulesDeFiliere(f.filiere)}
+          placeholder={f.filiere ? "Choisir un module…" : "Choisissez d'abord une filière…"}
+          error={errors.module}
         />
       </FullWidth>
       <SelectField

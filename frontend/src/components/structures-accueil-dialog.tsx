@@ -118,11 +118,9 @@ export function StructuresAccueilDialog({
         >
           <div className="space-y-2.5">
             {rows.map((r) => {
-              // Capacité de référence affichée : Σ tous niveaux (détail par
-              // niveau dans l'affectation et la page Paramètres).
-              const total = r.subStages.length
-                ? r.subStages.reduce((t, x) => t + x.capacite, 0)
-                : (r.capacite ?? 5);
+              // Capacité : seul plafond de la structure (ni stages ni
+              // sous-stages n'en portent) ; occupation globale ici.
+              const total = r.capacite ?? 5;
               const used = occupation.get(r.nom) ?? 0;
               const complet = used >= total;
               return (
@@ -135,8 +133,8 @@ export function StructuresAccueilDialog({
                       {r.nom}
                     </span>
                     <span className="block truncate text-[11px] text-muted-foreground">
-                      {r.subStages.length
-                        ? `${r.subStages.length} sous-stage(s)`
+                      {r.stages.length
+                        ? `${r.stages.length} stage(s) · ${r.stages.reduce((t, s) => t + s.subStages.length, 0)} sous-stage(s)`
                         : "Capacité globale"}
                     </span>
                   </span>

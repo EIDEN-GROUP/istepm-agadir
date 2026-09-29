@@ -386,67 +386,124 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { services: list };
   });
 
-  const subStageSchema = z.object({
-    // Pas de min(1) : les lignes sans nom sont écartées par normSubStage
-    // (le formulaire n'en envoie jamais, l'API reste tolérante).
-    nom: z.string().trim().max(200),
+  const niveauHeuresSchema = z.object({
     niveau: z.string().trim().max(50).optional().default(""),
     heures: z.number().int().min(0).max(2000).optional().default(0),
-    capacite: z.number().int().min(0).optional().default(5),
-    filieres: z.array(z.string().trim().min(1).max(100)).max(10).optional().default([]),
   });
 
-  type SubStage = {
-    nom: string;
-    niveau: string;
-    heures: number;
-    capacite: number;
-    filieres?: string[];
-  };
+  const subDetailSchema = z.object({
+    nom: z.string().trim().max(200),
+    niveaux: z.array(niveauHeuresSchema).max(10).optional().default([]),
+  });
 
-  type StructRow = { nom: string; capacite?: number; subStages: SubStage[] };
+  const stageSchema = z.object({
+    nom: z.string().trim().max(200),
+    niveaux: z.array(niveauHeuresSchema).max(10).optional().default([]),
+    filiere: z.string().trim().max(100).optional().default(""),
+    subStages: z.array(subDetailSchema).max(200).optional().default([]),
+  });
 
-  function normSubStage(r: unknown): SubStage | null {
+  type NiveauHeures = { niveau: string; heures: number };
+  type SubStageDetail = { nom: string; niveaux: NiveauHeures[] };
+  type StageRef = { nom: string; niveaux: NiveauHeures[]; filiere: string; subStages: SubStageDetail[] };
+  type StructRow = { nom: string; capacite?: number; stages: StageRef[] };
+
+  function normNiveauxHeures(v: unknown): NiveauHeures[] {
+    if (!Array.isArray(v)) return [];
+    const parNiveau = new Map<string, number>();
+    for (const r of v) {
+      if (typeof r !== "object" || !r) continue;
+      const x = r as Record<string, unknown>;
+      const niveau = String(x.niveau ?? "");
+      if (!parNiveau.has(niveau)) {
+        parNiveau.set(niveau, Math.max(0, Math.min(2000, Math.floor(Number(x.heures) || 0))));
+      }
+    }
+    return [...parNiveau.entries()]
+      .map(([niveau, heures]) => ({ niveau, heures }))
+      .sort((a, b) => a.niveau.localeCompare(b.niveau));
+  }
+
+  function normSubDetail(r: unknown): SubStageDetail | null {
     if (typeof r !== "object" || !r) return null;
     const x = r as Record<string, unknown>;
     const nom = String(x.nom ?? "").trim().replace(/\s+/g, " ");
     if (!nom) return null;
-    const filieres = Array.isArray(x.filieres)
-      ? (x.filieres as unknown[])
-          .filter((f): f is string => typeof f === "string" && f.trim().length > 0)
-          .map((f) => f.trim())
-      : [];
+    return { nom, niveaux: normNiveauxHeures(x.niveaux) };
+  }
+
+  function normStage(t: unknown): StageRef | null {
+    if (typeof t !== "object" || !t) return null;
+    const y = t as Record<string, unknown>;
+    const nom = String(y.nom ?? "").trim().replace(/\s+/g, " ");
+    if (!nom) return null;
+    const sub = Array.isArray(y.subStages) ? y.subStages : [];
     return {
       nom,
-      niveau: String(x.niveau ?? "").trim().slice(0, 50),
-      heures: Math.max(0, Math.min(2000, Math.floor(Number(x.heures) || 0))),
-      capacite: Math.max(0, Math.floor(Number(x.capacite ?? 5) || 0)),
-      ...(filieres.length ? { filieres } : {}),
+      niveaux: normNiveauxHeures(y.niveaux),
+      filiere: String(y.filiere ?? "").trim().slice(0, 100),
+      subStages: sub
+        .map(normSubDetail)
+        .filter((r): r is SubStageDetail => r !== null)
+        .sort((a, b) => a.nom.localeCompare(b.nom)),
     };
   }
 
   /**
-   * Normalise structures data : chaîne historique → { nom, capacite: 5,
-   * subStages: [] } ; { nom, capacite } → + subStages: [] (repli préservé,
-   * jamais éclaté) ; lignes malformées écartées.
+   * Normalise structures data : chaîne → { nom, capacite: 5, stages: [] } ;
+   * { nom, capacite } → + stages: [] ; ancien modèle plat subStages[]
+   * {nom, niveau, heures, capacite, filieres[]} → regroupé en stages
+   * (filière = premier tag, sous-stages vides ; capacités par ligne
+   * abandonnées, plafond unique sur la structure).
    */
   function asStructs(v: unknown): StructRow[] {
     if (!Array.isArray(v)) return [];
     return v.flatMap((s: unknown) => {
-      if (typeof s === "string") return [{ nom: s, capacite: 5, subStages: [] as SubStage[] }];
-      if (typeof s === "object" && s && "nom" in (s as Record<string, unknown>)) {
-        const o = s as Record<string, unknown>;
-        const sub = Array.isArray(o.subStages) ? o.subStages : [];
-        return [{
-          nom: String(o.nom ?? "?"),
-          ...(o.capacite === undefined ? {} : { capacite: Math.max(0, Math.floor(Number(o.capacite) || 0)) }),
-          subStages: sub
-            .map(normSubStage)
-            .filter((r): r is SubStage => r !== null)
-            .sort((a, b) => (a.niveau || "").localeCompare(b.niveau || "") || a.nom.localeCompare(b.nom)),
-        }];
+      if (typeof s === "string") return [{ nom: s, capacite: 5, stages: [] as StageRef[] }];
+      if (typeof s !== "object" || !s || !("nom" in (s as Record<string, unknown>))) {
+        return [{ nom: "?", capacite: 5, stages: [] as StageRef[] }];
       }
-      return [{ nom: "?", capacite: 5, subStages: [] as SubStage[] }];
+      const o = s as Record<string, unknown>;
+      const nom = String(o.nom ?? "?");
+      const capacite = o.capacite === undefined ? undefined : Math.max(1, Math.floor(Number(o.capacite) || 5));
+      if (Array.isArray(o.stages)) {
+        const stages = (o.stages as unknown[])
+          .map(normStage)
+          .filter((t): t is StageRef => t !== null)
+          .sort((a, b) => a.nom.localeCompare(b.nom));
+        return [{ nom, capacite, stages }];
+      }
+      // Ancien modèle plat.
+      const sub = Array.isArray(o.subStages) ? o.subStages : [];
+      const parService = new Map<string, { niveaux: Map<string, number>; filiere: string }>();
+      for (const r of sub) {
+        if (typeof r !== "object" || !r) continue;
+        const x = r as Record<string, unknown>;
+        const snom = String(x.nom ?? "").trim().replace(/\s+/g, " ");
+        if (!snom) continue;
+        const niveau = String(x.niveau ?? "");
+        const heures = Math.max(0, Math.floor(Number(x.heures) || 0));
+        const tags = Array.isArray(x.filieres)
+          ? (x.filieres as unknown[]).filter((f): f is string => typeof f === "string" && f.trim().length > 0)
+          : [];
+        let g = parService.get(snom);
+        if (!g) {
+          g = { niveaux: new Map(), filiere: tags[0] ?? "" };
+          parService.set(snom, g);
+        }
+        if (!g.niveaux.has(niveau)) g.niveaux.set(niveau, heures);
+      }
+      const stages: StageRef[] = [...parService.entries()]
+        .map(([snom, g]) => ({
+          nom: snom,
+          niveaux: [...g.niveaux.entries()]
+            .map(([niveau, heures]) => ({ niveau, heures }))
+            .sort((a, b) => a.niveau.localeCompare(b.niveau)),
+          filiere: g.filiere,
+          subStages: [],
+        }))
+        .sort((a, b) => a.nom.localeCompare(b.nom));
+      return [{ nom, capacite, stages }];
     });
   }
 
@@ -482,7 +539,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     if (list.some((s) => s.nom.toLowerCase() === norm)) {
       return reply.status(409).send({ error: "Cette structure existe déjà" });
     }
-    list.push({ nom, capacite, subStages: [] });
+    list.push({ nom, capacite, stages: [] });
     list.sort((a, b) => a.nom.localeCompare(b.nom));
 
     if (row) {
@@ -496,15 +553,15 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { structures: list };
   });
 
-  // Update: change le nom, la capacité de repli et/ou la table des sous-stages
-  // (remplacement intégral, validé et trié côté serveur).
+  // Update: change le nom, la capacité (seul plafond) et/ou la table des
+  // stages (remplacement intégral, validé et trié côté serveur).
   app.put("/structures/:nom", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { nom } = request.params as { nom: string };
     const body = z
       .object({
         nouveauNom: z.string().min(1).optional(),
         capacite: z.number().int().min(1).optional(),
-        subStages: z.array(subStageSchema).max(200).optional(),
+        stages: z.array(stageSchema).max(200).optional(),
       })
       .parse(request.body);
     const db = getDb();
@@ -526,13 +583,13 @@ export async function settingsRoutes(app: FastifyInstance) {
     list[idx] = {
       nom: newName,
       capacite: body.capacite ?? list[idx].capacite,
-      subStages:
-        body.subStages === undefined
-          ? list[idx].subStages
-          : body.subStages
-              .map(normSubStage)
-              .filter((r): r is SubStage => r !== null)
-              .sort((a, b) => (a.niveau || "").localeCompare(b.niveau || "") || a.nom.localeCompare(b.nom)),
+      stages:
+        body.stages === undefined
+          ? list[idx].stages
+          : body.stages
+              .map(normStage)
+              .filter((t): t is StageRef => t !== null)
+              .sort((a, b) => a.nom.localeCompare(b.nom)),
     };
     list.sort((a, b) => a.nom.localeCompare(b.nom));
 

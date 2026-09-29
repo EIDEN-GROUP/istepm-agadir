@@ -1,11 +1,9 @@
 -- 01_referentiel.sql — filières, modules, niveaux, réglages (idempotent).
 -- Prérequis : migrations appliquées.
 
--- Filières (clé settings, créée si absente). Inclut les 4 filières aux
--- carnets de stage (Aide-Soignant(e), Infirmier(e) Auxiliaire) en plus des
--- 7 historiques.
+-- Filières (clé settings, créée si absente) : exactement les 4 aux carnets.
 INSERT INTO "settings" ("key", "value")
-SELECT 'filieres', '["Aide-Soignant(e)", "Infirmier polyvalent", "Infirmier(e) Auxiliaire", "Infirmier en anesthésie-réanimation", "Sage-femme", "Kinésithérapie", "Radiologie / Imagerie médicale", "Laboratoire / Biologie médicale", "Prothèse dentaire"]'::jsonb
+SELECT 'filieres', '["Aide-Soignant(e)", "Infirmier polyvalent", "Infirmier(e) Auxiliaire", "Sage-femme"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM "settings" WHERE "key" = 'filieres');
 
 -- Modules (21, insérés uniquement si la table est vide).

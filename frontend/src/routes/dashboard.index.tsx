@@ -1132,6 +1132,7 @@ function DashboardDirecteur() {
               conflits={[]}
               canEdit={false}
               ownerId={null}
+              profUserId={formateurs.find((f) => f.id === (seances.find((x) => x.id === chargeDetail.id) ?? chargeDetail).professeurId)?.userId ?? null}
               validation="direction"
               onEdit={() => setChargeDetail(null)}
               onDelete={() => setChargeDetail(null)}

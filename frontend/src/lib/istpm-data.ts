@@ -79,24 +79,34 @@ export function anneeDeCode(code: string): string | null {
 }
 
 /** CHU / hôpitaux / cliniques d'accueil (structures de stage réelles au Maroc). */
-export type SubStage = {
-  /** Service (ex. « Médecine »). */
-  nom: string;
+export type NiveauHeures = {
   /** Année concernée (« 1ère année »… ; « » = toutes années, carnets sans ventilation). */
   niveau: string;
   /** Volume horaire du carnet de stage. */
   heures: number;
-  /** Places d'accueil pour ce service × niveau (éditable, défaut 5). */
-  capacite: number;
-  /** Filières concernées (carnets de stage) ; vide = toutes. */
-  filieres?: string[];
+};
+
+export type SubStageDetail = {
+  /** Service du sous-stage (ex. « Salle d'admission (jour) »). */
+  nom: string;
+  niveaux: NiveauHeures[];
+};
+
+export type StageRef = {
+  /** Service du stage (ex. « Médecine »). */
+  nom: string;
+  /** Heures par niveau encore portées par le stage (bascule vers les sous-stages). */
+  niveaux: NiveauHeures[];
+  /** Filière du carnet (une seule par stage). */
+  filiere: string;
+  subStages: SubStageDetail[];
 };
 
 export type StructureAccueil = {
   nom: string;
-  /** Capacité historique globale : repli quand aucun sous-stage ne correspond. */
+  /** Capacité d'accueil (seul plafond : ni stages ni sous-stages n'en portent). */
   capacite?: number;
-  subStages: SubStage[];
+  stages: StageRef[];
 };
 
 /** Les 4 filières aux carnets de stage (référence des sous-stages). */
@@ -107,63 +117,138 @@ export const FILIERES_CARNET = [
   "Sage-femme",
 ] as const;
 
-/** Normalise une structure (chaîne historique → objet, défauts sûrs). */
-export function normalizeStructure(s: unknown): StructureAccueil {
-  if (typeof s === "string") return { nom: s, capacite: 5, subStages: [] };
-  if (typeof s === "object" && s && "nom" in (s as Record<string, unknown>)) {
-    const o = s as Record<string, unknown>;
-    const sub = Array.isArray(o.subStages) ? o.subStages : [];
-    return {
-      nom: String(o.nom ?? "?"),
-      capacite: o.capacite === undefined ? undefined : Math.max(0, Number(o.capacite) || 0),
-      subStages: sub
-        .map((r: unknown) => {
-          if (typeof r !== "object" || !r) return null;
-          const x = r as Record<string, unknown>;
-          const nom = String(x.nom ?? "").trim();
-          if (!nom) return null;
-          const filieres = Array.isArray(x.filieres)
-            ? (x.filieres as unknown[]).filter((f): f is string => typeof f === "string" && f.trim().length > 0)
-            : [];
-          return {
-            nom,
-            niveau: String(x.niveau ?? ""),
-            heures: Math.max(0, Number(x.heures) || 0),
-            capacite: Math.max(0, Number(x.capacite ?? 5) || 0),
-            ...(filieres.length ? { filieres } : {}),
-          } as SubStage;
-        })
-        .filter((r): r is SubStage => r !== null),
-    };
+/** Normalise des heures par niveau (niveaux vides écartés, doublons fusionnés). */
+function normNiveauxHeures(v: unknown): NiveauHeures[] {
+  if (!Array.isArray(v)) return [];
+  const parNiveau = new Map<string, number>();
+  for (const r of v) {
+    if (typeof r !== "object" || !r) continue;
+    const x = r as Record<string, unknown>;
+    const niveau = String(x.niveau ?? "");
+    const heures = Math.max(0, Math.floor(Number(x.heures) || 0));
+    if (!parNiveau.has(niveau)) parNiveau.set(niveau, heures);
   }
-  return { nom: "?", capacite: 5, subStages: [] };
+  return [...parNiveau.entries()]
+    .map(([niveau, heures]) => ({ niveau, heures }))
+    .sort((a, b) => a.niveau.localeCompare(b.niveau));
 }
 
-/** Vrai si le sous-stage vaut pour le niveau ("" = toutes années). */
-export function subStageMatchNiveau(r: SubStage, niveau: string): boolean {
-  return !r.niveau || r.niveau === niveau;
+function normSubDetail(r: unknown): SubStageDetail | null {
+  if (typeof r !== "object" || !r) return null;
+  const x = r as Record<string, unknown>;
+  const nom = String(x.nom ?? "").trim().replace(/\s+/g, " ");
+  if (!nom) return null;
+  return { nom, niveaux: normNiveauxHeures(x.niveaux) };
 }
 
-/** Vrai si le sous-stage vaut pour la filière (tag absent = toutes). */
-export function subStageMatchFiliere(r: SubStage, filiere: string): boolean {
-  if (!r.filieres || r.filieres.length === 0) return true;
-  if (!filiere) return true;
-  return r.filieres.includes(filiere);
+/** Normalise une structure (tous formats historiques → modèle courant). */
+export function normalizeStructure(s: unknown): StructureAccueil {
+  if (typeof s === "string") return { nom: s, capacite: 5, stages: [] };
+  if (typeof s !== "object" || !s || !("nom" in (s as Record<string, unknown>))) {
+    return { nom: "?", capacite: 5, stages: [] };
+  }
+  const o = s as Record<string, unknown>;
+  const nom = String(o.nom ?? "?");
+  const capacite = o.capacite === undefined ? undefined : Math.max(1, Math.floor(Number(o.capacite) || 5));
+  // Nouveau modèle : stages[].
+  if (Array.isArray(o.stages)) {
+    const stages: StageRef[] = [];
+    for (const t of o.stages) {
+      if (typeof t !== "object" || !t) continue;
+      const y = t as Record<string, unknown>;
+      const snom = String(y.nom ?? "").trim().replace(/\s+/g, " ");
+      if (!snom) continue;
+      const sub = Array.isArray(y.subStages) ? y.subStages : [];
+      stages.push({
+        nom: snom,
+        niveaux: normNiveauxHeures(y.niveaux),
+        filiere: String(y.filiere ?? "").trim().slice(0, 100),
+        subStages: sub
+          .map(normSubDetail)
+          .filter((r): r is SubStageDetail => r !== null)
+          .sort((a, b) => a.nom.localeCompare(b.nom)),
+      });
+    }
+    stages.sort((a, b) => a.nom.localeCompare(b.nom));
+    return { nom, capacite, stages };
+  }
+  // Ancien modèle plat : subStages[] {nom, niveau, heures, capacite, filieres[]}
+  // → regroupés par (nom) en stages (filière = premier tag, sous-stages vides).
+  // Les capacités par ligne sont abandonnées (plafond unique sur la structure).
+  const sub = Array.isArray(o.subStages) ? o.subStages : [];
+  const parService = new Map<string, { niveaux: Map<string, number>; filiere: string }>();
+  for (const r of sub) {
+    if (typeof r !== "object" || !r) continue;
+    const x = r as Record<string, unknown>;
+    const snom = String(x.nom ?? "").trim().replace(/\s+/g, " ");
+    if (!snom) continue;
+    const niveau = String(x.niveau ?? "");
+    const heures = Math.max(0, Math.floor(Number(x.heures) || 0));
+    const tags = Array.isArray(x.filieres)
+      ? (x.filieres as unknown[]).filter((f): f is string => typeof f === "string" && f.trim().length > 0)
+      : [];
+    let g = parService.get(snom);
+    if (!g) {
+      g = { niveaux: new Map(), filiere: tags[0] ?? "" };
+      parService.set(snom, g);
+    }
+    if (!g.niveaux.has(niveau)) g.niveaux.set(niveau, heures);
+  }
+  const stages: StageRef[] = [...parService.entries()]
+    .map(([snom, g]) => ({
+      nom: snom,
+      niveaux: [...g.niveaux.entries()]
+        .map(([niveau, heures]) => ({ niveau, heures }))
+        .sort((a, b) => a.niveau.localeCompare(b.niveau)),
+      filiere: g.filiere,
+      subStages: [],
+    }))
+    .sort((a, b) => a.nom.localeCompare(b.nom));
+  return { nom, capacite, stages };
 }
 
-/** Sous-stages d'une structure pour (niveau, filière), triés (niveau, nom). */
-export function subStagesPour(s: StructureAccueil, niveau: string, filiere: string): SubStage[] {
-  return s.subStages
-    .filter((r) => subStageMatchNiveau(r, niveau) && subStageMatchFiliere(r, filiere))
-    .slice()
-    .sort((a, b) => (a.niveau || "").localeCompare(b.niveau || "") || a.nom.localeCompare(b.nom));
+/** Ligne d'affichage pour le bandeau d'affectation. */
+export type StageDisplayRow = {
+  stageNom: string;
+  subNom: string | null;
+  niveau: string;
+  heures: number;
+};
+
+/** Vrai si la filière du stage vaut pour la filière demandée (vide = toutes). */
+export function stageMatchFiliere(filiereStage: string, filiere: string): boolean {
+  if (!filiereStage || !filiere) return true;
+  return filiereStage === filiere;
 }
 
-/** Capacité d'une structure pour un niveau : Σ des sous-stages, sinon repli historique. */
-export function capaciteStructureNiveau(s: StructureAccueil, niveau: string): number {
-  const rows = s.subStages.filter((r) => subStageMatchNiveau(r, niveau));
-  if (rows.length === 0) return s.capacite ?? 5;
-  return rows.reduce((t, r) => t + r.capacite, 0);
+/**
+ * Lignes d'un stage pour (niveau, filière) : ses sous-stages s'ils existent
+ * (avec leurs heures), sinon ses propres niveaux. Triées (nom, niveau).
+ */
+export function stageDisplayRows(t: StageRef, niveau: string, filiere: string): StageDisplayRow[] {
+  if (!stageMatchFiliere(t.filiere, filiere)) return [];
+  const matchNiveau = (n: string) => !n || !niveau || n === niveau;
+  if (t.subStages.length) {
+    const out: StageDisplayRow[] = [];
+    for (const s of t.subStages) {
+      for (const nh of s.niveaux) {
+        if (matchNiveau(nh.niveau)) {
+          out.push({ stageNom: t.nom, subNom: s.nom, niveau: nh.niveau, heures: nh.heures });
+        }
+      }
+    }
+    return out.sort((a, b) => (a.subNom ?? "").localeCompare(b.subNom ?? "") || a.niveau.localeCompare(b.niveau));
+  }
+  return t.niveaux
+    .filter((nh) => matchNiveau(nh.niveau))
+    .map((nh) => ({ stageNom: t.nom, subNom: null as string | null, niveau: nh.niveau, heures: nh.heures }))
+    .sort((a, b) => a.niveau.localeCompare(b.niveau));
+}
+
+/** Capacité d'une structure : son seul plafond (ni stages ni sous-stages n'en portent). */
+export function capaciteStructureNiveau(s: StructureAccueil, _niveau: string): number {
+  void _niveau;
+  return s.capacite ?? 5;
 }
 
 

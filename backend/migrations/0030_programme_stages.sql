@@ -2,18 +2,11 @@
 -- Strictement additif : fusionne l'union des services et des 2 filières aux
 -- carnets (jamais de suppression) et crée `service_heures` + `programme_stages`
 -- uniquement si absents. Les 6 hôpitaux et les autres réglages sont intouchés.
+-- Filières : exactement les 4 aux carnets de stage (remplace toute liste
+-- antérieure ; les fiches existantes gardent leurs valeurs).
 --> statement-breakpoint
 UPDATE "settings"
-SET "value" = (
-  SELECT COALESCE(jsonb_agg(e ORDER BY e), '[]'::jsonb)
-  FROM (
-    SELECT DISTINCT e FROM (
-      SELECT jsonb_array_elements_text("value") AS e FROM "settings" WHERE "key" = 'filieres'
-      UNION
-      SELECT unnest(ARRAY['Aide-Soignant(e)', 'Infirmier(e) Auxiliaire'])
-    ) u
-  ) s(e)
-)
+SET "value" = '["Aide-Soignant(e)", "Infirmier polyvalent", "Infirmier(e) Auxiliaire", "Sage-femme"]'::jsonb
 WHERE "key" = 'filieres';
 --> statement-breakpoint
 UPDATE "settings"

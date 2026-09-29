@@ -10,7 +10,7 @@ import type {
   Stage,
   Seance,
   Filiere,
-  SubStage,
+  StageRef,
 } from "@/lib/istpm-data";
 
 /* ------------------------------------------------------------------ */
@@ -432,7 +432,7 @@ export function createStructureApi(nom: string, capacite = 5) {
   return api.post<{ structures: StructureAccueil[] }>("/settings/structures", { nom, capacite });
 }
 
-export function updateStructureApi(nom: string, body: { nouveauNom?: string; capacite?: number; subStages?: SubStage[] }) {
+export function updateStructureApi(nom: string, body: { nouveauNom?: string; capacite?: number; stages?: StageRef[] }) {
   return api.put<{ structures: StructureAccueil[] }>(`/settings/structures/${encodeURIComponent(nom)}`, body);
 }
 
@@ -472,7 +472,16 @@ export function serviceHeuresDepuisReglages(reglages: Record<string, unknown>): 
   return out;
 }
 
-export function programmeStagesDepuisReglages(reglages: Record<string, unknown>): SubStage[] {
+/** Ligne plate du programme des carnets (seed `programme_stages`). */
+export type ProgrammeRow = {
+  nom: string;
+  niveau: string;
+  heures: number;
+  capacite: number;
+  filieres?: string[];
+};
+
+export function programmeStagesDepuisReglages(reglages: Record<string, unknown>): ProgrammeRow[] {
   const v = reglages.programme_stages;
   if (!Array.isArray(v)) return [];
   return (v as unknown[])
@@ -490,9 +499,9 @@ export function programmeStagesDepuisReglages(reglages: Record<string, unknown>)
         heures: Math.max(0, Math.floor(Number(x.heures) || 0)),
         capacite: Math.max(0, Math.floor(Number(x.capacite ?? 5) || 0)),
         ...(filieres.length ? { filieres } : {}),
-      } as SubStage;
+      } as ProgrammeRow;
     })
-    .filter((r): r is SubStage => r !== null);
+    .filter((r): r is ProgrammeRow => r !== null);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1308,6 +1317,17 @@ export function markStudentNotificationRead(id: string) {
 /** Bouton X = effacer la notification (cachée, jamais supprimée). */
 export function hideStudentNotification(id: string) {
   return api.post<{ ok: boolean }>(`/student/notifications/${id}/masquer`);
+}
+
+/** Envoie une notification in-app (direction uniquement, côté serveur). */
+export function createNotificationApi(data: {
+  userId?: string;
+  type?: string;
+  title: string;
+  message?: string;
+  link?: string;
+}) {
+  return api.post(`/notifications`, data);
 }
 
 /** Catalogue officiel des demandes prédéfinies (même liste front + back-office). */

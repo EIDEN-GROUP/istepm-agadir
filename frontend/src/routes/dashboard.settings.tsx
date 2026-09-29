@@ -2473,12 +2473,18 @@ function SettingsPage() {
                   // Hors directeur, la fiche `directeur` est masquée ici aussi
                   // (le serveur la filtre déjà : double verrou).
                   .filter((r) => role === "directeur" || r.name !== "directeur")
+                  // Ordre canonique : directeur, assistant, responsable…
+                  .sort((a, b) => {
+                    const oa = NOMS_ROLES.indexOf(a.name as (typeof NOMS_ROLES)[number]);
+                    const ob = NOMS_ROLES.indexOf(b.name as (typeof NOMS_ROLES)[number]);
+                    return (oa === -1 ? 99 : oa) - (ob === -1 ? 99 : ob);
+                  })
                   .map((role) => (
                   <div key={role.id} className="rounded-xl border border-brand/12 overflow-hidden">
                     <div className="flex items-center justify-between gap-3 bg-brand/4 px-4 py-2.5">
                       <div className="min-w-0 flex-1">
                         <span className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-foreground">{role.name}</span>
+                          <span className="text-sm font-bold text-foreground">{ROLE_META[role.name as UserRole]?.label ?? role.name}</span>
                           {role.isSystem ? <span className={cn(toneBadge("neutral"), "text-[10px]")}>Système</span> : null}
                         </span>
                         <span className="block text-[11px] text-muted-foreground">
@@ -2665,15 +2671,14 @@ function SettingsPage() {
             <Carte id="structures" readOnly={!modifiable}>
               <div className="space-y-3">
                 {structuresAccueil.map((s) => {
-                  const rows = s.subStages ?? [];
-                  const tot = rows.reduce((t, r) => t + r.capacite, 0);
+                  const stages = s.stages ?? [];
                   return (
                     <div key={s.nom} className="flex items-center gap-2 rounded-xl border border-brand/12 bg-card px-3 py-2">
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-foreground">{s.nom}</span>
                         <span className="block truncate text-[11px] text-muted-foreground">
-                          {rows.length
-                            ? `${rows.length} sous-stage(s) · ${tot} places`
+                          {stages.length
+                            ? `${stages.length} stage(s) · Cap. ${s.capacite ?? 5} places`
                             : `Capacité : ${s.capacite ?? 5} places`}
                         </span>
                       </span>

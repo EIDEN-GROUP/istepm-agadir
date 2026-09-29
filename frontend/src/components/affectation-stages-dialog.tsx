@@ -14,7 +14,7 @@ import {
   capaciteStructureNiveau,
   libelleNiveau,
   normalizeStructure,
-  subStagesPour,
+  stageDisplayRows,
   fmtDate,
   type Etudiant,
   type Stage,
@@ -431,7 +431,7 @@ export function AffectationStagesDialog({
                     </summary>
                     <div className="mt-2 space-y-2">
                       {structs.map((st) => {
-                        const lignes = subStagesPour(st, niveau, filiere);
+                        const lignes = st.stages.flatMap((t) => stageDisplayRows(t, niveau, filiere));
                         if (!lignes.length) return null;
                         const restantes = placesRestantes(st.nom);
                         return (
@@ -441,17 +441,17 @@ export function AffectationStagesDialog({
                             </p>
                             <ul className="mt-0.5 space-y-0.5">
                               {lignes.map((r, i) => {
-                                const indisponible = r.capacite <= 0 || restantes <= 0;
+                                const indisponible = restantes <= 0;
                                 return (
                                   <li
-                                    key={`${r.nom}|${r.niveau}|${i}`}
+                                    key={`${r.stageNom}|${r.subNom ?? ""}|${r.niveau}|${i}`}
                                     className={cn(
                                       "text-xs",
                                       indisponible ? "font-semibold text-alert" : "text-muted-foreground",
                                     )}
                                   >
-                                    {r.nom} · {r.heures} h · {r.capacite} pl. · {Math.max(0, Math.min(r.capacite, restantes))} restante(s)
-                                    {r.niveau ? "" : " (toutes années)"}
+                                    {r.subNom ? `${r.stageNom} › ${r.subNom}` : r.stageNom} ·{" "}
+                                    {r.niveau || "toutes années"} · {r.heures} h · {Math.max(0, restantes)} restante(s)
                                   </li>
                                 );
                               })}
