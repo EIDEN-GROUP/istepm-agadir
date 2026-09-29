@@ -9,16 +9,12 @@
 /*  Référentiels                                                       */
 /* ------------------------------------------------------------------ */
 
+/** Filières de l'institut : exactement les 4 aux carnets de stage. */
 export const FILIERES = [
   "Aide-Soignant(e)",
   "Infirmier polyvalent",
   "Infirmier(e) Auxiliaire",
-  "Infirmier en anesthésie-réanimation",
   "Sage-femme",
-  "Kinésithérapie",
-  "Radiologie / Imagerie médicale",
-  "Laboratoire / Biologie médicale",
-  "Prothèse dentaire",
 ] as const;
 
 export type Filiere = (typeof FILIERES)[number];
@@ -28,12 +24,7 @@ export const FILIERE_COURT: Record<Filiere, string> = {
   "Aide-Soignant(e)": "AS",
   "Infirmier polyvalent": "IP",
   "Infirmier(e) Auxiliaire": "IA",
-  "Infirmier en anesthésie-réanimation": "IADE",
   "Sage-femme": "SF",
-  Kinésithérapie: "KINÉ",
-  "Radiologie / Imagerie médicale": "RADIO",
-  "Laboratoire / Biologie médicale": "LABO",
-  "Prothèse dentaire": "PROTH",
 };
 
 /** Niveaux d'étude : 1ère, 2ème et 3ème année (remplace les semestres S1–S6). */

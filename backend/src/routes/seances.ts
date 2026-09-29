@@ -162,6 +162,36 @@ export async function seanceRoutes(app: FastifyInstance) {
     return rows.map(enrichSeance);
   });
 
+  /**
+   * Heures validées par (enseignant, module) : somme des durées des séances
+   * au statut `valide`. C'est la confirmation (passage à `valide`) qui fait
+   * foi pour l'avancement du volume horaire des modules. Avant /:id car
+   * Fastify routerait sinon vers le détail.
+   */
+  app.get("/heures-par-module", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request) => {
+    const query = request.query as { professeurId?: string };
+    const db = getDb();
+    const dureeMinutes = sql<number>`COALESCE(SUM(
+      CASE WHEN ${seances.debut} ~ '^[0-9]{1,2}:[0-9]{2}$' AND ${seances.fin} ~ '^[0-9]{1,2}:[0-9]{2}$'
+      THEN GREATEST(0,
+        (split_part(${seances.fin}, ':', 1)::int * 60 + split_part(${seances.fin}, ':', 2)::int) -
+        (split_part(${seances.debut}, ':', 1)::int * 60 + split_part(${seances.debut}, ':', 2)::int))
+      ELSE 0 END
+    ), 0)::int`;
+    const conditions = [eq(seances.statut, "valide")];
+    if (query.professeurId) conditions.push(eq(seances.professeurId, query.professeurId));
+    return db
+      .select({
+        professeurId: seances.professeurId,
+        module: seances.module,
+        filiere: seances.filiere,
+        minutes: dureeMinutes,
+      })
+      .from(seances)
+      .where(and(...conditions))
+      .groupBy(seances.professeurId, seances.module, seances.filiere);
+  });
+
   app.get("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable", "enseignant")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();

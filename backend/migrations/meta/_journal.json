@@ -218,6 +218,13 @@
       "when": 1790370000000,
       "tag": "0030_programme_stages",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790380000000,
+      "tag": "0031_filieres_carnet",
+      "breakpoints": true
     }
   ]
 }

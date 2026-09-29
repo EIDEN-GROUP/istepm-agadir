@@ -7,7 +7,14 @@ import { settings } from "@/db/schema/settings";
 import { levels } from "@/db/schema/levels";
 import { modules } from "@/db/schema/modules";
 import { groupConfigs } from "@/db/schema/groupConfigs";
-import { eq, desc, asc } from "drizzle-orm";
+import { etudiants } from "@/db/schema/etudiants";
+import { formateurs } from "@/db/schema/formateurs";
+import { examens } from "@/db/schema/examens";
+import { seances } from "@/db/schema/seances";
+import { stages } from "@/db/schema/stages";
+import { bulletins } from "@/db/schema/bulletins";
+import { inscriptionRequests } from "@/db/schema/inscription-requests";
+import { eq, desc, asc, sql } from "drizzle-orm";
 
 // La clé vient de l'URL (`PUT /settings/:key`) : le corps ne porte que la valeur.
 const settingSchema = z.object({
@@ -231,6 +238,52 @@ export async function settingsRoutes(app: FastifyInstance) {
     const list: string[] = (row.value as string[]) ?? [];
     const idx = list.indexOf(nom);
     if (idx === -1) return reply.status(404).send({ error: "Filière introuvable" });
+
+    // Garde anti-orphelins : une filière utilisée par des fiches ne se
+    // supprime pas (réassignez d'abord les fiches vers une autre filière).
+    const compte = async (
+      table:
+        | typeof etudiants
+        | typeof formateurs
+        | typeof modules
+        | typeof examens
+        | typeof seances
+        | typeof stages
+        | typeof bulletins
+        | typeof inscriptionRequests,
+      col:
+        | typeof etudiants.filiere
+        | typeof formateurs.departement
+        | typeof modules.filiere
+        | typeof examens.filiere
+        | typeof seances.filiere
+        | typeof stages.filiere
+        | typeof bulletins.filiere
+        | typeof inscriptionRequests.filiere,
+    ): Promise<number> => {
+      const [r] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        // Les 8 colonnes sont des text() : l'union rend la requête typable.
+        .from(table as typeof etudiants)
+        .where(eq(col as typeof etudiants.filiere, nom));
+      return Number(r?.n ?? 0);
+    };
+    const usages: [string, number][] = [
+      ["étudiants", await compte(etudiants as never, etudiants.filiere as never)],
+      ["formateurs", await compte(formateurs as never, formateurs.departement as never)],
+      ["modules", await compte(modules as never, modules.filiere as never)],
+      ["examens", await compte(examens as never, examens.filiere as never)],
+      ["séances", await compte(seances as never, seances.filiere as never)],
+      ["stages", await compte(stages as never, stages.filiere as never)],
+      ["bulletins", await compte(bulletins as never, bulletins.filiere as never)],
+      ["inscriptions", await compte(inscriptionRequests as never, inscriptionRequests.filiere as never)],
+    ];
+    const bloquees = usages.filter(([, n]) => n > 0).map(([label, n]) => `${label} (${n})`);
+    if (bloquees.length) {
+      return reply.status(409).send({
+        error: `Filière utilisée par : ${bloquees.join(", ")}. Réassignez ces fiches d'abord.`,
+      });
+    }
     list.splice(idx, 1);
 
     await db

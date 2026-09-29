@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Plus,
   ChevronLeft,
@@ -78,7 +79,7 @@ import {
 } from "@/lib/dash-ui";
 import { escCsvCell } from "@/lib/csv";
 import { ApiError } from "@/lib/api";
-import { createNotificationApi } from "@/lib/istpm-api";
+import { createNotificationApi, fetchHeuresParModule } from "@/lib/istpm-api";
 import {
   PageHeader,
   FilterPanel,
@@ -987,6 +988,26 @@ export function SeanceDetail({
     }
   };
 
+  // Avancement du volume horaire du module : compté à la confirmation.
+  const { modules: modulesRegistreDetail } = useIstpm();
+  const heuresQ = useQuery({
+    queryKey: ["heures-module", seance.professeurId, seance.module],
+    queryFn: () => fetchHeuresParModule(seance.professeurId || undefined),
+    retry: false,
+  });
+  const moduleRef = (modulesRegistreDetail ?? []).find(
+    (m) => m.nom === seance.module && (!m.filiere || !seance.filiere || m.filiere === seance.filiere),
+  ) ?? (modulesRegistreDetail ?? []).find((m) => m.nom === seance.module);
+  const volumeCible = Number(moduleRef?.volumeHoraire ?? 0) || 0;
+  const minutesFaites = (heuresQ.data ?? [])
+    .filter((h) => h.module === seance.module)
+    .reduce((t, h) => t + (Number(h.minutes) || 0), 0);
+  const heuresFaites = Math.round((minutesFaites / 60) * 10) / 10;
+  const dureeSeanceH = Math.max(
+    0,
+    Math.round(((minutesDepuisMinuit(seance.fin) - minutesDepuisMinuit(seance.debut)) / 60) * 10) / 10,
+  );
+
   const ligneStatut =
     seance.statut === "valide"
       ? "Validée par la direction."
@@ -1098,9 +1119,18 @@ export function SeanceDetail({
           <DetailField
             label="Horaire"
             value={
-              <span className="inline-flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-brand" />
-                {seance.debut} – {seance.fin}
+              <span className="inline-flex flex-col gap-0.5">
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-brand" />
+                  {seance.debut} – {seance.fin}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {heuresQ.isLoading
+                    ? "Avancement du module…"
+                    : volumeCible > 0
+                      ? `+${dureeSeanceH} h cette séance · Module : ${heuresFaites} h / ${volumeCible} h · reste ${Math.max(0, Math.round((volumeCible - heuresFaites) * 10) / 10)} h`
+                      : `+${dureeSeanceH} h cette séance · Volume du module non renseigné`}
+                </span>
               </span>
             }
           />

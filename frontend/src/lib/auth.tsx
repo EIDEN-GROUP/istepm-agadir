@@ -303,9 +303,6 @@ function mapBackendRole(backendRole: string): UserRole {
       return "responsable";
     case "etudiant":
       return "etudiant";
-    case "comptable":
-      // Rôle supprimé (migration 0028) : jetons périmés rattachés à l'assistant.
-      return "assistant_directeur";
     default:
       return "directeur";
   }

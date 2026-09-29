@@ -711,6 +711,14 @@ export function deleteSeanceDocumentApi(seanceId: string) {
   return api.delete<{ ok: boolean }>(`/seances/${seanceId}/document`);
 }
 
+/** Heures validées par (enseignant, module) : comptées à la confirmation. */
+export function fetchHeuresParModule(professeurId?: string) {
+  return api.get<{ professeurId: string; module: string; filiere: string; minutes: number }[]>(
+    "/seances/heures-par-module",
+    professeurId ? { professeurId } : undefined,
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Dashboard aggregates                                               */
 /* ------------------------------------------------------------------ */

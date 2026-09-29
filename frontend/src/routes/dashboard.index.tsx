@@ -7,6 +7,7 @@ import {
   fetchStudentRequests,
   fetchStudentNotifications,
   fetchAllStudentRequests,
+  fetchHeuresParModule,
   type StudentRequest,
 } from "@/lib/istpm-api";
 import { motion, animate, useInView } from "framer-motion";
@@ -495,6 +496,88 @@ const ACTIVITE_ICON: Record<ActiviteItem["type"], typeof UserPlus> = {
   note: PenLine,
 };
 
+/**
+ * Heures restantes par enseignant et par module : le volume horaire du
+ * module se consomme à chaque séance confirmée (`valide`). Sans volume
+ * renseigné (Paramètres › Modules), la ligne l'indique au lieu d'inventer.
+ */
+function HeuresModulesSection() {
+  const { formateurs, modules } = useIstpm();
+  const heuresQ = useQuery({
+    queryKey: ["heures-par-module"],
+    queryFn: () => fetchHeuresParModule(),
+    retry: false,
+  });
+  const faitesParCle = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const h of heuresQ.data ?? []) {
+      const k = `${h.professeurId}||${h.module}`;
+      map.set(k, (map.get(k) ?? 0) + (Number(h.minutes) || 0));
+    }
+    return map;
+  }, [heuresQ.data]);
+  const lignes = useMemo(() => {
+    const out: {
+      prof: string;
+      module: string;
+      faites: number;
+      volume: number;
+    }[] = [];
+    for (const f of formateurs) {
+      if (f.archived) continue;
+      for (const mod of f.modules ?? []) {
+        const ref = modules.find((m) => m.nom === mod);
+        const volume = Number(ref?.volumeHoraire ?? 0) || 0;
+        const faites = Math.round(((faitesParCle.get(`${f.id}||${mod}`) ?? 0) / 60) * 10) / 10;
+        out.push({ prof: `${f.prenom} ${f.nom}`, module: mod, faites, volume });
+      }
+    }
+    return out.sort((a, b) => a.prof.localeCompare(b.prof) || a.module.localeCompare(b.module));
+  }, [formateurs, modules, faitesParCle]);
+
+  return (
+    <Section title="Heures modules restantes">
+      {heuresQ.isLoading ? (
+        <p className="px-5 py-8 text-center text-sm text-muted-foreground">Chargement…</p>
+      ) : !lignes.length ? (
+        <p className="px-5 py-8 text-center text-sm text-muted-foreground">Aucun module suivi.</p>
+      ) : (
+        <div className={cn(softCard, "max-h-[380px] divide-y divide-brand/8 overflow-y-auto")}>
+          {lignes.map((l, i) => {
+            const reste = l.volume > 0 ? Math.max(0, Math.round((l.volume - l.faites) * 10) / 10) : null;
+            const ratio = l.volume > 0 ? Math.min(1, l.faites / l.volume) : 0;
+            return (
+              <div key={`${l.prof}|${l.module}|${i}`} className="space-y-1 px-4 py-3 sm:px-5">
+                <p className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="min-w-0 truncate font-medium text-foreground">
+                    {l.prof} · {l.module}
+                  </span>
+                  {reste === null ? (
+                    <span className={toneBadge("amber")}>Volume à renseigner</span>
+                  ) : reste <= 0 ? (
+                    <span className={toneBadge("teal")}>Terminé</span>
+                  ) : (
+                    <span className="shrink-0 text-xs text-muted-foreground">reste {reste} h</span>
+                  )}
+                </p>
+                {reste !== null ? (
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand/12">
+                    <div
+                      className={cn("h-full rounded-full", reste <= 0 ? "bg-teal-600" : "bg-brand")}
+                      style={{ width: `${Math.round(ratio * 100)}%` }}
+                    />
+                  </div>
+                ) : null}
+                <p className="text-[11px] text-muted-foreground">{l.faites} h / {l.volume > 0 ? `${l.volume} h` : "—"}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 function ActiviteFeed() {
   // Fil dérivé des lignes serveur (jamais de session seule) : derniers examens
   // notés, derniers stages — triés par date décroissante.
@@ -978,9 +1061,12 @@ function DashboardDirecteur() {
             <Section title="Aujourd&rsquo;hui" action={<SectionLink to="/dashboard/calendar">Voir le planning</SectionLink>}>
               <AujourdhuiTable seances={seancesAujourdhui} />
             </Section>
-            <Section title="Notifications">
-              <ActiviteFeed />
-            </Section>
+            <div className="grid gap-6 xl:grid-cols-2">
+              <Section title="Logs">
+                <ActiviteFeed />
+              </Section>
+              <HeuresModulesSection />
+            </div>
           </div>
         ) : tab === 1 ? (
           <div className="space-y-6">

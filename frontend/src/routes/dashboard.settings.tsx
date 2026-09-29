@@ -2471,7 +2471,9 @@ function SettingsPage() {
               ) : (
                 rolesList
                   // Hors directeur, la fiche `directeur` est masquée ici aussi
-                  // (le serveur la filtre déjà : double verrou).
+                  // (le serveur la filtre déjà : double verrou). La fiche
+                  // `comptable` (rôle supprimé) ne s'affiche jamais.
+                  .filter((r) => r.name !== "comptable")
                   .filter((r) => role === "directeur" || r.name !== "directeur")
                   // Ordre canonique : directeur, assistant, responsable…
                   .sort((a, b) => {
