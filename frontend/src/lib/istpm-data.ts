@@ -624,7 +624,7 @@ export type Stage = {
 /**
  * Entrée du fil « activité récente » du tableau de bord.
  *
- * Dérivé à l'affichage depuis les lignes serveur (examens, stages) —
+ * Dérivé à l'affichage depuis les lignes serveur (examens, stages) -
  * jamais persisté, jamais en session seule.
  */
 export type ActiviteItem = {
@@ -695,7 +695,7 @@ export function parseCreneaux(labels: readonly string[]): Creneau[] {
   const out: Creneau[] = [];
   for (const label of labels) {
     const m = String(label).match(
-      /(\d{1,2})\s*[:hH]\s*(\d{2}).*?[-–—]\s*(\d{1,2})\s*[:hH]\s*(\d{2})/,
+      /(\d{1,2})\s*[:hH]\s*(\d{2}).*?[-–-]\s*(\d{1,2})\s*[:hH]\s*(\d{2})/,
     );
     if (!m) continue;
     const pad = (n: string) => n.padStart(2, "0");
@@ -842,7 +842,7 @@ export function isoDate(d: Date): string {
 /**
  * Bornes de l'année universitaire : du 1er septembre au 30 juin.
  *
- * Juillet et août sont hors année scolaire — aucune séance n'y est planifiée.
+ * Juillet et août sont hors année scolaire - aucune séance n'y est planifiée.
  */
 export function bornesAnneeUniversitaire(annee = getCurrentAcademicYear()): {
   debut: Date;

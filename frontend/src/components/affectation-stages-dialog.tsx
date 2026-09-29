@@ -48,7 +48,7 @@ import {
 } from "@/lib/dash-ui";
 import { cn } from "@/lib/utils";
 
-export type Affectation = { etudiant: Etudiant; structure: string; debut: string; fin: string };
+export type Affectation = { etudiant: Etudiant; structure: string; service: string; debut: string; fin: string };
 
 /**
  * Affectation groupée des étudiants aux structures d'accueil.
@@ -91,6 +91,9 @@ export function AffectationStagesDialog({
   const [groupe, setGroupe] = useState<string>("");
   // étudiantId → nom de structure choisie ("" = pas encore affecté).
   const [assign, setAssign] = useState<Record<string, string>>({});
+  // étudiantId → stage (service) et sous-stage choisis.
+  const [assignService, setAssignService] = useState<Record<string, string>>({});
+  const [assignSub, setAssignSub] = useState<Record<string, string>>({});
   const [nouvelleStructure, setNouvelleStructure] = useState("");
 
   const dateError =
@@ -171,6 +174,44 @@ export function AffectationStagesDialog({
         label: `${o.nom} · ${o.reste} place${o.reste > 1 ? "s" : ""}`,
       }));
 
+  /** Stages (services) de la structure choisie, pour (niveau, filière). */
+  const stagesDe = (etudiantId: string) => {
+    const st = structs.find((s) => s.nom === assign[etudiantId]);
+    if (!st) return [];
+    return st.stages
+      .filter((t) => stageDisplayRows(t, niveau, filiere).length > 0)
+      .map((t) => {
+        const heures = stageDisplayRows(t, niveau, filiere).reduce((s, r) => s + r.heures, 0);
+        return { value: t.nom, label: `${t.nom} · ${heures} h` };
+      });
+  };
+
+  /** Sous-stages du service choisi (niveau courant). */
+  const subsDe = (etudiantId: string) => {
+    const st = structs.find((s) => s.nom === assign[etudiantId]);
+    const t = st?.stages.find((x) => x.nom === assignService[etudiantId]);
+    if (!st || !t) return [];
+    return t.subStages
+      .filter((d) => d.niveaux.some((nh) => !nh.niveau || nh.niveau === niveau))
+      .map((d) => {
+        const heures = d.niveaux
+          .filter((nh) => !nh.niveau || nh.niveau === niveau)
+          .reduce((s, nh) => s + nh.heures, 0);
+        return { value: d.nom, label: `${d.nom} · ${heures} h` };
+      });
+  };
+
+  const choisirStructure = (etudiantId: string, v: string) => {
+    setAssign((prev) => ({ ...prev, [etudiantId]: v }));
+    setAssignService((prev) => ({ ...prev, [etudiantId]: "" }));
+    setAssignSub((prev) => ({ ...prev, [etudiantId]: "" }));
+  };
+
+  const choisirService = (etudiantId: string, v: string) => {
+    setAssignService((prev) => ({ ...prev, [etudiantId]: v }));
+    setAssignSub((prev) => ({ ...prev, [etudiantId]: "" }));
+  };
+
   const nbAffectes = etudiantsNonAffectes.filter((e) => assign[e.id]).length;
 
   const handleAleatoire = () => {
@@ -184,6 +225,7 @@ export function AffectationStagesDialog({
     }
     const noms = structs.map((s) => s.nom);
     const next = { ...assign };
+    const nextService: Record<string, string> = { ...assignService };
     let places = 0;
     let sansPlace = 0;
     for (const e of etudiantsNonAffectes) {
@@ -195,10 +237,17 @@ export function AffectationStagesDialog({
       }
       const pick = dispo[Math.floor(Math.random() * dispo.length)];
       next[e.id] = pick;
+      // Service tiré parmi ceux de la structure (même filtre que le select).
+      const st = structs.find((s) => s.nom === pick);
+      const services = (st?.stages ?? []).filter((t) => stageDisplayRows(t, niveau, filiere).length > 0);
+      if (services.length) {
+        nextService[e.id] = services[Math.floor(Math.random() * services.length)].nom;
+      }
       reste.set(pick, (reste.get(pick) ?? 0) - 1);
       places++;
     }
     setAssign(next);
+    setAssignService(nextService);
     toast.success(
       `${places} étudiant(s) affecté(s) aléatoirement${
         sansPlace ? ` · ${sansPlace} sans place disponible` : ""
@@ -212,9 +261,24 @@ export function AffectationStagesDialog({
       setStep(0);
       return;
     }
+    const sansService = etudiantsNonAffectes.filter((e) => assign[e.id] && !assignService[e.id]);
+    if (sansService.length) {
+      toast.error(`${sansService.length} étudiant(s) sans service : choisissez le service de chaque structure`);
+      return;
+    }
     const affectations: Affectation[] = etudiantsNonAffectes
-      .filter((e) => assign[e.id])
-      .map((e) => ({ etudiant: e, structure: assign[e.id], debut, fin }));
+      .filter((e) => assign[e.id] && assignService[e.id])
+      .map((e) => {
+        const service = assignService[e.id];
+        const sub = assignSub[e.id];
+        return {
+          etudiant: e,
+          structure: assign[e.id],
+          service: sub ? `${service} › ${sub}` : service,
+          debut,
+          fin,
+        };
+      });
     if (!affectations.length) {
       toast.error("Aucune affectation sélectionnée");
       return;
@@ -328,6 +392,8 @@ export function AffectationStagesDialog({
                 setFiliere("");
                 setGroupe("");
                 setAssign({});
+                setAssignService({});
+                setAssignSub({});
               }}
               options={NIVEAUX}
               placeholder="Choisir un niveau…"
@@ -343,6 +409,8 @@ export function AffectationStagesDialog({
                 setFiliere(v as Filiere);
                 setGroupe("");
                 setAssign({});
+                setAssignService({});
+                setAssignSub({});
               }}
               options={filieresOptions}
               placeholder="Choisir une filière…"
@@ -355,10 +423,12 @@ export function AffectationStagesDialog({
                 label="Groupe"
                 required
                 value={groupe}
-                onChange={(v) => {
-                  setGroupe(v);
-                  setAssign({});
-                }}
+              onChange={(v) => {
+                setGroupe(v);
+                setAssign({});
+                setAssignService({});
+                setAssignSub({});
+              }}
                 options={groupesDisponibles}
                 placeholder="Choisir un groupe…"
               />
@@ -408,7 +478,11 @@ export function AffectationStagesDialog({
                   <button
                     type="button"
                     className={cn(ghostPill, "gap-1.5")}
-                    onClick={() => setAssign({})}
+                    onClick={() => {
+                      setAssign({});
+                      setAssignService({});
+                      setAssignSub({});
+                    }}
                   >
                     <RotateCcw className="h-3.5 w-3.5" /> Réinitialiser
                   </button>
@@ -480,18 +554,16 @@ export function AffectationStagesDialog({
                           </span>
                         </span>
                       </span>
-                      <span className="w-full sm:w-64">
+                      <span className="w-full space-y-2 sm:w-72">
                         <Select
                           value={assign[e.id] || undefined}
-                          onValueChange={(v) =>
-                            setAssign((prev) => ({ ...prev, [e.id]: v }))
-                          }
+                          onValueChange={(v) => choisirStructure(e.id, v)}
                         >
                           <SelectTrigger
                             className={cn(softSelectTrigger, "w-full")}
                             aria-label={`Structure pour ${e.prenom} ${e.nom}`}
                           >
-                            <SelectValue placeholder="À affecter…" />
+                            <SelectValue placeholder="Structure…" />
                           </SelectTrigger>
                           <SelectContent className={softSelectContent}>
                             {optionsStructure(e.id).map((o) => (
@@ -501,6 +573,48 @@ export function AffectationStagesDialog({
                             ))}
                           </SelectContent>
                         </Select>
+                        {assign[e.id] ? (
+                          <Select
+                            value={assignService[e.id] || undefined}
+                            onValueChange={(v) => choisirService(e.id, v)}
+                          >
+                            <SelectTrigger
+                              className={cn(softSelectTrigger, "w-full")}
+                              aria-label={`Service pour ${e.prenom} ${e.nom}`}
+                            >
+                              <SelectValue placeholder="Service (requis)…" />
+                            </SelectTrigger>
+                            <SelectContent className={softSelectContent}>
+                              {stagesDe(e.id).map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : null}
+                        {assignService[e.id] && subsDe(e.id).length ? (
+                          <Select
+                            value={assignSub[e.id] || undefined}
+                            onValueChange={(v) =>
+                              setAssignSub((prev) => ({ ...prev, [e.id]: v }))
+                            }
+                          >
+                            <SelectTrigger
+                              className={cn(softSelectTrigger, "w-full")}
+                              aria-label={`Sous-stage pour ${e.prenom} ${e.nom}`}
+                            >
+                              <SelectValue placeholder="Sous-stage (facultatif)…" />
+                            </SelectTrigger>
+                            <SelectContent className={softSelectContent}>
+                              {subsDe(e.id).map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : null}
                       </span>
                     </li>
                   ))}

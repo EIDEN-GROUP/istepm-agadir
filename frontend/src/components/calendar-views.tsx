@@ -235,7 +235,7 @@ function GrilleHoraire({
   /** Vue consultation : la grille se limite aux heures réellement occupées. */
   fit?: boolean;
 }) {
-  // Consultation (`fit`) : on cadre la grille sur les séances de la semaine —
+  // Consultation (`fit`) : on cadre la grille sur les séances de la semaine -
   // pas de plages mortes avant 8 h ou après le dernier cours. Sinon l'amplitude
   // suit les créneaux paramétrés (édition du planning).
   const { debut: HEURE_DEBUT, fin: HEURE_FIN } = useMemo(() => {

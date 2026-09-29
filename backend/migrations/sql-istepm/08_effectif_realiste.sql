@@ -1,4 +1,4 @@
--- 08_effectif_realiste.sql — effectif cohérent à grande échelle (idempotent).
+-- 08_effectif_realiste.sql - effectif cohérent à grande échelle (idempotent).
 -- 820 étudiants aux NOMS UNIQUES par construction (paire (g%96, (g//96+g%96)%60)
 -- injective sur 1..820, preuve en commentaire du commit), 48 formateurs
 -- (ratio ~1:15), 84 examens + notes, 45 séances + présences, demandes.
@@ -151,7 +151,7 @@ FROM (
     CASE v.t WHEN 1 THEN ROUND((b.frais * 0.4)) WHEN 2 THEN ROUND((b.frais * 0.35)) ELSE ROUND((b.frais * 0.25)) END AS mnt,
     (ARRAY['Virement','Espèces','Chèque','Carte'])[(s.sseq + v.t) % 4 + 1] AS md,
     CASE v.t WHEN 1 THEN '2025-10' WHEN 2 THEN '2026-01' ELSE to_char(CURRENT_DATE, 'YYYY-MM') END AS ms,
-    CASE v.t WHEN 1 THEN 'Tranche 1 — 2025/26' WHEN 2 THEN 'Tranche 2 — 2025/26' ELSE 'Tranche 3 — 2025/26' END AS pr,
+    CASE v.t WHEN 1 THEN 'Tranche 1 - 2025/26' WHEN 2 THEN 'Tranche 2 - 2025/26' ELSE 'Tranche 3 - 2025/26' END AS pr,
     CASE WHEN v.t < 3 OR (s.sseq % 4) = 0 THEN 'ISTPM-R-25' || lpad(((s.sseq * 10) + v.t)::text, 6, '0') ELSE '' END AS rc,
     CASE WHEN v.t < 3 THEN 'paye'
       ELSE (ARRAY['paye','en_attente','retard','impaye'])[(s.sseq % 4) + 1] END AS st
@@ -204,7 +204,7 @@ INSERT INTO "stages"
    "service","debut","fin","statut","tuteur_academique","encadrant_clinique","convention_signee")
 SELECT ('e8130000-0000-4000-8000-' || lpad(to_hex(e.seq), 12, '0'))::uuid,
   e.id, e.cne, e.prenom, e.nom, e.filiere, e.niveau,
-  (ARRAY['CHR Hassan II — Agadir','Hôpital Al Hassani','Clinique Les Fleurs',
+  (ARRAY['CHR Hassan II - Agadir','Hôpital Al Hassani','Clinique Les Fleurs',
     'CHU Souss Massa','Centre de Santé Al Amal','Polyclinique CNSS'])[(e.seq % 6) + 1],
   (ARRAY['Urgences','Médecine interne','Pédiatrie','Bloc opératoire',
     'Laboratoire','Radiologie','Maternité','Réanimation'])[(e.seq % 8) + 1],

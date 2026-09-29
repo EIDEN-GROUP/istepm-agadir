@@ -7,7 +7,7 @@ import { getStoredRole, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 /**
- * Portail étudiant — écran de connexion.
+ * Portail étudiant - écran de connexion.
  *
  * Design importé de la maquette Lovable « agadir-faces » (panneau visuel +
  * formulaire, dégradé teal, motif zellige). L'authentification reste celle du

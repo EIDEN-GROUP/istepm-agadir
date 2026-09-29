@@ -6,7 +6,7 @@ import { getStoredRole, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 /**
- * Espace personnel — connexion (adresse discrète `/istepm`).
+ * Espace personnel - connexion (adresse discrète `/istepm`).
  *
  * Écran sobre, centré, réservé au personnel (responsable, direction,
  * formateurs). L'authentification est celle du backend (`POST /auth/login`) :

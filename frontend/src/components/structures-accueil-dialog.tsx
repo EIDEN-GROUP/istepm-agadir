@@ -83,7 +83,7 @@ export function StructuresAccueilDialog({
     try {
       await addStructureAccueil(nom, 5);
       setNouveauNom("");
-      toast.success(`Ajoutée · ${nom} — complétez ses sous-stages via Modifier`);
+      toast.success(`Ajoutée · ${nom} - complétez ses sous-stages via Modifier`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Ajout impossible");
     }

@@ -685,7 +685,7 @@ export function FormDialog({
   subtitle?: string;
   submitLabel?: string;
   onSubmit: () => void;
-  /** Désactive les boutons pendant l'envoi — évite les doubles soumissions. */
+  /** Désactive les boutons pendant l'envoi - évite les doubles soumissions. */
   busy?: boolean;
   wide?: boolean;
   children: ReactNode;

@@ -568,7 +568,7 @@ function HeuresModulesSection() {
                     />
                   </div>
                 ) : null}
-                <p className="text-[11px] text-muted-foreground">{l.faites} h / {l.volume > 0 ? `${l.volume} h` : "—"}</p>
+                <p className="text-[11px] text-muted-foreground">{l.faites} h / {l.volume > 0 ? `${l.volume} h` : "-"}</p>
               </div>
             );
           })}
@@ -580,7 +580,7 @@ function HeuresModulesSection() {
 
 function ActiviteFeed() {
   // Fil dérivé des lignes serveur (jamais de session seule) : derniers examens
-  // notés, derniers stages — triés par date décroissante.
+  // notés, derniers stages - triés par date décroissante.
   const { examens, stages } = useIstpm();
   const items: ActiviteItem[] = useMemo(() => {
     const out: ActiviteItem[] = [];
@@ -1034,7 +1034,7 @@ function DashboardDirecteur() {
   const [chargeDetail, setChargeDetail] = useState<Seance | null>(null);
   const nomProfCharge = (id: string) => {
     const f = formateurs.find((x) => x.id === id);
-    return f ? `${f.prenom} ${f.nom}` : "—";
+    return f ? `${f.prenom} ${f.nom}` : "-";
   };
 
   return (
@@ -1238,7 +1238,7 @@ function DashboardDirecteur() {
 /**
  * Récapitulatif de ce qu'un formateur enseigne : filière, niveaux (lus dans
  * le registre des groupes), groupes et modules.
- * Lecture seule — l'affectation est gérée dans Formateurs par la direction.
+ * Lecture seule - l'affectation est gérée dans Formateurs par la direction.
  */
 function AffectationEnseignant({ formateur }: { formateur: Formateur }) {
   const { groupConfigs } = useIstpm();
@@ -1314,7 +1314,7 @@ function DashboardEnseignant() {
   const seancesAujourdhui = useMemo(() => seances.filter((s) => s.date === today && s.professeurId === moi?.id), [seances, moi?.id]);
   const mesSeances = useMemo(() => seances.filter((s) => s.professeurId === moi?.id).slice().sort((a, b) => (a.date < b.date ? -1 : 1)), [seances, moi?.id]);
   // Tous les étudiants de la filière du formateur dans ses niveaux (lus dans
-  // le registre des groupes) ou directement dans ses groupes — le professeur
+  // le registre des groupes) ou directement dans ses groupes - le professeur
   // voit ainsi l'intégralité de ses promotions.
   const mesEtudiants = useMemo(() => {
     if (!moi) return [];

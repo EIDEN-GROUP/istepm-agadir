@@ -150,7 +150,7 @@ export async function inscriptionRoutes(app: FastifyInstance) {
       // Best-effort : la demande est enregistrée même sans SMTP.
       await notifyBestEffort(
         env.ADMIN_EMAIL,
-        `ISTPM · Demande d'inscription — ${row.prenom} ${row.nom}`,
+        `ISTPM · Demande d'inscription - ${row.prenom} ${row.nom}`,
         html,
         text,
         "inscription",

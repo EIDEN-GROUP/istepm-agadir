@@ -1,11 +1,11 @@
--- 02_comptes.sql — rôles, comptes de test, employés, centres (idempotent).
+-- 02_comptes.sql - rôles, comptes de test, employés, centres (idempotent).
 
 -- Rôles par défaut.
 INSERT INTO "roles" ("name", "description", "permissions", "is_system") VALUES
   ('directeur', 'Accès complet à l''ensemble du système',
    '["etudiants.read", "etudiants.write", "etudiants.delete", "formateurs.read", "formateurs.write", "formateurs.delete", "examens.read", "examens.write", "examens.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read", "settings.annees.read", "settings.annees.write", "settings.groupes.read", "settings.groupes.write", "settings.modules.read", "settings.modules.write", "settings.salles.read", "settings.salles.write", "settings.creneaux.read", "settings.creneaux.write", "settings.planning.read", "settings.planning.write", "settings.filieres.read", "settings.filieres.write", "settings.niveaux_etudes.read", "settings.niveaux_etudes.write", "settings.examens.read", "settings.examens.write", "settings.bulletins.read", "settings.bulletins.write", "settings.institut.read", "settings.institut.write", "settings.securite.read", "settings.securite.write", "settings.cachet.read", "settings.cachet.write", "settings.structures.read", "settings.structures.write"]'::jsonb,
    true),
-  ('assistant_directeur', 'Assistant du directeur — mêmes droits que le directeur, sauf la gestion du rôle et des comptes directeur',
+  ('assistant_directeur', 'Assistant du directeur - mêmes droits que le directeur, sauf la gestion du rôle et des comptes directeur',
    '["etudiants.read", "etudiants.write", "etudiants.delete", "formateurs.read", "formateurs.write", "formateurs.delete", "examens.read", "examens.write", "examens.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read", "settings.annees.read", "settings.annees.write", "settings.groupes.read", "settings.groupes.write", "settings.modules.read", "settings.modules.write", "settings.salles.read", "settings.salles.write", "settings.creneaux.read", "settings.creneaux.write", "settings.planning.read", "settings.planning.write", "settings.filieres.read", "settings.filieres.write", "settings.niveaux_etudes.read", "settings.niveaux_etudes.write", "settings.examens.read", "settings.examens.write", "settings.bulletins.read", "settings.bulletins.write", "settings.institut.read", "settings.institut.write", "settings.securite.read", "settings.securite.write", "settings.cachet.read", "settings.cachet.write", "settings.structures.read", "settings.structures.write"]'::jsonb,
    true),
   ('responsable', 'Gestion pédagogique et organisationnelle',
@@ -19,7 +19,7 @@ ON CONFLICT ("name") DO UPDATE SET
   "permissions" = EXCLUDED."permissions",
   "is_system" = EXCLUDED."is_system";
 
--- Comptes de test (mots de passe faibles — recette uniquement).
+-- Comptes de test (mots de passe faibles - recette uniquement).
 -- direction@istpm-agadir.ma / directeur123 · assistant@… / assistant123 · enseignant@… / enseignant123 · responsable@… / responsable123
 INSERT INTO "users" ("email", "password_hash", "name", "role") VALUES
   ('direction@istpm-agadir.ma', '$2b$10$PAnZKRCQa.uKh92Bgf1TDeIYlEmRsRnMlR3tK3eH.1TuOzB/wuJ9C', 'Dr. Youssef Benali', 'directeur'),

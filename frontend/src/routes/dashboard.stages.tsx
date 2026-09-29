@@ -1025,7 +1025,7 @@ function StagesPage() {
           }}
           onConfirm={async (affectations) => {
             try {
-              for (const { etudiant, structure, debut, fin } of affectations) {
+              for (const { etudiant, structure, service, debut, fin } of affectations) {
                 await addStage({
                 etudiantId: etudiant.id,
                 cne: etudiant.cne,
@@ -1034,7 +1034,7 @@ function StagesPage() {
                 filiere: etudiant.filiere,
                 niveau: etudiant.niveau,
                 structure,
-                service: "",
+                service,
                 encadrantClinique: "",
                 tuteurAcademique: "",
                 debut,

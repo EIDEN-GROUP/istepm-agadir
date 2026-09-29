@@ -1,5 +1,5 @@
 /**
- * Page « Mon profil » — accessible uniquement en cliquant la pastille ronde
+ * Page « Mon profil » - accessible uniquement en cliquant la pastille ronde
  * en bas du rail latéral (aucune entrée de menu).
  *
  * En-tête façon fiche : photo à gauche (cliquable pour changer), identité et

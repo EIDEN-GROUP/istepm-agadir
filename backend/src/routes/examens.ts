@@ -362,7 +362,7 @@ export async function examenRoutes(app: FastifyInstance) {
     },
   );
 
-  /** Download the document for an examen (staff only — sujets confidentiels). */
+  /** Download the document for an examen (staff only - sujets confidentiels). */
   app.get(
     "/:id/document",
     { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable", "enseignant")] },

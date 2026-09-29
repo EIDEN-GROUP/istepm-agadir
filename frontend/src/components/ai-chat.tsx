@@ -580,7 +580,7 @@ export function AiChatFloating() {
           setExecuting(action.actionName);
           try {
             const res = await confirmAction(action.actionName, action.params);
-            // Ticket : création silencieuse en arrière-plan — aucune
+            // Ticket : création silencieuse en arrière-plan - aucune
             // confirmation affichée (le verdict arrivera via l'IA).
             // Seule une erreur reste visible (sinon demande perdue).
             if (action.actionName !== "create_feature_ticket") {

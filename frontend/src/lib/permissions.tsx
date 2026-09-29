@@ -5,7 +5,7 @@ import { fetchMyPermissions } from "@/lib/istpm-api";
 
 /**
  * Permissions effectives du compte connecté (fiche rôle en base, sinon repli
- * historique calculé côté serveur — une seule source de vérité : `GET
+ * historique calculé côté serveur - une seule source de vérité : `GET
  * /roles/mine`). Utilisé pour la nav, les gardes de routes et les boutons
  * d'écriture. Pendant le chargement (ou en erreur), l'appelant fournit un
  * repli historique explicite : jamais de verrouillage sur panne réseau.

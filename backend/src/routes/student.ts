@@ -83,7 +83,7 @@ export async function studentRoutes(app: FastifyInstance) {
   });
 
   // La photo d'identité de l'étudiant est gérée par les affaires estudiantines
-  // (PUT /api/etudiants/:id) — l'étudiant ne la modifie jamais lui-même.
+  // (PUT /api/etudiants/:id) - l'étudiant ne la modifie jamais lui-même.
   app.put("/me/photo", { preHandler: [authenticate] }, async (_request, reply) => {
     return reply.status(403).send({
       error: "Votre photo est gérée par les affaires estudiantines.",

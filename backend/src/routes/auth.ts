@@ -53,7 +53,7 @@ const PHOTO_MAX = 3_000_000; // ~2 Mo d'image en base64
 const updateSelfSchema = z
   .object({
     email: z.string().email("Email invalide").optional(),
-    /** Nom affiché — réservé directeur/responsable (garde ci-dessous). */
+    /** Nom affiché - réservé directeur/responsable (garde ci-dessous). */
     name: z.string().trim().min(1, "Nom requis").max(100).optional(),
     currentPassword: z.string().min(1).optional(),
     newPassword: z
@@ -99,7 +99,7 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.status(401).send({
           error:
             result.reason === "archived"
-              ? "Compte désactivé — contactez le secrétariat."
+              ? "Compte désactivé - contactez le secrétariat."
               : "Email ou mot de passe incorrect",
         });
       }

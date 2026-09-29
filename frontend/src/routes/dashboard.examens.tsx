@@ -233,7 +233,7 @@ function DocumentPreview({
           dialogSurfaceWide,
           // Hauteur FIXE (pas seulement max-h) : sans quoi la colonne flex se
           // réduit à son contenu et la zone de lecture s'écrase à sa hauteur
-          // mini — le PDF paraissait « coupé ».
+          // mini - le PDF paraissait « coupé ».
           "h-[min(92vh,900px)] max-h-[min(92vh,900px)] w-[min(100vw_-_1.5rem,880px)] max-w-[min(100vw_-_1.5rem,880px)]",
         )}
       >
@@ -306,7 +306,7 @@ function DocumentPreview({
                     // scripts ET d'un accès same-origin pour lire le blob :
                     // sans quoi l'iframe reste noire (seule la barre d'outils
                     // s'affiche). Le rendu PDF natif n'exécute jamais le
-                    // JavaScript embarqué — le sujet déposé ne peut rien lancer.
+                    // JavaScript embarqué - le sujet déposé ne peut rien lancer.
                     sandbox="allow-scripts allow-same-origin"
                     className="h-full w-full bg-white"
                   />
@@ -476,7 +476,7 @@ function EspaceFormateur() {
   }, [examens]);
 
   /** Classes réelles (groupes des séances et des étudiants, normalisés) :
-   *  la convocation compare à l'identique — la saisie libre produisait des
+   *  la convocation compare à l'identique - la saisie libre produisait des
    *  classes vides. */
   const classesDisponibles = useMemo(() => {
     const set = new Set<string>();
@@ -1145,8 +1145,8 @@ function ExamenForm({
     module: initial?.module ?? "",
     filiere: (initial?.filiere ?? "") as Filiere | "",
     niveau: (initial?.niveau ?? "") as Niveau | "",
-    // Titre et année universitaire : dérivés par le serveur (type — module,
-    // année déduite de la date) — pas de doublon à saisir.
+    // Titre et année universitaire : dérivés par le serveur (type - module,
+    // année déduite de la date) - pas de doublon à saisir.
     classe: initial?.classe ?? "",
     type: (initial?.type ?? "examen_theorique") as TypeExamen,
     composante: (initial?.composante ??

@@ -40,7 +40,7 @@ export function InviteLinkBanner({
       <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-dk" />
       <div className="min-w-0 flex-1 space-y-1.5">
         <p className="text-xs font-semibold text-foreground">
-          Compte créé pour {email} —{" "}
+          Compte créé pour {email} -{" "}
           {emailSent ? "invitation envoyée par e-mail." : "e-mail non envoyé, partagez ce lien :"}
         </p>
         {!emailSent ? (

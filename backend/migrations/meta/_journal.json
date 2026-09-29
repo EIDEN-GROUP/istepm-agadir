@@ -225,6 +225,20 @@
       "when": 1790380000000,
       "tag": "0031_filieres_carnet",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790390000000,
+      "tag": "0032_tiret_simple",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790400000000,
+      "tag": "0033_modules_filieres",
+      "breakpoints": true
     }
   ]
 }

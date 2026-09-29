@@ -49,7 +49,7 @@ const cloneStages = (stages: StageRef[]): StageRef[] =>
  *
  * Flux : on tape le nom du service + sa capacité vient de la structure ;
  * on ajoute un stage = nom + heures PAR niveau coché + UNE filière ; le
- * stage peut ensuite recevoir des sous-stages — ajouter un sous-stage
+ * stage peut ensuite recevoir des sous-stages - ajouter un sous-stage
  * DÉPLACE les niveaux+heures du stage vers lui (re-fusionnés s'il est
  * supprimé). D'autres sous-stages ont leur propre nom/niveaux/heures.
  * Les heures sont pré-remplies depuis le programme des carnets
@@ -128,7 +128,7 @@ export function StructureEditModal({
       arr.push(`${r.niveau || "toutes années"} : ${r.heures} h`);
       parFiliere.set(tag, arr);
     }
-    return [...parFiliere.entries()].map(([tag, v]) => `Carnet ${tag} — ${v.join(" · ")}`).join(" | ");
+    return [...parFiliere.entries()].map(([tag, v]) => `Carnet ${tag} - ${v.join(" · ")}`).join(" | ");
   }, [fService, programmeParService]);
 
   /** Pré-remplit heures + filière depuis le carnet quand le service change. */
@@ -288,7 +288,7 @@ export function StructureEditModal({
         });
         ajoutes++;
       }
-      toast.success(ajoutes ? `${ajoutes} stage(s) importé(s) — ${importFiliere}` : "Programme déjà présent");
+      toast.success(ajoutes ? `${ajoutes} stage(s) importé(s) - ${importFiliere}` : "Programme déjà présent");
       return next.slice().sort((a, b) => a.nom.localeCompare(b.nom));
     });
   };
@@ -353,7 +353,7 @@ export function StructureEditModal({
                 type="number"
                 min={0}
                 value={sel[n]}
-                aria-label={`${prefix} heures — ${n}`}
+                aria-label={`${prefix} heures - ${n}`}
                 onChange={(e) => set({ ...sel, [n]: Math.max(0, Number(e.target.value) || 0) })}
                 className="h-7 w-16 rounded-lg border-brand/20 text-center text-xs tabular-nums"
               />
@@ -369,7 +369,7 @@ export function StructureEditModal({
       open={!!structure}
       onOpenChange={(o) => !o && onClose()}
       wide
-      title={structure ? `Structure — ${structure.nom}` : "Structure"}
+      title={structure ? `Structure - ${structure.nom}` : "Structure"}
       subtitle="Stages du carnet : heures par niveau, une filière, sous-stages"
       submitLabel={saving || busy ? "Enregistrement…" : "Enregistrer"}
       onSubmit={() => void enregistrer()}
@@ -480,7 +480,7 @@ export function StructureEditModal({
                           <span className="text-muted-foreground">
                             {d.niveaux.length
                               ? d.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")
-                              : "—"}
+                              : "-"}
                           </span>
                           {readOnly ? null : (
                             <button

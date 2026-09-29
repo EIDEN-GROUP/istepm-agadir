@@ -1,5 +1,5 @@
 /**
- * Store de données ISTPM — source unique : le backend.
+ * Store de données ISTPM - source unique : le backend.
  *
  * Chaque collection est chargée depuis l'API au montage (`refresh()`), et
  * chaque écriture attend la réponse serveur avant d'être appliquée : aucun
@@ -639,7 +639,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Le provider vit au-dessus du routeur : il monte sur l'écran de login,
     // SANS jeton. On (re)charge donc à chaque connexion, jamais au montage
-    // aveugle — sinon le dashboard restait vide après login (401 initiaux,
+    // aveugle - sinon le dashboard restait vide après login (401 initiaux,
     // aucun nouvel essai). Déconnexion = état vidé (pas de fuite inter-comptes).
     if (!userId) {
       snapRef.current = emptySnapshot();
@@ -1607,7 +1607,7 @@ export function niveauxDuGroupe(nom: string, groupConfigs: GroupConfig[]): strin
  * Formateur « courant ».
  *
  * Enseignant : la fiche liée au compte (`formateurs.user_id`), sinon `null`
- * (le compte doit être lié — aucun choix d'identité côté client). Autres
+ * (le compte doit être lié - aucun choix d'identité côté client). Autres
  * rôles : première fiche du référentiel serveur (affichage uniquement).
  */
 export function useCurrentFormateur(): Formateur | null {

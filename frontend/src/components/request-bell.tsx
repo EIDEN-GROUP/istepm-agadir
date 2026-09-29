@@ -46,7 +46,7 @@ function fmtDateNotif(v: unknown): string {
 }
 
 /**
- * Cloche des demandes — petit bouton qui n'existe que s'il y a du nouveau,
+ * Cloche des demandes - petit bouton qui n'existe que s'il y a du nouveau,
  * et qui ouvre une **modale** (pas un simple menu).
  *
  * - Étudiant : réponses du staff. Cliquer sur une demande l'ouvre (détail) et la

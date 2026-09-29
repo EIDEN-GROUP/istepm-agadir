@@ -180,7 +180,7 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
 
 /**
  * Destinations ouvertes à tous les rôles connectés, hors menu de navigation
- * (on y accède autrement — ex. la pastille profil du rail).
+ * (on y accède autrement - ex. la pastille profil du rail).
  */
 const COMMON_ROUTES: readonly string[] = ["/dashboard/mon-profil"];
 

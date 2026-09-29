@@ -164,13 +164,13 @@ export async function invoiceRoutes(app: FastifyInstance) {
 
     page.drawText("Client", { x: 50, y, size: 14, font: fontBold, color: rgb(0, 0, 0) });
     y -= 22;
-    page.drawText(`Nom : ${cli?.parentName ?? "—"}`, { x: 50, y, size: 11, font, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText(`Nom : ${cli?.parentName ?? "-"}`, { x: 50, y, size: 11, font, color: rgb(0.2, 0.2, 0.2) });
     y -= 18;
-    page.drawText(`Email : ${cli?.email ?? "—"}`, { x: 50, y, size: 11, font, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText(`Email : ${cli?.email ?? "-"}`, { x: 50, y, size: 11, font, color: rgb(0.2, 0.2, 0.2) });
     y -= 18;
-    page.drawText(`Tél : ${cli?.phone ?? "—"}`, { x: 50, y, size: 11, font, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText(`Tél : ${cli?.phone ?? "-"}`, { x: 50, y, size: 11, font, color: rgb(0.2, 0.2, 0.2) });
     y -= 18;
-    page.drawText(`Adresse : ${cli?.address ?? "—"}`, { x: 50, y, size: 11, font, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText(`Adresse : ${cli?.address ?? "-"}`, { x: 50, y, size: 11, font, color: rgb(0.2, 0.2, 0.2) });
     y -= 30;
 
     const statusLabel: Record<string, string> = {

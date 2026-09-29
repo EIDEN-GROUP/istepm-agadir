@@ -312,7 +312,7 @@ function Carte({
 /**
  * Cachet officiel : téléversement d'une image apposée sur tous les PDF générés.
  * Réservé au directeur (la section n'est listée que pour ce rôle).
- * Source unique : le serveur (`settings.stamp_image`) — jamais de localStorage.
+ * Source unique : le serveur (`settings.stamp_image`) - jamais de localStorage.
  */
 function StampSection({ readOnly }: { readOnly?: boolean }) {
   const stamp = useStamp();
@@ -1179,7 +1179,7 @@ function NewRoleForm({
       <h4 className="mb-3 text-xs font-bold text-foreground">Nouveau rôle</h4>
       {nomsDisponibles.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          Tous les rôles configurables existent déjà — modifiez une fiche existante.
+          Tous les rôles configurables existent déjà - modifiez une fiche existante.
         </p>
       ) : (
       <>
@@ -1822,7 +1822,7 @@ function SettingsPage() {
 
   /**
    * Visibilité d'une rubrique : fiche fine si présente, sinon matrice
-   * historique (et pendant le chargement — jamais de verrouillage sur panne).
+   * historique (et pendant le chargement - jamais de verrouillage sur panne).
    * Directeur : toujours complet. `utilisateurs`/`roles`/`formateurs` gardent
    * leur gouvernance existante (`users.*`, `roles.*`, directeur seul).
    */

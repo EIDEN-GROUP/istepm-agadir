@@ -1,11 +1,11 @@
 /**
  * Cachet / tampon officiel de l'établissement.
  *
- * Source unique : la base (`settings.stamp_image`, via l'API) — aucun
+ * Source unique : la base (`settings.stamp_image`, via l'API) - aucun
  * localStorage. Le cachet est chargé depuis le serveur (`useStamp`, cache
  * React Query partagé) et persisté via (`saveStampImage` / `clearStampImage`),
  * donc identique sur tous les postes. Il est apposé sur tous les documents
- * PDF générés — bulletins, conventions, rapports de stage et reçus.
+ * PDF générés - bulletins, conventions, rapports de stage et reçus.
  *
  * Le cachet est redimensionné à l'upload (max 600 px) et conservé en PNG afin
  * de préserver la transparence pour l'aperçu et le bulletin HTML.

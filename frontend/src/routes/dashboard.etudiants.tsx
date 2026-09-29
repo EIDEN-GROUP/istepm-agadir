@@ -122,7 +122,7 @@ function EtudiantsPage() {
   // restreints au niveau choisi (comparé normalisé lui aussi).
   const groupeOptions = useMemo(() => {
     // Un formateur ne choisit que parmi SES groupes encadrés (filtrés par le
-    // niveau sélectionné) — pas tous les groupes de l'établissement.
+    // niveau sélectionné) - pas tous les groupes de l'établissement.
     if (enseignantScope) {
       return [...new Set(enseignantScope.groupes.map(normGroupe))]
         .filter(
@@ -584,7 +584,7 @@ function EtudiantsPage() {
                   {e.moyenne > 0 ? (
                     <span className="font-medium">{e.moyenne.toFixed(2)}</span>
                   ) : (
-                    <span className="text-muted-foreground">—</span>
+                    <span className="text-muted-foreground">-</span>
                   )}
                 </td>
               </>
@@ -593,7 +593,7 @@ function EtudiantsPage() {
                 {e.moyenne > 0 ? (
                   <span className="font-medium">{e.moyenne.toFixed(2)}</span>
                 ) : (
-                  <span className="text-muted-foreground">—</span>
+                  <span className="text-muted-foreground">-</span>
                 )}
               </td>
             )}
@@ -808,7 +808,7 @@ type FormState = {
   email: string;
   dateNaissance: string;
   ville: string;
-  /** Photo d'identité (data URL) — gérée par les affaires estudiantines. */
+  /** Photo d'identité (data URL) - gérée par les affaires estudiantines. */
   photoUrl: string;
   /** Nouvelle inscription : envoyer l'invitation mot de passe par e-mail. */
   invite: boolean;

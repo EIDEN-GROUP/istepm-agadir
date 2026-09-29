@@ -111,7 +111,7 @@ export function SeanceDocPreview({
               ) : state === "missing" || !url ? (
                 <p className="px-5 py-10 text-center text-sm text-muted-foreground">Aperçu indisponible.</p>
               ) : isPdf ? (
-                <iframe title={`Aperçu — ${docNom}`} src={url} className="h-full w-full" />
+                <iframe title={`Aperçu - ${docNom}`} src={url} className="h-full w-full" />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-5 py-10">
                   <FileText className="h-10 w-10 text-muted-foreground" />

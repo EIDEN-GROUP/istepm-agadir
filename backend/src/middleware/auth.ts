@@ -67,7 +67,7 @@ export async function authenticate(
                 .limit(1)
             )[0]?.archived;
       if (archived) {
-        return reply.status(401).send({ error: "Compte désactivé — contactez le secrétariat." });
+        return reply.status(401).send({ error: "Compte désactivé - contactez le secrétariat." });
       }
     }
     request.user = {

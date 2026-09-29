@@ -15,7 +15,7 @@ import { eq, and, gte, lte, inArray, desc, sql } from "drizzle-orm";
  * Fiche formateur du compte connecté. L'API confondait historiquement
  * `users.id` et `formateurs.id` (égalité UUID impossible) : tout l'espace
  * enseignant répondait vide. La liaison passe par `formateurs.user_id`,
- * posée à l'acceptation d'invitation (email) — voir services/invitations.ts.
+ * posée à l'acceptation d'invitation (email) - voir services/invitations.ts.
  */
 async function ficheConnectee(db: ReturnType<typeof getDb>, userId: string | undefined) {
   if (!userId) return null;

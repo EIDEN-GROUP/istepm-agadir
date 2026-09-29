@@ -1,4 +1,4 @@
--- 05_calendrier.sql — événements, vacances, fériés, exceptions, planifications (idempotent).
+-- 05_calendrier.sql - événements, vacances, fériés, exceptions, planifications (idempotent).
 
 -- Événements (EV_1..EV_10).
 INSERT INTO "events" ("id", "title", "description", "date", "start_time", "end_time", "all_day", "type", "color", "location", "status") VALUES

@@ -1,4 +1,4 @@
--- 01_referentiel.sql — filières, modules, niveaux, réglages (idempotent).
+-- 01_referentiel.sql - filières, modules, niveaux, réglages (idempotent).
 -- Prérequis : migrations appliquées.
 
 -- Filières (clé settings, créée si absente) : exactement les 4 aux carnets.
@@ -6,7 +6,8 @@ INSERT INTO "settings" ("key", "value")
 SELECT 'filieres', '["Aide-Soignant(e)", "Infirmier polyvalent", "Infirmier(e) Auxiliaire", "Sage-femme"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM "settings" WHERE "key" = 'filieres');
 
--- Modules (21, insérés uniquement si la table est vide).
+-- Modules (21, insérés uniquement si la table est vide). Filières : les 4
+-- du carnet (même attribution que les migrations 0031/0033).
 INSERT INTO "modules" ("nom", "filiere")
 SELECT m.nom, m.filiere FROM (VALUES
   ('Soins infirmiers en médecine', 'Infirmier polyvalent'),
@@ -14,22 +15,22 @@ SELECT m.nom, m.filiere FROM (VALUES
   ('Éthique et déontologie', 'Infirmier polyvalent'),
   ('Pharmacologie', 'Infirmier polyvalent'),
   ('Santé publique', 'Infirmier polyvalent'),
-  ('Réanimation et soins intensifs', 'Infirmier en anesthésie-réanimation'),
-  ('Anesthésie clinique', 'Infirmier en anesthésie-réanimation'),
+  ('Réanimation et soins intensifs', 'Infirmier(e) Auxiliaire'),
+  ('Anesthésie clinique', 'Infirmier(e) Auxiliaire'),
   ('Obstétrique', 'Sage-femme'),
   ('Suivi de grossesse', 'Sage-femme'),
   ('Néonatologie', 'Sage-femme'),
-  ('Rééducation fonctionnelle', 'Kinésithérapie'),
-  ('Électrothérapie', 'Kinésithérapie'),
-  ('Techniques de radiologie', 'Radiologie / Imagerie médicale'),
-  ('Scanner et IRM', 'Radiologie / Imagerie médicale'),
-  ('Radioprotection', 'Radiologie / Imagerie médicale'),
-  ('Hématologie', 'Laboratoire / Biologie médicale'),
-  ('Biochimie clinique', 'Laboratoire / Biologie médicale'),
-  ('Microbiologie', 'Laboratoire / Biologie médicale'),
-  ('Anatomie dentaire', 'Prothèse dentaire'),
-  ('Prothèse fixe (TP)', 'Prothèse dentaire'),
-  ('Occlusodontie', 'Prothèse dentaire')
+  ('Rééducation fonctionnelle', 'Aide-Soignant(e)'),
+  ('Électrothérapie', 'Aide-Soignant(e)'),
+  ('Techniques de radiologie', 'Sage-femme'),
+  ('Scanner et IRM', 'Sage-femme'),
+  ('Radioprotection', 'Sage-femme'),
+  ('Hématologie', 'Infirmier(e) Auxiliaire'),
+  ('Biochimie clinique', 'Infirmier(e) Auxiliaire'),
+  ('Microbiologie', 'Infirmier(e) Auxiliaire'),
+  ('Anatomie dentaire', 'Aide-Soignant(e)'),
+  ('Prothèse fixe (TP)', 'Aide-Soignant(e)'),
+  ('Occlusodontie', 'Aide-Soignant(e)')
 ) AS m(nom, filiere)
 WHERE NOT EXISTS (SELECT 1 FROM "modules");
 
@@ -43,15 +44,15 @@ INSERT INTO "levels" ("id", "name", "cycle", "monthly_fee", "max_students") VALU
   ('87bc5bbe-7580-47fb-8193-bb755c560241', 'S6', 'Licence', 3500, 40)
 ON CONFLICT ("name") DO NOTHING;
 
--- Structures d'accueil (capacités de démo — ajuster en Paramètres).
+-- Structures d'accueil (capacités de démo - ajuster en Paramètres).
 INSERT INTO "settings" ("key", "value")
 SELECT 'structures_accueil', '[
-  {"nom": "CHR Hassan II — Agadir", "capacite": 40},
-  {"nom": "Hôpital Hassan II — Agadir", "capacite": 30},
+  {"nom": "CHR Hassan II - Agadir", "capacite": 40},
+  {"nom": "Hôpital Hassan II - Agadir", "capacite": 30},
   {"nom": "Hôpital préfectoral Inezgane", "capacite": 20},
-  {"nom": "Clinique Al Massira — Agadir", "capacite": 15},
-  {"nom": "CHU Ibn Rochd — Casablanca", "capacite": 25},
-  {"nom": "Clinique Ennakhil — Agadir", "capacite": 10}
+  {"nom": "Clinique Al Massira - Agadir", "capacite": 15},
+  {"nom": "CHU Ibn Rochd - Casablanca", "capacite": 25},
+  {"nom": "Clinique Ennakhil - Agadir", "capacite": 10}
 ]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM "settings" WHERE "key" = 'structures_accueil');
 

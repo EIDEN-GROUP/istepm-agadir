@@ -890,7 +890,7 @@ export function revokeInvitation(userId: string) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Tickets de fonctionnalité — notifications du demandeur             */
+/*  Tickets de fonctionnalité - notifications du demandeur             */
 /* ------------------------------------------------------------------ */
 
 export interface TicketNotification {
@@ -1213,7 +1213,7 @@ export function fetchAuthMe() {
 
 export interface UpdateMyProfileInput {
   email?: string;
-  /** Nom affiché — accepté seulement pour directeur/responsable (403 sinon). */
+  /** Nom affiché - accepté seulement pour directeur/responsable (403 sinon). */
   name?: string;
   /** Requis seulement pour changer l'email ou le mot de passe. */
   currentPassword?: string;
@@ -1288,12 +1288,12 @@ export function fetchInscriptions(params?: { statut?: string; search?: string })
   return api.get<InscriptionRequest[]>("/inscriptions", params as Record<string, string | undefined>);
 }
 
-/** Réponse staff (motif exigé en cas de rejet) — notifie le candidat. */
+/** Réponse staff (motif exigé en cas de rejet) - notifie le candidat. */
 export function updateInscription(id: string, data: { statut: StatutInscription; reponse?: string }) {
   return api.patch<InscriptionRequest>(`/inscriptions/${id}`, data);
 }
 
-/** Rendez-vous staff (passe en « en cours ») — notifie le candidat. */
+/** Rendez-vous staff (passe en « en cours ») - notifie le candidat. */
 export function createRendezVous(id: string, data: { date: string; heure?: string; message?: string }) {
   return api.post<RendezVous>(`/inscriptions/${id}/rendez-vous`, data);
 }

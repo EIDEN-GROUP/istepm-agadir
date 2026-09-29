@@ -1,4 +1,4 @@
--- 06_crm_annexes.sql — rendez-vous, clients CRM, support, divers (idempotent).
+-- 06_crm_annexes.sql - rendez-vous, clients CRM, support, divers (idempotent).
 -- Prérequis : 02_comptes.sql.
 
 -- Rendez-vous / demandes de contact (3).

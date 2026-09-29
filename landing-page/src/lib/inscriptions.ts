@@ -16,17 +16,15 @@ const ORIGIN = (import.meta.env.VITE_INSCRIPTIONS_API || "").replace(/\/$/, "");
 const API = `${ORIGIN}/api/inscriptions`;
 
 /**
- * Liste de secours si l’API ne répond pas : copie de GET /filieres au 23/09/2026. Si le serveur la change,
- * une filière périmée est refusée (400) et l’erreur s’affiche ; mettre alors cette copie à jour.
+ * Liste de secours si l'API ne répond pas : les 4 filières aux carnets.
+ * Si le serveur la change, une filière périmée est refusée (400) et
+ * l'erreur s'affiche ; mettre alors cette copie à jour.
  */
 export const FALLBACK_FILIERES = [
+  "Aide-Soignant(e)",
   "Infirmier polyvalent",
-  "Infirmier en anesthésie-réanimation",
+  "Infirmier(e) Auxiliaire",
   "Sage-femme",
-  "Kinésithérapie",
-  "Radiologie / Imagerie médicale",
-  "Laboratoire / Biologie médicale",
-  "Prothèse dentaire",
 ];
 
 /**

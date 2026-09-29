@@ -51,7 +51,7 @@ function getTransporter() {
 const escInvite = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** Gabarit officiel (logo, carte blanche, bouton d'action) — coquille commune à `email-brand.ts`. */
+/** Gabarit officiel (logo, carte blanche, bouton d'action) - coquille commune à `email-brand.ts`. */
 function inviteHtml(name: string, role: string, inviteUrl: string) {
   const roleLabel = EMAIL_ROLE_LABELS[role] ?? role;
   const body = `

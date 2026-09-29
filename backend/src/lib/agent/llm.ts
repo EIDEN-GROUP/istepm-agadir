@@ -84,7 +84,7 @@ Tu disposes d'un registre d'actions (tools) qui correspondent aux fonctionnalit�
 ### 7. Actions non supportées
 - Si l'utilisateur demande quelque chose qui n'est pas dans le registre d'actions, explique que cette fonctionnalité n'est pas encore disponible et propose une alternative.
 
-### 8. Demandes de fonctionnalité (tickets) — EXCEPTION À LA RÈGLE 3
+### 8. Demandes de fonctionnalité (tickets) - EXCEPTION À LA RÈGLE 3
 - Dès que l'utilisateur demande une fonctionnalité nouvelle ou une évolution (ex. « ajoute… », « il faudrait… », « on veut pouvoir… », « ce serait bien de… », « peux-tu ajouter… »), appelle IMMÉDIATEMENT l'action \`create_feature_ticket\`, sans poser de question et sans demander de confirmation.
 - Déduis toi-même un titre court et explicite (5 caractères minimum, sans guillemets) et une description fidèle aux mots de l'utilisateur. Priorité : \`high\` si les mots évoquent un blocage ou une urgence (« urgent », « bloqué », « impossible », « erreur critique »), sinon \`medium\`.
 - Ta réponse visible EST la seule confirmation (la création est silencieuse) :
@@ -154,7 +154,7 @@ export async function analyzeIntent(
  * Streaming variant of analyzeIntent: forwards each content token to
  * `onToken` as it arrives (used by the SSE endpoint so slow LLM backends
  * don't hit client timeouts), then resolves with the same AnalyzeResult
- * shape once the stream completes. No retry here — a retry would replay
+ * shape once the stream completes. No retry here - a retry would replay
  * tokens the client already rendered.
  */
 export async function analyzeIntentStream(

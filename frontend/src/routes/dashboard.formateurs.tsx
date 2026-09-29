@@ -92,7 +92,7 @@ function FormateursPage() {
   );
 
   /** Groupes réels (séances + étudiants + fiches) : seule source proposée au
-   *  formulaire — le périmètre enseignant exige une correspondance EXACTE,
+   *  formulaire - le périmètre enseignant exige une correspondance EXACTE,
    *  la saisie libre produisait des groupes invisibles. */
   const groupesDisponibles = useMemo(
     () =>
@@ -335,18 +335,21 @@ function FormateursPage() {
         ]}
       />
 
-      <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-        <input
-          type="checkbox"
-          checked={showArchived}
-          onChange={() => setShowArchived((v) => !v)}
-          className="h-3.5 w-3.5 accent-[var(--brand)]"
-        />
-        Afficher les archivés
-        {archivedCount > 0 ? (
-          <span className="font-semibold text-foreground">({archivedCount})</span>
-        ) : null}
-      </label>
+      <div className="flex items-center gap-3 rounded-2xl border border-brand/12 bg-card px-4 py-3">
+        <span className="text-xs text-muted-foreground">
+          <strong className="font-semibold text-foreground">({archivedCount})</strong> formateur(s) archivé(s)
+        </span>
+        <span className="h-4 w-px bg-brand/12" />
+        <label className="flex items-center gap-2 text-xs font-medium text-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={() => setShowArchived((v) => !v)}
+            className="h-4 w-4 rounded border-muted-300 accent-brand"
+          />
+          Afficher les archivés
+        </label>
+      </div>
 
       {inviteInfo ? (
         <InviteLinkBanner

@@ -73,7 +73,7 @@ export async function buildApp() {
     // limites de login contournables/aveugles). eiden-nginx ÉCRASE
     // X-Real-IP avec $remote_addr (non falsifiable au niveau TCP), tandis
     // que X-Forwarded-For est concaténé ($proxy_add_x_forwarded_for) donc
-    // falsifiable à gauche — on ne l'utilise jamais ici.
+    // falsifiable à gauche - on ne l'utilise jamais ici.
     keyGenerator: (request) => {
       const real = request.headers["x-real-ip"];
       if (typeof real === "string" && real.trim()) return real.split(",")[0].trim();

@@ -199,7 +199,7 @@ function PlanningPage() {
   );
   /**
    * Position d'ouverture : aujourd'hui pendant l'année scolaire, la rentrée
-   * sinon — en juillet ou en août, s'ouvrir sur « aujourd'hui » ne montrerait
+   * sinon - en juillet ou en août, s'ouvrir sur « aujourd'hui » ne montrerait
    * qu'une période vide.
    */
   const positionDouverture = () => {
@@ -275,7 +275,7 @@ const [importOpen, setImportOpen] = useState(false);
   const joursSemaine = useMemo(() => {
     const lundi = lundiDeLaSemaine(curseur);
     // Semaine de 6 jours : pas de cours le dimanche. La semaine à cheval sur
-    // la fin de l'année scolaire est tronquée — le 1er juillet n'appartient
+    // la fin de l'année scolaire est tronquée - le 1er juillet n'appartient
     // pas au calendrier.
     return Array.from({ length: 6 }, (_, i) => {
       const d = new Date(lundi);
@@ -373,7 +373,7 @@ const [importOpen, setImportOpen] = useState(false);
   };
 
   // Séances en conflit parmi celles affichées, avec le détail de chaque
-  // chevauchement — le compteur du bandeau et la modale s'appuient dessus.
+  // chevauchement - le compteur du bandeau et la modale s'appuient dessus.
   const seancesEnConflit = useMemo(
     () =>
       filtrees
@@ -1012,9 +1012,9 @@ export function SeanceDetail({
     seance.statut === "valide"
       ? "Validée par la direction."
       : seance.statut === "rejete"
-        ? "Rejetée par la direction — voir le motif ci-dessous."
+        ? "Rejetée par la direction - voir le motif ci-dessous."
         : seance.statut === "termine"
-          ? "Terminée — en attente de validation par la direction."
+          ? "Terminée - en attente de validation par la direction."
           : seance.statut === "annule"
             ? "Séance annulée."
             : "Séance en cours de préparation.";
@@ -1160,7 +1160,7 @@ export function SeanceDetail({
             onTerminer={() => transition({ statut: "termine" }, `Séance marquée faite   ${seance.module}`)}
             onVu={() => transition({ statut: "planifie" }, "Rejet pris en compte")}
             onConfirmer={() => transition({ statut: "valide" }, `Séance validée   ${seance.module}`)}
-            onRejeter={(motif) => transition({ statut: "rejete", motifRejet: motif }, "Séance rejetée — l'enseignant est notifié")}
+            onRejeter={(motif) => transition({ statut: "rejete", motifRejet: motif }, "Séance rejetée - l'enseignant est notifié")}
           />
         </div>
       </DetailSection>

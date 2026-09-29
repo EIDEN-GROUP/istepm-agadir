@@ -274,7 +274,7 @@ export async function seanceRoutes(app: FastifyInstance) {
       return enrichSeance(updated);
     }
 
-    // ——— Direction ———
+    // --- Direction ---
     if (input.statut === "valide" || input.statut === "rejete") {
       if (existing.statut !== "termine") {
         return reply.status(422).send({ error: "Seule une séance terminée peut être validée ou rejetée" });

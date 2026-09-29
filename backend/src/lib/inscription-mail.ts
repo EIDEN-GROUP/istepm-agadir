@@ -7,7 +7,7 @@ import { escHtml } from "@/lib/notify";
  * candidat passent par `escHtml`. Design repris du site (bandeau encre
  * `#17353A`, accents sarcelle `#067C7A` et rouge `#E52329`, fond `#F0F5F5`)
  * en HTML compatible clients mail (tableaux, styles en ligne, aucune CSS
- * externe — les polices Tevlen/Poppins du site ne chargent pas dans les
+ * externe - les polices Tevlen/Poppins du site ne chargent pas dans les
  * mails, repli système). Le logo blanc est un PNG (Gmail n'affiche pas le
  * SVG) servi en URL absolue par la landing (`landing-page/public/`).
  */
@@ -60,13 +60,13 @@ export function buildConfirmationText(row: InscriptionMailRow): string {
     `Une coquille dans vos coordonnées ? Répondez simplement à cet e-mail pour la signaler.`,
     ``,
     `À préparer pour votre rendez-vous :`,
-    ...CONFIRMATION_DOCS.map((d) => `— ${d}`),
+    ...CONFIRMATION_DOCS.map((d) => `- ${d}`),
     ``,
     `Une question sur l'admission ? ${PHONE_LABEL}`,
     ``,
     `Cordialement,`,
     `L'équipe ISTEPM Agadir`,
-    `Institut Spécialisé des Techniques Paramédicales — Cité Salam, Agadir`,
+    `Institut Spécialisé des Techniques Paramédicales - Cité Salam, Agadir`,
   ];
   return lines.join("\n");
 }
@@ -162,7 +162,7 @@ export function buildConfirmationHtml(row: InscriptionMailRow): string {
     // Pied de page encre.
     `<tr><td align="center" class="px" style="background-color:#17353A;padding:18px 32px;">` +
     `<p style="margin:0;${FONT}font-size:12px;line-height:1.5;color:#B6E6E3;">` +
-    `Institut Spécialisé des Techniques Paramédicales — Cité Salam, Agadir</p>` +
+    `Institut Spécialisé des Techniques Paramédicales - Cité Salam, Agadir</p>` +
     `</td></tr>` +
     `</table></td></tr></table></body></html>`
   );
@@ -236,7 +236,7 @@ export function buildStaffNotificationHtml(row: InscriptionMailRow): string {
     // Pied de page.
     `<tr><td class="px" style="padding:22px 32px 24px;">` +
     `<p style="margin:0;padding-top:16px;border-top:1px solid #E8F0EF;${FONT}font-size:12px;line-height:1.5;color:#536A6E;">` +
-    `Institut Spécialisé des Techniques Paramédicales — Cité Salam, Agadir</p>` +
+    `Institut Spécialisé des Techniques Paramédicales - Cité Salam, Agadir</p>` +
     `</td></tr>` +
     `</table></td></tr></table></body></html>`
   );

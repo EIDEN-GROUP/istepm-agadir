@@ -202,7 +202,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
   const me = meQuery.data;
   // Source unique : la fiche servie par le backend (`GET /student/me`).
   // Sans fiche liée, les champs restent vides et l'état vide ci-dessous
-  // s'affiche — jamais de données d'un autre étudiant.
+  // s'affiche - jamais de données d'un autre étudiant.
   const profil = me?.etudiant as unknown as Record<string, string> | undefined;
   const prenom = String(profil?.prenom ?? "");
   const nom = String(profil?.nom ?? "");
@@ -1089,7 +1089,7 @@ const STATUT_FILTRES = [
 
 /**
  * Vue « Espace étudiant » côté staff (direction / responsable) : ni fiche ni
- * calendrier — le staff gère ça dans les pages dédiées. Ici, uniquement la
+ * calendrier - le staff gère ça dans les pages dédiées. Ici, uniquement la
  * file des demandes des étudiants, à approuver ou rejeter avec une réponse.
  */
 function StaffRequestsView({

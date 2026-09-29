@@ -4,7 +4,7 @@ import { users } from "./users";
 /**
  * Tickets de demande de fonctionnalité, créés via l'assistant IA.
  * Table lue aussi par le BMS (pull via /api/feature-tickets/feed) :
- * garder des clés plates et stables — le BMS construit ses colonnes
+ * garder des clés plates et stables - le BMS construit ses colonnes
  * dynamiquement depuis la première ligne.
  */
 export const featureTickets = pgTable("feature_tickets", {

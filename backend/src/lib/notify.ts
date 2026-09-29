@@ -5,7 +5,7 @@ import { getEnv } from "@/config/env";
 
 let _transporter: nodemailer.Transporter | null = null;
 
-/** Transport SMTP partagé (null si non configuré — envois ignorés). */
+/** Transport SMTP partagé (null si non configuré - envois ignorés). */
 function getTransporter() {
   if (!_transporter) {
     const env = getEnv();

@@ -117,7 +117,7 @@ export async function rolePermissions(role: string): Promise<{ permissions: stri
 
 /**
  * Garde d'écriture par permission (à chaîner après `authenticate`, à côté de
- * `requireRole`). 403 explicite quand la permission manque — y compris avec
+ * `requireRole`). 403 explicite quand la permission manque - y compris avec
  * repli (le repli reproduit exactement les droits historiques).
  */
 export function requirePerm(perm: string) {

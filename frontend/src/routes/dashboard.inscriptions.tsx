@@ -206,7 +206,7 @@ function InscriptionsPage() {
                       {d.rendezVous.heure ? ` à ${d.rendezVous.heure}` : ""}
                     </span>
                   ) : (
-                    "—"
+                    "-"
                   )}
                 </td>
                 <td className="whitespace-nowrap text-xs text-muted-foreground">

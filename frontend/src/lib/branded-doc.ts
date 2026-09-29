@@ -1,5 +1,5 @@
 /**
- * Documents de marque ISTEPM Agadir — PDF et e-mail.
+ * Documents de marque ISTEPM Agadir - PDF et e-mail.
  *
  * Un seul endroit produit les livrables « officiels » (convention / rapport de
  * stage) pour qu'ils partagent le logo `public/istpm-logo.svg` et la palette de
@@ -321,7 +321,7 @@ function buildContentStream(
   }
 
   // Cachet officiel de l'établissement, apposé en bas à droite au-dessus du
-  // pied de page — l'emplacement usuel d'une signature sur un document officiel.
+  // pied de page - l'emplacement usuel d'une signature sur un document officiel.
   if (hasStamp) {
     const BOX = 92;
     let dw = BOX;
