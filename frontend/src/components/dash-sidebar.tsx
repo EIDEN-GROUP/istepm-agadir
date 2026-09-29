@@ -744,7 +744,7 @@ export function DashSidebarShell({
       </div>
 
       <Toaster />
-      {shellUser?.role === "etudiant" || shellUser?.role === "comptable" ? null : (
+      {shellUser?.role === "etudiant" ? null : (
         <AiChatFloating />
       )}
       {/* Cloche des demandes sur desktop (coin haut-droit, seulement s'il y a du nouveau). */}

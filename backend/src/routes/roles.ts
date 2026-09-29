@@ -23,10 +23,10 @@ const updateRoleSchema = z.object({
  * (fini la saisie libre). Le rôle `directeur` n'est gérable que par un
  * directeur : les autres rôles gestionnaires ne le voient même pas.
  */
-const ROLE_NAMES = ["directeur", "responsable", "comptable", "enseignant", "etudiant"] as const;
+const ROLE_NAMES = ["directeur", "assistant_directeur", "responsable", "enseignant", "etudiant"] as const;
 
 /** Rôles autorisés à GÉRER les rôles (le directeur garde un accès complet). */
-const ROLE_MANAGERS = ["directeur", "responsable", "comptable", "enseignant"] as const;
+const ROLE_MANAGERS = ["directeur", "assistant_directeur", "responsable", "enseignant"] as const;
 
 function estDirecteur(request: { user: { role: string } }): boolean {
   return request.user.role === "directeur";

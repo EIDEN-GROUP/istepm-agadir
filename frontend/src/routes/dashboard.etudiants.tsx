@@ -16,15 +16,11 @@ import {
   normGroupe,
   STATUT_ETUDIANT_LABEL,
   STATUT_ETUDIANT_TONE,
-  STATUT_PAIEMENT_LABEL,
-  STATUT_PAIEMENT_TONE,
   fmtDate,
-  fmtMAD,
   type Etudiant,
   type Filiere,
   type Niveau,
   type StatutEtudiant,
-  type StatutPaiement,
   type GroupConfig,
 } from "@/lib/istpm-data";
 import { PersonAvatar } from "@/components/person-avatar";
@@ -59,7 +55,6 @@ import {
   FormDialog,
   ConfirmDialog,
   TextField,
-  NumberField,
   SelectField,
   FullWidth,
 } from "@/components/dash-form";
@@ -77,12 +72,6 @@ const STATUTS: StatutEtudiant[] = [
   "diplome",
   "abandon",
 ];
-const STATUTS_PAIEMENT: StatutPaiement[] = [
-  "paye",
-  "en_attente",
-  "retard",
-  "impaye",
-];
 
 function EtudiantsPage() {
   const { role } = useAuth();
@@ -91,7 +80,7 @@ function EtudiantsPage() {
   const filieresOptions = filieresApi.length ? filieresApi : [...FILIERES];
   // Teachers get a read-only view; student administration is the responsable's
   // and the directeur's job (sauf fiche rôle contraire : `useCan` tranche).
-  const canEdit = useCan("etudiants.write", role === "directeur" || role === "responsable");
+  const canEdit = useCan("etudiants.write", role === "directeur" || role === "assistant_directeur" || role === "responsable");
 
   // Teachers start from an explicit selection (filière + semestre + groupe)
   // rather than the full roster, so the view stays focused on one class.
@@ -538,7 +527,7 @@ function EtudiantsPage() {
                 <th className="text-right">Moyenne</th>
               </>
             ) : (
-              <th>Paiement</th>
+              <th className="text-right">Moyenne</th>
             )}
             <th className="w-28 text-center">Actions</th>
           </>
@@ -555,7 +544,7 @@ function EtudiantsPage() {
             <td
               className="border-l-[3px] font-medium tabular-nums"
               style={{
-                borderLeftColor: TONE_COLORS[STATUT_PAIEMENT_TONE[e.paiement]],
+                borderLeftColor: TONE_COLORS[STATUT_ETUDIANT_TONE[e.statut]],
               }}
             >
               {e.cne}
@@ -600,10 +589,12 @@ function EtudiantsPage() {
                 </td>
               </>
             ) : (
-              <td>
-                <span className={toneBadge(STATUT_PAIEMENT_TONE[e.paiement])}>
-                  {STATUT_PAIEMENT_LABEL[e.paiement]}
-                </span>
+              <td className="text-right tabular-nums">
+                {e.moyenne > 0 ? (
+                  <span className="font-medium">{e.moyenne.toFixed(2)}</span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
               </td>
             )}
             <td
@@ -813,12 +804,10 @@ type FormState = {
   annee: string;
   groupe: string;
   statut: StatutEtudiant;
-  paiement: StatutPaiement;
   telephone: string;
   email: string;
   dateNaissance: string;
   ville: string;
-  fraisMensuels: number | "";
   /** Photo d'identité (data URL) — gérée par les affaires estudiantines. */
   photoUrl: string;
   /** Nouvelle inscription : envoyer l'invitation mot de passe par e-mail. */
@@ -841,10 +830,10 @@ function EtudiantForm({
   existing: Etudiant[];
   /** Registre des groupes (Paramètres › Groupes) pour le dropdown. */
   groupConfigs: GroupConfig[];
-  onSubmit: (data: Omit<FormState, "fraisMensuels"> & {
+  onSubmit: (data: Omit<FormState, "invite"> & {
     filiere: Filiere;
     niveau: Niveau;
-    fraisMensuels: number;
+    invite: boolean;
   }) => void | Promise<void>;
   onCancel: () => void;
 }) {
@@ -869,12 +858,10 @@ function EtudiantForm({
     annee: initial?.annee ?? [...annees].sort().reverse()[0] ?? "2025/2026",
     groupe: initial?.groupe ?? "",
     statut: initial?.statut ?? "inscrit",
-    paiement: initial?.paiement ?? "en_attente",
     telephone: initial?.telephone ?? "",
     email: initial?.email ?? "",
     dateNaissance: initial?.dateNaissance ?? "",
     ville: initial?.ville ?? "",
-    fraisMensuels: initial?.fraisMensuels ?? 3400,
     photoUrl: initial?.photoUrl ?? "",
     invite: !initial,
   }));
@@ -973,8 +960,6 @@ function EtudiantForm({
       next.email = "Adresse e-mail invalide";
     if (f.invite && !initial && !f.email.trim())
       next.email = "E-mail requis pour envoyer l'invitation";
-    if (f.fraisMensuels === "" || Number(f.fraisMensuels) < 0)
-      next.fraisMensuels = "Montant invalide";
 
     if (Object.keys(next).length) {
       setErrors(next);
@@ -988,7 +973,6 @@ function EtudiantForm({
         ...f,
         filiere: f.filiere as Filiere,
         niveau: f.niveau as Niveau,
-        fraisMensuels: Number(f.fraisMensuels),
       });
     } finally {
       setBusy(false);
@@ -1121,15 +1105,6 @@ function EtudiantForm({
           label: STATUT_ETUDIANT_LABEL[s],
         }))}
       />
-      <SelectField
-        label="Statut de paiement"
-        value={f.paiement}
-        onChange={(v) => set("paiement", v)}
-        options={STATUTS_PAIEMENT.map((s) => ({
-          value: s,
-          label: STATUT_PAIEMENT_LABEL[s],
-        }))}
-      />
       <TextField
         label="Téléphone"
         value={f.telephone}
@@ -1195,15 +1170,6 @@ function EtudiantForm({
           onChange={(v) => set("annee", v)}
         />
       )}
-      <NumberField
-        label="Frais mensuels"
-        required
-        suffix="MAD"
-        min={0}
-        value={f.fraisMensuels}
-        onChange={(v) => set("fraisMensuels", v)}
-        error={errors.fraisMensuels}
-      />
     </FormDialog>
   );
 }
@@ -1226,8 +1192,6 @@ const RESULTAT_TONE = {
 };
 
 function EtudiantDetail({ e }: { e: Etudiant }) {
-  const moisPayes = e.paiementsMensuelsRecords.filter((r) => r.statut === "paye").length;
-  const moisTotal = e.paiementsMensuelsRecords.length || 10;
   // Relevés réels servis par le backend ; en attendant la réponse, vide.
   const [semestres, setSemestres] = useState<SemestreResume[]>([]);
   useEffect(() => {
@@ -1252,9 +1216,6 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
         <>
           <span className={toneBadge(STATUT_ETUDIANT_TONE[e.statut])}>
             {STATUT_ETUDIANT_LABEL[e.statut]}
-          </span>
-          <span className={toneBadge(STATUT_PAIEMENT_TONE[e.paiement])}>
-            {STATUT_PAIEMENT_LABEL[e.paiement]}
           </span>
           <span className={toneBadge(e.moyenne < 10 ? "red" : "teal")}>
             {e.moyenne > 0 ? `Moyenne ${e.moyenne.toFixed(2)}/20` : "Sans note"}
@@ -1378,73 +1339,6 @@ function EtudiantDetail({ e }: { e: Etudiant }) {
           <DetailEmpty>
             Aucun relevé antérieur enregistré pour cet étudiant.
           </DetailEmpty>
-        )}
-      </DetailSection>
-
-      <DetailSection title="Situation financière">
-        <DetailGrid single>
-          <DetailField label="Frais mensuels" value={fmtMAD(e.fraisMensuels)} />
-          <DetailField
-            label="Mois réglés"
-            value={`${moisPayes} / ${moisTotal}`}
-            tone={moisPayes < moisTotal ? "negative" : "positive"}
-          />
-        </DetailGrid>
-
-        <div
-          className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-brand/12"
-          role="img"
-          aria-label={`${moisPayes} mois payés sur ${moisTotal}`}
-        >
-          <div
-            className={cn(
-              "h-full rounded-full transition-all",
-              moisPayes < moisTotal ? "bg-warn" : "bg-brand",
-            )}
-            style={{
-              width: `${Math.min(100, Math.max(0, (moisPayes / moisTotal) * 100))}%`,
-            }}
-          />
-        </div>
-
-        {e.paiementsMensuelsRecords.length ? (
-          <DetailTable
-            head={
-              <>
-                <th className="px-3 py-2">Mois</th>
-                <th className="px-3 py-2 text-right">Montant</th>
-                <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2">Mode</th>
-                <th className="px-3 py-2">Statut</th>
-                <th className="px-3 py-2">Reçu</th>
-              </>
-            }
-          >
-            {e.paiementsMensuelsRecords.map((r) => (
-              <tr key={r.id}>
-                <td className="whitespace-nowrap px-3 py-2 font-medium capitalize">
-                  {r.mois}
-                </td>
-                <td className="px-3 py-2 text-right font-medium tabular-nums">
-                  {fmtMAD(r.montantPaye)} / {fmtMAD(r.montantDu)}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2">
-                  {r.datePaiement ? fmtDate(r.datePaiement) : ""}
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">{r.mode}</td>
-                <td className="px-3 py-2">
-                  <span className={toneBadge(STATUT_PAIEMENT_TONE[r.statut])}>
-                    {STATUT_PAIEMENT_LABEL[r.statut]}
-                  </span>
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted-foreground">
-                  {r.recu || ""}
-                </td>
-              </tr>
-            ))}
-          </DetailTable>
-        ) : (
-          <DetailEmpty>Aucun paiement enregistré.</DetailEmpty>
         )}
       </DetailSection>
     </DetailShell>

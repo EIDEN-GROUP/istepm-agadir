@@ -23,6 +23,7 @@ export function istpmLogoAttachment() {
 /** Libellés FR des rôles, pour l'affichage dans les e-mails (le rôle brut vient du backend). */
 export const EMAIL_ROLE_LABELS: Record<string, string> = {
   directeur: "Directeur",
+  assistant_directeur: "Assistant directeur",
   responsable: "Responsable",
   enseignant: "Formateur",
   etudiant: "Étudiant",

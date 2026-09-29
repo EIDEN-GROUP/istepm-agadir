@@ -12,8 +12,8 @@ const INSTITUT_LINKS = [
 const FORMATION_LINKS = [
   { href: "#f-infirmier-polyvalent", label: "Infirmier polyvalent" },
   { href: "#f-sage-femme", label: "Sage-femme" },
-  { href: "#f-infirmier-auxiliaire", label: "Infirmier auxiliaire" },
-  { href: "#f-aide-soignant", label: "Aide-soignant" },
+  { href: "#f-infirmier-auxiliaire", label: "Infirmier(e) Auxiliaire" },
+  { href: "#f-aide-soignant", label: "Aide-Soignant(e)" },
 ];
 
 export function SiteFooter() {
@@ -49,7 +49,7 @@ export function SiteFooter() {
             </span>
             <p>
               Institut Spécialisé des Techniques Paramédicales, Agadir. Formations d’infirmier polyvalent, de sage-femme,
-              d’infirmier auxiliaire et d’aide-soignant.
+              d’infirmier(e) auxiliaire et d’aide-soignant(e).
             </p>
           </div>
           <div>

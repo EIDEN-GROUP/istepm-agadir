@@ -14,7 +14,7 @@ const SIZES: Record<AvatarSize, string> = {
 
 /**
  * Photo d'identité partagée — rendu identique partout où une personne est
- * listée (étudiants, stages, bulletins, paiements, tableau de bord…).
+ * listée (étudiants, stages, bulletins, tableau de bord…).
  *
  * Si `photoUrl` est fourni, la photo est affichée ; sinon on retombe sur les
  * initiales en pastille teal. Une photo d'étudiant téléversée depuis son espace

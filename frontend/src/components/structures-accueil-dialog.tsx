@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Building2, Plus, Trash2, Save } from "lucide-react";
+import { Building2, PenLine, Plus, Trash2 } from "lucide-react";
 import { useIstpm } from "@/lib/istpm-store";
+import { normalizeStructure } from "@/lib/istpm-data";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { DetailShell } from "@/components/dash-page";
 import { Input } from "@/components/ui/input";
+import { StructureEditModal } from "@/components/structure-edit-modal";
 import {
   dialogSurface,
   primaryPill,
@@ -18,11 +20,6 @@ import {
   softInput,
 } from "@/lib/dash-ui";
 import { cn } from "@/lib/utils";
-
-type Row = {
-  nom: string;
-  capacite: number;
-};
 
 export function StructuresAccueilDialog({
   open,
@@ -33,27 +30,24 @@ export function StructuresAccueilDialog({
 }) {
   const {
     structuresAccueil,
+    servicesStage,
+    servicesHeures,
+    programmeStages,
     stages,
     addStructureAccueil,
     updateStructureAccueil,
     deleteStructureAccueil,
   } = useIstpm();
 
-  const normalize = (s: unknown) =>
-    typeof s === "string" ? { nom: s, capacite: 5 } : (s as Row);
-
-  const [rows, setRows] = useState<Row[]>(() =>
-    structuresAccueil.map(normalize),
+  const rows = useMemo(
+    () => structuresAccueil.map((s) => normalizeStructure(s)),
+    [structuresAccueil],
   );
+
   const [nouveauNom, setNouveauNom] = useState("");
-  const [nouvelleCapacite, setNouvelleCapacite] = useState(5);
+  const [editNom, setEditNom] = useState<string | null>(null);
 
-  // Le serveur fait foi : toute modification confirmée realigne les lignes.
-  // Les brouillons de capacité locaux survivent tant que le store ne bouge pas.
-  useEffect(() => {
-    setRows(structuresAccueil.map(normalize));
-  }, [structuresAccueil]);
-
+  // Occupation globale (sans filtre niveau : ce dialogue n'en choisit pas).
   const occupation = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of stages) {
@@ -63,49 +57,17 @@ export function StructuresAccueilDialog({
     return map;
   }, [stages]);
 
-  const setRow = (i: number, patch: Partial<Row>) =>
-    setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-
-  const aDesModifs = useMemo(() => {
-    const store = structuresAccueil.reduce(
-      (acc, s) => {
-        acc[s.nom] = s.capacite;
-        return acc;
-      },
-      {} as Record<string, number>,
-    );
-    return rows.some((r) => {
-      const stored = store[r.nom];
-      return stored !== undefined && stored !== r.capacite;
-    });
-  }, [rows, structuresAccueil]);
-
-  const saveCapacites = async () => {
-    const store = structuresAccueil.reduce(
-      (acc, s) => {
-        acc[s.nom] = s.capacite;
-        return acc;
-      },
-      {} as Record<string, number>,
-    );
-    try {
-      for (const r of rows) {
-        const stored = store[r.nom];
-        if (stored !== undefined && stored !== r.capacite) {
-          await updateStructureAccueil(r.nom, { capacite: r.capacite });
-        }
-      }
-      toast.success("Capacités enregistrées");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+  // Le serveur fait foi : la modale d'édition suit le store.
+  useEffect(() => {
+    if (editNom && !structuresAccueil.some((s) => s.nom === editNom)) {
+      setEditNom(null);
     }
-  };
+  }, [structuresAccueil, editNom]);
 
-  const removeRow = async (i: number) => {
-    const r = rows[i];
+  const removeRow = async (nom: string) => {
     try {
-      await deleteStructureAccueil(r.nom);
-      toast.success(`Supprimée · ${r.nom}`);
+      await deleteStructureAccueil(nom);
+      toast.success(`Supprimée · ${nom}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Suppression impossible");
     }
@@ -118,16 +80,18 @@ export function StructuresAccueilDialog({
       toast.error("Cette structure existe déjà");
       return;
     }
-    const cap = Math.max(1, nouvelleCapacite || 1);
     try {
-      await addStructureAccueil(nom, cap);
+      await addStructureAccueil(nom, 5);
       setNouveauNom("");
-      setNouvelleCapacite(5);
-      toast.success(`Ajoutée · ${nom}`);
+      toast.success(`Ajoutée · ${nom} — complétez ses sous-stages via Modifier`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Ajout impossible");
     }
   };
+
+  const editStructure = editNom
+    ? (structuresAccueil.find((s) => s.nom === editNom) ?? null)
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -139,7 +103,7 @@ export function StructuresAccueilDialog({
         <DetailShell
           icon={<Building2 className="h-5 w-5" />}
           title="Structures d'accueil"
-          subtitle="Ajouter, plafonner ou supprimer les lieux de stage"
+          subtitle="Ajouter, détailler (sous-stages) ou supprimer les lieux de stage"
           footer={
             <div className="flex justify-end">
               <button
@@ -153,41 +117,46 @@ export function StructuresAccueilDialog({
           }
         >
           <div className="space-y-2.5">
-            {rows.map((r, i) => {
+            {rows.map((r) => {
+              // Capacité de référence affichée : Σ tous niveaux (détail par
+              // niveau dans l'affectation et la page Paramètres).
+              const total = r.subStages.length
+                ? r.subStages.reduce((t, x) => t + x.capacite, 0)
+                : (r.capacite ?? 5);
               const used = occupation.get(r.nom) ?? 0;
-              const complet = used >= r.capacite;
+              const complet = used >= total;
               return (
                 <div
-                  key={i}
+                  key={r.nom}
                   className="flex flex-wrap items-center gap-2 rounded-2xl border border-brand/12 bg-card px-3 py-2.5"
                 >
-                  <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
-                    {r.nom}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">
+                      {r.nom}
+                    </span>
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {r.subStages.length
+                        ? `${r.subStages.length} sous-stage(s)`
+                        : "Capacité globale"}
+                    </span>
                   </span>
                   <span className={toneBadge(complet ? "red" : "teal")}>
-                    {used}/{r.capacite}
+                    {used}/{total}
                   </span>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <span>Cap.</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={r.capacite}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        if (v >= 1) setRow(i, { capacite: v });
-                      }}
-                      className="h-9 w-16 rounded-lg border-brand/20 text-center text-xs tabular-nums"
-                      aria-label={`Capacité de ${r.nom}`}
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    className={cn(ghostPill, "h-7 gap-1 px-2.5 text-[11px]")}
+                    onClick={() => setEditNom(r.nom)}
+                  >
+                    <PenLine className="h-3 w-3" /> Modifier
+                  </button>
                   <button
                     type="button"
                     className={cn(
                       ghostPill,
                       "h-9 w-9 justify-center p-0 text-alert",
                     )}
-                    onClick={() => removeRow(i)}
+                    onClick={() => void removeRow(r.nom)}
                     aria-label={`Supprimer ${r.nom}`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -202,18 +171,6 @@ export function StructuresAccueilDialog({
               </p>
             ) : null}
 
-            {aDesModifs ? (
-              <div className="flex justify-end border-t border-brand/12 pt-3">
-                <button
-                  type="button"
-                  className={cn(primaryPill, "h-9 gap-1.5 px-5 text-sm")}
-                  onClick={saveCapacites}
-                >
-                  <Save className="h-4 w-4" /> Enregistrer les capacités
-                </button>
-              </div>
-            ) : null}
-
             <div className="flex items-center gap-2 border-t border-brand/12 pt-3">
               <Input
                 placeholder="Ajouter une structure…"
@@ -222,28 +179,15 @@ export function StructuresAccueilDialog({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    addRow();
+                    void addRow();
                   }
                 }}
                 className={cn(softInput, "h-9 flex-1 text-sm")}
               />
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span>Cap.</span>
-                <Input
-                  type="number"
-                  min={1}
-                  value={nouvelleCapacite}
-                  onChange={(e) =>
-                    setNouvelleCapacite(Number(e.target.value))
-                  }
-                  className="h-9 w-16 rounded-lg border-brand/20 text-center text-xs tabular-nums"
-                  aria-label="Capacité de la nouvelle structure"
-                />
-              </div>
               <button
                 type="button"
                 className={cn(primaryPill, "h-9 px-4 text-sm")}
-                onClick={addRow}
+                onClick={() => void addRow()}
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -251,6 +195,20 @@ export function StructuresAccueilDialog({
           </div>
         </DetailShell>
       </DialogContent>
+
+      {editStructure ? (
+        <StructureEditModal
+          structure={editStructure}
+          services={servicesStage}
+          servicesHeures={servicesHeures}
+          programme={programmeStages}
+          onClose={() => setEditNom(null)}
+          onSave={async (nomInitial, body) => {
+            await updateStructureAccueil(nomInitial, body);
+            toast.success("Structure enregistrée");
+          }}
+        />
+      ) : null}
     </Dialog>
   );
 }

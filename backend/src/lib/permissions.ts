@@ -29,14 +29,13 @@ export const SETTINGS_SECTIONS = [
   "structures",
 ] as const;
 
-/** Catalogue des permissions (10 rubriques gérées dans Paramètres › Rôles). */
+/** Catalogue des permissions (9 rubriques gérées dans Paramètres › Rôles). */
 export const PERMISSIONS_LIST = [
   "etudiants.read", "etudiants.write", "etudiants.delete",
   "formateurs.read", "formateurs.write", "formateurs.delete",
   "examens.read", "examens.write", "examens.delete",
   "bulletins.read", "bulletins.write", "bulletins.delete",
   "stages.read", "stages.write", "stages.delete",
-  "paiements.read", "paiements.write", "paiements.delete",
   "settings.read", "settings.write",
   "users.read", "users.write", "users.delete",
   "roles.read", "roles.manage",
@@ -50,7 +49,7 @@ export const PERMISSIONS_LIST = [
 /**
  * Catalogue → périmètre fonctionnel.
  *
- * Les fiches rôles (`roles.permissions`) gouvernent les 10 rubriques du
+ * Les fiches rôles (`roles.permissions`) gouvernent les 9 rubriques du
  * catalogue (Étudiants…Dashboard) en lecture comme en écriture, côté UI
  * (nav, gardes, boutons) comme côté API (`requirePerm` sur les écritures).
  * Correspondances particulières :
@@ -60,13 +59,13 @@ export const PERMISSIONS_LIST = [
  */
 export const ROLE_FALLBACKS: Record<string, string[]> = {
   directeur: [...PERMISSIONS_LIST],
+  assistant_directeur: [...PERMISSIONS_LIST],
   responsable: [
     "etudiants.read", "etudiants.write", "etudiants.delete",
     "formateurs.read", "formateurs.write", "formateurs.delete",
     "examens.read", "examens.write", "examens.delete",
     "bulletins.read", "bulletins.write", "bulletins.delete",
     "stages.read", "stages.write", "stages.delete",
-    "paiements.read", "paiements.write", "paiements.delete",
     "settings.read", "settings.write",
     // Rubriques vues aujourd'hui (organisation pédagogique), en édition.
     "settings.annees.read", "settings.annees.write",
@@ -84,15 +83,6 @@ export const ROLE_FALLBACKS: Record<string, string[]> = {
     "etudiants.read",
     "examens.read", "examens.write", "examens.delete",
     "bulletins.read",
-    "roles.read", "roles.manage",
-    "dashboard.read",
-  ],
-  comptable: [
-    "paiements.read", "paiements.write",
-    "etudiants.read",
-    // users.write : uniquement les invitations de comptes comptables (borné
-    // côté endpoint, pas seulement masqué dans l'UI).
-    "users.write",
     "roles.read", "roles.manage",
     "dashboard.read",
   ],

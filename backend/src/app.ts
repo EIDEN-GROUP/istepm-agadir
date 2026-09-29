@@ -19,7 +19,6 @@ import { adminRoutes } from "@/routes/admin";
 import { supportRoutes } from "@/routes/support";
 import { whatsappRoutes } from "@/routes/whatsapp";
 import { emailRoutes } from "@/routes/email";
-import { receiptRoutes } from "@/routes/receipt";
 
 import { etudiantRoutes } from "@/routes/etudiants";
 import { etudiantImportRoutes } from "@/routes/etudiants-import";
@@ -27,7 +26,6 @@ import { formateurRoutes } from "@/routes/formateurs";
 import { examenRoutes } from "@/routes/examens";
 import { bulletinRoutes } from "@/routes/bulletins";
 import { stageRoutes } from "@/routes/stages";
-import { paiementIstpmRoutes } from "@/routes/paiements-istpm";
 import { roleRoutes } from "@/routes/roles";
 import { eventRoutes } from "@/routes/events";
 import { notificationRoutes } from "@/routes/notifications";
@@ -125,7 +123,6 @@ export async function buildApp() {
   await app.register(supportRoutes, { prefix: "/api/support" });
   await app.register(whatsappRoutes, { prefix: "/api/whatsapp" });
   await app.register(emailRoutes, { prefix: "/api/email" });
-  await app.register(receiptRoutes, { prefix: "/api/receipts" });
 
   await app.register(etudiantRoutes, { prefix: "/api/etudiants" });
   await app.register(etudiantImportRoutes, { prefix: "/api/etudiants" });
@@ -133,7 +130,6 @@ export async function buildApp() {
   await app.register(examenRoutes, { prefix: "/api/examens" });
   await app.register(bulletinRoutes, { prefix: "/api/bulletins" });
   await app.register(stageRoutes, { prefix: "/api/stages" });
-  await app.register(paiementIstpmRoutes, { prefix: "/api/paiements-istpm" });
   await app.register(roleRoutes, { prefix: "/api/roles" });
   await app.register(eventRoutes, { prefix: "/api/events" });
   await app.register(notificationRoutes, { prefix: "/api/notifications" });

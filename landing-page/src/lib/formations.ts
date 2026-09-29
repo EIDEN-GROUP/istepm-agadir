@@ -41,7 +41,7 @@ export const FORMATIONS: Formation[] = [
   },
   {
     id: "f-infirmier-auxiliaire",
-    name: "Infirmier auxiliaire",
+    name: "Infirmier(e) Auxiliaire",
     desc: "Participer aux soins courants au sein d’une équipe soignante, sous la responsabilité de l’infirmier.",
     photo: infirmierAuxiliaire,
     focus: "50% 35%",
@@ -50,7 +50,7 @@ export const FORMATIONS: Formation[] = [
   },
   {
     id: "f-aide-soignant",
-    name: "Aide-soignant",
+    name: "Aide-Soignant(e)",
     desc: "Assurer le confort, l’hygiène et l’accompagnement quotidien des patients, en collaboration avec l’équipe soignante.",
     photo: aideSoignant,
     focus: "42% 40%",

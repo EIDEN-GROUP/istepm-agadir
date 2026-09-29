@@ -65,7 +65,7 @@ export function RequestBell() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const isStudent = role === "etudiant";
-  const isStaff = role === "directeur" || role === "responsable";
+  const isStaff = role === "directeur" || role === "assistant_directeur" || role === "responsable";
 
   const studentQ = useQuery({
     queryKey: ["student-notifications"],

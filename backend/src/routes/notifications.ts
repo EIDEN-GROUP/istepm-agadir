@@ -7,13 +7,13 @@ import { eq, and, desc, or, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
 /**
- * Périmètre de visibilité : les directeurs supervisent tout (légitime),
- * les autres rôles ne voient que leurs notifications + la diffusion
- * (userId NULL). Sans ceci, tout compte authentifié lisait/modifiait les
- * notifications de tout le monde (IDOR/BOLA).
+ * Périmètre de visibilité : la direction (directeur + assistant) supervise
+ * tout (légitime), les autres rôles ne voient que leurs notifications +
+ * la diffusion (userId NULL). Sans ceci, tout compte authentifié
+ * lisait/modifiait les notifications de tout le monde (IDOR/BOLA).
  */
 export function scopeCondition(userId: string, role?: string) {
-  if (role === "directeur") return undefined;
+  if (role === "directeur" || role === "assistant_directeur") return undefined;
   return or(eq(notifications.userId, userId), isNull(notifications.userId));
 }
 
@@ -70,7 +70,7 @@ export async function notificationRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur")] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur")] }, async (request) => {
     const schema = z.object({
       userId: z.string().optional(),
       type: z.string().optional().default("info"),
@@ -84,7 +84,7 @@ export async function notificationRoutes(app: FastifyInstance) {
     return notification;
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur")] }, async (request, reply) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(notifications).where(eq(notifications.id, id));

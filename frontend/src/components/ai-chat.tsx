@@ -36,7 +36,6 @@ function formatActionResult(actionName: string, data: unknown): string {
     etudiants: "Étudiants",
     examens: "Examens",
     seances: "Séances",
-    paiements: "Paiements",
     bulletins: "Bulletins",
     stages: "Stages",
     evenements: "Événements",
@@ -235,7 +234,7 @@ const LEGACY_CHAT_KEY = "istpm-ai-chat";
 const MAX_SENT_MESSAGES = 60;
 
 const GREETING =
-  "Bonjour ! Je suis votre assistant IA. Je peux vous aider à gérer les étudiants, formateurs, examens, bulletins, stages, paiements et plus encore. Que souhaitez-vous faire ?";
+  "Bonjour ! Je suis votre assistant IA. Je peux vous aider à gérer les étudiants, formateurs, examens, bulletins, stages et plus encore. Que souhaitez-vous faire ?";
 
 function titleFor(messages: ChatMessage[]): string {
   const first = messages.find((m) => m.role === "user");

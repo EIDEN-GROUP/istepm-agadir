@@ -1,6 +1,6 @@
 /**
  * Sections de l'espace étudiant, chacune sur son propre chemin :
- *   /dashboard/espace-etudiant/scolarite | stage | calendrier | paiements | demandes
+ *   /dashboard/espace-etudiant/scolarite | stage | calendrier | demandes
  *
  * La vue est partagée avec la route de base ; seul le segment `section` change.
  * Un segment inconnu est renvoyé vers « scolarite ».

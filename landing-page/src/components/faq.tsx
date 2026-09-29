@@ -22,7 +22,7 @@ const QUESTIONS: { topic: string; q: string; a: ReactNode; validate?: string }[]
   {
     topic: "Formations",
     q: "Combien de temps durent les formations ?",
-    a: "Aide-soignant : 1 an · Infirmier auxiliaire : 2 ans · Infirmier polyvalent : 3 ans · Sage-femme : 3 ans.",
+    a: "Aide-Soignant(e) : 1 an · Infirmier(e) Auxiliaire : 2 ans · Infirmier polyvalent : 3 ans · Sage-femme : 3 ans.",
     validate: "Durées à confirmer (notamment Sage-femme)",
   },
   {

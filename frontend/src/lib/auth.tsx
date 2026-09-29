@@ -7,9 +7,9 @@ import {
   type ReactNode,
 } from "react";
 
-export type UserRole = "directeur" | "enseignant" | "responsable" | "etudiant" | "comptable";
+export type UserRole = "directeur" | "assistant_directeur" | "enseignant" | "responsable" | "etudiant";
 
-export const ROLES: UserRole[] = ["directeur", "enseignant", "responsable", "etudiant", "comptable"];
+export const ROLES: UserRole[] = ["directeur", "assistant_directeur", "enseignant", "responsable", "etudiant"];
 
 export const ROLE_META: Record<
   UserRole,
@@ -18,7 +18,12 @@ export const ROLE_META: Record<
   directeur: {
     label: "Directeur",
     short: "Directeur",
-    description: "Accès complet · pilotage académique et financier",
+    description: "Accès complet · pilotage académique et administratif",
+  },
+  assistant_directeur: {
+    label: "Assistant directeur",
+    short: "Assistant directeur",
+    description: "Mêmes droits que le directeur, sauf la gestion du directeur",
   },
   enseignant: {
     label: "Enseignant (formateur)",
@@ -28,17 +33,12 @@ export const ROLE_META: Record<
   responsable: {
     label: "Responsable des affaires estudiantines",
     short: "Resp. affaires estudiantines",
-    description: "Inscriptions, recouvrement, conventions de stage",
+    description: "Inscriptions, stages et conventions",
   },
   etudiant: {
     label: "Étudiant",
     short: "Étudiant",
     description: "Mon profil, mes cours, mes stages et mes demandes",
-  },
-  comptable: {
-    label: "Comptable",
-    short: "Comptable",
-    description: "Paiements, reçus, recouvrement et finance",
   },
 };
 
@@ -72,7 +72,7 @@ export function getStoredRole(): UserRole | null {
 
 /**
  * Portail de retour après déconnexion : le personnel (directeur,
- * responsable, enseignant) retrouve l'adresse discrète `/istepm`,
+ * assistant, responsable, enseignant) retrouve l'adresse discrète `/istepm`,
  * les étudiants leur portail `/login`. Rôle inconnu → `/login`.
  */
 export function logoutTarget(role: UserRole | null | undefined): string {
@@ -114,10 +114,10 @@ const Ctx = createContext<AuthCtx>({
 
 const ROLE_LABEL: Record<UserRole, string> = {
   directeur: "Directeur",
+  assistant_directeur: "Assistant directeur",
   enseignant: "Enseignant",
   responsable: "Responsable",
   etudiant: "Étudiant",
-  comptable: "Comptable",
 };
 
 function userFor(role: UserRole): AuthUser {
@@ -295,6 +295,8 @@ function mapBackendRole(backendRole: string): UserRole {
     case "superadmin":
     case "directeur":
       return "directeur";
+    case "assistant_directeur":
+      return "assistant_directeur";
     case "enseignant":
       return "enseignant";
     case "responsable":
@@ -302,7 +304,8 @@ function mapBackendRole(backendRole: string): UserRole {
     case "etudiant":
       return "etudiant";
     case "comptable":
-      return "comptable";
+      // Rôle supprimé (migration 0028) : jetons périmés rattachés à l'assistant.
+      return "assistant_directeur";
     default:
       return "directeur";
   }

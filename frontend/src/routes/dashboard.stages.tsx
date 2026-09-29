@@ -476,7 +476,7 @@ function StagesPage() {
   const { role } = useAuth();
   const { stages, etudiants, structuresAccueil, servicesStage, addStage, updateStage, deleteStage, addStructureAccueil, addServiceStage, photoDe, institut } = useIstpm();
   // Conventions are handled by student administration (fiche rôle tranche).
-  const canManage = useCan("stages.write", role === "directeur" || role === "responsable");
+  const canManage = useCan("stages.write", role === "directeur" || role === "assistant_directeur" || role === "responsable");
 
   const [search, setSearch] = useState("");
   const [filiere, setFiliere] = useState<string>(ALL);

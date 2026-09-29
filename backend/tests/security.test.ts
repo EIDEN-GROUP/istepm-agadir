@@ -1,53 +1,23 @@
 /**
  * Régressions de sécurité — vérifient les correctifs sans base de données.
  * Exécuter : `npm test` (backend).
+ *
+ * NOTE : le bloc `isPrivateHost` (garde SSRF des gabarits PDF de reçus) a été
+ * retiré avec le module reçus/paiements (WS4) : plus de surface concernée
+ * (les uploads examens/séances sont en base64 POST, jamais via URL).
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { isPrivateHost } from "@/routes/receipt";
 import { scopeCondition } from "@/routes/notifications";
 import { agentErrorMessage } from "@/routes/agent";
 
 process.env.NODE_ENV ??= "test";
 
-describe("isPrivateHost (garde SSRF gabarits PDF)", () => {
-  const blocked = [
-    "localhost",
-    "127.0.0.1",
-    "127.1.2.3",
-    "10.0.0.5",
-    "172.16.0.1",
-    "172.31.255.255",
-    "192.168.1.1",
-    "169.254.169.254", // métadonnées cloud
-    "0.0.0.0",
-    "::1",
-    "[::1]",
-    "fc00::1",
-    "fd00::5",
-    "fe80::1",
-    "::ffff:127.0.0.1",
-  ];
-  for (const h of blocked) {
-    it(`bloque ${h}`, () => expect(isPrivateHost(h)).toBe(true));
-  }
-  const allowed = [
-    "example.com",
-    "eiden-group.com",
-    "8.8.8.8",
-    "1.1.1.1",
-    "172.32.0.1", // hors 172.16/12
-    "192.167.1.1", // hors 192.168/16
-    "2001:db8::1", // documentation publique
-    "999.999.999.999", // invalide : pas un littéral IP, traité comme nom d'hôte
-  ];
-  for (const h of allowed) {
-    it(`autorise ${h}`, () => expect(isPrivateHost(h)).toBe(false));
-  }
-});
-
 describe("scopeCondition (notifications : pas de lecture inter-comptes)", () => {
   it("directeur : supervision globale (pas de filtre)", () => {
     expect(scopeCondition("u1", "directeur")).toBeUndefined();
+  });
+  it("assistant_directeur : même supervision que le directeur", () => {
+    expect(scopeCondition("u1", "assistant_directeur")).toBeUndefined();
   });
   for (const role of ["responsable", "enseignant", "etudiant", undefined]) {
     it(`filtre appliqué pour rôle=${String(role)}`, () => {

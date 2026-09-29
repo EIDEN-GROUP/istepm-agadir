@@ -26,7 +26,7 @@ const createUserSchema = z.object({
   password: z.string().min(8, "Mot de passe trop court (8 caractères min)"),
   name: z.string().min(1, "Nom requis"),
   role: z
-    .enum(["directeur", "enseignant", "responsable", "etudiant", "comptable"])
+    .enum(["directeur", "assistant_directeur", "enseignant", "responsable", "etudiant"])
     .optional()
     .default("directeur"),
   filiere: z.string().optional(),
@@ -44,8 +44,8 @@ const updateUserSchema = z.object({
 /**
  * Modification self-service du compte courant. Le rôle est volontairement
  * absent : seul un directeur le change. Le nom est modifiable par la
- * direction elle-même (directeur/responsable) ; les autres profils le font
- * changer via une demande au secrétariat.
+ * direction elle-même (directeur/assistant/responsable) ; les autres
+ * profils le font changer via une demande au secrétariat.
  * Changer l'email ou le mot de passe exige `currentPassword` ; changer le
  * seul nom ou la seule photo ne le demande pas (ni credential d'accès).
  */
@@ -82,7 +82,7 @@ const updateSelfSchema = z
     { message: "Aucune modification fournie" },
   );
 
-const ROLES_ENUM = ["directeur", "enseignant", "responsable", "etudiant"] as const;
+const ROLES_ENUM = ["directeur", "assistant_directeur", "enseignant", "responsable", "etudiant"] as const;
 const assignRoleSchema = z.object({
   role: z.enum(ROLES_ENUM),
 });
@@ -108,7 +108,7 @@ export async function authRoutes(app: FastifyInstance) {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role as "directeur" | "enseignant" | "responsable" | "etudiant" | "comptable",
+      role: user.role as "directeur" | "assistant_directeur" | "enseignant" | "responsable" | "etudiant",
     });
     return { token, user };
   });
@@ -143,7 +143,7 @@ export async function authRoutes(app: FastifyInstance) {
       // Le nom n'est modifiable en self-service que par la direction.
       const nextName = input.name?.trim();
       const nameChanged = !!nextName && nextName !== me.name;
-      if (nameChanged && me.role !== "directeur" && me.role !== "responsable") {
+      if (nameChanged && me.role !== "directeur" && me.role !== "assistant_directeur" && me.role !== "responsable") {
         return reply.status(403).send({
           error: "Votre nom est géré par la direction.",
         });
@@ -203,10 +203,10 @@ export async function authRoutes(app: FastifyInstance) {
         name: updated.name,
         role: updated.role as
           | "directeur"
+          | "assistant_directeur"
           | "enseignant"
           | "responsable"
-          | "etudiant"
-          | "comptable",
+          | "etudiant",
       });
       return { token, user: updated };
     },
@@ -214,28 +214,40 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post(
     "/register",
-    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("users.write")] },
     async (request, reply) => {
       const input = createUserSchema.parse(request.body);
       const existing = await findByEmail(input.email);
       if (existing) {
         return reply.status(409).send({ error: "Cet email est déjà utilisé" });
       }
+      // L'assistant ne touche jamais aux comptes directeur (ni création).
+      if (request.user.role !== "directeur" && input.role === "directeur") {
+        return reply.status(403).send({ error: "Accès réservé au directeur" });
+      }
       const user = await createUser(input);
       return user;
     },
   );
 
-  app.get("/users", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.read")] }, async () => {
+  app.get("/users", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("users.read")] }, async () => {
     return listAllUsers();
   });
 
   app.put(
     "/users/:id",
-    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("users.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const input = updateUserSchema.parse(request.body);
+      const target = await findById(id);
+      if (!target) {
+        return reply.status(404).send({ error: "Utilisateur introuvable" });
+      }
+      // L'assistant ne touche jamais aux comptes directeur.
+      if (request.user.role !== "directeur" && target.role === "directeur") {
+        return reply.status(403).send({ error: "Accès réservé au directeur" });
+      }
       const user = await updateUser(id, input);
       if (!user) {
         return reply.status(404).send({ error: "Utilisateur introuvable" });
@@ -246,9 +258,17 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.delete(
     "/users/:id",
-    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.delete")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("users.delete")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      const target = await findById(id);
+      if (!target) {
+        return reply.status(404).send({ error: "Utilisateur introuvable" });
+      }
+      // L'assistant ne touche jamais aux comptes directeur.
+      if (request.user.role !== "directeur" && target.role === "directeur") {
+        return reply.status(403).send({ error: "Accès réservé au directeur" });
+      }
       await deleteUser(id);
       return { success: true };
     },
@@ -256,11 +276,25 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.put(
     "/users/:id/role",
-    { preHandler: [authenticate, requireRole("directeur"), requirePerm("users.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur"), requirePerm("users.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const { role } = assignRoleSchema.parse(request.body);
+      // Ni promotion vers directeur, ni modification d'un directeur,
+      // sauf par un directeur lui-même.
+      if (request.user.role !== "directeur" && role === "directeur") {
+        return reply.status(403).send({ error: "Accès réservé au directeur" });
+      }
       const db = getDb();
+      const [target] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
+      if (!target) return reply.status(404).send({ error: "Utilisateur introuvable" });
+      if (request.user.role !== "directeur" && target.role === "directeur") {
+        return reply.status(403).send({ error: "Accès réservé au directeur" });
+      }
       const [updated] = await db
         .update(users)
         .set({ role, updatedAt: new Date() })

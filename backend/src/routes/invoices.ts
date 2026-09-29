@@ -95,7 +95,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
     return results;
   });
 
-  app.post("/generate", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/generate", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request) => {
     const { period } = generateSchema.parse(request.body);
     const db = getDb();
 

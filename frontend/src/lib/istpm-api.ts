@@ -8,10 +8,9 @@ import type {
   Examen,
   Bulletin,
   Stage,
-  PaiementLigne,
-  LignePaiement,
   Seance,
   Filiere,
+  SubStage,
 } from "@/lib/istpm-data";
 
 /* ------------------------------------------------------------------ */
@@ -314,71 +313,6 @@ export function validerStageApi(id: string) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Paiements mensuels                                                 */
-/* ------------------------------------------------------------------ */
-
-export type PaiementMensuelApi = {
-  id: string;
-  etudiantId: string;
-  mois: string;
-  montantDu: string;
-  montantPaye: string;
-  datePaiement: string | null;
-  mode: string;
-  recu: string;
-  statut: string;
-  notes: string;
-  etudiantPrenom: string;
-  etudiantNom: string;
-  etudiantCne: string;
-  etudiantFiliere: string;
-  etudiantNiveau: string;
-  etudiantFraisAnnuels: string;
-};
-
-export function fetchPaiementsMensuels(params?: { etudiantId?: string }) {
-  return api.get<PaiementMensuelApi[]>("/paiements-istpm", params);
-}
-
-export function createPaiementsMensuels(data: {
-  etudiantId: string;
-  mois: string[];
-  montant: number;
-  mode: string;
-  date?: string;
-  recu?: string;
-  notes?: string;
-}) {
-  return api.post<{ ok: boolean; recu: string; result: Array<{ mois: string; statut: string }>; reste: number }>(
-    "/paiements-istpm",
-    data,
-  );
-}
-
-export function updatePaiementMensuel(id: string, data: {
-  montantPaye?: number;
-  datePaiement?: string;
-  mode?: string;
-  recu?: string;
-  statut?: string;
-  notes?: string;
-}) {
-  return api.put<{ ok: boolean }>(`/paiements-istpm/${id}`, data);
-}
-
-export function fetchPaiementStats() {
-  return api.get<{
-    total: number;
-    count: number;
-    encaisseCeMois: number;
-    enAttente: number;
-    impaye: number;
-    retard: number;
-    tauxRecouvrement: number;
-  }>("/paiements-istpm/stats");
-}
-
-/* ------------------------------------------------------------------ */
 /*  Import / Export Étudiants                                          */
 /* ------------------------------------------------------------------ */
 
@@ -498,7 +432,7 @@ export function createStructureApi(nom: string, capacite = 5) {
   return api.post<{ structures: StructureAccueil[] }>("/settings/structures", { nom, capacite });
 }
 
-export function updateStructureApi(nom: string, body: { nouveauNom?: string; capacite?: number }) {
+export function updateStructureApi(nom: string, body: { nouveauNom?: string; capacite?: number; subStages?: SubStage[] }) {
   return api.put<{ structures: StructureAccueil[] }>(`/settings/structures/${encodeURIComponent(nom)}`, body);
 }
 
@@ -509,7 +443,6 @@ export function deleteStructureApi(nom: string) {
 export function fetchStageServicesApi() {
   return api.get<string[]>("/settings/stage-services");
 }
-
 export function createStageServiceApi(nom: string) {
   return api.post<{ services: string[] }>("/settings/stage-services", { nom });
 }
@@ -520,6 +453,46 @@ export function updateStageServiceApi(nom: string, body: { nouveauNom?: string }
 
 export function deleteStageServiceApi(nom: string) {
   return api.delete<{ services: string[] }>(`/settings/stage-services/${encodeURIComponent(nom)}`);
+}
+
+/**
+ * Heures indicatives par service (carnet IP, 0 si inconnu) : pré-remplit le
+ * formulaire d'ajout de sous-stage. Programme de référence des carnets
+ * (lignes plates filière-tagguées) : pré-remplit heures + filières.
+ * Lus depuis la carte `/settings` (clés `service_heures`, `programme_stages`).
+ */
+export function serviceHeuresDepuisReglages(reglages: Record<string, unknown>): Record<string, number> {
+  const v = reglages.service_heures;
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  const out: Record<string, number> = {};
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    const n = Number(val);
+    if (k && Number.isFinite(n) && n >= 0) out[k] = Math.floor(n);
+  }
+  return out;
+}
+
+export function programmeStagesDepuisReglages(reglages: Record<string, unknown>): SubStage[] {
+  const v = reglages.programme_stages;
+  if (!Array.isArray(v)) return [];
+  return (v as unknown[])
+    .map((r) => {
+      if (typeof r !== "object" || !r) return null;
+      const x = r as Record<string, unknown>;
+      const nom = String(x.nom ?? "").trim();
+      if (!nom) return null;
+      const filieres = Array.isArray(x.filieres)
+        ? (x.filieres as unknown[]).filter((f): f is string => typeof f === "string" && f.trim().length > 0)
+        : [];
+      return {
+        nom,
+        niveau: String(x.niveau ?? ""),
+        heures: Math.max(0, Math.floor(Number(x.heures) || 0)),
+        capacite: Math.max(0, Math.floor(Number(x.capacite ?? 5) || 0)),
+        ...(filieres.length ? { filieres } : {}),
+      } as SubStage;
+    })
+    .filter((r): r is SubStage => r !== null);
 }
 
 /* ------------------------------------------------------------------ */
@@ -662,6 +635,73 @@ export function deleteSeance(id: string) {
   return api.delete<{ ok: boolean }>(`/seances/${id}`);
 }
 
+/* -------- Comptes-rendus de séance (upload via base64 JSON, comme examens) -------- */
+
+const API_BASE_SEANCE = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
+
+/** Upload d'un compte-rendu pour une séance. Lit le File, base64, envoie à l'API. */
+export async function uploadSeanceDocumentApi(
+  seanceId: string,
+  file: File,
+): Promise<Record<string, unknown>> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const content = btoa(binary);
+  return api.post<Record<string, unknown>>(`/seances/${seanceId}/document`, {
+    nom: file.name,
+    mime: file.type,
+    content,
+  });
+}
+
+/** Téléchargement d'un compte-rendu (blob depuis l'API). */
+export async function downloadSeanceDocumentApi(
+  seanceId: string,
+  filename: string,
+): Promise<void> {
+  const token = getStoredToken();
+  const res = await fetch(`${API_BASE_SEANCE}/seances/${seanceId}/document`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error("Impossible de télécharger le document");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const extMatch = filename.match(/\.(pdf|docx?)$/i);
+  const ext = (extMatch?.[1].toLowerCase() === "doc" ? ".doc" : extMatch?.[1].toLowerCase() === "docx" ? ".docx" : ".pdf") as
+    | ".pdf"
+    | ".doc"
+    | ".docx";
+  a.download = sanitizeFilename(filename.replace(/\.[^.]+$/, ""), ext);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+/** URL d'aperçu d'un compte-rendu. */
+export async function previewSeanceDocumentApi(
+  seanceId: string,
+): Promise<string | null> {
+  const token = getStoredToken();
+  const res = await fetch(`${API_BASE_SEANCE}/seances/${seanceId}/document`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+/** Suppression du compte-rendu d'une séance (direction). */
+export function deleteSeanceDocumentApi(seanceId: string) {
+  return api.delete<{ ok: boolean }>(`/seances/${seanceId}/document`);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Dashboard aggregates                                               */
 /* ------------------------------------------------------------------ */
@@ -672,19 +712,7 @@ export function fetchDashboardStats() {
     deltaSemestre: number;
     formateursActifs: number;
     tauxReussite: number;
-    totalARecouvrer: number;
   }>("/dashboard/istpm-stats");
-}
-
-export function fetchFinancier() {
-  return api.get<{
-    encaisse: number;
-    encaisseCeMois: number;
-    enAttente: number;
-    impaye: number;
-    retard: number;
-    tauxRecouvrement: number;
-  }>("/dashboard/istpm-financier");
 }
 
 export function fetchRepartitionFiliere() {
@@ -705,10 +733,6 @@ export function fetchReussiteFiliere() {
 
 export function fetchEtudiantsARisque() {
   return api.get<any[]>("/dashboard/istpm-etudiants-a-risque");
-}
-
-export function fetchARelancer() {
-  return api.get<any[]>("/dashboard/istpm-a-relancer");
 }
 
 export function fetchATraiter() {
@@ -1124,7 +1148,6 @@ export interface StudentMe {
   stages: Record<string, unknown>[];
   notes: Record<string, unknown>[];
   bulletins: Record<string, unknown>[];
-  paiements: Record<string, unknown>[];
   presence: { total: number; presents: number; taux: number };
 }
 
@@ -1293,7 +1316,6 @@ export const CATALOGUE_DEMANDES: { titre: string; description: string }[] = [
   { titre: "Relevé de notes", description: "Je souhaite obtenir mon relevé de notes du semestre." },
   { titre: "Convention de stage", description: "Je souhaite obtenir / renouveler ma convention de stage." },
   { titre: "Changement de groupe", description: "Je souhaite demander un changement de groupe. Motif : " },
-  { titre: "Relevé de paiement / reçu", description: "Je souhaite obtenir un reçu / relevé de mes paiements." },
   { titre: "Lettre de recommandation", description: "Je souhaite obtenir une lettre de recommandation." },
   { titre: "Duplicata carte étudiant", description: "Je souhaite obtenir un duplicata de ma carte d'étudiant (perte / vol)." },
 ];

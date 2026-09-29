@@ -29,7 +29,7 @@ const QUOTES: { text: string; initial: string; author: string; role: ReactNode }
     text: "Une équipe disponible, qui répond à nos questions et suit vraiment les étudiants.",
     initial: "P",
     author: "Parent d’étudiante",
-    role: "Aide-soignant",
+    role: "Aide-Soignant(e)",
   },
 ];
 

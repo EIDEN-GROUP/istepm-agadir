@@ -45,7 +45,7 @@ export function Hero({ onPick }: PickProps) {
             Préparez votre <span className="accent">avenir</span> dans les métiers de la santé.
           </Reveal>
           <Reveal as="p" className="hero__lead" delay={2}>
-            Infirmier, sage-femme, aide-soignant : formez-vous à Agadir dans un institut qui relie la théorie à la
+            Infirmier, sage-femme, aide-soignant(e) : formez-vous à Agadir dans un institut qui relie la théorie à la
             pratique, du premier cours jusqu’au terrain.
           </Reveal>
           <Reveal className="hero__actions" delay={3}>

@@ -11,7 +11,10 @@ import {
 import {
   NIVEAUX,
   FILIERES,
+  capaciteStructureNiveau,
   libelleNiveau,
+  normalizeStructure,
+  subStagesPour,
   fmtDate,
   type Etudiant,
   type Stage,
@@ -76,10 +79,7 @@ export function AffectationStagesDialog({
   onConfirm: (affectations: Affectation[]) => void;
 }) {
   const structs = useMemo(
-    () =>
-      structuresAccueil.map((s) =>
-        typeof s === "string" ? { nom: s, capacite: 5 } : s,
-      ),
+    () => structuresAccueil.map((s) => normalizeStructure(s)),
     [structuresAccueil],
   );
 
@@ -105,15 +105,19 @@ export function AffectationStagesDialog({
     [stages],
   );
 
-  // Occupation de base de chaque structure = stages actifs déjà enregistrés.
-  const occupationBase = useMemo(() => {
+  // Occupation par (structure, niveau choisi) : seuls les stages actifs du
+  // même niveau consomment les places (les stages ne tracent pas le service,
+  // les places restent fongibles au sein de la structure pour un niveau).
+  const occupationNiveau = useMemo(() => {
     const map = new Map<string, number>();
+    if (!niveau) return map;
     for (const s of stages) {
       if (s.statut === "valide") continue;
+      if (libelleNiveau(s.niveau) !== libelleNiveau(niveau)) continue;
       map.set(s.structure, (map.get(s.structure) ?? 0) + 1);
     }
     return map;
-  }, [stages]);
+  }, [stages, niveau]);
 
   // Groupes disponibles pour l'année + filière choisies.
   const filieresOptions = useMemo(() => {
@@ -146,15 +150,16 @@ export function AffectationStagesDialog({
       .sort((a, b) => `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`));
   }, [etudiants, niveau, filiere, groupe, idsAvecStage]);
 
-  /** Places restantes d'une structure, en tenant compte des choix en cours
-   *  (hors l'étudiant courant, dont on veut conserver l'option sélectionnée). */
+  /** Places restantes d'une structure POUR LE NIVEAU CHOISI, en tenant compte
+   *  des choix en cours (hors l'étudiant courant, dont on veut conserver
+   *  l'option sélectionnée). */
   const placesRestantes = (structure: string, exceptId?: string) => {
-    const cap =
-      structs.find((s) => s.nom === structure)?.capacite ?? 0;
+    const st = structs.find((s) => s.nom === structure);
+    const cap = st ? capaciteStructureNiveau(st, niveau) : 0;
     const enCours = Object.entries(assign).filter(
       ([id, str]) => str === structure && id !== exceptId,
     ).length;
-    return cap - (occupationBase.get(structure) ?? 0) - enCours;
+    return cap - (occupationNiveau.get(structure) ?? 0) - enCours;
   };
 
   const optionsStructure = (etudiantId: string) =>
@@ -169,10 +174,10 @@ export function AffectationStagesDialog({
   const nbAffectes = etudiantsNonAffectes.filter((e) => assign[e.id]).length;
 
   const handleAleatoire = () => {
-    // Places restantes réelles au départ (occupation de base + choix manuels).
+    // Places restantes réelles au départ (occupation du niveau + choix manuels).
     const reste = new Map<string, number>();
     for (const s of structs) {
-      reste.set(s.nom, s.capacite - (occupationBase.get(s.nom) ?? 0));
+      reste.set(s.nom, capaciteStructureNiveau(s, niveau) - (occupationNiveau.get(s.nom) ?? 0));
     }
     for (const str of Object.values(assign)) {
       if (str) reste.set(str, (reste.get(str) ?? 0) - 1);
@@ -218,10 +223,10 @@ export function AffectationStagesDialog({
     onOpenChange(false);
   };
 
-  const totalCapacite = structs.reduce((s, x) => s + x.capacite, 0);
+  const totalCapacite = structs.reduce((s, x) => s + capaciteStructureNiveau(x, niveau), 0);
   const placesLibres =
     totalCapacite -
-    [...occupationBase.values()].reduce((s, n) => s + n, 0) -
+    [...occupationNiveau.values()].reduce((s, n) => s + n, 0) -
     Object.values(assign).filter(Boolean).length;
 
   const peutSuivant =
@@ -419,7 +424,44 @@ export function AffectationStagesDialog({
               </div>
 
               {etudiantsNonAffectes.length ? (
-                <ul className="space-y-2">
+                <>
+                  <details className="rounded-2xl border border-brand/12 bg-muted/40 px-4 py-3">
+                    <summary className="cursor-pointer text-xs font-semibold text-brand-dk">
+                      Détails par service (carnet · {niveau} · {filiere})
+                    </summary>
+                    <div className="mt-2 space-y-2">
+                      {structs.map((st) => {
+                        const lignes = subStagesPour(st, niveau, filiere);
+                        if (!lignes.length) return null;
+                        const restantes = placesRestantes(st.nom);
+                        return (
+                          <div key={st.nom}>
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                              {st.nom} · {restantes} restante(s)
+                            </p>
+                            <ul className="mt-0.5 space-y-0.5">
+                              {lignes.map((r, i) => {
+                                const indisponible = r.capacite <= 0 || restantes <= 0;
+                                return (
+                                  <li
+                                    key={`${r.nom}|${r.niveau}|${i}`}
+                                    className={cn(
+                                      "text-xs",
+                                      indisponible ? "font-semibold text-alert" : "text-muted-foreground",
+                                    )}
+                                  >
+                                    {r.nom} · {r.heures} h · {r.capacite} pl. · {Math.max(0, Math.min(r.capacite, restantes))} restante(s)
+                                    {r.niveau ? "" : " (toutes années)"}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </details>
+                  <ul className="space-y-2">
                   {etudiantsNonAffectes.map((e) => (
                     <li
                       key={e.id}
@@ -462,7 +504,8 @@ export function AffectationStagesDialog({
                       </span>
                     </li>
                   ))}
-                </ul>
+                  </ul>
+                </>
               ) : (
                 <p className="rounded-2xl border border-brand/12 bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
                   Tous les étudiants de ce groupe ont déjà un stage.

@@ -15,7 +15,6 @@ import { holidays } from "@/db/schema/holidays";
 import { schoolVacations } from "@/db/schema/vacations";
 import { calendarExceptions } from "@/db/schema/calendar-exceptions";
 import { attendance } from "@/db/schema/attendance";
-import { historiquePaiements } from "@/db/schema/historique-paiements";
 import { eq, and, ne, desc, gte, lte, sql, count } from "drizzle-orm";
 import { escHtml, notifyBestEffort } from "@/lib/notify";
 
@@ -31,7 +30,7 @@ async function resolveEtudiant(db: ReturnType<typeof getDb>, userId: string) {
 }
 
 export async function studentRoutes(app: FastifyInstance) {
-  // ── Profil complet : fiche + enseignants + stage + notes + paiements ──
+  // ── Profil complet : fiche + enseignants + stage + notes ──
   app.get("/me", { preHandler: [authenticate] }, async (request, reply) => {
     const db = getDb();
     const userId = request.user.id;
@@ -39,18 +38,17 @@ export async function studentRoutes(app: FastifyInstance) {
 
     // Le staff peut prévisualiser via ?etudiantId= (support / debug).
     const q = request.query as { etudiantId?: string };
-    if (!etudiant && (request.user.role === "directeur" || request.user.role === "responsable") && q.etudiantId) {
+    if (!etudiant && (request.user.role === "directeur" || request.user.role === "assistant_directeur" || request.user.role === "responsable") && q.etudiantId) {
       const [row] = await db.select().from(etudiants).where(eq(etudiants.id, q.etudiantId)).limit(1);
       etudiant = row ?? null;
     }
     if (!etudiant) return reply.status(404).send({ error: "Fiche étudiant introuvable pour ce compte" });
 
-    const [teachers, stageRows, notes, bulletinRows, paiements, attRows] = await Promise.all([
+    const [teachers, stageRows, notes, bulletinRows, attRows] = await Promise.all([
       db.select().from(formateurs).where(eq(formateurs.archived, false)),
       db.select().from(stages).where(eq(stages.etudiantId, etudiant.id)).orderBy(desc(stages.createdAt)),
       db.select().from(notesEtudiant).where(eq(notesEtudiant.etudiantId, etudiant.id)),
       db.select().from(bulletins).where(eq(bulletins.etudiantId, etudiant.id)).orderBy(desc(bulletins.createdAt)),
-      db.select().from(historiquePaiements).where(eq(historiquePaiements.etudiantId, etudiant.id)).orderBy(desc(historiquePaiements.date)),
       db.select().from(attendance).where(eq(attendance.etudiantId, etudiant.id)),
     ]);
 
@@ -74,15 +72,12 @@ export async function studentRoutes(app: FastifyInstance) {
       etudiant: {
         ...etudiant,
         moyenne: Number(etudiant.moyenne),
-        fraisAnnuels: Number(etudiant.fraisAnnuels),
-        resteAPayer: Number(etudiant.resteAPayer),
       },
       enseignants: mesEnseignants,
       stageEnCours,
       stages: stageRows,
       notes: notes.map((n) => ({ ...n, note: Number(n.note), coef: Number(n.coef), credits: Number(n.credits) })),
       bulletins: bulletinRows,
-      paiements,
       presence: { total: attRows.length, presents, taux: tauxPresence },
     };
   });
@@ -241,7 +236,7 @@ export async function studentRoutes(app: FastifyInstance) {
   // ── Staff : toutes les demandes + traitement ──
   app.get(
     "/requests/all",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] },
     async (request) => {
       const db = getDb();
       const query = request.query as { statut?: string; search?: string };
@@ -285,7 +280,7 @@ export async function studentRoutes(app: FastifyInstance) {
 
   app.patch(
     "/requests/:id",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const input = z

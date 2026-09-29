@@ -30,7 +30,9 @@ import {
   CalendarRange,
   Search,
   Bell,
+  Eye,
   Inbox,
+  Upload,
   PhoneCall,
   MessageSquare,
   Activity,
@@ -38,6 +40,10 @@ import {
 } from "lucide-react";
 import { useAuth, ROLE_META } from "@/lib/auth";
 import { useIstpm, useCurrentFormateur } from "@/lib/istpm-store";
+import { toast } from "sonner";
+import { ApiError } from "@/lib/api";
+import { SeanceStatutBadge } from "@/components/seance-validation";
+import { SeanceDetail } from "@/routes/dashboard.calendar";
 import {
   fmtMAD,
   fmtDate,
@@ -58,6 +64,7 @@ import {
   toneBadge,
   TONE_COLORS,
   primaryPill,
+  ghostPill,
   eyebrowClass,
   dashTooltip,
   dashCursor,
@@ -377,95 +384,15 @@ function KpiGrid({ children }: { children: ReactNode }) {
 }
 
 /**
- * Combined « Taux de réussite » / « Total à recouvrer » card.
- *
- * A segmented switch flips between the two metrics; each shows its headline
- * figure and a compact bar chart (success rate per filière, or the outstanding
- * amount broken down by payment status). Spans two columns so it flexes in the
- * KPI grid beside the four stat cards.
+ * Carte « Taux de réussite » : figure + barres par filière.
+ * Spans two columns so it flexes in the KPI grid beside the stat cards.
  */
-type PerfMetric = "reussite" | "recouvrement";
-
-/** Recouvrement palette   teal / amber / coral (reference « Mail Statistic » donut). */
-const RECOUV_COLORS = ["#029994", "#f0a92e", "#ee6c4d"];
-
-type PieDatum = { name: string; value: number; color: string };
-
-/** White percentage label centred on each pie slice (skips tiny slivers). */
-function renderPiePct({
-  cx, cy, midAngle, innerRadius, outerRadius, percent,
-}: {
-  cx: number; cy: number; midAngle: number;
-  innerRadius: number; outerRadius: number; percent: number;
-}) {
-  if (percent < 0.05) return null;
-  const RAD = Math.PI / 180;
-  // Sur un camembert plein (innerRadius 0), on place l'étiquette vers le centre
-  // de masse de la part (~0,6 du rayon) plutôt qu'à mi-hauteur de l'anneau.
-  const r = innerRadius + (outerRadius - innerRadius) * 0.6;
-  const x = cx + r * Math.cos(-midAngle * RAD);
-  const y = cy + r * Math.sin(-midAngle * RAD);
-  return (
-    <text
-      x={x}
-      y={y}
-      fill="#ffffff"
-      fontSize={12}
-      fontWeight={700}
-      textAnchor="middle"
-      dominantBaseline="central"
-    >
-      {Math.round(percent * 100)}%
-    </text>
-  );
-}
-
-/**
- * Camembert plein : chaque part est remplie jusqu'au centre, la valeur en %
- * imprimée en blanc dessus, avec une fine séparation blanche entre les parts,
- * accompagné d'une légende à pastilles de couleur.
- */
-function RecouvrementPie({ data }: { data: PieDatum[] }) {
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey="value"
-          nameKey="name"
-          cx="50%"
-          cy="50%"
-          innerRadius={0}
-          outerRadius="92%"
-          paddingAngle={0}
-          startAngle={90}
-          endAngle={-270}
-          stroke="var(--card)"
-          strokeWidth={2}
-          labelLine={false}
-          label={renderPiePct}
-          animationDuration={600}
-        >
-          {data.map((d, i) => (
-            <Cell key={i} fill={d.color} />
-          ))}
-        </Pie>
-        <Tooltip contentStyle={dashTooltip} formatter={(v: number, n: string) => [fmtMAD(v), n]} />
-      </PieChart>
-    </ResponsiveContainer>
-  );
-}
-
 function MetricSwitchChart({
-  reussite, aRecouvrer, reussiteData, recouvrementData,
+  reussite, reussiteData,
 }: {
   reussite: number;
-  aRecouvrer: number;
   reussiteData: ChartDatum[];
-  recouvrementData: ChartDatum[];
 }) {
-  const [metric, setMetric] = useState<PerfMetric>("reussite");
-  const isReussite = metric === "reussite";
   const color = "var(--chart-2)";
   const gid = "msc-reussite";
 
@@ -478,111 +405,46 @@ function MetricSwitchChart({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className={eyebrowClass}>
-            {isReussite ? "Taux de réussite" : "Total À recouvrer"}
+            Taux de réussite
           </p>
           <p className="mt-1 font-display text-2xl font-bold leading-none tracking-tight text-foreground">
-            {isReussite ? `${reussite} %` : fmtMAD(aRecouvrer)}
+            {reussite} %
           </p>
-        </div>
-
-        <div
-          role="tablist"
-          aria-label="Choisir la métrique"
-          className="flex shrink-0 items-center gap-1 rounded-full border border-brand/12 bg-muted/60 p-1"
-        >
-          {(
-            [
-              ["reussite", "Réussite"],
-              ["recouvrement", "Recouvrement"],
-            ] as const
-          ).map(([key, tabLabel]) => {
-            const active = metric === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setMetric(key)}
-                className={cn(
-                  "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                  active
-                    ? "bg-brand text-white shadow-[0_2px_8px_-3px_rgb(var(--istpm-shadow)/0.5)]"
-                    : "text-muted-foreground hover:text-brand-dk",
-                )}
-              >
-                {tabLabel}
-              </button>
-            );
-          })}
         </div>
       </div>
 
-      {/* Fondu doux au changement de métrique. Le conteneur garde une hauteur
-          fixe et reste monté, pour que ResponsiveContainer mesure tout de suite
-          (pas de « blanc » au basculement). */}
       <div className="relative mt-3 h-[172px]">
-        {isReussite ? (
-          <motion.div
-            key="reussite"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="h-full w-full"
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={reussiteData} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
-                <defs>
-                  <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={color} stopOpacity={0.95} />
-                    <stop offset="100%" stopColor={color} stopOpacity={0.5} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.5} stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} stroke="var(--muted-foreground)" />
-                <YAxis
-                  width={34}
-                  allowDecimals={false}
-                  domain={[0, 100]}
-                  tick={{ fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={false}
-                  stroke="var(--muted-foreground)"
-                />
-                <Tooltip contentStyle={dashTooltip} cursor={dashCursor} formatter={(v: number) => [`${v} %`, "Réussite"]} />
-                <Bar dataKey="value" maxBarSize={34} radius={[6, 6, 0, 0]} fill={`url(#${gid})`} animationDuration={600} />
-              </BarChart>
-            </ResponsiveContainer>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="recouvrement"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="flex h-full items-center gap-4"
-          >
-            <div className="h-full w-[52%] shrink-0">
-              <RecouvrementPie
-                data={recouvrementData.map((d, i) => ({
-                  ...d,
-                  color: RECOUV_COLORS[i % RECOUV_COLORS.length],
-                }))}
+        <motion.div
+          key="reussite"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          className="h-full w-full"
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={reussiteData} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+              <defs>
+                <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity={0.95} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0.5} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.5} stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} stroke="var(--muted-foreground)" />
+              <YAxis
+                width={34}
+                allowDecimals={false}
+                domain={[0, 100]}
+                tick={{ fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                stroke="var(--muted-foreground)"
               />
-            </div>
-            <ul className="min-w-0 flex-1 space-y-3.5">
-              {recouvrementData.map((d, i) => (
-                <li key={d.name} className="flex items-center gap-2.5">
-                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: RECOUV_COLORS[i % RECOUV_COLORS.length] }} />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-foreground">{d.name}</span>
-                    <span className="block text-xs text-muted-foreground">{fmtMAD(d.value)}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-        )}
+              <Tooltip contentStyle={dashTooltip} cursor={dashCursor} formatter={(v: number) => [`${v} %`, "Réussite"]} />
+              <Bar dataKey="value" maxBarSize={34} radius={[6, 6, 0, 0]} fill={`url(#${gid})`} animationDuration={600} />
+            </BarChart>
+          </ResponsiveContainer>
+        </motion.div>
       </div>
     </motion.div>
   );
@@ -631,13 +493,12 @@ function EmptyState({ icon: Icon, children }: { icon: ComponentType<LucideProps>
 const ACTIVITE_ICON: Record<ActiviteItem["type"], typeof UserPlus> = {
   inscription: UserPlus,
   note: PenLine,
-  paiement: Wallet,
 };
 
 function ActiviteFeed() {
   // Fil dérivé des lignes serveur (jamais de session seule) : derniers examens
-  // notés, derniers stages, derniers paiements — triés par date décroissante.
-  const { examens, stages, etudiants } = useIstpm();
+  // notés, derniers stages — triés par date décroissante.
+  const { examens, stages } = useIstpm();
   const items: ActiviteItem[] = useMemo(() => {
     const out: ActiviteItem[] = [];
     for (const x of examens) {
@@ -656,19 +517,8 @@ function ActiviteFeed() {
         date: s.debut,
       });
     }
-    const nomParId = new Map(etudiants.map((e) => [e.id, `${e.prenom} ${e.nom}`]));
-    for (const e of etudiants) {
-      for (const r of e.paiementsMensuelsRecords ?? []) {
-        if (r.statut !== "paye" || !r.datePaiement) continue;
-        out.push({
-          type: "paiement",
-          texte: `Paiement reçu · ${r.montantPaye.toLocaleString("fr-FR")} MAD (${nomParId.get(r.etudiantId) ?? "étudiant"})`,
-          date: r.datePaiement.slice(0, 10),
-        });
-      }
-    }
     return out.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 8);
-  }, [examens, stages, etudiants]);
+  }, [examens, stages]);
   if (!items.length) {
     return (
       <div className={cn(softCard, "px-5 py-10 text-center text-sm text-muted-foreground")}>
@@ -1045,14 +895,7 @@ const DIRECTOR_TABS: DashTab[] = [
 
 function DashboardDirecteur() {
   const { tab, setTab, direction } = useTabs();
-  const { dashboard, financier, reussiteFiliere, formateurs, seances, examens, etudiants, aTraiter, repartitionFiliere, repartitionNiveau } = useIstpm();
-
-  // Décomposition du « reste à recouvrer » par statut de paiement, pour le graphe.
-  const recouvrementData = useMemo<ChartDatum[]>(() => [
-    { name: "En attente", value: financier.enAttente },
-    { name: "Retard", value: financier.retard },
-    { name: "Impayé", value: financier.impaye },
-  ], [financier]);
+  const { dashboard, reussiteFiliere, formateurs, seances, examens, etudiants, aTraiter, repartitionFiliere, repartitionNiveau } = useIstpm();
 
   const seancesAujourdhui = useMemo(() => seances.filter((s) => s.date === today), [seances]);
   // « Étudiants actifs » = ceux dont la scolarité est en cours (statut inscrit),
@@ -1104,6 +947,12 @@ function DashboardDirecteur() {
   // « Charge des formateurs » : ligne cliquable → modale des séances du formateur.
   const [chargeSel, setChargeSel] = useState<{ id: string; nom: string } | null>(null);
   const seancesFormateur = useMemo(() => chargeSel ? seancesPeriode.filter((s) => s.professeurId === chargeSel.id).slice().sort((a, b) => (a.date === b.date ? (a.debut < b.debut ? -1 : 1) : a.date < b.date ? -1 : 1)) : [], [chargeSel, seancesPeriode]);
+  // Fiche séance depuis la modale de charge (validation direction).
+  const [chargeDetail, setChargeDetail] = useState<Seance | null>(null);
+  const nomProfCharge = (id: string) => {
+    const f = formateurs.find((x) => x.id === id);
+    return f ? `${f.prenom} ${f.nom}` : "—";
+  };
 
   return (
     <>
@@ -1123,9 +972,7 @@ function DashboardDirecteur() {
               </div>
               <MetricSwitchChart
                 reussite={dashboard.tauxReussite}
-                aRecouvrer={dashboard.totalARecouvrer}
                 reussiteData={reussiteFiliere}
-                recouvrementData={recouvrementData}
               />
             </div>
             <Section title="Aujourd&rsquo;hui" action={<SectionLink to="/dashboard/calendar">Voir le planning</SectionLink>}>
@@ -1230,6 +1077,8 @@ function DashboardDirecteur() {
                           <th className="px-4 py-3">Groupe</th>
                           <th className="px-4 py-3">Salle</th>
                           <th className="px-4 py-3">Type</th>
+                          <th className="px-4 py-3">Statut</th>
+                          <th className="px-4 py-3"><span className="sr-only">Détail</span></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-brand/8">
@@ -1241,6 +1090,16 @@ function DashboardDirecteur() {
                             <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{s.groupe}</td>
                             <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{s.salle}</td>
                             <td className="whitespace-nowrap px-4 py-3"><span className={toneBadge("blue")}>{TYPE_SEANCE_LABEL[s.type]}</span></td>
+                            <td className="whitespace-nowrap px-4 py-3"><SeanceStatutBadge statut={s.statut} /></td>
+                            <td className="whitespace-nowrap px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setChargeDetail(s)}
+                                className={cn(ghostPill, "h-7 gap-1 px-2.5 text-[11px]")}
+                              >
+                                <Eye className="h-3.5 w-3.5" /> Détail
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1255,6 +1114,29 @@ function DashboardDirecteur() {
                 )}
               </DetailSection>
             </DetailShell>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Fiche séance depuis la charge (validation direction : PDF + confirmer/rejeter) */}
+      <Dialog open={!!chargeDetail} onOpenChange={(o) => !o && setChargeDetail(null)}>
+        <DialogContent className={dialogSurfaceWide}>
+          <DialogTitle className="sr-only">Détail de la séance</DialogTitle>
+          <DialogDescription className="sr-only">
+            Validation de la séance sélectionnée
+          </DialogDescription>
+          {chargeDetail ? (
+            <SeanceDetail
+              seance={seances.find((x) => x.id === chargeDetail.id) ?? chargeDetail}
+              nomProf={nomProfCharge}
+              conflits={[]}
+              canEdit={false}
+              ownerId={null}
+              validation="direction"
+              onEdit={() => setChargeDetail(null)}
+              onDelete={() => setChargeDetail(null)}
+              onAppel={() => setChargeDetail(null)}
+            />
           ) : null}
         </DialogContent>
       </Dialog>
@@ -1335,7 +1217,11 @@ function AffectationEnseignant({ formateur }: { formateur: Formateur }) {
 
 function DashboardEnseignant() {
   const { tab, setTab, direction } = useTabs();
-  const { seances, examens, bulletins, etudiants, groupConfigs } = useIstpm();
+  const { seances, examens, bulletins, etudiants, groupConfigs, updateSeance, attachSeanceDocument } = useIstpm();
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [finishingId, setFinishingId] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadTarget, setUploadTarget] = useState<string | null>(null);
   const moi = useCurrentFormateur();
   const mesExamens = useMemo(() => (moi ? examens.filter((x) => moi.modules.includes(x.module)) : []), [examens, moi]);
   const seancesAujourdhui = useMemo(() => seances.filter((s) => s.date === today && s.professeurId === moi?.id), [seances, moi?.id]);
@@ -1358,6 +1244,32 @@ function DashboardEnseignant() {
   const mesBulletins = useMemo(() => (moi ? bulletins.filter((b) => moi.modules.some((m) => b.notes?.some((n) => n.module === m))) : []), [bulletins, moi]);
   const calendrierProche = useMemo(() => mesSeances.filter((s) => s.date >= today).slice(0, 8), [mesSeances]);
   if (!moi) return <EmptyState icon={GraduationCap}>Aucun formateur enregistré.</EmptyState>;
+  const erreurServeur = (err: unknown, repli: string) =>
+    err instanceof ApiError && err.message ? err.message : err instanceof Error ? err.message : repli;
+  const deposerCr = async (file: File) => {
+    if (!uploadTarget) return;
+    setUploadingId(uploadTarget);
+    try {
+      await attachSeanceDocument(uploadTarget, file);
+      toast.success(`Compte-rendu déposé   ${file.name}`);
+    } catch (err) {
+      toast.error(erreurServeur(err, "Dépôt impossible"));
+    } finally {
+      setUploadingId(null);
+      setUploadTarget(null);
+    }
+  };
+  const marquerFaite = async (s: Seance) => {
+    setFinishingId(s.id);
+    try {
+      await updateSeance(s.id, { statut: "termine" });
+      toast.success(`Séance marquée faite   ${s.module}`);
+    } catch (err) {
+      toast.error(erreurServeur(err, "Opération impossible"));
+    } finally {
+      setFinishingId(null);
+    }
+  };
   const aNoter = mesExamens.filter((x) => x.statut !== "notes_saisies");
   const bulletinsAPublier = mesBulletins.filter((b) => b.statut !== "publie");
   const PROFESSOR_TABS: DashTab[] = [
@@ -1383,7 +1295,18 @@ function DashboardEnseignant() {
               <AffectationEnseignant formateur={moi} />
             </Section>
             <div className="grid gap-6 xl:grid-cols-1">
-              <Section title="Mon calendrier (7 jours)" action={<SectionLink to="/dashboard/calendar">Voir tout</SectionLink>}>
+            <Section title="Mon calendrier (7 jours)" action={<SectionLink to="/dashboard/calendar">Voir tout</SectionLink>}>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) void deposerCr(f);
+                  }}
+                />
                 <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
                   {calendrierProche.length ? calendrierProche.map((s) => (
                     <div key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-brand/6 sm:px-5">
@@ -1393,11 +1316,36 @@ function DashboardEnseignant() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-foreground">{s.module}</span>
-                        <span className="block text-xs text-muted-foreground">{s.debut} - {s.fin} Â· {s.salle} Â· {s.groupe}</span>
+                        <span className="block text-xs text-muted-foreground">{s.debut} - {s.fin} · {s.salle} · {s.groupe}</span>
                       </span>
+                      <SeanceStatutBadge statut={s.statut} />
                       <span className={toneBadge("blue")}>{TYPE_SEANCE_LABEL[s.type]}</span>
+                      {(s.statut === "planifie" || s.statut === "en_cours") ? (
+                        <span className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={uploadingId === s.id}
+                            title={s.documentId ? "Remplacer le compte-rendu (PDF/DOC)" : "Déposer le compte-rendu (PDF/DOC)"}
+                            onClick={() => { setUploadTarget(s.id); fileRef.current?.click(); }}
+                            className={cn(ghostPill, "h-7 gap-1 px-2.5 text-[11px]")}
+                          >
+                            <Upload className="h-3.5 w-3.5" />
+                            {uploadingId === s.id ? "…" : s.documentId ? "CR ✓" : "CR"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={finishingId === s.id || !s.documentId}
+                            title={s.documentId ? "Marquer la séance faite" : "Déposez le compte-rendu d'abord"}
+                            onClick={() => void marquerFaite(s)}
+                            className={cn(primaryPill, "h-7 gap-1 px-2.5 text-[11px] disabled:opacity-60")}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {finishingId === s.id ? "…" : "Faite"}
+                          </button>
+                        </span>
+                      ) : null}
                     </div>
-                  )) : <p className="px-5 py-8 text-center text-sm text-muted-foreground">Aucune séance À  venir.</p>}
+                  )) : <p className="px-5 py-8 text-center text-sm text-muted-foreground">Aucune séance à venir.</p>}
                 </div>
               </Section>
             </div>
@@ -1568,309 +1516,9 @@ function DashboardResponsable() {
   );
 }
 
-/* ------------------------------------------------------------------ */
-
-/** Accueil du comptable : graphe encaissé/taux, carte donut du reste
- *  (avec total + comptes à relancer), échéances du mois en cours, puis
- *  les plus gros taux d'impayés. */
-function DashboardComptable() {
-  const { financier, etudiants } = useIstpm();
-  const resteData = useMemo(
-    () => [
-      { name: "En attente", value: financier.enAttente },
-      { name: "Retard", value: financier.retard },
-      { name: "Impayé", value: financier.impaye },
-    ],
-    [financier],
-  );
-  const resteTotal = resteData.reduce((s, d) => s + d.value, 0);
-  // Comptes distincts à relancer (global + par statut du reste).
-  const relancerParStatut = useMemo(() => {
-    const parStatut = new Map<string, Set<string>>();
-    const tous = new Set<string>();
-    for (const e of etudiants) {
-      if (e.archived) continue;
-      for (const r of e.paiementsMensuelsRecords) {
-        if (r.statut === "paye" || r.montantPaye >= r.montantDu) continue;
-        tous.add(e.id);
-        if (!parStatut.has(r.statut)) parStatut.set(r.statut, new Set());
-        parStatut.get(r.statut)!.add(e.id);
-      }
-    }
-    return {
-      total: tous.size,
-      parStatut: [...parStatut.entries()].map(([statut, ids]) => ({ statut, count: ids.size })),
-    };
-  }, [etudiants]);
-  // Série mensuelle (12 derniers mois) : encaissé + taux de recouvrement.
-  const tendanceFinance = useMemo(() => {
-    const MOIS_FR = [
-      "janvier", "février", "mars", "avril", "mai", "juin",
-      "juillet", "août", "septembre", "octobre", "novembre", "décembre",
-    ];
-    const cleMois = (label: string): string | null => {
-      const m = String(label)
-        .trim()
-        .toLowerCase()
-        .match(/^([a-zéû]+)\s+(\d{4})$/);
-      if (!m) return null;
-      const idx = MOIS_FR.indexOf(m[1]);
-      if (idx < 0) return null;
-      return `${m[2]}-${String(idx + 1).padStart(2, "0")}`;
-    };
-    const paye = new Map<string, number>();
-    const du = new Map<string, number>();
-    for (const e of etudiants) {
-      if (e.archived) continue;
-      for (const r of e.paiementsMensuelsRecords) {
-        if (r.datePaiement && r.montantPaye > 0) {
-          const k = String(r.datePaiement).slice(0, 7);
-          paye.set(k, (paye.get(k) ?? 0) + r.montantPaye);
-          du.set(k, (du.get(k) ?? 0) + r.montantPaye);
-        }
-        const reste = r.montantDu - r.montantPaye;
-        if (reste > 0) {
-          const k = cleMois(r.mois);
-          if (k) du.set(k, (du.get(k) ?? 0) + reste);
-        }
-      }
-    }
-    const cles = [...new Set([...paye.keys(), ...du.keys()])].sort().slice(-12);
-    return cles.map((k) => {
-      const p = paye.get(k) ?? 0;
-      const d = du.get(k) ?? 0;
-      const [y, m] = k.split("-");
-      return {
-        name: `${MOIS_FR[Number(m) - 1].slice(0, 3)} ${y.slice(2)}`,
-        encaisse: Math.round(p),
-        taux: d > 0 ? Math.round((p / d) * 100) : 0,
-      };
-    });
-  }, [etudiants]);
-  // Échéances du mois en cours (mensualités non soldées libellées
-  // « septembre 2026 », comparées dans le même format).
-  const moisCle = new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
-  const echeancesMois = useMemo(() => {
-    const lignes: Array<{ id: string; etudiant: string; mois: string; reste: number }> = [];
-    for (const e of etudiants) {
-      if (e.archived) continue;
-      for (const r of e.paiementsMensuelsRecords) {
-        const reste = r.montantDu - r.montantPaye;
-        if (reste <= 0) continue;
-        if (String(r.mois).trim().toLowerCase() !== moisCle) continue;
-        lignes.push({
-          id: `${e.id}:${r.id}`,
-          etudiant: `${e.prenom} ${e.nom}`,
-          mois: r.mois,
-          reste,
-        });
-      }
-    }
-    return lignes.sort((a, b) => b.reste - a.reste);
-  }, [etudiants, moisCle]);
-  const totalMois = echeancesMois.reduce((s, l) => s + l.reste, 0);
-  // Plus gros taux d'impayés (reste / dû total de la fiche).
-  const topTaux = useMemo(() => {
-    return etudiants
-      .filter((e) => !e.archived)
-      .map((e) => {
-        const du = e.paiementsMensuelsRecords.reduce((s, r) => s + r.montantDu, 0);
-        const reste = e.paiementsMensuelsRecords
-          .filter((r) => r.statut !== "paye")
-          .reduce((s, r) => s + Math.max(0, r.montantDu - r.montantPaye), 0);
-        return { id: e.id, nom: `${e.prenom} ${e.nom}`, ratio: du > 0 ? reste / du : 0, reste };
-      })
-      .filter((x) => x.reste > 0)
-      .sort((a, b) => b.ratio - a.ratio)
-      .slice(0, 8);
-  }, [etudiants]);
-  return (
-    <div className="space-y-6">
-      <DashHero chips={[]} />
-      <div className="grid gap-4 xl:grid-cols-2">
-      <div className={cn(softCard, "p-4 sm:p-5")}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className={eyebrowClass}>Encaissé &amp; taux de recouvrement · 12 mois</p>
-          <span className="flex items-center gap-3 text-[11px] font-medium text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-[var(--istpm-teal)]" />
-              Encaissé
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-[var(--istpm-blue)]" />
-              Taux %
-            </span>
-          </span>
-        </div>
-        <div className="mt-3 w-full" style={{ height: 230 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={tendanceFinance} margin={{ top: 6, right: 6, left: -14, bottom: 0 }}>
-              <CartesianGrid stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} stroke="var(--muted-foreground)" />
-              <YAxis
-                yAxisId="mad"
-                width={44}
-                tick={{ fontSize: 11 }}
-                tickLine={false}
-                stroke="var(--muted-foreground)"
-                tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${v}`)}
-              />
-              <YAxis
-                yAxisId="pct"
-                orientation="right"
-                width={36}
-                domain={[0, 100]}
-                tick={{ fontSize: 11 }}
-                tickLine={false}
-                stroke="var(--muted-foreground)"
-                tickFormatter={(v: number) => `${v}%`}
-              />
-              <Tooltip contentStyle={dashTooltip} />
-              <Line
-                yAxisId="mad"
-                type="monotone"
-                dataKey="encaisse"
-                name="Encaissé (MAD)"
-                stroke="var(--istpm-teal)"
-                strokeWidth={2.5}
-                dot={{ r: 3, strokeWidth: 0, fill: "var(--istpm-teal)" }}
-              />
-              <Line
-                yAxisId="pct"
-                type="monotone"
-                dataKey="taux"
-                name="Taux (%)"
-                stroke="var(--istpm-blue)"
-                strokeWidth={2.5}
-                strokeDasharray="6 3"
-                dot={{ r: 3, strokeWidth: 0, fill: "var(--istpm-blue)" }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-        <div className={cn(softCard, "p-4 sm:p-5")}>
-          <div className="flex items-baseline justify-between gap-2">
-            <p className={eyebrowClass}>Reste par statut</p>
-            <span className="text-right">
-              <span className="block text-lg font-bold tabular-nums leading-none text-foreground">
-                {fmtMAD(resteTotal)}
-              </span>
-              <span className="mt-0.5 block text-[11px] font-medium text-muted-foreground">
-                {relancerParStatut.total} compte(s) à relancer
-              </span>
-            </span>
-          </div>
-          <div className="mt-3 w-full" style={{ height: 180 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={resteData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="52%"
-                  outerRadius="92%"
-                  paddingAngle={1}
-                  stroke="var(--card)"
-                  strokeWidth={2}
-                  labelLine={false}
-                  label={({ percent }: { percent?: number }) => `${Math.round((percent ?? 0) * 100)} %`}
-                >
-                  {resteData.map((_, i) => (
-                    <Cell
-                      key={i}
-                      fill={BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={dashTooltip} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <ul className="mt-3 space-y-2">
-            {resteData.map((d, i) => {
-              const key =
-                d.name === "En attente" ? "en_attente" : d.name === "Retard" ? "retard" : "impaye";
-              const nb = relancerParStatut.parStatut.find((p) => p.statut === key)?.count ?? 0;
-              return (
-                <li key={d.name} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: BRAND_CHART_COLORS[i % BRAND_CHART_COLORS.length] }}
-                    />
-                    <span className="truncate text-muted-foreground">{d.name}</span>
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="block font-semibold tabular-nums text-foreground">
-                      {fmtMAD(d.value)}
-                    </span>
-                    <span className="block text-[11px] font-normal tabular-nums text-muted-foreground">
-                      {nb} compte(s)
-                    </span>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </div>
-      <Section title={`Échéances du mois (${echeancesMois.length})`}>
-        <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
-          {echeancesMois.length ? (
-            echeancesMois.slice(0, 10).map((l) => (
-              <div key={l.id} className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-foreground">{l.etudiant}</span>
-                  <span className="block text-[11px] text-muted-foreground">{l.mois}</span>
-                </span>
-                <span className="shrink-0 text-sm font-semibold tabular-nums text-alert-dk">
-                  {fmtMAD(l.reste)}
-                </span>
-              </div>
-            ))
-          ) : (
-            <p className="px-5 py-8 text-center text-sm text-muted-foreground">
-              Aucune échéance ce mois-ci.
-            </p>
-          )}
-          {echeancesMois.length ? (
-            <div className="flex items-center justify-between bg-muted/40 px-4 py-2.5 text-sm sm:px-5">
-              <span className="font-medium text-muted-foreground">Total du mois</span>
-              <span className="font-bold tabular-nums text-foreground">{fmtMAD(totalMois)}</span>
-            </div>
-          ) : null}
-        </div>
-      </Section>
-      <Section title="Plus gros taux d'impayés">
-        <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden max-h-[380px] overflow-y-auto")}>
-          {topTaux.length ? (
-            topTaux.map((x) => (
-              <MeterRow
-                key={x.id}
-                label={x.nom}
-                ratio={x.ratio}
-                color={x.ratio > 0.5 ? TONE_COLORS.red : x.ratio > 0.25 ? TONE_COLORS.amber : TONE_COLORS.teal}
-                detail={`${Math.round(x.ratio * 100)} % impayé · ${fmtMAD(x.reste)} restants`}
-              />
-            ))
-          ) : (
-            <p className="px-5 py-8 text-center text-sm text-muted-foreground">
-              Aucun impayé : tout est recouvré.
-            </p>
-          )}
-        </div>
-      </Section>
-    </div>
-  );
-}
-
 function DashboardIndex() {
   const { role } = useAuth();
   if (role === "etudiant") return <DashboardEtudiant />;
-  if (role === "comptable") return <DashboardComptable />;
   return (
     <div className="space-y-6">
       {role === "enseignant" ? <DashboardEnseignant /> : role === "responsable" ? <DashboardResponsable /> : <DashboardDirecteur />}
@@ -1895,7 +1543,6 @@ function DashboardEtudiant() {
   const notes = (meQ.data?.notes as { note: number }[] | undefined) ?? [];
   const moyenne = notes.length ? (notes.reduce((a, n) => a + n.note, 0) / notes.length).toFixed(2) : null;
   const bulletins = (meQ.data?.bulletins as unknown[] | undefined) ?? [];
-  const reste = s("resteAPayer", "reste_a_payer");
   const demandes = reqQ.data ?? [];
   const enAttente = demandes.filter((d) => d.statut === "en_attente" || d.statut === "en_cours").length;
   const reponses = notifQ.data?.unread ?? 0;
@@ -1917,7 +1564,6 @@ function DashboardEtudiant() {
     { to: "/dashboard/espace-etudiant/scolarite", label: "Scolarité", icon: GraduationCap, hint: "Enseignants, notes, présence" },
     { to: "/dashboard/espace-etudiant/stage", label: "Mon stage", icon: Building2, hint: "Structure, période, encadrant" },
     { to: "/dashboard/espace-etudiant/calendrier", label: "Calendrier", icon: CalendarRange, hint: "Emploi du temps" },
-    { to: "/dashboard/espace-etudiant/paiements", label: "Paiements", icon: Wallet, hint: "Scolarité, reste à payer" },
     { to: "/dashboard/espace-etudiant/demandes", label: "Demandes", icon: PenLine, hint: "Attestations, réclamations" },
   ];
 
@@ -1949,7 +1595,6 @@ function DashboardEtudiant() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MiniStat label="Moyenne générale" value={moyenne ? `${moyenne}/20` : ""} icon={BarChart3} />
         <MiniStat label="Bulletins" value={String(bulletins.length)} icon={CheckCircle2} />
-        <MiniStat label="Reste à payer" value={reste ? `${reste} MAD` : ""} icon={Wallet} />
         <MiniStat
           label="Demandes"
           value={reponses > 0 ? `${reponses} réponse(s)` : enAttente > 0 ? `${enAttente} en cours` : "À jour"}

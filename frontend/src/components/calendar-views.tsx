@@ -91,6 +91,13 @@ function SeanceBloc({
   // Assez haut pour deux lignes de titre + une ligne de détail.
   const court = duree < 50;
   const tresCourt = duree <= 30;
+  // Pastille de validation : seuls les états saillants s'affichent
+  // (planifiée/en cours/annulée gardent l'aspect habituel).
+  const pastille =
+    seance.statut === "valide" ? { label: "Validée", bg: "#067C7A" }
+    : seance.statut === "rejete" ? { label: "Rejetée", bg: "#E52329" }
+    : seance.statut === "termine" ? { label: "Terminée", bg: "#B07A1E" }
+    : null;
 
   return (
     <button
@@ -119,6 +126,15 @@ function SeanceBloc({
       >
         {seance.module}
       </span>
+      {pastille && !compact ? (
+        <span
+          title={`Séance ${pastille.label.toLowerCase()}`}
+          className="inline-flex w-fit items-center gap-1 rounded-full px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white"
+          style={{ backgroundColor: pastille.bg }}
+        >
+          {pastille.label}
+        </span>
+      ) : null}
       {!court && !compact ? (
         <>
           <span className="block truncate text-[10px] font-medium opacity-95">

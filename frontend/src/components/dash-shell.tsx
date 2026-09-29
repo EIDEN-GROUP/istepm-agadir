@@ -322,16 +322,6 @@ function ShellNotifications() {
                     <ExternalLink className="h-3.5 w-3.5" /> Voir la fiche
                     famille
                   </Link>
-                  <Link
-                    to="/dashboard/paiements"
-                    onClick={() => setOpen(false)}
-                    className={cn(
-                      actionClass,
-                      "border border-brand/15 text-foreground hover:bg-muted",
-                    )}
-                  >
-                    Voir les paiements
-                  </Link>
                   <button
                     type="button"
                     onClick={() => {

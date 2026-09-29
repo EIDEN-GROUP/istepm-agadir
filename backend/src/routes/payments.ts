@@ -37,7 +37,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     return rows.map((r) => ({ ...r.payments, client: r.clients }));
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request) => {
     const input = paymentSchema.parse(request.body);
     const now = new Date();
     const db = getDb();
@@ -66,7 +66,7 @@ export async function paymentRoutes(app: FastifyInstance) {
 
   app.put(
     "/:id/invoice-sent",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();
@@ -81,7 +81,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     },
   );
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [payment] = await db

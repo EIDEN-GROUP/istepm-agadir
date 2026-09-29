@@ -205,7 +205,7 @@ export async function examenRoutes(app: FastifyInstance) {
     return fiche ?? null;
   }
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant"), requirePerm("examens.write")] }, async (request, reply) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable", "enseignant"), requirePerm("examens.write")] }, async (request, reply) => {
     const input = examenSchema.parse(request.body) as Record<string, unknown>;
     normaliseClasse(input);
     if (request.user.role === "enseignant") {
@@ -223,7 +223,7 @@ export async function examenRoutes(app: FastifyInstance) {
     return enrichExamen(examen);
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant"), requirePerm("examens.write")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable", "enseignant"), requirePerm("examens.write")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = examenSchema.partial().parse(request.body) as Record<string, unknown>;
     normaliseClasse(input);
@@ -255,7 +255,7 @@ export async function examenRoutes(app: FastifyInstance) {
     return enrichExamen(examen);
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant"), requirePerm("examens.delete")] }, async (request, reply) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable", "enseignant"), requirePerm("examens.delete")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     if (request.user.role === "enseignant") {
@@ -290,7 +290,7 @@ export async function examenRoutes(app: FastifyInstance) {
   /** Upload a document for an examen. */
   app.post(
     "/:id/document",
-    { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant"), requirePerm("examens.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable", "enseignant"), requirePerm("examens.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();
@@ -365,7 +365,7 @@ export async function examenRoutes(app: FastifyInstance) {
   /** Download the document for an examen (staff only — sujets confidentiels). */
   app.get(
     "/:id/document",
-    { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable", "enseignant")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();
@@ -399,7 +399,7 @@ export async function examenRoutes(app: FastifyInstance) {
   /** Delete the document for an examen. */
   app.delete(
     "/:id/document",
-    { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant"), requirePerm("examens.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable", "enseignant"), requirePerm("examens.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();
@@ -438,7 +438,7 @@ export async function examenRoutes(app: FastifyInstance) {
 
   app.post(
     "/:id/notes",
-    { preHandler: [authenticate, requireRole("directeur", "enseignant", "responsable"), requirePerm("examens.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "enseignant", "responsable"), requirePerm("examens.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const { saisies } = saveNotesSchema.parse(request.body);

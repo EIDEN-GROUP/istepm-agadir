@@ -17,8 +17,6 @@ import {
   ClipboardList,
   FileText,
   Stethoscope,
-  CreditCard,
-  Wallet,
   Settings,
   Inbox,
   UserPlus,
@@ -113,8 +111,11 @@ export function useDashboardI18n() {
  * Which nav destinations each role may reach. Roles are a UI state only   this
  * hides navigation, it is not a security boundary.
  *
- * directeur    full access
- * enseignant   pedagogy only: no payments, no staff management ; settings
+ * directeur    full access, sauf le groupe Espace étudiant (réservé à
+ *              l'assistant pour le traitement des demandes).
+ * assistant_directeur  full access historique (garde Espace étudiant +
+ *              inscriptions pour le traitement des demandes).
+ * enseignant   pedagogy only: no staff management ; settings
  *              limited to Rôles & permissions. Voit l'emploi du temps en
  *              consultation seule (son planning).
  * responsable  student administration: no staff management, no note entry ;
@@ -132,7 +133,16 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
     "/dashboard/examens",
     "/dashboard/bulletins",
     "/dashboard/stages",
-    "/dashboard/paiements",
+    "/dashboard/settings",
+  ],
+  assistant_directeur: [
+    "/dashboard",
+    "/dashboard/calendar",
+    "/dashboard/etudiants",
+    "/dashboard/formateurs",
+    "/dashboard/examens",
+    "/dashboard/bulletins",
+    "/dashboard/stages",
     "/dashboard/espace-etudiant",
     "/dashboard/inscriptions",
     "/dashboard/settings",
@@ -152,7 +162,6 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
     "/dashboard/etudiants",
     "/dashboard/bulletins",
     "/dashboard/stages",
-    "/dashboard/paiements",
     "/dashboard/espace-etudiant",
     "/dashboard/inscriptions",
     "/dashboard/settings",
@@ -165,15 +174,7 @@ const NAV_BY_ROLE: Record<UserRole, readonly string[]> = {
     "/dashboard/espace-etudiant/scolarite",
     "/dashboard/espace-etudiant/stage",
     "/dashboard/espace-etudiant/calendrier",
-    "/dashboard/espace-etudiant/paiements",
     "/dashboard/espace-etudiant/demandes",
-  ],
-  // Le comptable pilote la finance : paiements, espace Finance dédié,
-  // calendrier des échéances ; lecture des fiches étudiants (recouvrement).
-  comptable: [
-    "/dashboard",
-    "/dashboard/paiements",
-    "/dashboard/settings",
   ],
 };
 
@@ -191,8 +192,8 @@ export function canAccess(role: UserRole | null, to: string): boolean {
 }
 
 /**
- * Page → permission de lecture. Seules ces 7 rubriques suivent les fiches
- * rôles ; le reste (accueil, planning, espace étudiant, profil, finance)
+ * Page → permission de lecture. Seules ces 6 rubriques suivent les fiches
+ * rôles ; le reste (accueil, planning, espace étudiant, profil)
  * reste gouverné par `NAV_BY_ROLE`.
  */
 export const ROUTE_READ_PERM: Record<string, string> = {
@@ -201,7 +202,6 @@ export const ROUTE_READ_PERM: Record<string, string> = {
   "/dashboard/examens": "examens.read",
   "/dashboard/bulletins": "bulletins.read",
   "/dashboard/stages": "stages.read",
-  "/dashboard/paiements": "paiements.read",
   "/dashboard/settings": "settings.read",
 };
 
@@ -300,12 +300,6 @@ export function useDashboardNav(role: UserRole | null) {
               CalendarDays,
             ),
             item(
-              "/dashboard/espace-etudiant/paiements",
-              "Paiements",
-              "Paiements",
-              CreditCard,
-            ),
-            item(
               "/dashboard/espace-etudiant/demandes",
               "Demandes",
               "Demandes",
@@ -333,18 +327,6 @@ export function useDashboardNav(role: UserRole | null) {
               ],
             },
           ]),
-      item(
-        "/dashboard/paiements",
-        t.nav.paiements,
-        t.navShort.paiements,
-        CreditCard,
-      ),
-      item(
-        "/dashboard/finance",
-        t.nav.finance,
-        t.navShort.finance,
-        Wallet,
-      ),
       item("/dashboard/settings", t.nav.settings, t.navShort.settings, Settings),
     ];
 

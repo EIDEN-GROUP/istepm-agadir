@@ -6,7 +6,6 @@ import {
   Stethoscope,
   CalendarDays,
   FileText,
-  Wallet,
   ClipboardCheck,
   Inbox,
   RefreshCw,
@@ -68,18 +67,8 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { Seance, Etudiant } from "@/lib/istpm-data";
 import {
-  STATUT_PAIEMENT_LABEL,
   STATUT_ETUDIANT_LABEL,
 } from "@/lib/istpm-data";
-
-/** Libellé FR d'un statut de paiement, tolérant aux valeurs inconnues. */
-const libellePaiement = (v: unknown): string => {
-  const k = String(v ?? "").trim();
-  if (!k) return "Inconnu";
-  return (
-    (STATUT_PAIEMENT_LABEL as Record<string, string>)[k] ?? k
-  );
-};
 /** Libellé FR d'un statut d'étudiant. */
 const libelleStatutEtudiant = (v: unknown): string => {
   const k = String(v ?? "").trim();
@@ -120,7 +109,6 @@ export const SECTION_KEYS = [
   "scolarite",
   "stage",
   "calendrier",
-  "paiements",
   "demandes",
 ] as const;
 export type EspaceSection = (typeof SECTION_KEYS)[number];
@@ -134,7 +122,7 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
   const { role } = useAuth();
   const qc = useQueryClient();
   const store = useIstpm();
-  const isStaff = role === "directeur" || role === "responsable";
+  const isStaff = role === "directeur" || role === "assistant_directeur" || role === "responsable";
 
   const sectionIdx = section ? SECTION_KEYS.indexOf(section) : -1;
   // Position dans `tabBodies` (profil = 0) ; défaut = Scolarité.
@@ -224,7 +212,6 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
   const stageEnCours = (me?.stageEnCours as unknown as Record<string, string> | null | undefined) ?? stages.find((s) => ["en_cours", "convention_signee", "soutenance"].includes(String(s.statut))) ?? null;
   const notes = (me?.notes as unknown as { module: string; note: number }[] | undefined) ?? [];
   const bulletins = (me?.bulletins as unknown as Record<string, string | number>[] | undefined) ?? [];
-  const paiements = (me?.paiements as unknown as Record<string, string | number>[] | undefined) ?? [];
   const demandes: StudentRequest[] = reqQuery.data ?? [];
   const demandesPager = usePagination(demandes);
 
@@ -555,18 +542,6 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
         <DetailGrid single>
           <DetailField label="Moyenne générale" value={moyenne ? `${moyenne}/20` : ""} />
           <DetailField label="Bulletins publiés" value={String(bulletins.length)} />
-          <DetailField
-            label="Statut de paiement"
-            value={libellePaiement(profil?.paiement)}
-          />
-          <DetailField
-            label="Reste à payer"
-            value={
-              profil?.resteAPayer ?? profil?.reste_a_payer
-                ? `${String(profil.resteAPayer ?? profil.reste_a_payer)} MAD`
-                : ""
-            }
-          />
         </DetailGrid>
       </section>
     </div>
@@ -699,38 +674,6 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
     </section>
   );
 
-  const paiementsTab = (
-    <section className={cn(softCard, "space-y-3 p-5")}>
-      <div className="flex items-center gap-2">
-        <Wallet className="h-4 w-4 text-brand-dk" />
-        <p className={eyebrowClass}>Mes paiements</p>
-      </div>
-      <DetailGrid>
-        <DetailField
-          label="Reste à payer"
-          value={
-            profil?.resteAPayer ?? profil?.reste_a_payer
-              ? `${String(profil.resteAPayer ?? profil.reste_a_payer)} MAD`
-              : ""
-          }
-        />
-        <DetailField label="Statut" value={libellePaiement(profil?.paiement)} />
-      </DetailGrid>
-      {paiements.length ? (
-        <ul className="divide-y divide-brand/8">
-          {paiements.slice(0, 12).map((p, i) => (
-            <li key={String(p.id ?? i)} className="flex items-center justify-between py-2 text-sm">
-              <span className="text-muted-foreground">{String(p.date ?? p.mois ?? "")}</span>
-              <span className="font-semibold tabular-nums">{String(p.montant ?? "")} MAD</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-muted-foreground">Aucun règlement enregistré.</p>
-      )}
-    </section>
-  );
-
   const demandesTab = (
     <section className={cn(softCard, "space-y-3 p-4 sm:p-5")}>
       <div className="flex items-center justify-between gap-2">
@@ -791,7 +734,6 @@ export function EspaceEtudiantView({ section }: { section?: EspaceSection }) {
     scolariteTab,
     stageTab,
     calendrierSection,
-    paiementsTab,
     demandesTab,
   ];
 
@@ -1146,7 +1088,7 @@ const STATUT_FILTRES = [
 ] as const;
 
 /**
- * Vue « Espace étudiant » côté staff (directeur / responsable) : ni fiche ni
+ * Vue « Espace étudiant » côté staff (direction / responsable) : ni fiche ni
  * calendrier — le staff gère ça dans les pages dédiées. Ici, uniquement la
  * file des demandes des étudiants, à approuver ou rejeter avec une réponse.
  */

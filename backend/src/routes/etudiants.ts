@@ -6,7 +6,6 @@ import { etudiants } from "@/db/schema/etudiants";
 import { users } from "@/db/schema/users";
 import { formateurs } from "@/db/schema/formateurs";
 import { notesEtudiant } from "@/db/schema/notes-etudiant";
-import { historiquePaiements } from "@/db/schema/historique-paiements";
 import { stages } from "@/db/schema/stages";
 import { bulletins } from "@/db/schema/bulletins";
 import { ownEtudiantId, teacherScope, etudiantInScope } from "@/lib/scope";
@@ -25,7 +24,6 @@ const etudiantSchema = z.object({
   annee: z.string().optional().default(""),
   groupe: z.string().optional().default(""),
   statut: z.string().optional().default("inscrit"),
-  paiement: z.string().optional().default("en_attente"),
   telephone: z.string().optional().default(""),
   email: z.string().optional().default(""),
   dateNaissance: z.string().optional().default(""),
@@ -35,13 +33,10 @@ const etudiantSchema = z.object({
   photoUrl: z.string().max(3_000_000, "Image trop volumineuse").optional().default(""),
   // NOTE (sécurité) : la liaison de compte (userId) ne passe jamais par ici —
   // inscription/invitation avec CNE (voir services/auth.ts, routes/invitations.ts).
-  fraisMensuels: z.number().optional().default(0),
-  resteAPayer: z.number().optional().default(0),
-  paiementsMensuels: z.record(z.string(), z.enum(["paye", "en_attente", "retard", "impaye"])).optional(),
 });
 
 export async function etudiantRoutes(app: FastifyInstance) {
-  app.get("/export/csv", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.get("/export/csv", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request, reply) => {
     request.log.info({ by: request.user.id }, "Export CSV étudiants");
     const db = getDb();
     const query = request.query as {
@@ -63,12 +58,10 @@ export async function etudiantRoutes(app: FastifyInstance) {
         annee: etudiants.annee,
         groupe: etudiants.groupe,
         statut: etudiants.statut,
-        paiement: etudiants.paiement,
         telephone: etudiants.telephone,
         email: etudiants.email,
         dateNaissance: etudiants.dateNaissance,
         ville: etudiants.ville,
-        fraisAnnuels: etudiants.fraisAnnuels,
       })
       .from(etudiants)
       .orderBy(etudiants.nom, etudiants.prenom)
@@ -108,17 +101,14 @@ export async function etudiantRoutes(app: FastifyInstance) {
 
     const headers = [
       "cne", "matricule", "prenom", "nom", "filiere", "niveau",
-      "annee", "groupe", "statut", "paiement",
-      "telephone", "email", "dateNaissance", "ville", "fraisMensuels",
+      "annee", "groupe", "statut",
+      "telephone", "email", "dateNaissance", "ville",
     ];
 
     const headerLine = headers.join(",");
     const dataLines = rows.map((r) =>
       headers
-        .map((h) => {
-          if (h === "fraisMensuels") return escCsv(String(Math.round(Number(r.fraisAnnuels) / 10)));
-          return escCsv(String((r as Record<string, unknown>)[h] ?? ""));
-        })
+        .map((h) => escCsv(String((r as Record<string, unknown>)[h] ?? "")))
         .join(","),
     );
 
@@ -207,20 +197,12 @@ export async function etudiantRoutes(app: FastifyInstance) {
     const ids = rows.map((e) => e.id);
     // Enrichissement groupé : 3 requêtes au total au lieu de 3 par étudiant
     // (le N+1 prenait ~11 s pour 800+ fiches).
-    const [allNotes, allPaiements, allStages]: [
+    const [allNotes, allStages]: [
       (typeof notesEtudiant.$inferSelect)[],
-      (typeof historiquePaiements.$inferSelect)[],
       (typeof stages.$inferSelect)[],
     ] = await Promise.all([
       ids.length
         ? db.select().from(notesEtudiant).where(inArray(notesEtudiant.etudiantId, ids))
-        : [],
-      ids.length
-        ? db
-            .select()
-            .from(historiquePaiements)
-            .where(inArray(historiquePaiements.etudiantId, ids))
-            .orderBy(desc(historiquePaiements.date))
         : [],
       ids.length
         ? db
@@ -240,19 +222,12 @@ export async function etudiantRoutes(app: FastifyInstance) {
       if (list) list.push(n);
       else notesByEtudiant.set(n.etudiantId, [n]);
     }
-    const paiementsByEtudiant = new Map<string, typeof allPaiements>();
-    for (const p of allPaiements) {
-      const list = paiementsByEtudiant.get(p.etudiantId);
-      if (list) list.push(p);
-      else paiementsByEtudiant.set(p.etudiantId, [p]);
-    }
     const stageByEtudiant = new Map<string, (typeof allStages)[number]>();
     for (const s of allStages) {
       if (!stageByEtudiant.has(s.etudiantId)) stageByEtudiant.set(s.etudiantId, s);
     }
     const enriched = rows.map((e) => {
       const notes = notesByEtudiant.get(e.id) ?? [];
-      const paiements = paiementsByEtudiant.get(e.id) ?? [];
       const stageEnCours = stageByEtudiant.get(e.id) ?? null;
       {
         return {
@@ -266,7 +241,6 @@ export async function etudiantRoutes(app: FastifyInstance) {
           annee: e.annee,
           groupe: e.groupe,
           statut: e.statut,
-          paiement: e.paiement,
           moyenne: Number(e.moyenne),
           telephone: e.telephone,
           email: e.email,
@@ -274,11 +248,7 @@ export async function etudiantRoutes(app: FastifyInstance) {
           ville: e.ville,
           photoUrl: (e as { photoUrl?: string }).photoUrl ?? "",
           userId: (e as { userId?: string | null }).userId ?? null,
-          fraisAnnuels: Number(e.fraisAnnuels),
-          fraisMensuels: Math.round(Number(e.fraisAnnuels) / 10),
-          resteAPayer: Number(e.resteAPayer),
           archived: e.archived,
-          paiementsMensuels: e.paiementsMensuels ?? {},
           notes: notes.map((n) => ({
             id: n.id,
             module: n.module,
@@ -286,16 +256,6 @@ export async function etudiantRoutes(app: FastifyInstance) {
             coef: Number(n.coef),
             credits: Number(n.credits),
             examen: n.examen || undefined,
-          })),
-          historique: paiements.map((p) => ({
-            id: p.id,
-            date: p.date,
-            montant: Number(p.montant),
-            mode: p.mode,
-            periode: p.periode,
-            recu: p.recu,
-            statut: p.statut,
-            mois: p.mois || undefined,
           })),
           stageEnCours: stageEnCours
             ? `${stageEnCours.structure}   ${stageEnCours.service}`
@@ -332,12 +292,6 @@ export async function etudiantRoutes(app: FastifyInstance) {
       .from(notesEtudiant)
       .where(eq(notesEtudiant.etudiantId, id));
 
-    const paiements = await db
-      .select()
-      .from(historiquePaiements)
-      .where(eq(historiquePaiements.etudiantId, id))
-      .orderBy(desc(historiquePaiements.date));
-
     const [stageEnCours] = await db
       .select()
       .from(stages)
@@ -351,17 +305,12 @@ export async function etudiantRoutes(app: FastifyInstance) {
 
     return {
       ...etudiant,
-      fraisAnnuels: Number(etudiant.fraisAnnuels),
-      fraisMensuels: Math.round(Number(etudiant.fraisAnnuels) / 10),
-      resteAPayer: Number(etudiant.resteAPayer),
-      paiementsMensuels: etudiant.paiementsMensuels ?? {},
       notes,
-      historique: paiements,
       stageEnCours: stageEnCours ?? null,
     };
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.write")], bodyLimit: 2_000_000 }, async (request, reply) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("etudiants.write")], bodyLimit: 2_000_000 }, async (request, reply) => {
     const input = etudiantSchema.parse(request.body);
     const db = getDb();
 
@@ -395,10 +344,9 @@ export async function etudiantRoutes(app: FastifyInstance) {
     }
 
     try {
-      const fraisAnnuels = input.fraisMensuels * 10;
       const insertValues: Record<string, unknown> = {};
       for (const [key, val] of Object.entries(input)) {
-        if (val !== undefined && key !== "fraisMensuels" && key !== "fraisAnnuels") {
+        if (val !== undefined) {
           if (key === "moyenne") {
             insertValues[key] = String(val);
           } else {
@@ -406,8 +354,6 @@ export async function etudiantRoutes(app: FastifyInstance) {
           }
         }
       }
-      insertValues.fraisAnnuels = String(fraisAnnuels);
-      insertValues.resteAPayer = String(fraisAnnuels);
       const [etudiant] = await db
         .insert(etudiants)
         .values(insertValues as typeof etudiants.$inferInsert)
@@ -422,18 +368,14 @@ export async function etudiantRoutes(app: FastifyInstance) {
     }
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.write")], bodyLimit: 2_000_000 }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("etudiants.write")], bodyLimit: 2_000_000 }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = etudiantSchema.partial().parse(request.body);
     const db = getDb();
     const values: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(input)) {
       if (val !== undefined) {
-        if (key === "fraisMensuels") {
-          values.fraisAnnuels = String(Number(val) * 10);
-        } else if (key === "fraisAnnuels") {
-          values.fraisAnnuels = String(val);
-        } else if (key === "resteAPayer" || key === "moyenne") {
+        if (key === "moyenne") {
           values[key] = String(val);
         } else {
           values[key] = val;
@@ -458,14 +400,14 @@ export async function etudiantRoutes(app: FastifyInstance) {
     return etudiant;
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.delete")] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("etudiants.delete")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.update(etudiants).set({ archived: true }).where(eq(etudiants.id, id));
     return { ok: true };
   });
 
-  app.post("/:id/restore", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.write")] }, async (request) => {
+  app.post("/:id/restore", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("etudiants.write")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.update(etudiants).set({ archived: false }).where(eq(etudiants.id, id));

@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
   Trash2,
-  Save,
   Check,
   Users,
   ShieldCheck,
@@ -65,6 +64,7 @@ import {
   type UserRecord,
 } from "@/lib/istpm-api";
 import { InviteLinkBanner } from "@/components/invite-link-banner";
+import { StructureEditModal } from "@/components/structure-edit-modal";
 import {
   ConfirmDialog,
   FormDialog,
@@ -121,8 +121,8 @@ type SectionId =
  * Ce que chaque rôle peut administrer.
  *
  * Le responsable touche à l'organisation pédagogique + aux rôles (hors
- * directeur) ; le directeur a l'administration complète ; le comptable et
- * l'enseignant gèrent les rôles non-directeur. Le rôle est global : une fiche
+ * directeur) ; le directeur et son assistant ont l'administration complète ;
+ * l'enseignant gère les rôles non-directeur. Le rôle est global : une fiche
  * rôle s'applique à tous ses comptes, sans exception par utilisateur.
  */
 const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
@@ -154,19 +154,35 @@ const SECTIONS_PAR_ROLE: Record<UserRole, SectionId[]> = {
     "cachet",
     "structures",
   ],
+  assistant_directeur: [
+    "utilisateurs",
+    "roles",
+    "formateurs",
+    "filieres",
+    "niveaux_etudes",
+    "annees",
+    "groupes",
+    "modules",
+    "salles",
+    "creneaux",
+    "examens",
+    "bulletins",
+    "institut",
+    "securite",
+    "cachet",
+    "structures",
+  ],
   enseignant: ["roles"],
   etudiant: [],
-  // Le comptable ne voit que les comptes (création limitée au rôle comptable).
-  comptable: ["utilisateurs", "roles"],
 };
 
 /**
  * Noms de rôles canoniques (miroir du backend : toute autre valeur est
  * refusée côté serveur). Création/édition via dropdown uniquement.
  */
-const NOMS_ROLES = ["directeur", "responsable", "comptable", "enseignant", "etudiant"] as const;
+const NOMS_ROLES = ["directeur", "assistant_directeur", "responsable", "enseignant", "etudiant"] as const;
 /** Noms gérables hors directeur (jamais `directeur`, jamais de saisie libre). */
-const NOMS_ROLES_GERES = ["responsable", "comptable", "enseignant"] as const;
+const NOMS_ROLES_GERES = ["assistant_directeur", "responsable", "enseignant"] as const;
 
 const META: Record<
   SectionId,
@@ -401,12 +417,6 @@ function StampSection({ readOnly }: { readOnly?: boolean }) {
       </div>
     </Carte>
   );
-}
-
-/** Retire une clé d'un objet (brouillons de capacité). */
-function omitKey<T extends Record<string, unknown>>(obj: T, key: string): T {
-  const { [key]: _dropped, ...rest } = obj;
-  return rest as T;
 }
 
 /** Liste éditable de libellés simples (salles, groupes, années…). */
@@ -1258,7 +1268,7 @@ function NewUserForm({
 }: {
   onClose: () => void;
   onCreated: (user: UserRecord) => void;
-  /** Rôle imposé (ex. comptable créant un pair) : sélecteur masqué. */
+  /** Rôle imposé : sélecteur masqué. */
   fixedRole?: string;
 }) {
   const [name, setName] = useState("");
@@ -1395,7 +1405,7 @@ function NewUserForm({
               onChange={(e) => setRole(e.target.value)}
               className={selectClass}
             >
-              {["directeur", "responsable", "comptable"].map((r) => (
+              {["directeur", "assistant_directeur", "responsable"].map((r) => (
                 <option key={r} value={r}>{ROLE_META[r as UserRole]?.label ?? r}</option>
               ))}
             </select>
@@ -1771,7 +1781,7 @@ function isHiddenAccountRole(role: string): boolean {
 }
 
 /** Rôles visibles/éditables dans « Utilisateurs ». */
-const VISIBLE_ACCOUNT_ROLES = ["directeur", "responsable", "comptable"];
+const VISIBLE_ACCOUNT_ROLES = ["directeur", "assistant_directeur", "responsable"];
 
 function SettingsPage() {
   const { role } = useAuth();
@@ -1790,6 +1800,9 @@ function SettingsPage() {
     addNiveauEtudes,
     deleteNiveauEtudes,
     structuresAccueil,
+    servicesStage,
+    servicesHeures,
+    programmeStages,
     groupConfigs,
     addGroupConfig,
     updateGroupConfig,
@@ -1836,8 +1849,8 @@ function SettingsPage() {
   const [annees, setAnnees] = useState<string[]>([]);
   const [salles, setSalles] = useState<string[]>([]);
   const [nouvelleStructure, setNouvelleStructure] = useState("");
-  /** Brouillons de capacité (nom → capacité) ; le store serveur fait foi. */
-  const [brouillonsCap, setBrouillonsCap] = useState<Record<string, number>>({});
+  /** Structure en cours d'édition (modale sous-stages), null = fermée. */
+  const [editStructure, setEditStructure] = useState<StructureAccueil | null>(null);
 
   const ajouterStructure = async () => {
     const nom = nouvelleStructure.trim();
@@ -1984,7 +1997,6 @@ function SettingsPage() {
     { label: "Examens", perms: ["examens.read", "examens.write", "examens.delete"] },
     { label: "Bulletins", perms: ["bulletins.read", "bulletins.write", "bulletins.delete"] },
     { label: "Stages", perms: ["stages.read", "stages.write", "stages.delete"] },
-    { label: "Paiements", perms: ["paiements.read", "paiements.write", "paiements.delete"] },
     { label: "Paramètres", perms: ["settings.read", "settings.write"] },
     { label: "Utilisateurs", perms: ["users.read", "users.write", "users.delete"] },
     { label: "Rôles", perms: ["roles.read", "roles.manage"] },
@@ -2273,7 +2285,7 @@ function SettingsPage() {
             }
           >
             <div className="space-y-1.5">
-              {smtpOk === false && role !== "comptable" ? (
+              {smtpOk === false ? (
                 <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
                   E-mails non configurés sur le serveur (SMTP) : les invitations devront être
                   partagées manuellement via leur lien.
@@ -2288,24 +2300,22 @@ function SettingsPage() {
                     className={cn(softInput, "h-8 text-sm")}
                   />
                 </div>
-                {role === "comptable" ? null : (
-                  <select
-                    value={userRoleFilter}
-                    onChange={(e) => setUserRoleFilter(e.target.value)}
-                    className={cn(
-                      "h-8 rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none",
-                      "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
-                    )}
-                    aria-label="Filtrer par rôle"
-                  >
-                    <option value="__all__">Tous les rôles ({staffCount})</option>
-                    {VISIBLE_ACCOUNT_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_META[r as UserRole]?.label ?? r}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <select
+                  value={userRoleFilter}
+                  onChange={(e) => setUserRoleFilter(e.target.value)}
+                  className={cn(
+                    "h-8 rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none",
+                    "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
+                  )}
+                  aria-label="Filtrer par rôle"
+                >
+                  <option value="__all__">Tous les rôles ({staffCount})</option>
+                  {VISIBLE_ACCOUNT_ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {ROLE_META[r as UserRole]?.label ?? r}
+                    </option>
+                  ))}
+                </select>
               </div>
               {filteredUsers.length === 0 ? (
                 <p className="py-3 text-center text-xs text-muted-foreground">
@@ -2325,43 +2335,35 @@ function SettingsPage() {
                         {u.email}
                       </span>
                     </span>
-                    {role === "comptable" ? (
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {ROLE_META[u.role as UserRole]?.label ?? u.role}
-                      </span>
-                    ) : (
-                      <select
-                        value={u.role}
-                        onChange={(e) => {
-                          assignUserRole(u.id, e.target.value).then(() => {
-                            setUsersList((prev) =>
-                              prev.map((x) => (x.id === u.id ? { ...x, role: e.target.value } : x)),
-                            );
-                            toast.success(`Rôle de ${u.name} mis à jour`);
-                          }).catch(() => toast.error("Erreur lors du changement de rôle"));
-                        }}
-                        className={cn(
-                          "h-7 rounded-lg border border-brand/12 bg-card px-2 text-xs font-medium text-foreground outline-none",
-                          "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
-                        )}
-                      >
-                        {VISIBLE_ACCOUNT_ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {ROLE_META[r as UserRole]?.label ?? r}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    {role === "comptable" ? null : (
-                      <button
-                        type="button"
-                        aria-label={`Supprimer ${u.name}`}
-                        onClick={() => setDeleteTarget({ type: "user", id: u.id, name: u.name })}
-                        className={cn(iconButtonDanger, "h-7 w-7")}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
+                    <select
+                      value={u.role}
+                      onChange={(e) => {
+                        assignUserRole(u.id, e.target.value).then(() => {
+                          setUsersList((prev) =>
+                            prev.map((x) => (x.id === u.id ? { ...x, role: e.target.value } : x)),
+                          );
+                          toast.success(`Rôle de ${u.name} mis à jour`);
+                        }).catch(() => toast.error("Erreur lors du changement de rôle"));
+                      }}
+                      className={cn(
+                        "h-7 rounded-lg border border-brand/12 bg-card px-2 text-xs font-medium text-foreground outline-none",
+                        "focus:border-brand/30 focus:ring-1 focus:ring-brand/20",
+                      )}
+                    >
+                      {VISIBLE_ACCOUNT_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_META[r as UserRole]?.label ?? r}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      aria-label={`Supprimer ${u.name}`}
+                      onClick={() => setDeleteTarget({ type: "user", id: u.id, name: u.name })}
+                      className={cn(iconButtonDanger, "h-7 w-7")}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
                   </div>
                 ))
               )}
@@ -2438,7 +2440,7 @@ function SettingsPage() {
                 })}
               </div>
             ) : null}
-            {showNewUser ? <NewUserForm onClose={() => setShowNewUser(false)} fixedRole={role === "comptable" ? "comptable" : undefined} onCreated={(u) => { setUsersList((prev) => [...prev, u]); setShowNewUser(false); reloadPendingInvites(); }} /> : null}
+            {showNewUser ? <NewUserForm onClose={() => setShowNewUser(false)} onCreated={(u) => { setUsersList((prev) => [...prev, u]); setShowNewUser(false); reloadPendingInvites(); }} /> : null}
           </Carte>
         );
 
@@ -2656,87 +2658,89 @@ function SettingsPage() {
       case "cachet":
         return <StampSection readOnly={!sectionModifiable("cachet")} />;
 
-      case "structures":
+      case "structures": {
+        const modifiable = sectionModifiable("structures");
         return (
-          <Carte id="structures" readOnly={!sectionModifiable("structures")}>
-            <div className="space-y-3">
-              {structuresAccueil.map((s) => (
-                <div key={s.nom} className="flex items-center gap-2 rounded-xl border border-brand/12 bg-card px-3 py-2">
-                  <span className="min-w-0 flex-1 text-sm font-medium text-foreground">{s.nom}</span>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <span>Cap.</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={brouillonsCap[s.nom] ?? s.capacite}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        if (v >= 1) {
-                          setBrouillonsCap((p) => (v === s.capacite ? omitKey(p, s.nom) : { ...p, [s.nom]: v }));
-                        }
-                      }}
-                      className="h-7 w-16 rounded-lg border-brand/20 text-center text-xs tabular-nums"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className={ghostPill + " text-alert p-1.5"}
-                    aria-label={`Supprimer ${s.nom}`}
-                    onClick={() => {
-                      void deleteStructureAccueil(s.nom)
-                        .then(() => toast.success(`Supprimée   ${s.nom}`))
-                        .catch((err) => toast.error(err instanceof Error ? err.message : "Suppression impossible"));
-                    }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Ajouter une structure…"
-                  value={nouvelleStructure}
-                  onChange={(e) => setNouvelleStructure(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void ajouterStructure();
-                    }
-                  }}
-                  className={cn(softInput, "h-9 flex-1 text-sm")}
-                />
-                <button
-                  type="button"
-                  className={cn(primaryPill, "h-9 px-4 text-sm")}
-                  onClick={() => void ajouterStructure()}
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
-              {Object.keys(brouillonsCap).length ? (
-                <div className="flex justify-end border-t border-brand/12 pt-3">
-                  <button
-                    type="button"
-                    className={cn(primaryPill, "h-9 gap-1.5 px-5 text-sm")}
-                    onClick={async () => {
-                      try {
-                        for (const [nom, capacite] of Object.entries(brouillonsCap)) {
-                          await updateStructureAccueil(nom, { capacite });
-                        }
-                        setBrouillonsCap({});
-                        toast.success("Capacités enregistrées");
-                      } catch (err) {
-                        toast.error(err instanceof Error ? err.message : "Enregistrement impossible");
+          <>
+            <Carte id="structures" readOnly={!modifiable}>
+              <div className="space-y-3">
+                {structuresAccueil.map((s) => {
+                  const rows = s.subStages ?? [];
+                  const tot = rows.reduce((t, r) => t + r.capacite, 0);
+                  return (
+                    <div key={s.nom} className="flex items-center gap-2 rounded-xl border border-brand/12 bg-card px-3 py-2">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-foreground">{s.nom}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {rows.length
+                            ? `${rows.length} sous-stage(s) · ${tot} places`
+                            : `Capacité : ${s.capacite ?? 5} places`}
+                        </span>
+                      </span>
+                      {modifiable ? (
+                        <button
+                          type="button"
+                          className={cn(ghostPill, "h-7 gap-1 px-2.5 text-[11px]")}
+                          onClick={() => setEditStructure(s)}
+                        >
+                          <PenLine className="h-3 w-3" /> Modifier
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={ghostPill + " text-alert p-1.5"}
+                        aria-label={`Supprimer ${s.nom}`}
+                        onClick={() => {
+                          void deleteStructureAccueil(s.nom)
+                            .then(() => toast.success(`Supprimée   ${s.nom}`))
+                            .catch((err) => toast.error(err instanceof Error ? err.message : "Suppression impossible"));
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Ajouter une structure…"
+                    value={nouvelleStructure}
+                    onChange={(e) => setNouvelleStructure(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void ajouterStructure();
                       }
                     }}
+                    className={cn(softInput, "h-9 flex-1 text-sm")}
+                  />
+                  <button
+                    type="button"
+                    className={cn(primaryPill, "h-9 px-4 text-sm")}
+                    onClick={() => void ajouterStructure()}
                   >
-                    <Save className="h-4 w-4" /> Enregistrer les capacités
+                    <Plus className="h-4 w-4" />
                   </button>
                 </div>
-              ) : null}
-            </div>
-          </Carte>
+              </div>
+            </Carte>
+            {editStructure ? (
+              <StructureEditModal
+                structure={structuresAccueil.find((x) => x.nom === editStructure.nom) ?? editStructure}
+                services={servicesStage}
+                servicesHeures={servicesHeures}
+                programme={programmeStages}
+                readOnly={!modifiable}
+                onClose={() => setEditStructure(null)}
+                onSave={async (nomInitial, body) => {
+                  await updateStructureAccueil(nomInitial, body);
+                  toast.success("Structure enregistrée");
+                }}
+              />
+            ) : null}
+          </>
         );
+      }
 
       default:
         return null;

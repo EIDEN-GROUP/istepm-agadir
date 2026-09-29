@@ -16,10 +16,10 @@ export const INVITATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 export type InvitationRole =
   | "directeur"
+  | "assistant_directeur"
   | "enseignant"
   | "responsable"
-  | "etudiant"
-  | "comptable";
+  | "etudiant";
 
 function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -60,7 +60,7 @@ function inviteHtml(name: string, role: string, inviteUrl: string) {
     <p style="margin:0 0 16px;">
       Un compte <strong>${escInvite(roleLabel)}</strong> vient d'être créé pour vous sur la
       plateforme de gestion scolaire de l'ISTEPM Agadir. Il vous donne accès à votre espace
-      personnel : emploi du temps, notes, paiements et démarches administratives selon votre profil.
+      personnel : emploi du temps, notes et démarches administratives selon votre profil.
     </p>
     <p style="margin:0 0 26px;">
       Pour commencer, choisissez votre mot de passe en cliquant sur le bouton ci-dessous.

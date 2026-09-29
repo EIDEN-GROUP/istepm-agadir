@@ -8,7 +8,6 @@ import { formateurs } from "@/db/schema/formateurs";
 import { examens } from "@/db/schema/examens";
 import { bulletins } from "@/db/schema/bulletins";
 import { stages } from "@/db/schema/stages";
-import { historiquePaiements } from "@/db/schema/historique-paiements";
 import { and, gte, lte, eq, sql, ne, desc } from "drizzle-orm";
 
 export async function dashboardRoutes(app: FastifyInstance) {
@@ -122,20 +121,11 @@ export async function dashboardRoutes(app: FastifyInstance) {
       (Number(totalReussite.count) / totalEtudiantsVal) * 100,
     );
 
-    const resteRows = await db
-      .select({ reste: etudiants.resteAPayer })
-      .from(etudiants);
-    const totalARecouvrer = resteRows.reduce(
-      (s, r) => s + Number(r.reste),
-      0,
-    );
-
     return {
       totalInscrits: Number(totalInscrits.count),
       deltaSemestre: 6,
       formateursActifs: Number(formateursActifs.count),
       tauxReussite,
-      totalARecouvrer,
     };
   });
 
@@ -186,50 +176,6 @@ export async function dashboardRoutes(app: FastifyInstance) {
     }));
   });
 
-  app.get("/istpm-financier", { preHandler: [authenticate] }, async () => {
-    const db = getDb();
-    const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString()
-      .split("T")[0];
-
-    const paiementsRows = await db.select().from(historiquePaiements);
-    const encaisse = paiementsRows.reduce((s, p) => s + Number(p.montant), 0);
-    const encaisseCeMois = paiementsRows
-      .filter((p) => p.date >= firstOfMonth)
-      .reduce((s, p) => s + Number(p.montant), 0);
-
-    const etuRows = await db
-      .select({
-        fraisAnnuels: etudiants.fraisAnnuels,
-        paiementsMensuels: etudiants.paiementsMensuels,
-      })
-      .from(etudiants);
-
-    const fm = (e: { fraisAnnuels: string }) =>
-      Math.round(Number(e.fraisAnnuels) / 10);
-
-    let enAttente = 0;
-    let impaye = 0;
-    let retard = 0;
-    for (const e of etuRows) {
-      const pm = (e.paiementsMensuels ?? {}) as Record<string, string>;
-      for (const st of Object.values(pm)) {
-        if (st === "en_attente") enAttente += fm(e);
-        else if (st === "impaye") impaye += fm(e);
-        else if (st === "retard") retard += fm(e);
-      }
-    }
-
-    const totalARecouvrer = enAttente + impaye + retard;
-    const tauxRecouvrement =
-      encaisse + totalARecouvrer > 0
-        ? Math.round((encaisse / (encaisse + totalARecouvrer)) * 100)
-        : 0;
-
-    return { encaisse, encaisseCeMois, enAttente, impaye, retard, tauxRecouvrement };
-  });
-
   app.get("/istpm-a-traiter", { preHandler: [authenticate] }, async () => {
     const db = getDb();
 
@@ -269,36 +215,10 @@ export async function dashboardRoutes(app: FastifyInstance) {
     return rows;
   });
 
-  app.get("/istpm-a-relancer", { preHandler: [authenticate] }, async () => {
-    const db = getDb();
-    const rows = await db
-      .select()
-      .from(etudiants)
-      .where(
-        and(
-          ne(etudiants.paiement, "paye"),
-          sql`${etudiants.resteAPayer}::numeric > 0`,
-        ),
-      )
-      .orderBy(desc(etudiants.resteAPayer));
-    return rows;
-  });
-
   app.get("/activities", { preHandler: [authenticate] }, async () => {
     const db = getDb();
-    const [recentPayments, recentExamens, recentBulletins, recentStages, recentEtudiants] =
+    const [recentExamens, recentBulletins, recentStages, recentEtudiants] =
       await Promise.all([
-        db
-          .select({
-            id: historiquePaiements.id,
-            type: sql<string>`'paiement'`,
-            message: sql<string>`'Paiement de ' || ${historiquePaiements.montant} || ' DH enregistré'`,
-            date: historiquePaiements.date,
-            createdAt: historiquePaiements.createdAt,
-          })
-          .from(historiquePaiements)
-          .orderBy(desc(historiquePaiements.createdAt))
-          .limit(10),
         db
           .select({
             id: examens.id,
@@ -346,7 +266,6 @@ export async function dashboardRoutes(app: FastifyInstance) {
       ]);
 
     const all = [
-      ...recentPayments,
       ...recentExamens,
       ...recentBulletins,
       ...recentStages,

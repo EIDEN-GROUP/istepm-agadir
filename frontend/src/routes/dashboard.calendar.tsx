@@ -61,6 +61,11 @@ import {
 } from "@/components/calendar-views";
 import { AppelSeanceDialog } from "@/components/appel-seance-dialog";
 import {
+  SeanceStatutBadge,
+  SeanceDocumentSection,
+  SeanceValidationActions,
+} from "@/components/seance-validation";
+import {
   softCard,
   primaryPill,
   ghostPill,
@@ -149,7 +154,7 @@ function PlanningPage() {
 
   // La direction et le responsable des affaires estudiantines organisent les
   // séances ; l'enseignant consulte uniquement son propre planning.
-  const canEdit = role === "responsable" || role === "directeur";
+  const canEdit = role === "responsable" || role === "directeur" || role === "assistant_directeur";
   const estEnseignant = role === "enseignant";
   const moiFormateur = useCurrentFormateur();
 
@@ -757,6 +762,7 @@ const [importOpen, setImportOpen] = useState(false);
               nomProf={nomProf}
               conflits={conflitsSeance(detail, detail.id)}
               canEdit={canEdit}
+              ownerId={moiFormateur?.id ?? null}
               onEdit={(s) => {
                 setEditing(s);
                 setPrefill(null);
@@ -871,7 +877,7 @@ const [importOpen, setImportOpen] = useState(false);
 
 /* ------------------------------------------------------------------ */
 
-function SeanceDetail({
+export function SeanceDetail({
   seance,
   nomProf,
   conflits,
@@ -879,6 +885,8 @@ function SeanceDetail({
   onEdit,
   onDelete,
   onAppel,
+  ownerId,
+  validation,
 }: {
   seance: Seance;
   nomProf: (id: string) => string;
@@ -887,8 +895,64 @@ function SeanceDetail({
   onEdit: (s: Seance) => void;
   onDelete: (s: Seance) => void;
   onAppel: (s: Seance) => void;
+  /** Fiche formateur du compte connecté (workflow enseignant). */
+  ownerId?: string | null;
+  /** Force le bloc de validation direction (ex. dialogue de charge). Défaut : suit `canEdit`. */
+  validation?: "direction" | null;
 }) {
   const c = couleurSeance(seance.module);
+  const { updateSeance, attachSeanceDocument, removeSeanceDocument } = useIstpm();
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const isDirection = validation !== undefined ? validation === "direction" : canEdit;
+  const isOwner = !!ownerId && seance.professeurId === ownerId && !isDirection;
+
+  const erreurServeur = (err: unknown, repli: string) =>
+    err instanceof ApiError && err.message ? err.message : err instanceof Error ? err.message : repli;
+
+  const transition = async (patch: Partial<Seance>, ok: string) => {
+    setBusy(true);
+    try {
+      await updateSeance(seance.id, patch);
+      toast.success(ok);
+    } catch (err) {
+      toast.error(erreurServeur(err, "Opération impossible"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deposer = async (file: File) => {
+    setUploading(true);
+    try {
+      await attachSeanceDocument(seance.id, file);
+      toast.success(`Compte-rendu déposé   ${file.name}`);
+    } catch (err) {
+      toast.error(erreurServeur(err, "Dépôt impossible"));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const retirerDoc = async () => {
+    try {
+      await removeSeanceDocument(seance.id);
+      toast.success("Compte-rendu retiré");
+    } catch (err) {
+      toast.error(erreurServeur(err, "Retrait impossible"));
+    }
+  };
+
+  const ligneStatut =
+    seance.statut === "valide"
+      ? "Validée par la direction."
+      : seance.statut === "rejete"
+        ? "Rejetée par la direction — voir le motif ci-dessous."
+        : seance.statut === "termine"
+          ? "Terminée — en attente de validation par la direction."
+          : seance.statut === "annule"
+            ? "Séance annulée."
+            : "Séance en cours de préparation.";
   return (
     <DetailShell
       icon={<CalendarDays className="h-5 w-5" />}
@@ -903,6 +967,7 @@ function SeanceDetail({
             {TYPE_SEANCE_LABEL[seance.type]}
           </span>
           <span className={toneBadge("blue")}>{libelleNiveau(seance.semestre)}</span>
+          <SeanceStatutBadge statut={seance.statut} />
           {conflits.length ? (
             <span className={toneBadge("red")}>
               {conflits.length} conflit(s)
@@ -996,6 +1061,39 @@ function SeanceDetail({
             value={seance.anneeUniversitaire}
           />
         </DetailGrid>
+      </DetailSection>
+
+      <DetailSection title="Statut">
+        <p className="text-sm text-muted-foreground">{ligneStatut}</p>
+        {seance.statut === "rejete" && seance.motifRejet ? (
+          <div className="mt-2 space-y-1 rounded-2xl bg-alert/10 px-4 py-3">
+            <p className="text-sm font-semibold text-alert">Motif du rejet</p>
+            <p className="text-sm text-alert-dk">{seance.motifRejet}</p>
+          </div>
+        ) : null}
+        <div className="mt-3">
+          <SeanceValidationActions
+            seance={seance}
+            isDirection={isDirection}
+            isOwner={isOwner}
+            busy={busy}
+            onTerminer={() => transition({ statut: "termine" }, `Séance marquée faite   ${seance.module}`)}
+            onVu={() => transition({ statut: "planifie" }, "Rejet pris en compte")}
+            onConfirmer={() => transition({ statut: "valide" }, `Séance validée   ${seance.module}`)}
+            onRejeter={(motif) => transition({ statut: "rejete", motifRejet: motif }, "Séance rejetée — l'enseignant est notifié")}
+          />
+        </div>
+      </DetailSection>
+
+      <DetailSection title="Compte-rendu">
+        <SeanceDocumentSection
+          seance={seance}
+          canUpload={isOwner}
+          uploading={uploading}
+          onUpload={deposer}
+          canDelete={isDirection}
+          onDelete={retirerDoc}
+        />
       </DetailSection>
 
       <DetailSection title="Notes">
@@ -1127,6 +1225,7 @@ function SeanceForm({
       anneeUniversitaire: f.anneeUniversitaire,
       semestre: f.semestre as Niveau,
       type: f.type,
+      statut: initial?.statut ?? "planifie",
       notes: f.notes.trim() || undefined,
     });
   };
@@ -1546,6 +1645,7 @@ function validerLigne(
       anneeUniversitaire,
       semestre: semestre as Niveau,
       type,
+      statut: "planifie",
       notes: notes || undefined,
     },
   };

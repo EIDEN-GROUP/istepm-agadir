@@ -13,7 +13,7 @@ async function assertSeanceOwnership(
   user: { id: string; role: string },
   seanceId: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (user.role === "directeur" || user.role === "responsable") return { ok: true };
+  if (user.role === "directeur" || user.role === "assistant_directeur" || user.role === "responsable") return { ok: true };
   if (user.role !== "enseignant") return { ok: false, error: "Accès refusé : rôle insuffisant" };
   const scope = await teacherScope(user.id);
   const [seance] = await db.select().from(seances).where(eq(seances.id, seanceId)).limit(1);
@@ -25,7 +25,7 @@ async function assertSeanceOwnership(
 }
 
 export async function attendanceRoutes(app: FastifyInstance) {
-  app.post("/session/open", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request, reply) => {
+  app.post("/session/open", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable", "enseignant")] }, async (request, reply) => {
     const schema = z.object({ seanceId: z.string().min(1) });
     const { seanceId } = schema.parse(request.body);
     const db = getDb();
@@ -46,7 +46,7 @@ export async function attendanceRoutes(app: FastifyInstance) {
     return session;
   });
 
-  app.post("/session/:id/close", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request, reply) => {
+  app.post("/session/:id/close", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable", "enseignant")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [session] = await db
@@ -78,7 +78,7 @@ export async function attendanceRoutes(app: FastifyInstance) {
     return session;
   });
 
-  app.post("/bulk", { preHandler: [authenticate, requireRole("directeur", "responsable", "enseignant")] }, async (request, reply) => {
+  app.post("/bulk", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable", "enseignant")] }, async (request, reply) => {
     const schema = z.object({
       seanceId: z.string().min(1),
       entries: z.array(

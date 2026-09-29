@@ -53,7 +53,7 @@ function LoginPage() {
     try {
       await login(result.data.email, result.data.password);
       // Portail réservé aux étudiants et enseignants : le personnel
-      // (directeur, responsable, comptable) passe par /istepm.
+      // (directeur, assistant, responsable) passe par /istepm.
       const r = getStoredRole();
       if (r !== "etudiant" && r !== "enseignant") {
         logout();

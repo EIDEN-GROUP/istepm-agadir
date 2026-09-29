@@ -74,7 +74,7 @@ function FormateursPage() {
   const { role } = useAuth();
   const { formateurs, modules, seances, etudiants, filieres: filieresApi, addFormateur, updateFormateur, archiveFormateur, restoreFormateur } =
     useIstpm();
-  const canEdit = useCan("formateurs.write", role === "directeur" || role === "responsable");
+  const canEdit = useCan("formateurs.write", role === "directeur" || role === "assistant_directeur" || role === "responsable");
   const filieresOptions = filieresApi.length ? filieresApi : [...FILIERES];
 
   /** Options du sélecteur : registre des modules (Paramètres › Modules),

@@ -12,7 +12,7 @@ export type CreateUserInput = {
   email: string;
   password: string;
   name: string;
-  role?: "directeur" | "enseignant" | "responsable" | "etudiant" | "comptable";
+  role?: "directeur" | "assistant_directeur" | "enseignant" | "responsable" | "etudiant";
   filiere?: string;
   niveau?: string;
   groupe?: string;
@@ -58,7 +58,7 @@ export async function createUser(input: CreateUserInput): Promise<UserResult> {
   const db = getDb();
   const passwordHash = await hashPassword(input.password);
   // E-mails insensibles à la casse : normalisés une fois pour toutes
-  // (sinon `Comptable@…` créé puis `comptable@…` à la connexion = 401).
+  // (sinon `Direction@…` créé puis `direction@…` à la connexion = 401).
   const email = input.email.trim().toLowerCase();
   const [user] = await db
     .insert(users)
@@ -204,7 +204,7 @@ export async function updateSelfProfile(
       .where(eq(formateurs.userId, id));
   }
   // La photo d'un étudiant doit apparaître partout dans l'app (listes, bulletins,
-  // paiements, stages…) : ces écrans lisent `etudiants.photo_url`. On y recopie
+  // stages…) : ces écrans lisent `etudiants.photo_url`. On y recopie
   // donc la photo du compte, comme le fait déjà PUT /student/me/photo.
   if (data.photoUrl !== undefined && updated.role === "etudiant") {
     await db

@@ -45,7 +45,7 @@ async function recalculerMoyenne(db: ReturnType<typeof getDb>, etudiantId: strin
 export async function noteRoutes(app: FastifyInstance) {
   app.post(
     "/",
-    { preHandler: [authenticate, requireRole("directeur", "enseignant", "responsable"), requirePerm("examens.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "enseignant", "responsable"), requirePerm("examens.write")] },
     async (request, reply) => {
       const input = createNoteSchema.parse(request.body);
       const db = getDb();
@@ -108,7 +108,7 @@ export async function noteRoutes(app: FastifyInstance) {
 
   app.delete(
     "/:id",
-    { preHandler: [authenticate, requireRole("directeur", "enseignant", "responsable"), requirePerm("examens.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "enseignant", "responsable"), requirePerm("examens.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const db = getDb();

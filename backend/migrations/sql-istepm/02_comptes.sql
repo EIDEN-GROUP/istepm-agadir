@@ -3,16 +3,16 @@
 -- Rôles par défaut.
 INSERT INTO "roles" ("name", "description", "permissions", "is_system") VALUES
   ('directeur', 'Accès complet à l''ensemble du système',
-   '["etudiants.read", "etudiants.write", "etudiants.delete", "formateurs.read", "formateurs.write", "formateurs.delete", "examens.read", "examens.write", "examens.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "paiements.read", "paiements.write", "paiements.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read", "settings.annees.read", "settings.annees.write", "settings.groupes.read", "settings.groupes.write", "settings.modules.read", "settings.modules.write", "settings.salles.read", "settings.salles.write", "settings.creneaux.read", "settings.creneaux.write", "settings.planning.read", "settings.planning.write", "settings.filieres.read", "settings.filieres.write", "settings.examens.read", "settings.examens.write", "settings.bulletins.read", "settings.bulletins.write", "settings.institut.read", "settings.institut.write", "settings.securite.read", "settings.securite.write", "settings.cachet.read", "settings.cachet.write", "settings.structures.read", "settings.structures.write"]'::jsonb,
+   '["etudiants.read", "etudiants.write", "etudiants.delete", "formateurs.read", "formateurs.write", "formateurs.delete", "examens.read", "examens.write", "examens.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read", "settings.annees.read", "settings.annees.write", "settings.groupes.read", "settings.groupes.write", "settings.modules.read", "settings.modules.write", "settings.salles.read", "settings.salles.write", "settings.creneaux.read", "settings.creneaux.write", "settings.planning.read", "settings.planning.write", "settings.filieres.read", "settings.filieres.write", "settings.niveaux_etudes.read", "settings.niveaux_etudes.write", "settings.examens.read", "settings.examens.write", "settings.bulletins.read", "settings.bulletins.write", "settings.institut.read", "settings.institut.write", "settings.securite.read", "settings.securite.write", "settings.cachet.read", "settings.cachet.write", "settings.structures.read", "settings.structures.write"]'::jsonb,
+   true),
+  ('assistant_directeur', 'Assistant du directeur — mêmes droits que le directeur, sauf la gestion du rôle et des comptes directeur',
+   '["etudiants.read", "etudiants.write", "etudiants.delete", "formateurs.read", "formateurs.write", "formateurs.delete", "examens.read", "examens.write", "examens.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read", "settings.annees.read", "settings.annees.write", "settings.groupes.read", "settings.groupes.write", "settings.modules.read", "settings.modules.write", "settings.salles.read", "settings.salles.write", "settings.creneaux.read", "settings.creneaux.write", "settings.planning.read", "settings.planning.write", "settings.filieres.read", "settings.filieres.write", "settings.niveaux_etudes.read", "settings.niveaux_etudes.write", "settings.examens.read", "settings.examens.write", "settings.bulletins.read", "settings.bulletins.write", "settings.institut.read", "settings.institut.write", "settings.securite.read", "settings.securite.write", "settings.cachet.read", "settings.cachet.write", "settings.structures.read", "settings.structures.write"]'::jsonb,
    true),
   ('responsable', 'Gestion pédagogique et organisationnelle',
-   '["etudiants.read", "etudiants.write", "etudiants.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "paiements.read", "paiements.write", "paiements.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read", "settings.annees.read", "settings.annees.write", "settings.groupes.read", "settings.groupes.write", "settings.modules.read", "settings.modules.write", "settings.salles.read", "settings.salles.write", "settings.creneaux.read", "settings.creneaux.write", "settings.planning.read", "settings.planning.write", "settings.structures.read", "settings.structures.write"]'::jsonb,
+   '["etudiants.read", "etudiants.write", "etudiants.delete", "bulletins.read", "bulletins.write", "bulletins.delete", "stages.read", "stages.write", "stages.delete", "settings.read", "settings.write", "users.read", "users.write", "users.delete", "roles.read", "roles.manage", "dashboard.read", "settings.annees.read", "settings.annees.write", "settings.groupes.read", "settings.groupes.write", "settings.modules.read", "settings.modules.write", "settings.salles.read", "settings.salles.write", "settings.creneaux.read", "settings.creneaux.write", "settings.planning.read", "settings.planning.write", "settings.structures.read", "settings.structures.write"]'::jsonb,
    true),
   ('enseignant', 'Accès limité à ses modules, séances, et saisie de notes',
    '["etudiants.read", "examens.read", "examens.write", "examens.delete", "bulletins.read", "roles.read", "roles.manage", "dashboard.read"]'::jsonb,
-   true),
-  ('comptable', 'Gestion des paiements et de la comptabilité',
-   '["paiements.read", "paiements.write", "etudiants.read", "users.write", "roles.read", "roles.manage", "dashboard.read"]'::jsonb,
    true)
 ON CONFLICT ("name") DO UPDATE SET
   "description" = EXCLUDED."description",
@@ -20,9 +20,10 @@ ON CONFLICT ("name") DO UPDATE SET
   "is_system" = EXCLUDED."is_system";
 
 -- Comptes de test (mots de passe faibles — recette uniquement).
--- direction@istpm-agadir.ma / directeur123 · enseignant@… / enseignant123 · responsable@… / responsable123
+-- direction@istpm-agadir.ma / directeur123 · assistant@… / assistant123 · enseignant@… / enseignant123 · responsable@… / responsable123
 INSERT INTO "users" ("email", "password_hash", "name", "role") VALUES
   ('direction@istpm-agadir.ma', '$2b$10$PAnZKRCQa.uKh92Bgf1TDeIYlEmRsRnMlR3tK3eH.1TuOzB/wuJ9C', 'Dr. Youssef Benali', 'directeur'),
+  ('assistant@istpm-agadir.ma', '$2b$10$k8qcfO7V6qZF6Nybkj0ZsOAWUe4aSr5h/mePAbYy8tG6sFZHaIWqO', 'Mme Khadija Amrani', 'assistant_directeur'),
   ('enseignant@istpm-agadir.ma', '$2b$10$W0xAH.9MgiR/rXH2UJX8Te7ujbUDVkG5mTKx/rEHq.BHJCfnJzSKO', 'Mme Salma Ait Taleb', 'enseignant'),
   ('responsable@istpm-agadir.ma', '$2b$10$FW.DWb7/.dx4JDsFHN3Nv.y2RxLQnRNZ1QiVXIrAMWrrtLUG/eA.m', 'M. Rachid El Ouafi', 'responsable')
 ON CONFLICT ("email") DO UPDATE SET
@@ -33,7 +34,7 @@ ON CONFLICT ("email") DO UPDATE SET
 -- Préférences des comptes de test.
 INSERT INTO "user_preferences" ("user_id", "preferences")
 SELECT id, '{"theme":"system","notifications":true,"language":"fr"}'::jsonb FROM "users"
-WHERE "email" IN ('direction@istpm-agadir.ma', 'enseignant@istpm-agadir.ma', 'responsable@istpm-agadir.ma')
+WHERE "email" IN ('direction@istpm-agadir.ma', 'assistant@istpm-agadir.ma', 'enseignant@istpm-agadir.ma', 'responsable@istpm-agadir.ma')
 ON CONFLICT ("user_id") DO NOTHING;
 
 -- Employés (fiches RH).

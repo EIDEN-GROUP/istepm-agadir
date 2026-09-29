@@ -31,7 +31,7 @@ import {
   type InvitationRole,
 } from "@/services/invitations";
 
-const INVITE_ROLES = ["directeur", "enseignant", "responsable", "etudiant", "comptable"] as const;
+const INVITE_ROLES = ["directeur", "assistant_directeur", "enseignant", "responsable", "etudiant"] as const;
 
 const createInviteSchema = z.object({
   email: z.string().email("Email invalide"),
@@ -45,15 +45,14 @@ const createInviteSchema = z.object({
 
 export async function invitationRoutes(app: FastifyInstance) {
   // Crée le compte + envoie le lien (staff uniquement).
-  // Un comptable ne peut créer que des comptes comptables (borné serveur,
-  // pas seulement masqué dans l'UI).
+  // Nul autre qu'un directeur ne peut inviter un directeur.
   app.post(
     "/",
-    { preHandler: [authenticate, requireRole("directeur", "responsable", "comptable"), requirePerm("users.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("users.write")] },
     async (request, reply) => {
       const input = createInviteSchema.parse(request.body);
-      if (request.user.role === "comptable" && input.role !== "comptable") {
-        return reply.status(403).send({ error: "Un comptable ne peut créer que des comptes comptables" });
+      if (request.user.role !== "directeur" && input.role === "directeur") {
+        return reply.status(403).send({ error: "Accès réservé au directeur" });
       }
       const result = await registerWithInvite({
         email: input.email,
@@ -74,19 +73,19 @@ export async function invitationRoutes(app: FastifyInstance) {
   );
 
   // État SMTP (staff) : l'UI affiche « configuré » ou invite au partage manuel.
-  app.get("/smtp", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async () => {
+  app.get("/smtp", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async () => {
     return { configured: smtpConfigured() };
   });
 
   // Invitations en attente (staff).
-  app.get("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async () => {
+  app.get("/", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async () => {
     return listPendingInvites();
   });
 
   // Renvoyer : nouveau lien 24 h (staff).
   app.post(
     "/:userId/resend",
-    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("users.write")] },
     async (request, reply) => {
       const { userId } = request.params as { userId: string };
       const result = await resendInvite(userId);
@@ -102,7 +101,7 @@ export async function invitationRoutes(app: FastifyInstance) {
   // Révoquer : tue le lien, le compte reste verrouillé (staff).
   app.delete(
     "/:userId",
-    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("users.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("users.write")] },
     async (request) => {
       const { userId } = request.params as { userId: string };
       return revokeInvite(userId);

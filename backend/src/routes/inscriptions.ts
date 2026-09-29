@@ -170,7 +170,7 @@ export async function inscriptionRoutes(app: FastifyInstance) {
   // Liste staff (recherche + filtre statut), dernier rendez-vous joint.
   app.get(
     "/",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] },
     async (request) => {
       const q = request.query as { statut?: string; search?: string };
       const db = getDb();
@@ -205,7 +205,7 @@ export async function inscriptionRoutes(app: FastifyInstance) {
   // Réponse staff (motif exigé en cas de rejet) + e-mail au candidat.
   app.patch(
     "/:id",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const input = reponseSchema.parse(request.body);
@@ -239,7 +239,7 @@ export async function inscriptionRoutes(app: FastifyInstance) {
   // Rendez-vous staff (passe en « en cours ») + e-mail au candidat.
   app.post(
     "/:id/rendez-vous",
-    { preHandler: [authenticate, requireRole("directeur", "responsable")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const input = rendezvousSchema.parse(request.body);

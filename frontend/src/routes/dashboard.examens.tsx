@@ -448,7 +448,7 @@ function InfosExamen({
 
 function ExamensPage() {
   const { role } = useAuth();
-  return role === "directeur" ? <EspaceDirecteur /> : <EspaceFormateur />;
+  return role === "directeur" || role === "assistant_directeur" ? <EspaceDirecteur /> : <EspaceFormateur />;
 }
 
 /* ------------------------------------------------------------------ */

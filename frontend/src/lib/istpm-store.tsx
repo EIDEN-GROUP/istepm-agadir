@@ -4,7 +4,7 @@
  * Chaque collection est chargée depuis l'API au montage (`refresh()`), et
  * chaque écriture attend la réponse serveur avant d'être appliquée : aucun
  * contenu de démonstration, aucun miroir localStorage, aucune écriture
- * fantôme. Les agrégats (dashboard, financier, répartitions) sont dérivés
+ * fantôme. Les agrégats (dashboard, répartitions) sont dérivés
  * des lignes serveur. En cas d'échec réseau, `syncFailed` permet d'afficher
  * un bandeau explicite au lieu de données inventées.
  */
@@ -34,15 +34,13 @@ import {
   minutesDepuisMinuit,
   ajouterMinutes,
   type ModuleRecord,
-  type LignePaiement,
   type NoteModule,
-  type PaiementLigne,
-  type StatutPaiement,
-  type PaiementMensuel,
   type Mention,
   type Decision,
   type ExamDocument,
   type StructureAccueil,
+  type SubStage,
+  normalizeStructure,
   libelleNiveau,
   type InstitutInfo,
   INSTITUT_DEFAUT,
@@ -80,9 +78,6 @@ import {
   createStage as apiCreateStage,
   updateStage as apiUpdateStage,
   deleteStage as apiDeleteStage,
-  createPaiementsMensuels as apiCreatePaiementsMensuels,
-  updatePaiementMensuel as apiUpdatePaiementMensuel,
-  fetchPaiementsMensuels as apiFetchPaiementsMensuels,
   createNote as apiCreateNote,
   deleteNote as apiDeleteNote,
   createFiliereApi,
@@ -91,10 +86,14 @@ import {
   fetchNiveauxEtudes as apiFetchNiveauxEtudes,
   createNiveauEtudesApi,
   deleteNiveauEtudesApi,
+  uploadSeanceDocumentApi,
+  deleteSeanceDocumentApi,
   createStructureApi,
   updateStructureApi,
   deleteStructureApi,
   fetchStructuresApi as apiFetchStructures,
+  serviceHeuresDepuisReglages,
+  programmeStagesDepuisReglages,
   fetchStageServicesApi as apiFetchStageServices,
   createStageServiceApi as apiCreateStageService,
   updateStageServiceApi as apiUpdateStageService,
@@ -117,7 +116,6 @@ import {
   closeAttendanceSession as apiCloseAttendanceSession,
   fetchSeanceAttendance as apiFetchSeanceAttendance,
   saveAttendanceBulk as apiSaveAttendanceBulk,
-  type PaiementMensuelApi,
   type HolidayRow,
   type VacationRow,
   type CalendarExceptionRow,
@@ -142,6 +140,10 @@ type Snapshot = {
   structuresAccueil: StructureAccueil[];
   /** Services de stage libres (créables depuis le formulaire de stage). */
   servicesStage: string[];
+  /** Heures indicatives par service (carnet IP) : pré-remplit l'ajout de sous-stage. */
+  servicesHeures: Record<string, number>;
+  /** Programme de référence des carnets (lignes filière-tagguées) : pré-remplit heures + filières. */
+  programmeStages: SubStage[];
   modules: ModuleRecord[];
   groupConfigs: GroupConfig[];
   /** Créneaux horaires, au format libellé des Paramètres (« 08:30 – 10:00 »). */
@@ -169,6 +171,8 @@ function emptySnapshot(): Snapshot {
     niveauxEtudes: [],
     structuresAccueil: [],
     servicesStage: [],
+    servicesHeures: {},
+    programmeStages: [],
     modules: [],
     groupConfigs: [],
     creneaux: [],
@@ -237,67 +241,10 @@ function normNoteModule(n: Record<string, unknown>): NoteModule {
   };
 }
 
-function normPaiementRecord(r: PaiementMensuelApi): PaiementMensuel {
-  const mode = ["Espèces", "Virement", "Carte", "Chèque"].includes(String(r.mode))
-    ? (r.mode as PaiementMensuel["mode"])
-    : "Espèces";
-  const statut = (["paye", "en_attente", "retard", "impaye"] as const).includes(
-    r.statut as PaiementMensuel["statut"],
-  )
-    ? (r.statut as PaiementMensuel["statut"])
-    : "en_attente";
-  return {
-    id: String(r.id),
-    etudiantId: String(r.etudiantId),
-    mois: String(r.mois ?? ""),
-    montantDu: num(r.montantDu),
-    montantPaye: num(r.montantPaye),
-    datePaiement: String(r.datePaiement ?? ""),
-    mode,
-    recu: String(r.recu ?? ""),
-    statut,
-    notes: String(r.notes ?? ""),
-  };
-}
-
-function historiqueDepuisRecords(records: PaiementMensuel[]): LignePaiement[] {
-  return records.map((r) => ({
-    id: r.id,
-    date: r.datePaiement,
-    montant: r.montantPaye,
-    mode: r.mode as LignePaiement["mode"],
-    periode: r.mois,
-    recu: r.recu,
-    statut: r.statut as LignePaiement["statut"],
-    mois: r.mois,
-  }));
-}
-
-/** Statut global déduit des lignes canoniques (jamais inventé). */
-function statutPaiementGlobal(statuts: StatutPaiement[]): StatutPaiement {
-  if (statuts.length > 0 && statuts.every((s) => s === "paye")) return "paye";
-  if (statuts.some((s) => s === "retard")) return "retard";
-  if (statuts.some((s) => s === "impaye")) return "impaye";
-  return "en_attente";
-}
-
-function normEtudiant(raw: Record<string, unknown>, records: PaiementMensuel[]): Etudiant {
+function normEtudiant(raw: Record<string, unknown>): Etudiant {
   const notes = Array.isArray(raw.notes)
     ? (raw.notes as Record<string, unknown>[]).map(normNoteModule)
     : [];
-  const histo = Array.isArray(raw.historique) ? raw.historique as Record<string, unknown>[] : [];
-  const historique: LignePaiement[] = histo.length
-    ? histo.map((h) => ({
-        id: String(h.id ?? ""),
-        date: String(h.date ?? ""),
-        montant: num(h.montant),
-        mode: String(h.mode ?? "") as LignePaiement["mode"],
-        periode: String(h.periode ?? h.mois ?? ""),
-        recu: String(h.recu ?? ""),
-        statut: String(h.statut ?? "") as LignePaiement["statut"],
-        mois: h.mois !== undefined ? String(h.mois) : "",
-      }))
-    : historiqueDepuisRecords(records);
   return {
     id: String(raw.id ?? ""),
     cne: String(raw.cne ?? ""),
@@ -309,18 +256,13 @@ function normEtudiant(raw: Record<string, unknown>, records: PaiementMensuel[]):
     annee: String(raw.annee ?? ""),
     groupe: String(raw.groupe ?? ""),
     statut: String(raw.statut ?? "inscrit"),
-    paiement: String(raw.paiement ?? "en_attente"),
     moyenne: num(raw.moyenne),
     telephone: String(raw.telephone ?? ""),
     email: String(raw.email ?? ""),
     dateNaissance: String(raw.dateNaissance ?? raw.date_naissance ?? ""),
     ville: String(raw.ville ?? ""),
     photoUrl: String(raw.photoUrl ?? (raw as { photo_url?: string }).photo_url ?? ""),
-    fraisMensuels: num(raw.fraisMensuels ?? Math.round(num(raw.fraisAnnuels) / 10)),
     notes,
-    historique,
-    paiementsMensuels: (raw.paiementsMensuels ?? {}) as Etudiant["paiementsMensuels"],
-    paiementsMensuelsRecords: records,
     archived: raw.archived === true,
     stageEnCours: (raw.stageEnCours as string | undefined) ?? undefined,
   } as Etudiant;
@@ -413,7 +355,7 @@ function construireJoursChomes(
 
 export type NouvelEtudiant = Omit<
   Etudiant,
-  "id" | "moyenne" | "notes" | "historique" | "paiementsMensuels" | "paiementsMensuelsRecords" | "archived"
+  "id" | "moyenne" | "notes" | "archived"
 >;
 export type NouveauFormateur = Omit<Formateur, "id" | "notesSaisies">;
 /** `createdBy` et `document` sont posés par le store, pas par le formulaire. */
@@ -455,6 +397,10 @@ type IstpmCtx = {
   structuresAccueil: StructureAccueil[];
   /** Services de stage libres (créables depuis le formulaire de stage). */
   servicesStage: string[];
+  /** Heures indicatives par service (carnet IP) : pré-remplit l'ajout de sous-stage. */
+  servicesHeures: Record<string, number>;
+  /** Programme de référence des carnets (lignes filière-tagguées) : pré-remplit heures + filières. */
+  programmeStages: SubStage[];
   modules: ModuleRecord[];
   groupConfigs: GroupConfig[];
   /** Libellés bruts des créneaux, tels qu'édités dans les Paramètres. */
@@ -481,27 +427,16 @@ type IstpmCtx = {
   photoDe: (cleOuCne: string | undefined | null) => string | undefined;
 
   /* Dérivés */
-  paiements: PaiementLigne[];
   dashboard: {
     totalInscrits: number;
     deltaSemestre: number;
     formateursActifs: number;
     tauxReussite: number;
-    totalARecouvrer: number;
-  };
-  financier: {
-    encaisse: number;
-    encaisseCeMois: number;
-    enAttente: number;
-    impaye: number;
-    retard: number;
-    tauxRecouvrement: number;
   };
   repartitionFiliere: { name: string; filiere: string; value: number }[];
   repartitionNiveau: { name: string; value: number }[];
   reussiteFiliere: { name: string; filiere: string; value: number }[];
   etudiantsARisque: Etudiant[];
-  aRelancer: Etudiant[];
   aTraiter: {
     examensAVenir: number;
     bulletinsAPublier: number;
@@ -541,31 +476,6 @@ type IstpmCtx = {
   updateStage: (id: string, patch: Partial<Stage>) => Promise<Stage>;
   deleteStage: (id: string) => Promise<void>;
 
-  payerMois: (
-    etudiantId: string,
-    mois: string[],
-    details: {
-      montant: number;
-      mode: "Espèces" | "Virement" | "Carte" | "Chèque";
-      date: string;
-      recu?: string;
-      notes?: string;
-    },
-  ) => Promise<void>;
-
-  updatePaiementMensuel: (
-    id: string,
-    etudiantId: string,
-    patch: Partial<{
-      montantPaye: number;
-      datePaiement: string;
-      mode: "Espèces" | "Virement" | "Carte" | "Chèque";
-      recu: string;
-      statut: StatutPaiement;
-      notes: string;
-    }>,
-  ) => Promise<void>;
-
   /** Enregistre une note (module + examen) pour un étudiant et recalcule sa moyenne. */
   addNote: (etudiantId: string, note: NoteModule) => Promise<void>;
   deleteNote: (id: string, etudiantId: string) => Promise<void>;
@@ -577,7 +487,7 @@ type IstpmCtx = {
   deleteNiveauEtudes: (nom: string) => Promise<void>;
 
   addStructureAccueil: (nom: string, capacite?: number) => Promise<void>;
-  updateStructureAccueil: (oldName: string, body: { nouveauNom?: string; capacite?: number }) => Promise<void>;
+  updateStructureAccueil: (oldName: string, body: { nouveauNom?: string; capacite?: number; subStages?: SubStage[] }) => Promise<void>;
   deleteStructureAccueil: (nom: string) => Promise<void>;
 
   /** Persiste un service de stage libre (dropdown créable). */
@@ -592,6 +502,9 @@ type IstpmCtx = {
   addSeance: (data: NouvelleSeance, force?: boolean) => Promise<Seance>;
   updateSeance: (id: string, patch: Partial<Seance>, force?: boolean) => Promise<Seance>;
   deleteSeance: (id: string) => Promise<void>;
+  /** Dépose le compte-rendu sur le serveur (MinIO) ; l'aperçu relit le serveur. */
+  attachSeanceDocument: (seanceId: string, file: File) => Promise<void>;
+  removeSeanceDocument: (seanceId: string) => Promise<void>;
   /** Glisser-déposer : conserve la durée, ne change que le départ. */
   moveSeance: (id: string, date: string, debut: string, force?: boolean) => Promise<void>;
   conflitsSeance: (c: ConflitCandidate, ignorerId?: string) => Conflit[];
@@ -623,17 +536,14 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   // Synchronisation serveur : remplacement intégral, jamais de fusion locale.
   // Échec réseau = `syncFailed` (bandeau explicite), jamais de données inventées.
   // Les listes staff (étudiants, formateurs, stages, séances) répondent
-  // 403/404 aux rôles sans accès (étudiant via /api/student/*, comptable
-  // via son espace Finance) : on ne les demande même pas pour éviter
-  // erreurs console + bandeau abusif.
+  // 403/404 aux rôles sans accès (étudiant via /api/student/*) : on ne les
+  // demande même pas pour éviter erreurs console + bandeau abusif.
   const refresh = useCallback(async () => {
     setLoading(true);
     setSyncFailed(false);
     try {
       const isStudent = userRole === "etudiant";
-      // Comptable : ni formateurs, ni stages, ni séances (403) ; la liste
-      // des étudiants reste accessible (recouvrement).
-      const noStaffLists = isStudent || userRole === "comptable";
+      const noStaffLists = isStudent;
       const [
         etudiantsRaw,
         formateursRaw,
@@ -644,7 +554,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         structuresRaw,
         servicesRaw,
         reglages,
-        mensuelsRaw,
         holidaysRaw,
         vacationsRaw,
         exceptionsRaw,
@@ -662,7 +571,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         apiFetchStructures(),
         apiFetchStageServices(),
         fetchSettings().catch(() => ({}) as Record<string, unknown>),
-        apiFetchPaiementsMensuels().catch(() => [] as PaiementMensuelApi[]),
         apiFetchHolidays().catch(() => [] as HolidayRow[]),
         apiFetchVacations().catch(() => [] as VacationRow[]),
         apiFetchExceptions().catch(() => [] as CalendarExceptionRow[]),
@@ -672,18 +580,9 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         apiFetchGroupConfigs().catch(() => [] as GroupConfig[]),
       ]);
 
-      const recordsByEtudiant = new Map<string, PaiementMensuel[]>();
-      for (const r of mensuelsRaw as PaiementMensuelApi[]) {
-        const rec = normPaiementRecord(r);
-        const list = recordsByEtudiant.get(rec.etudiantId) ?? [];
-        list.push(rec);
-        recordsByEtudiant.set(rec.etudiantId, list);
-      }
-
-      const etudiants = (etudiantsRaw as unknown as Record<string, unknown>[]).map((raw) => {
-        const id = String(raw.id ?? "");
-        return normEtudiant(raw, recordsByEtudiant.get(id) ?? []);
-      });
+      const etudiants = (etudiantsRaw as unknown as Record<string, unknown>[]).map((raw) =>
+        normEtudiant(raw),
+      );
 
       setSnap({
         etudiants,
@@ -702,7 +601,9 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
         })),
         filieres: (filieresRaw as string[]).map(String),
         niveauxEtudes: (niveauxEtudesRaw as string[]).map(String),
-        structuresAccueil: (structuresRaw as StructureAccueil[]) ?? [],
+        structuresAccueil: ((structuresRaw as unknown[]) ?? []).map(normalizeStructure),
+        servicesHeures: serviceHeuresDepuisReglages(reglages),
+        programmeStages: programmeStagesDepuisReglages(reglages),
         servicesStage: [...(servicesRaw as string[])].sort((a, b) => a.localeCompare(b)),
         modules: (modulesRaw as unknown as Record<string, unknown>[]).map(normModule),
         groupConfigs: (groupsRaw as GroupConfig[]) ?? [],
@@ -816,7 +717,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   const addEtudiant = useCallback(
     async (data: NouvelEtudiant) => {
       const saved = await apiCreateEtudiant(data as unknown as Record<string, unknown>);
-      const etudiant = normEtudiant(saved as unknown as Record<string, unknown>, []);
+      const etudiant = normEtudiant(saved as unknown as Record<string, unknown>);
       setSnap((s) => ({ ...s, etudiants: [etudiant, ...s.etudiants] }));
       return etudiant;
     },
@@ -827,9 +728,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     const saved = await apiUpdateEtudiant(id, patch as unknown as Record<string, unknown>);
     const etudiant = normEtudiant(
       { ...(saved as unknown as Record<string, unknown>), id },
-      [],
     );
-    // Conserve les lignes de paiement/notes déjà chargées (le PUT ne les renvoie pas).
+    // Conserve les notes déjà chargées (le PUT ne les renvoie pas).
     setSnap((s) => ({
       ...s,
       etudiants: s.etudiants.map((e) =>
@@ -837,9 +737,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
           ? {
               ...etudiant,
               notes: e.notes,
-              historique: e.historique,
-              paiementsMensuels: e.paiementsMensuels,
-              paiementsMensuelsRecords: e.paiementsMensuelsRecords,
             }
           : e,
       ),
@@ -1019,6 +916,35 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  /* ---------------- Comptes-rendus de séance ---------------- */
+
+  const attachSeanceDocument = useCallback(async (seanceId: string, file: File) => {
+    if (file.size > MAX_DOC_OCTETS) {
+      throw new Error(
+        `Fichier trop volumineux (max ${Math.round(MAX_DOC_OCTETS / 1024 / 1024)} Mo)`,
+      );
+    }
+    // Le serveur persiste dans MinIO et renvoie la séance canonique.
+    const saved = await uploadSeanceDocumentApi(seanceId, file);
+    const seance = { ...(saved as unknown as Seance), id: seanceId };
+    setSnap((s) => ({
+      ...s,
+      seances: s.seances.map((x) => (x.id === seanceId ? seance : x)),
+    }));
+  }, []);
+
+  const removeSeanceDocument = useCallback(async (seanceId: string) => {
+    await deleteSeanceDocumentApi(seanceId);
+    setSnap((s) => ({
+      ...s,
+      seances: s.seances.map((x) =>
+        x.id === seanceId
+          ? { ...x, documentId: null, documentNom: null, documentTaille: null, documentMime: null, documentUploadedAt: null }
+          : x,
+      ),
+    }));
+  }, []);
+
   /**
    * Persist note entry for an exam.
    *
@@ -1142,78 +1068,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     setSnap((s) => ({ ...s, stages: s.stages.filter((st) => st.id !== id) }));
   }, []);
 
-  /* ---------------- Paiements mensuels ---------------- */
-
-  /** Recharge les lignes canoniques et reconstruit fiches + statuts. */
-  const refreshPaiements = useCallback(async () => {
-    const rows = (await apiFetchPaiementsMensuels()) as PaiementMensuelApi[];
-    const byEtudiant = new Map<string, PaiementMensuel[]>();
-    for (const r of rows) {
-      const rec = normPaiementRecord(r);
-      const list = byEtudiant.get(rec.etudiantId) ?? [];
-      list.push(rec);
-      byEtudiant.set(rec.etudiantId, list);
-    }
-    setSnap((s) => ({
-      ...s,
-      etudiants: s.etudiants.map((e) => {
-        const records = byEtudiant.get(e.id) ?? [];
-        return {
-          ...e,
-          paiementsMensuelsRecords: records,
-          historique: e.historique.length ? e.historique : historiqueDepuisRecords(records),
-          paiement: statutPaiementGlobal(records.map((r) => r.statut)),
-        };
-      }),
-    }));
-  }, []);
-
-  const payerMois = useCallback(
-    async (
-      etudiantId: string,
-      mois: string[],
-      details: {
-        montant: number;
-        mode: "Espèces" | "Virement" | "Carte" | "Chèque";
-        date: string;
-        recu?: string;
-        notes?: string;
-      },
-    ) => {
-      await apiCreatePaiementsMensuels({
-        etudiantId,
-        mois,
-        montant: details.montant,
-        mode: details.mode,
-        date: details.date,
-        recu: details.recu,
-        notes: details.notes,
-      });
-      await refreshPaiements();
-    },
-    [refreshPaiements],
-  );
-
-  const updatePaiementMensuel = useCallback(
-    async (
-      id: string,
-      etudiantId: string,
-      patch: Partial<{
-        montantPaye: number;
-        datePaiement: string;
-        mode: "Espèces" | "Virement" | "Carte" | "Chèque";
-        recu: string;
-        statut: StatutPaiement;
-        notes: string;
-      }>,
-    ) => {
-      await apiUpdatePaiementMensuel(id, patch);
-      await refreshPaiements();
-      void etudiantId;
-    },
-    [refreshPaiements],
-  );
-
   /**
    * Enregistre une note ponctuelle pour un étudiant (persistée côté serveur).
    *
@@ -1336,7 +1190,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateStructureAccueil = useCallback(
-    async (oldName: string, body: { nouveauNom?: string; capacite?: number }) => {
+    async (oldName: string, body: { nouveauNom?: string; capacite?: number; subStages?: SubStage[] }) => {
       const { structures } = await updateStructureApi(oldName, body);
       setSnap((s) => ({ ...s, structuresAccueil: structures }));
     },
@@ -1529,88 +1383,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
 
   /* ---------------- Dérivés ---------------- */
 
-  const paiements = useMemo<PaiementLigne[]>(
-    () =>
-      snap.etudiants.filter((e) => !e.archived).flatMap((e) =>
-        e.paiementsMensuelsRecords.map((r) => ({
-          id: r.id,
-          etudiantId: e.id,
-          cne: e.cne,
-          etudiant: `${e.prenom} ${e.nom}`,
-          filiere: e.filiere,
-          niveau: e.niveau,
-          date: r.datePaiement,
-          montant: r.montantPaye,
-          mode: r.mode,
-          periode: r.mois,
-          recu: r.recu,
-          statut: r.statut,
-          mois: r.mois,
-        })),
-      ),
-    [snap.etudiants],
-  );
-
-  const totalUnpaidMonths = useMemo(
-    () =>
-      snap.etudiants.filter((e) => !e.archived).reduce((s, e) => {
-        const unpaid = e.paiementsMensuelsRecords
-          .filter((r) => r.statut !== "paye")
-          .reduce((sum, r) => sum + (r.montantDu - r.montantPaye), 0);
-        return s + unpaid;
-      }, 0),
-    [snap.etudiants],
-  );
-
-  const financier = useMemo(() => {
-    const actifs = snap.etudiants.filter((e) => !e.archived);
-    const encaisse = actifs.reduce((sum, e) => {
-      const paye = e.paiementsMensuelsRecords
-        .filter((r) => r.statut === "paye")
-        .reduce((s, r) => s + r.montantPaye, 0);
-      return sum + paye;
-    }, 0);
-
-    const now = new Date();
-    const encaisseCeMois = actifs.reduce((sum, e) => {
-      const paye = e.paiementsMensuelsRecords
-        .filter(
-          (r) =>
-            r.statut === "paye" &&
-            r.datePaiement &&
-            new Date(r.datePaiement).getMonth() === now.getMonth() &&
-            new Date(r.datePaiement).getFullYear() === now.getFullYear(),
-        )
-        .reduce((s, r) => s + r.montantPaye, 0);
-      return sum + paye;
-    }, 0);
-
-    let enAttente = 0;
-    let impaye = 0;
-    let retard = 0;
-    for (const e of actifs) {
-      for (const r of e.paiementsMensuelsRecords) {
-        const reste = r.montantDu - r.montantPaye;
-        if (reste <= 0) continue;
-        if (r.statut === "en_attente") enAttente += reste;
-        else if (r.statut === "impaye") impaye += reste;
-        else if (r.statut === "retard") retard += reste;
-      }
-    }
-
-    return {
-      encaisse,
-      encaisseCeMois,
-      enAttente,
-      impaye,
-      retard,
-      tauxRecouvrement:
-        encaisse + totalUnpaidMonths === 0
-          ? 100
-          : Math.round((encaisse / (encaisse + totalUnpaidMonths)) * 100),
-    };
-  }, [snap.etudiants, totalUnpaidMonths]);
-
   const dashboard = useMemo(() => {
     const inscrits = snap.etudiants.filter(
       (e) => !e.archived && (e.statut === "inscrit" || e.statut === "diplome"),
@@ -1626,9 +1398,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
             (notes.filter((e) => e.moyenne >= 10).length / notes.length) * 100,
           )
         : 0,
-      totalARecouvrer: totalUnpaidMonths,
     };
-  }, [snap.etudiants, snap.formateurs, totalUnpaidMonths]);
+  }, [snap.etudiants, snap.formateurs]);
 
   const repartitionFiliere = useMemo(
     () => {
@@ -1672,18 +1443,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [snap.etudiants],
   );
 
-  const aRelancer = useMemo(
-    () =>
-      snap.etudiants.filter((e) => {
-        if (e.archived) return false;
-        const moisNonPayes = e.paiementsMensuelsRecords.filter(
-          (r) => r.statut !== "paye" && r.montantPaye < r.montantDu,
-        );
-        return moisNonPayes.length > 0;
-      }),
-    [snap.etudiants],
-  );
-
   const aTraiter = useMemo(
     () => ({
       examensAVenir: snap.examens.filter((x) => x.statut === "planifie").length,
@@ -1718,7 +1477,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   );
 
   // Résolution de la photo d'identité d'un étudiant par id OU par CNE : les
-  // enregistrements bulletins / stages / paiements ne portent que le CNE, mais
+  // enregistrements bulletins / stages ne portent que le CNE, mais
   // la photo (téléversée depuis l'espace étudiant) vit sur la fiche.
   const photoParCle = useMemo(() => {
     const m = new Map<string, string>();
@@ -1747,14 +1506,11 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     loading,
     syncFailed,
     refresh,
-    paiements,
     dashboard,
-    financier,
     repartitionFiliere,
     repartitionNiveau,
     reussiteFiliere,
     etudiantsARisque,
-    aRelancer,
     aTraiter,
     addEtudiant,
     updateEtudiant,
@@ -1780,6 +1536,8 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     addSeance,
     updateSeance,
     deleteSeance,
+    attachSeanceDocument,
+    removeSeanceDocument,
     moveSeance,
     conflitsSeance,
     openSession,
@@ -1790,8 +1548,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     addStage,
     updateStage,
     deleteStage,
-    payerMois,
-    updatePaiementMensuel,
     addNote,
     deleteNote,
     addFiliere,

@@ -180,14 +180,14 @@ export async function eventRoutes(app: FastifyInstance) {
     return event;
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request, reply) => {
     const input = createEventSchema.parse(request.body);
     const db = getDb();
     const [event] = await db.insert(events).values(input).returning();
     return event;
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = updateEventSchema.parse(request.body);
     const db = getDb();
@@ -201,7 +201,7 @@ export async function eventRoutes(app: FastifyInstance) {
     return updated;
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [existing] = await db.select().from(events).where(eq(events.id, id)).limit(1);

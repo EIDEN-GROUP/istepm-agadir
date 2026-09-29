@@ -7,7 +7,7 @@
  *
  * Édition self-service :
  *   · photo   → tout le monde, sans mot de passe
- *   · nom     → directeur/responsable, sans mot de passe
+ *   · nom     → directeur/assistant/responsable, sans mot de passe
  *   · e-mail / mot de passe → confirmation par le mot de passe actuel
  *   · le rôle reste géré par la direction
  */
@@ -24,7 +24,6 @@ import {
   ClipboardList,
   FileText,
   Briefcase,
-  Wallet,
   CalendarCheck,
 } from "lucide-react";
 import { ROLE_META, useAuth } from "@/lib/auth";
@@ -97,7 +96,7 @@ function EditCard({ onDone }: { onDone: () => void }) {
   // La direction gère elle-même son nom affiché ; les autres profils le font
   // changer via une demande au secrétariat.
   const canEditName =
-    user?.role === "directeur" || user?.role === "responsable";
+    user?.role === "directeur" || user?.role === "assistant_directeur" || user?.role === "responsable";
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -447,7 +446,7 @@ function MonProfilPage() {
             <p className="flex items-start gap-1.5 rounded-xl bg-brand/6 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
               <BadgeCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-dk" />
               {roleMeta.description}.{" "}
-              {user.role === "directeur" || user.role === "responsable"
+              {user.role === "directeur" || user.role === "assistant_directeur" || user.role === "responsable"
                 ? "Le rôle est géré par la direction. Signalez toute erreur via une demande."
                 : "Le nom et le rôle sont gérés par la direction. Signalez toute erreur via une demande."}
             </p>
@@ -468,7 +467,7 @@ function MonProfilPage() {
       {isEtudiant && me ? (
         <section className={cn(softCard, "space-y-3 p-6")}>
           <p className={eyebrowClass}>Mes indicateurs</p>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
             <Stat
               icon={<Users2 className="h-4 w-4" />}
               label="Profs"
@@ -488,11 +487,6 @@ function MonProfilPage() {
               icon={<Briefcase className="h-4 w-4" />}
               label="Stages"
               value={me.stages?.length ?? 0}
-            />
-            <Stat
-              icon={<Wallet className="h-4 w-4" />}
-              label="Paiements"
-              value={me.paiements?.length ?? 0}
             />
             <Stat
               icon={<CalendarCheck className="h-4 w-4" />}

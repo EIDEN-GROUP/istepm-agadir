@@ -10,20 +10,12 @@ import { eq, or, sql } from "drizzle-orm";
 const NIVEAUX = ["1ère année", "2ème année", "3ème année"] as const;
 
 const STATUTS_ETUDIANT = ["inscrit", "en_attente", "diplome", "abandon"] as const;
-const STATUTS_PAIEMENT = ["paye", "en_attente", "retard", "impaye"] as const;
 
 const STATUT_LABELS: Record<string, string> = {
   inscrit: "Inscrit",
   en_attente: "En attente",
   diplome: "Diplômé",
   abandon: "Abandon",
-};
-
-const PAIEMENT_LABELS: Record<string, string> = {
-  paye: "Payé",
-  en_attente: "En attente",
-  retard: "Retard",
-  impaye: "Impayé",
 };
 
 function parseCsv(text: string): string[][] {
@@ -72,19 +64,15 @@ const COLUMNS = [
   { key: "annee", label: "Année", required: true },
   { key: "groupe", label: "Groupe", required: false },
   { key: "statut", label: "Statut", required: false },
-  { key: "paiement", label: "Paiement", required: false },
   { key: "telephone", label: "Téléphone", required: false },
   { key: "email", label: "E-mail", required: false },
   { key: "dateNaissance", label: "Date de naissance", required: false },
   { key: "ville", label: "Ville", required: false },
-  { key: "fraisMensuels", label: "Frais mensuels", required: false },
 ] as const;
 
 const ALIASES: Record<string, string[]> = {
   statut: ["statut étudiant", "statut_etudiant"],
-  paiement: ["statut paiement", "statut_paiement"],
   dateNaissance: ["date_naissance", "date naissance"],
-  fraisMensuels: ["frais_mensuels"],
   telephone: ["téléphone", "tel"],
 };
 
@@ -137,7 +125,7 @@ function isValidPhone(phone: string): boolean {
 }
 
 export async function etudiantImportRoutes(app: FastifyInstance) {
-  app.post("/import/preview", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.write")] }, async (request, reply) => {
+  app.post("/import/preview", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("etudiants.write")] }, async (request, reply) => {
     const { csvText } = z.object({ csvText: z.string().min(1, "CSV text is required") }).parse(request.body);
 
     if (csvText.length > 10 * 1024 * 1024) {
@@ -228,11 +216,9 @@ export async function etudiantImportRoutes(app: FastifyInstance) {
       else if (!/^\d{4}\/\d{4}$/.test(row.annee)) errors.push(`Année « ${row.annee} » invalide. Format attendu : AAAA/AAAA (ex. 2025/2026) — ce n'est pas le niveau d'étude`);
       if (!row.groupe) warnings.push("Groupe manquant (sera laissé vide)");
       if (row.statut && !matchLabel(row.statut, STATUTS_ETUDIANT, STATUT_LABELS)) errors.push(`Statut « ${row.statut} » invalide. Valeurs attendues : ${STATUTS_ETUDIANT.join(", ")}`);
-      if (row.paiement && !matchLabel(row.paiement, STATUTS_PAIEMENT, PAIEMENT_LABELS)) errors.push(`Paiement « ${row.paiement} » invalide. Valeurs attendues : ${STATUTS_PAIEMENT.join(", ")}`);
       if (row.email && !isValidEmail(row.email)) errors.push("E-mail invalide");
       if (row.telephone && !isValidPhone(row.telephone)) warnings.push("Téléphone au format inhabituel");
       if (row.dateNaissance && !isValidDate(row.dateNaissance)) errors.push("Date de naissance invalide (format attendu : YYYY-MM-DD)");
-      if (row.fraisMensuels && (isNaN(Number(row.fraisMensuels)) || Number(row.fraisMensuels) < 0)) errors.push("Frais mensuels doit être un nombre positif");
       if (row.cne && existingCnes.has(row.cne.toLowerCase())) warnings.push(`CNE « ${row.cne} » déjà existant`);
       if (row.matricule && existingMatricules.has(row.matricule.toLowerCase())) warnings.push(`Matricule « ${row.matricule} » déjà existant`);
       if (row.email && existingEmails.has(row.email.toLowerCase())) warnings.push(`E-mail « ${row.email} » déjà existant`);
@@ -266,7 +252,7 @@ export async function etudiantImportRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post("/import/execute", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("etudiants.write")] }, async (request, reply) => {
+  app.post("/import/execute", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("etudiants.write")] }, async (request, reply) => {
     const schema = z.object({
       rows: z.array(z.object({
         cne: z.string(),
@@ -278,12 +264,10 @@ export async function etudiantImportRoutes(app: FastifyInstance) {
         annee: z.string(),
         groupe: z.string().optional().default(""),
         statut: z.string().optional().default("inscrit"),
-        paiement: z.string().optional().default("en_attente"),
         telephone: z.string().optional().default(""),
         email: z.string().optional().default(""),
         dateNaissance: z.string().optional().default(""),
         ville: z.string().optional().default(""),
-        fraisMensuels: z.string().optional().default("0"),
       })),
     });
 
@@ -321,11 +305,6 @@ export async function etudiantImportRoutes(app: FastifyInstance) {
         }
 
         const statutMapped = matchLabel(r.statut, STATUTS_ETUDIANT, STATUT_LABELS) ?? "inscrit";
-        const paiementMapped = matchLabel(r.paiement, STATUTS_PAIEMENT, PAIEMENT_LABELS) ?? "en_attente";
-
-        const fraisMensuels = r.fraisMensuels ? Number(r.fraisMensuels) : 0;
-        const fraisAnnuels = fraisMensuels * 10;
-        const resteAPayer = fraisAnnuels;
 
         await db.insert(etudiants).values({
           cne: r.cne,
@@ -337,14 +316,10 @@ export async function etudiantImportRoutes(app: FastifyInstance) {
           annee: r.annee,
           groupe: r.groupe || "",
           statut: statutMapped,
-          paiement: paiementMapped,
           telephone: r.telephone || "",
           email: r.email || "",
           dateNaissance: r.dateNaissance || "",
           ville: r.ville || "",
-          fraisAnnuels: String(fraisAnnuels),
-          resteAPayer: String(resteAPayer),
-          paiementsMensuels: {},
         });
 
         newFilieres.add(r.filiere);

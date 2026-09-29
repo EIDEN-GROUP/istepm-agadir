@@ -212,7 +212,7 @@ function BulletinsPage() {
   const { bulletins, etudiants, updateBulletin, publierBulletin, publierTousBulletins, photoDe, bulletinConfig: cfg, institut } =
     useIstpm();
   // Publishing transcripts is a student-administration act (fiche rôle tranche).
-  const canPublish = useCan("bulletins.write", role === "directeur" || role === "responsable");
+  const canPublish = useCan("bulletins.write", role === "directeur" || role === "assistant_directeur" || role === "responsable");
   // Cachet officiel servi par le backend, apposé sur les bulletins imprimés.
   const stamp = useStamp();
 

@@ -27,7 +27,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
     return db.select().from(appointments).orderBy(desc(appointments.createdAt));
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request) => {
     const input = appointmentSchema.parse(request.body);
     const db = getDb();
     const [appointment] = await db
@@ -37,7 +37,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
     return appointment;
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = appointmentSchema.partial().parse(request.body);
     const db = getDb();
@@ -51,7 +51,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
     return appointment;
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(appointments).where(eq(appointments.id, id));

@@ -24,7 +24,7 @@ const STATS: Stat[] = [
     href: "#formations",
     label: "Filières",
     title: "4",
-    text: "formations paramédicales, de l’aide-soignant à la sage-femme.",
+    text: "formations paramédicales, de l’aide-soignant(e) à la sage-femme.",
   },
   {
     area: "c2",

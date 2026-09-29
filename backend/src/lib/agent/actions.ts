@@ -27,18 +27,9 @@ const ACTIONS: ActionDefinition[] = [
   // ── Dashboard ──────────────────────────────────────────────────────
   {
     name: "get_dashboard_stats",
-    description: "Obtenir les statistiques principales du tableau de bord (total inscrits, formateurs actifs, taux de réussite, total à recouvrer)",
+    description: "Obtenir les statistiques principales du tableau de bord (total inscrits, formateurs actifs, taux de réussite)",
     method: "GET",
     path: "/api/dashboard/istpm-stats",
-    category: "Tableau de bord",
-    requiredRoles: [],
-    params: [],
-  },
-  {
-    name: "get_financier",
-    description: "Obtenir le récapitulatif financier (encaissements, en attente, impayés, retard, taux de recouvrement)",
-    method: "GET",
-    path: "/api/dashboard/istpm-financier",
     category: "Tableau de bord",
     requiredRoles: [],
     params: [],
@@ -48,15 +39,6 @@ const ACTIONS: ActionDefinition[] = [
     description: "Lister les étudiants en risque (moyenne < 10 ou abandon)",
     method: "GET",
     path: "/api/dashboard/istpm-etudiants-a-risque",
-    category: "Tableau de bord",
-    requiredRoles: [],
-    params: [],
-  },
-  {
-    name: "get_a_relancer",
-    description: "Lister les étudiants à relancer pour paiement",
-    method: "GET",
-    path: "/api/dashboard/istpm-a-relancer",
     category: "Tableau de bord",
     requiredRoles: [],
     params: [],
@@ -72,7 +54,7 @@ const ACTIONS: ActionDefinition[] = [
   },
   {
     name: "get_activities",
-    description: "Obtenir le fil d'activités récentes (paiements, inscriptions, etc.)",
+    description: "Obtenir le fil d'activités récentes (inscriptions, examens, bulletins, stages, etc.)",
     method: "GET",
     path: "/api/dashboard/activities",
     category: "Tableau de bord",
@@ -97,7 +79,7 @@ const ACTIONS: ActionDefinition[] = [
   },
   {
     name: "get_etudiant",
-    description: "Obtenir les détails d'un étudiant (notes, historique paiements, stage en cours)",
+    description: "Obtenir les détails d'un étudiant (notes, stage en cours)",
     method: "GET",
     path: "/api/etudiants/:id",
     category: "Étudiants",
@@ -112,7 +94,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/etudiants",
     category: "Étudiants",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "prenom", type: "string", description: "Prénom de l'étudiant", required: true },
       { name: "nom", type: "string", description: "Nom de l'étudiant", required: true },
@@ -127,7 +109,6 @@ const ACTIONS: ActionDefinition[] = [
       { name: "email", type: "string", description: "Email" },
       { name: "dateNaissance", type: "string", description: "Date de naissance (YYYY-MM-DD)" },
       { name: "ville", type: "string", description: "Ville" },
-      { name: "fraisMensuels", type: "number", description: "Frais mensuels" },
     ],
   },
   {
@@ -136,7 +117,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "PUT",
     path: "/api/etudiants/:id",
     category: "Étudiants",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID de l'étudiant", required: true },
       { name: "prenom", type: "string", description: "Prénom" },
@@ -146,7 +127,6 @@ const ACTIONS: ActionDefinition[] = [
       { name: "statut", type: "string", description: "Statut", enum: ["inscrit", "diplome", "abandon", "suspendu"] },
       { name: "telephone", type: "string", description: "Téléphone" },
       { name: "email", type: "string", description: "Email" },
-      { name: "fraisMensuels", type: "number", description: "Frais mensuels" },
     ],
   },
   {
@@ -155,7 +135,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/etudiants/:id",
     category: "Étudiants",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID de l'étudiant", required: true },
     ],
@@ -181,7 +161,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/formateurs",
     category: "Formateurs",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "prenom", type: "string", description: "Prénom", required: true },
       { name: "nom", type: "string", description: "Nom", required: true },
@@ -202,7 +182,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "PUT",
     path: "/api/formateurs/:id",
     category: "Formateurs",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID du formateur", required: true },
       { name: "prenom", type: "string", description: "Prénom" },
@@ -219,7 +199,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/formateurs/:id",
     category: "Formateurs",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID du formateur", required: true },
     ],
@@ -246,7 +226,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/examens",
     category: "Examens",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "module", type: "string", description: "Module", required: true },
       { name: "filiere", type: "string", description: "Filière", required: true },
@@ -268,7 +248,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "PUT",
     path: "/api/examens/:id",
     category: "Examens",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID de l'examen", required: true },
       { name: "module", type: "string", description: "Module" },
@@ -284,7 +264,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/examens/:id",
     category: "Examens",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID de l'examen", required: true },
     ],
@@ -295,7 +275,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/examens/:id/notes",
     category: "Examens",
-    requiredRoles: ["directeur", "enseignant"],
+    requiredRoles: ["directeur", "assistant_directeur", "enseignant"],
     params: [
       { name: "id", type: "string", description: "ID de l'examen", required: true },
       { name: "saisies", type: "array", description: "Tableau des notes: [{ etudiantId, theorique?, pratique? }]", required: true },
@@ -324,7 +304,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/bulletins",
     category: "Bulletins",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "etudiantId", type: "string", description: "ID de l'étudiant", required: true },
       { name: "session", type: "string", description: "Session (normale, rattrapage)" },
@@ -339,7 +319,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "PUT",
     path: "/api/bulletins/:id",
     category: "Bulletins",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID du bulletin", required: true },
       { name: "moyenne", type: "number", description: "Moyenne" },
@@ -354,7 +334,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/bulletins/:id",
     category: "Bulletins",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID du bulletin", required: true },
     ],
@@ -365,7 +345,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/bulletins/:id/publier",
     category: "Bulletins",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID du bulletin", required: true },
     ],
@@ -376,7 +356,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/bulletins/publier-tout",
     category: "Bulletins",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [],
   },
 
@@ -401,7 +381,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/stages",
     category: "Stages",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "etudiantId", type: "string", description: "ID de l'étudiant", required: true },
       { name: "structure", type: "string", description: "Structure d'accueil" },
@@ -419,7 +399,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "PUT",
     path: "/api/stages/:id",
     category: "Stages",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID du stage", required: true },
       { name: "structure", type: "string", description: "Structure d'accueil" },
@@ -433,7 +413,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/stages/:id",
     category: "Stages",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID du stage", required: true },
     ],
@@ -444,48 +424,10 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/stages/:id/valider",
     category: "Stages",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID du stage", required: true },
     ],
-  },
-
-  // ── Payments ───────────────────────────────────────────────────────
-  {
-    name: "list_paiements",
-    description: "Lister les paiements des étudiants",
-    method: "GET",
-    path: "/api/paiements-istpm",
-    category: "Paiements",
-    requiredRoles: [],
-    params: [
-      { name: "etudiantId", type: "string", description: "Filtrer par étudiant" },
-    ],
-  },
-  {
-    name: "create_paiement",
-    description: "Enregistrer un paiement pour un étudiant",
-    method: "POST",
-    path: "/api/paiements-istpm",
-    category: "Paiements",
-    requiredRoles: ["directeur", "responsable"],
-    params: [
-      { name: "etudiantId", type: "string", description: "ID de l'étudiant", required: true },
-      { name: "montant", type: "number", description: "Montant du paiement", required: true },
-      { name: "mode", type: "string", description: "Mode de paiement", enum: ["Especes", "Virement", "Carte", "Cheque"] },
-      { name: "periode", type: "string", description: "Période concernée" },
-      { name: "mois", type: "string", description: "Mois concerné" },
-      { name: "date", type: "string", description: "Date du paiement (YYYY-MM-DD)" },
-    ],
-  },
-  {
-    name: "get_paiement_stats",
-    description: "Obtenir les statistiques globales des paiements",
-    method: "GET",
-    path: "/api/paiements-istpm/stats",
-    category: "Paiements",
-    requiredRoles: [],
-    params: [],
   },
 
   // ── Grades ─────────────────────────────────────────────────────────
@@ -495,7 +437,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/notes",
     category: "Notes",
-    requiredRoles: ["directeur", "enseignant", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "enseignant", "responsable"],
     params: [
       { name: "etudiantId", type: "string", description: "ID de l'étudiant", required: true },
       { name: "module", type: "string", description: "Nom du module", required: true },
@@ -511,7 +453,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/notes/:id",
     category: "Notes",
-    requiredRoles: ["directeur", "enseignant", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "enseignant", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID de la note", required: true },
     ],
@@ -524,7 +466,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "GET",
     path: "/api/seances",
     category: "Séances",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "start", type: "string", description: "Date début (YYYY-MM-DD)" },
       { name: "end", type: "string", description: "Date fin (YYYY-MM-DD)" },
@@ -538,7 +480,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/seances",
     category: "Séances",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "date", type: "string", description: "Date (YYYY-MM-DD)", required: true },
       { name: "module", type: "string", description: "Module", required: true },
@@ -557,7 +499,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/seances/bulk",
     category: "Séances",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "seances", type: "array", description: "Tableau de séances à créer", required: true },
     ],
@@ -568,7 +510,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "PUT",
     path: "/api/seances/:id",
     category: "Séances",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID de la séance", required: true },
       { name: "date", type: "string", description: "Date" },
@@ -585,7 +527,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/seances/:id",
     category: "Séances",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID de la séance", required: true },
     ],
@@ -598,7 +540,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/attendance/session/open",
     category: "Présences",
-    requiredRoles: ["directeur", "responsable", "enseignant"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable", "enseignant"],
     params: [
       { name: "seanceId", type: "string", description: "ID de la séance", required: true },
     ],
@@ -609,7 +551,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/attendance/session/:id/close",
     category: "Présences",
-    requiredRoles: ["directeur", "responsable", "enseignant"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable", "enseignant"],
     params: [
       { name: "id", type: "string", description: "ID de la session d'appel", required: true },
     ],
@@ -620,7 +562,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/attendance/bulk",
     category: "Présences",
-    requiredRoles: ["directeur", "responsable", "enseignant"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable", "enseignant"],
     params: [
       { name: "seanceId", type: "string", description: "ID de la séance", required: true },
       { name: "entries", type: "array", description: "Tableau des présences: [{ etudiantId, present, justifie? }]", required: true },
@@ -654,7 +596,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "PUT",
     path: "/api/settings/:key",
     category: "Paramètres",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "key", type: "string", description: "Clé du paramètre", required: true },
       { name: "value", type: "object", description: "Valeur du paramètre", required: true },
@@ -675,7 +617,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/settings/levels",
     category: "Paramètres",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "name", type: "string", description: "Nom du niveau", required: true },
       { name: "cycle", type: "string", description: "Cycle" },
@@ -688,7 +630,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/settings/levels/:id",
     category: "Paramètres",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID du niveau", required: true },
     ],
@@ -708,7 +650,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/settings/filieres",
     category: "Paramètres",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "nom", type: "string", description: "Nom de la filière", required: true },
     ],
@@ -719,7 +661,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/settings/filieres/:nom",
     category: "Paramètres",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "nom", type: "string", description: "Nom de la filière", required: true },
     ],
@@ -739,7 +681,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/settings/niveaux-etudes",
     category: "Paramètres",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "nom", type: "string", description: "Libellé du niveau d'études", required: true },
     ],
@@ -750,7 +692,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/settings/niveaux-etudes/:nom",
     category: "Paramètres",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "nom", type: "string", description: "Libellé du niveau d'études", required: true },
     ],
@@ -776,7 +718,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/events",
     category: "Événements",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "title", type: "string", description: "Titre de l'événement", required: true },
       { name: "date", type: "string", description: "Date (YYYY-MM-DD)", required: true },
@@ -793,7 +735,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/events/:id",
     category: "Événements",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID de l'événement", required: true },
     ],
@@ -815,7 +757,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/auth/register",
     category: "Utilisateurs",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "email", type: "string", description: "Email", required: true },
       { name: "password", type: "string", description: "Mot de passe (min 6 caractères)", required: true },
@@ -829,7 +771,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "PUT",
     path: "/api/auth/users/:id",
     category: "Utilisateurs",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID de l'utilisateur", required: true },
       { name: "name", type: "string", description: "Nom" },
@@ -842,7 +784,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/auth/users/:id",
     category: "Utilisateurs",
-    requiredRoles: ["directeur", "responsable"],
+    requiredRoles: ["directeur", "assistant_directeur", "responsable"],
     params: [
       { name: "id", type: "string", description: "ID de l'utilisateur", required: true },
     ],
@@ -853,7 +795,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "PUT",
     path: "/api/auth/users/:id/role",
     category: "Utilisateurs",
-    requiredRoles: ["directeur"],
+    requiredRoles: ["directeur", "assistant_directeur"],
     params: [
       { name: "id", type: "string", description: "ID de l'utilisateur", required: true },
       { name: "role", type: "string", description: "Nouveau rôle", required: true, enum: ["directeur", "enseignant", "responsable", "etudiant"] },
@@ -865,7 +807,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "GET",
     path: "/api/roles",
     category: "Rôles",
-    requiredRoles: ["directeur"],
+    requiredRoles: ["directeur", "assistant_directeur"],
     params: [],
   },
   {
@@ -874,7 +816,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/roles",
     category: "Rôles",
-    requiredRoles: ["directeur"],
+    requiredRoles: ["directeur", "assistant_directeur"],
     params: [
       { name: "name", type: "string", description: "Nom du rôle", required: true },
       { name: "description", type: "string", description: "Description" },
@@ -887,7 +829,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "DELETE",
     path: "/api/roles/:id",
     category: "Rôles",
-    requiredRoles: ["directeur"],
+    requiredRoles: ["directeur", "assistant_directeur"],
     params: [
       { name: "id", type: "string", description: "ID du rôle", required: true },
     ],
@@ -911,7 +853,7 @@ const ACTIONS: ActionDefinition[] = [
     method: "POST",
     path: "/api/notifications",
     category: "Notifications",
-    requiredRoles: ["directeur"],
+    requiredRoles: ["directeur", "assistant_directeur"],
     params: [
       { name: "title", type: "string", description: "Titre", required: true },
       { name: "message", type: "string", description: "Message" },

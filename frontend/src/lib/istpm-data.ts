@@ -10,7 +10,9 @@
 /* ------------------------------------------------------------------ */
 
 export const FILIERES = [
+  "Aide-Soignant(e)",
   "Infirmier polyvalent",
+  "Infirmier(e) Auxiliaire",
   "Infirmier en anesthésie-réanimation",
   "Sage-femme",
   "Kinésithérapie",
@@ -23,7 +25,9 @@ export type Filiere = (typeof FILIERES)[number];
 
 /** Abréviation courte d'une filière (pour graphiques / colonnes étroites). */
 export const FILIERE_COURT: Record<Filiere, string> = {
+  "Aide-Soignant(e)": "AS",
   "Infirmier polyvalent": "IP",
+  "Infirmier(e) Auxiliaire": "IA",
   "Infirmier en anesthésie-réanimation": "IADE",
   "Sage-femme": "SF",
   Kinésithérapie: "KINÉ",
@@ -75,10 +79,92 @@ export function anneeDeCode(code: string): string | null {
 }
 
 /** CHU / hôpitaux / cliniques d'accueil (structures de stage réelles au Maroc). */
+export type SubStage = {
+  /** Service (ex. « Médecine »). */
+  nom: string;
+  /** Année concernée (« 1ère année »… ; « » = toutes années, carnets sans ventilation). */
+  niveau: string;
+  /** Volume horaire du carnet de stage. */
+  heures: number;
+  /** Places d'accueil pour ce service × niveau (éditable, défaut 5). */
+  capacite: number;
+  /** Filières concernées (carnets de stage) ; vide = toutes. */
+  filieres?: string[];
+};
+
 export type StructureAccueil = {
   nom: string;
-  capacite: number;
+  /** Capacité historique globale : repli quand aucun sous-stage ne correspond. */
+  capacite?: number;
+  subStages: SubStage[];
 };
+
+/** Les 4 filières aux carnets de stage (référence des sous-stages). */
+export const FILIERES_CARNET = [
+  "Aide-Soignant(e)",
+  "Infirmier polyvalent",
+  "Infirmier(e) Auxiliaire",
+  "Sage-femme",
+] as const;
+
+/** Normalise une structure (chaîne historique → objet, défauts sûrs). */
+export function normalizeStructure(s: unknown): StructureAccueil {
+  if (typeof s === "string") return { nom: s, capacite: 5, subStages: [] };
+  if (typeof s === "object" && s && "nom" in (s as Record<string, unknown>)) {
+    const o = s as Record<string, unknown>;
+    const sub = Array.isArray(o.subStages) ? o.subStages : [];
+    return {
+      nom: String(o.nom ?? "?"),
+      capacite: o.capacite === undefined ? undefined : Math.max(0, Number(o.capacite) || 0),
+      subStages: sub
+        .map((r: unknown) => {
+          if (typeof r !== "object" || !r) return null;
+          const x = r as Record<string, unknown>;
+          const nom = String(x.nom ?? "").trim();
+          if (!nom) return null;
+          const filieres = Array.isArray(x.filieres)
+            ? (x.filieres as unknown[]).filter((f): f is string => typeof f === "string" && f.trim().length > 0)
+            : [];
+          return {
+            nom,
+            niveau: String(x.niveau ?? ""),
+            heures: Math.max(0, Number(x.heures) || 0),
+            capacite: Math.max(0, Number(x.capacite ?? 5) || 0),
+            ...(filieres.length ? { filieres } : {}),
+          } as SubStage;
+        })
+        .filter((r): r is SubStage => r !== null),
+    };
+  }
+  return { nom: "?", capacite: 5, subStages: [] };
+}
+
+/** Vrai si le sous-stage vaut pour le niveau ("" = toutes années). */
+export function subStageMatchNiveau(r: SubStage, niveau: string): boolean {
+  return !r.niveau || r.niveau === niveau;
+}
+
+/** Vrai si le sous-stage vaut pour la filière (tag absent = toutes). */
+export function subStageMatchFiliere(r: SubStage, filiere: string): boolean {
+  if (!r.filieres || r.filieres.length === 0) return true;
+  if (!filiere) return true;
+  return r.filieres.includes(filiere);
+}
+
+/** Sous-stages d'une structure pour (niveau, filière), triés (niveau, nom). */
+export function subStagesPour(s: StructureAccueil, niveau: string, filiere: string): SubStage[] {
+  return s.subStages
+    .filter((r) => subStageMatchNiveau(r, niveau) && subStageMatchFiliere(r, filiere))
+    .slice()
+    .sort((a, b) => (a.niveau || "").localeCompare(b.niveau || "") || a.nom.localeCompare(b.nom));
+}
+
+/** Capacité d'une structure pour un niveau : Σ des sous-stages, sinon repli historique. */
+export function capaciteStructureNiveau(s: StructureAccueil, niveau: string): number {
+  const rows = s.subStages.filter((r) => subStageMatchNiveau(r, niveau));
+  if (rows.length === 0) return s.capacite ?? 5;
+  return rows.reduce((t, r) => t + r.capacite, 0);
+}
 
 
 /* ------------------------------------------------------------------ */
@@ -109,7 +195,6 @@ export type BadgeTone = "teal" | "red" | "amber" | "blue" | "neutral";
 /* ------------------------------------------------------------------ */
 
 export type StatutEtudiant = "inscrit" | "en_attente" | "diplome" | "abandon";
-export type StatutPaiement = "paye" | "en_attente" | "retard" | "impaye";
 
 export const STATUT_ETUDIANT_LABEL: Record<StatutEtudiant, string> = {
   inscrit: "Inscrit",
@@ -125,20 +210,6 @@ export const STATUT_ETUDIANT_TONE: Record<StatutEtudiant, BadgeTone> = {
   abandon: "red",
 };
 
-export const STATUT_PAIEMENT_LABEL: Record<StatutPaiement, string> = {
-  paye: "Payé",
-  en_attente: "En attente",
-  retard: "Retard",
-  impaye: "Impayé",
-};
-
-export const STATUT_PAIEMENT_TONE: Record<StatutPaiement, BadgeTone> = {
-  paye: "teal",
-  en_attente: "amber",
-  retard: "red",
-  impaye: "red",
-};
-
 export type NoteModule = {
   id?: string;
   module: string;
@@ -148,60 +219,6 @@ export type NoteModule = {
   /** Examen d'origine de la note (facultatif, pour la saisie des notes). */
   examen?: string;
 };
-
-export type LignePaiement = {
-  date: string;
-  montant: number;
-  mode: "Espèces" | "Virement" | "Carte" | "Chèque";
-  periode: string;
-  recu: string;
-  statut: StatutPaiement;
-  /** Mois de scolarité réglé (« septembre 2025 » … « juin 2026 ») */
-  mois?: string;
-};
-
-export type PaiementMensuel = {
-  id: string;
-  etudiantId: string;
-  mois: string;
-  montantDu: number;
-  montantPaye: number;
-  datePaiement: string;
-  mode: "Espèces" | "Virement" | "Carte" | "Chèque";
-  recu: string;
-  statut: StatutPaiement;
-  notes: string;
-};
-
-/** Mois de l'année scolaire, dans l'ordre académique (septembre → juin), sans année. */
-export const MOIS_ACADEMIQUE = [
-  "septembre",
-  "octobre",
-  "novembre",
-  "décembre",
-  "janvier",
-  "février",
-  "mars",
-  "avril",
-  "mai",
-  "juin",
-] as const;
-
-export type MoisAcademique = (typeof MOIS_ACADEMIQUE)[number];
-
-/**
- * Génère la liste des mois avec année pour une année universitaire donnée.
- * Exemple : "2025/2026" → ["septembre 2025", …, "juin 2026"]
- */
-export function getAcademicYearMonths(academicYear: string): string[] {
-  const parts = academicYear.split("/");
-  const start = Number.parseInt(parts[0], 10);
-  const end = Number.parseInt(parts[1], 10);
-  return MOIS_ACADEMIQUE.map((mois, i) => {
-    const year = i < 4 ? start : end;
-    return `${mois} ${year}`;
-  });
-}
 
 /**
  * Année universitaire couvrant une date donnée (année scolaire = septembre
@@ -220,18 +237,6 @@ export function getCurrentAcademicYear(): string {
   return academicYearOf(new Date());
 }
 
-/** Renvoie le mois académique correspondant à la date du jour. */
-export function getDefaultMois(academicYear: string): string {
-  const months = getAcademicYearMonths(academicYear);
-  const now = new Date();
-  const m = now.getMonth();
-  let idx: number;
-  if (m >= 8 && m <= 11) idx = m - 8;
-  else if (m >= 0 && m <= 5) idx = m + 4;
-  else idx = 9; // juillet/août → juin
-  return months[idx];
-}
-
 export type Etudiant = {
   id: string;
   cne: string;
@@ -243,7 +248,6 @@ export type Etudiant = {
   annee: string;
   groupe: string;
   statut: StatutEtudiant;
-  paiement: StatutPaiement;
   moyenne: number; // /20
   /** Photo d'identité (data URL ou URL). Téléversée par l'étudiant depuis son espace. */
   photoUrl?: string;
@@ -252,16 +256,8 @@ export type Etudiant = {
   email: string;
   dateNaissance: string;
   ville: string;
-  fraisMensuels: number;
   notes: NoteModule[];
-  historique: LignePaiement[];
   stageEnCours?: string;
-  /**
-   * Statut de paiement mois par mois (scolarité mensuelle).
-   * Clé = mois (« septembre 2025 » … « juin 2026 »), valeur = statut du règlement.
-   */
-  paiementsMensuels?: Partial<Record<string, StatutPaiement>>;
-  paiementsMensuelsRecords: PaiementMensuel[];
   archived: boolean;
 };
 
@@ -549,34 +545,14 @@ export type Stage = {
 };
 
 
-/* ------------------------------------------------------------------ */
-/*  Paiements (agrégés depuis les étudiants)                           */
-/* ------------------------------------------------------------------ */
-
-export type PaiementLigne = {
-  id: string;
-  etudiantId: string;
-  cne: string;
-  etudiant: string;
-  filiere: Filiere;
-  niveau: Niveau;
-  date: string;
-  montant: number;
-  mode: LignePaiement["mode"];
-  periode: string;
-  recu: string;
-  statut: StatutPaiement;
-  mois?: string;
-};
-
 /**
  * Entrée du fil « activité récente » du tableau de bord.
  *
- * Dérivé à l'affichage depuis les lignes serveur (examens, stages,
- * paiements) — jamais persisté, jamais en session seule.
+ * Dérivé à l'affichage depuis les lignes serveur (examens, stages) —
+ * jamais persisté, jamais en session seule.
  */
 export type ActiviteItem = {
-  type: "inscription" | "note" | "paiement";
+  type: "inscription" | "note";
   texte: string;
   date: string;
 };
@@ -703,7 +679,36 @@ export type Seance = {
   semestre: Niveau;
   type: TypeSeance;
   notes?: string;
+  /** Workflow de validation : planifie → termine (compte-rendu exigé) → valide | rejete → planifie (« vu »). */
+  statut: string;
+  /** Compte-rendu (fichier dans MinIO, métadonnées ci-dessous). */
+  documentId?: string | null;
+  documentNom?: string | null;
+  documentTaille?: number | null;
+  documentMime?: string | null;
+  documentUploadedAt?: string | null;
+  /** Motif du rejet (direction, obligatoire si rejete). */
+  motifRejet?: string;
 };
+
+/** Libellés FR des statuts de séance (hardcodé, comme le reste de l'UI). */
+export const STATUT_SEANCE_LABEL: Record<string, string> = {
+  planifie: "Planifiée",
+  en_cours: "En cours",
+  termine: "Terminée",
+  annule: "Annulée",
+  valide: "Validée",
+  rejete: "Rejetée",
+};
+
+/** Tonalité du badge de statut de séance. */
+export function statutSeanceTone(statut: string): BadgeTone {
+  if (statut === "valide") return "teal";
+  if (statut === "rejete") return "red";
+  if (statut === "termine") return "amber";
+  if (statut === "annule") return "neutral";
+  return "blue";
+}
 
 /**
  * Palette des séances   une teinte stable par module.

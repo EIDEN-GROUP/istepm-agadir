@@ -28,7 +28,7 @@ export async function employeeRoutes(app: FastifyInstance) {
     return db.select().from(employees).orderBy(desc(employees.createdAt));
   });
 
-  app.post("/", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request) => {
     const input = employeeSchema.parse(request.body);
     const db = getDb();
     const [employee] = await db
@@ -41,7 +41,7 @@ export async function employeeRoutes(app: FastifyInstance) {
     return employee;
   });
 
-  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request, reply) => {
+  app.put("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = employeeSchema.partial().parse(request.body);
     const db = getDb();
@@ -61,14 +61,14 @@ export async function employeeRoutes(app: FastifyInstance) {
     return employee;
   });
 
-  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.delete("/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(employees).where(eq(employees.id, id));
     return { ok: true };
   });
 
-  app.post("/import-csv", { preHandler: [authenticate, requireRole("directeur", "responsable")] }, async (request) => {
+  app.post("/import-csv", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request) => {
     const { csvText } = z.object({ csvText: z.string() }).parse(request.body);
     const lines = csvText.split("\n").filter(Boolean);
     let imported = 0;

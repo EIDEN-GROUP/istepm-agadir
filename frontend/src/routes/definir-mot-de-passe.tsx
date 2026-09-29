@@ -85,9 +85,13 @@ function DefinirMotDePassePage() {
       const mapped =
         r === "admin" || r === "superadmin" || r === "directeur"
           ? "directeur"
-          : r === "enseignant" || r === "responsable" || r === "etudiant"
-            ? r
-            : "directeur";
+          : r === "assistant_directeur"
+            ? "assistant_directeur"
+            : r === "enseignant" || r === "responsable" || r === "etudiant"
+              ? r
+              : r === "comptable"
+                ? "assistant_directeur"
+                : "directeur";
       window.localStorage.setItem("istpm-token", res.token);
       window.localStorage.setItem("istpm-user", JSON.stringify({ ...res.user, role: mapped }));
       window.localStorage.setItem("istpm-role", mapped);

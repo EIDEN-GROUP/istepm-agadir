@@ -30,7 +30,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return map;
   });
 
-  app.put("/:key", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.put("/:key", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { key } = request.params as { key: string };
     // Clés internes uniquement : bloque l'écrasement de clés arbitraires.
     if (!/^[a-z0-9_]{1,64}$/.test(key)) {
@@ -65,7 +65,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return db.select().from(levels).orderBy(desc(levels.createdAt));
   });
 
-  app.post("/levels", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request) => {
+  app.post("/levels", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request) => {
     const input = levelSchema.parse(request.body);
     const db = getDb();
     const [level] = await db
@@ -80,7 +80,7 @@ export async function settingsRoutes(app: FastifyInstance) {
 
   app.put(
     "/levels/:id",
-    { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] },
+    { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const input = levelSchema.partial().parse(request.body);
@@ -102,7 +102,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     },
   );
 
-  app.delete("/levels/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request) => {
+  app.delete("/levels/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(levels).where(eq(levels.id, id));
@@ -133,7 +133,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return db.select().from(groupConfigs).orderBy(asc(groupConfigs.name));
   });
 
-  app.post("/groups", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.post("/groups", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const input = groupConfigSchema.parse(request.body);
     const semesters = normaliseNiveaux(input);
     if (!semesters || semesters.length === 0) {
@@ -151,7 +151,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.put("/groups/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.put("/groups/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = groupConfigSchema.partial().parse(request.body);
     const db = getDb();
@@ -174,7 +174,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return updated;
   });
 
-  app.delete("/groups/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request) => {
+  app.delete("/groups/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     await db.delete(groupConfigs).where(eq(groupConfigs.id, id));
@@ -191,7 +191,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return row?.value ?? [];
   });
 
-  app.post("/filieres", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.post("/filieres", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { nom } = z.object({ nom: z.string().min(1) }).parse(request.body);
     const db = getDb();
     const [row] = await db
@@ -218,7 +218,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { filieres: list };
   });
 
-  app.delete("/filieres/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.delete("/filieres/:nom", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { nom } = request.params as { nom: string };
     const db = getDb();
     const [row] = await db
@@ -255,7 +255,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return row?.value ?? [];
   });
 
-  app.post("/niveaux-etudes", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.post("/niveaux-etudes", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { nom } = z.object({ nom: z.string().min(1) }).parse(request.body);
     const db = getDb();
     const [row] = await db
@@ -282,7 +282,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { niveaux: list };
   });
 
-  app.delete("/niveaux-etudes/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.delete("/niveaux-etudes/:nom", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { nom } = request.params as { nom: string };
     const db = getDb();
     const [row] = await db
@@ -322,7 +322,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return asStrings(row?.value);
   });
 
-  app.post("/stage-services", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.post("/stage-services", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { nom } = z.object({ nom: z.string().min(1).max(200) }).parse(request.body);
     const clean = nom.trim().replace(/\s+/g, " ");
     if (!clean) return reply.status(400).send({ error: "Nom de service requis" });
@@ -346,7 +346,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { services: list };
   });
 
-  app.put("/stage-services/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.put("/stage-services/:nom", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { nom } = request.params as { nom: string };
     const body = z.object({ nouveauNom: z.string().trim().min(1).max(200).optional() }).parse(request.body);
     const db = getDb();
@@ -369,7 +369,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { services: list };
   });
 
-  app.delete("/stage-services/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.delete("/stage-services/:nom", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { nom } = request.params as { nom: string };
     const db = getDb();
     const [row] = await db
@@ -386,21 +386,74 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { services: list };
   });
 
+  const subStageSchema = z.object({
+    // Pas de min(1) : les lignes sans nom sont écartées par normSubStage
+    // (le formulaire n'en envoie jamais, l'API reste tolérante).
+    nom: z.string().trim().max(200),
+    niveau: z.string().trim().max(50).optional().default(""),
+    heures: z.number().int().min(0).max(2000).optional().default(0),
+    capacite: z.number().int().min(0).optional().default(5),
+    filieres: z.array(z.string().trim().min(1).max(100)).max(10).optional().default([]),
+  });
+
+  type SubStage = {
+    nom: string;
+    niveau: string;
+    heures: number;
+    capacite: number;
+    filieres?: string[];
+  };
+
+  type StructRow = { nom: string; capacite?: number; subStages: SubStage[] };
+
+  function normSubStage(r: unknown): SubStage | null {
+    if (typeof r !== "object" || !r) return null;
+    const x = r as Record<string, unknown>;
+    const nom = String(x.nom ?? "").trim().replace(/\s+/g, " ");
+    if (!nom) return null;
+    const filieres = Array.isArray(x.filieres)
+      ? (x.filieres as unknown[])
+          .filter((f): f is string => typeof f === "string" && f.trim().length > 0)
+          .map((f) => f.trim())
+      : [];
+    return {
+      nom,
+      niveau: String(x.niveau ?? "").trim().slice(0, 50),
+      heures: Math.max(0, Math.min(2000, Math.floor(Number(x.heures) || 0))),
+      capacite: Math.max(0, Math.floor(Number(x.capacite ?? 5) || 0)),
+      ...(filieres.length ? { filieres } : {}),
+    };
+  }
+
+  /**
+   * Normalise structures data : chaîne historique → { nom, capacite: 5,
+   * subStages: [] } ; { nom, capacite } → + subStages: [] (repli préservé,
+   * jamais éclaté) ; lignes malformées écartées.
+   */
+  function asStructs(v: unknown): StructRow[] {
+    if (!Array.isArray(v)) return [];
+    return v.flatMap((s: unknown) => {
+      if (typeof s === "string") return [{ nom: s, capacite: 5, subStages: [] as SubStage[] }];
+      if (typeof s === "object" && s && "nom" in (s as Record<string, unknown>)) {
+        const o = s as Record<string, unknown>;
+        const sub = Array.isArray(o.subStages) ? o.subStages : [];
+        return [{
+          nom: String(o.nom ?? "?"),
+          ...(o.capacite === undefined ? {} : { capacite: Math.max(0, Math.floor(Number(o.capacite) || 0)) }),
+          subStages: sub
+            .map(normSubStage)
+            .filter((r): r is SubStage => r !== null)
+            .sort((a, b) => (a.niveau || "").localeCompare(b.niveau || "") || a.nom.localeCompare(b.nom)),
+        }];
+      }
+      return [{ nom: "?", capacite: 5, subStages: [] as SubStage[] }];
+    });
+  }
+
   const structSchema = z.object({
     nom: z.string().min(1),
     capacite: z.number().int().min(1).optional().default(5),
   });
-
-  /** Normalise structures data: legacy string[] → { nom, capacite }[]. */
-  function asStructs(v: unknown): { nom: string; capacite: number }[] {
-    if (!Array.isArray(v)) return [];
-    return v.map((s: unknown) => {
-      if (typeof s === "string") return { nom: s, capacite: 5 };
-      if (typeof s === "object" && s && "nom" in (s as Record<string, unknown>))
-        return { nom: (s as Record<string, string>).nom, capacite: Number((s as Record<string, number>).capacite) || 5 };
-      return { nom: "?", capacite: 5 };
-    });
-  }
 
   app.get("/structures", { preHandler: [authenticate] }, async () => {
     const db = getDb();
@@ -412,7 +465,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return asStructs(row?.value);
   });
 
-  app.post("/structures", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.post("/structures", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const parsed = structSchema.parse(request.body);
     const nom = parsed.nom.trim().replace(/\s+/g, " ");
     const capacite = parsed.capacite;
@@ -429,7 +482,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     if (list.some((s) => s.nom.toLowerCase() === norm)) {
       return reply.status(409).send({ error: "Cette structure existe déjà" });
     }
-    list.push({ nom, capacite });
+    list.push({ nom, capacite, subStages: [] });
     list.sort((a, b) => a.nom.localeCompare(b.nom));
 
     if (row) {
@@ -443,11 +496,16 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { structures: list };
   });
 
-  // Update: change name and/or capacity
-  app.put("/structures/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  // Update: change le nom, la capacité de repli et/ou la table des sous-stages
+  // (remplacement intégral, validé et trié côté serveur).
+  app.put("/structures/:nom", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { nom } = request.params as { nom: string };
     const body = z
-      .object({ nouveauNom: z.string().min(1).optional(), capacite: z.number().int().min(1).optional() })
+      .object({
+        nouveauNom: z.string().min(1).optional(),
+        capacite: z.number().int().min(1).optional(),
+        subStages: z.array(subStageSchema).max(200).optional(),
+      })
       .parse(request.body);
     const db = getDb();
     const [row] = await db
@@ -465,7 +523,17 @@ export async function settingsRoutes(app: FastifyInstance) {
     if (newName !== nom && list.some((s) => s.nom === newName))
       return reply.status(409).send({ error: "Ce nom existe déjà" });
 
-    list[idx] = { nom: newName, capacite: body.capacite ?? list[idx].capacite };
+    list[idx] = {
+      nom: newName,
+      capacite: body.capacite ?? list[idx].capacite,
+      subStages:
+        body.subStages === undefined
+          ? list[idx].subStages
+          : body.subStages
+              .map(normSubStage)
+              .filter((r): r is SubStage => r !== null)
+              .sort((a, b) => (a.niveau || "").localeCompare(b.niveau || "") || a.nom.localeCompare(b.nom)),
+    };
     list.sort((a, b) => a.nom.localeCompare(b.nom));
 
     await db
@@ -475,7 +543,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return { structures: list };
   });
 
-  app.delete("/structures/:nom", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.delete("/structures/:nom", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { nom } = request.params as { nom: string };
     const db = getDb();
     const [row] = await db
@@ -519,7 +587,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     coefficient: z.union([z.number(), z.string()]).nullable().optional(),
   });
 
-  app.post("/modules", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request) => {
+  app.post("/modules", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request) => {
     const body = moduleSchema.parse(request.body);
     const db = getDb();
     const [mod] = await db
@@ -536,7 +604,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return mod;
   });
 
-  app.put("/modules/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.put("/modules/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = moduleSchema.parse(request.body);
     const db = getDb();
@@ -560,7 +628,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     return updated;
   });
 
-  app.delete("/modules/:id", { preHandler: [authenticate, requireRole("directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
+  app.delete("/modules/:id", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable"), requirePerm("settings.write")] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const db = getDb();
     const [deleted] = await db.delete(modules).where(eq(modules.id, id)).returning();
