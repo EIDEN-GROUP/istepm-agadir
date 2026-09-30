@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { verifyInvitation, acceptInvitation, requestInviteResend } from "@/lib/istpm-api";
+import { resetKickSession } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const TOKEN_BACKUP_KEY = "istpm-invite-token";
@@ -91,6 +92,7 @@ function DefinirMotDePassePage() {
               ? r
               : "directeur";
       window.localStorage.setItem("istpm-token", res.token);
+      resetKickSession();
       window.localStorage.setItem("istpm-user", JSON.stringify({ ...res.user, role: mapped }));
       window.localStorage.setItem("istpm-role", mapped);
       clearTokenBackup();

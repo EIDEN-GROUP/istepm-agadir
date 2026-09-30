@@ -35,6 +35,7 @@ import {
 } from "@/lib/istpm-store";
 import {
   NIVEAUX,
+  normGroupe,
   FILIERES,
   CRENEAUX,
   libelleNiveau,
@@ -1307,6 +1308,25 @@ function SeanceForm({
   // Groupes liés au niveau choisi (via le registre des groupes ; les groupes
   // hors registre restent proposés, niveau indéterminable).
   const { groupConfigs } = useIstpm();
+  // Formateur choisi : Filière/Module/Niveau se restreignent à son
+  // affectation (le serveur refuse 422 tout module hors de ses modules).
+  const ficheChoisie = formateurs.find((p) => p.id === f.professeurId) ?? null;
+  const filieresChoisies = ficheChoisie?.departement ? [ficheChoisie.departement] : filieres;
+  const modulesChoisis = ficheChoisie
+    ? modulesDeFiliere(f.filiere).filter((m) => ficheChoisie.modules.includes(m))
+    : modulesDeFiliere(f.filiere);
+  const niveauxChoisis = useMemo(() => {
+    if (!ficheChoisie) return [...NIVEAUX];
+    const norm = new Set(ficheChoisie.groupes.map((g) => normGroupe(g)));
+    const duRegistre = new Set(
+      groupConfigs
+        .filter((g) => norm.has(normGroupe(g.name)))
+        .flatMap((g) => g.semesters ?? [])
+        .map((s) => libelleNiveau(s)),
+    );
+    const res = [...NIVEAUX].filter((n) => duRegistre.has(n));
+    return res.length ? res : [...NIVEAUX];
+  }, [ficheChoisie, groupConfigs]);
   const groupesLies = useMemo(() => {
     if (!f.semestre) return groupes;
     const lies = new Set(
@@ -1320,6 +1340,19 @@ function SeanceForm({
     if (f.groupe && !groupesLies.includes(f.groupe)) set("groupe", "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupesLies]);
+
+  // Périmètre formateur : vide les champs sortis de son affectation
+  // (filière, module, niveau) quand le formateur change.
+  useEffect(() => {
+    if (!ficheChoisie) return;
+    if (f.filiere && !filieresChoisies.includes(f.filiere)) {
+      setF((p) => ({ ...p, filiere: "", module: "", semestre: "" }));
+      return;
+    }
+    if (f.module && !modulesChoisis.includes(f.module)) set("module", "");
+    if (f.semestre && !(niveauxChoisis as string[]).includes(f.semestre)) set("semestre", "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f.professeurId]);
 
   // Conflits recalculés à chaque frappe : l'avertissement apparaît avant
   // l'enregistrement, pas après.
@@ -1428,7 +1461,7 @@ function SeanceForm({
               professeurId: v,
               filiere: p.filiere || (dep ?? ""),
             }));
-            setErrors((p) => ({ ...p, professeurId: undefined }));
+            setErrors((p) => ({ ...p, professeurId: undefined, filiere: undefined, module: undefined, semestre: undefined }));
           }}
           options={formateurs
             .filter((p) => !p.archived)
@@ -1445,9 +1478,11 @@ function SeanceForm({
           required
           value={f.filiere}
           onChange={(v) => {
-            // La filière pilote les modules : un module hors filière est vidé.
+            // La filière pilote les modules : un module hors périmètre est vidé.
             setF((p) => {
-              const mods = modulesDeFiliere(v);
+              const mods = (ficheChoisie
+                ? modulesDeFiliere(v).filter((m) => ficheChoisie.modules.includes(m))
+                : modulesDeFiliere(v));
               return {
                 ...p,
                 filiere: v as Filiere,
@@ -1456,7 +1491,7 @@ function SeanceForm({
             });
             setErrors((p) => ({ ...p, filiere: undefined, module: undefined }));
           }}
-          options={filieres}
+          options={filieresChoisies}
           error={errors.filiere}
         />
       </FullWidth>
@@ -1466,7 +1501,7 @@ function SeanceForm({
           required
           value={f.module}
           onChange={(v) => set("module", v)}
-          options={modulesDeFiliere(f.filiere)}
+          options={modulesChoisis}
           placeholder={f.filiere ? "Choisir un module…" : "Choisissez d'abord une filière…"}
           error={errors.module}
         />
@@ -1492,7 +1527,7 @@ function SeanceForm({
         required
         value={f.semestre}
         onChange={(v) => set("semestre", v)}
-        options={NIVEAUX}
+        options={niveauxChoisis}
         error={errors.semestre}
       />
       <SelectField

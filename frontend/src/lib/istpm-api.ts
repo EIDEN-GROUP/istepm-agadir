@@ -1,4 +1,4 @@
-import { api, getApiBaseUrl } from "@/lib/api";
+import { api, getApiBaseUrl, kickSessionExpiree } from "@/lib/api";
 import { sanitizeFilename } from "@/lib/filename";
 import { getStoredToken } from "@/lib/auth";
 import type {
@@ -172,7 +172,10 @@ export async function downloadExamenDocumentApi(
   const res = await fetch(`${API_BASE}/examens/${examenId}/document`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!res.ok) throw new Error("Impossible de télécharger le document");
+  if (!res.ok) {
+    if (res.status === 401) kickSessionExpiree(!!token);
+    throw new Error("Impossible de télécharger le document");
+  }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -199,7 +202,10 @@ export async function previewExamenDocumentApi(
   const res = await fetch(`${API_BASE}/examens/${examenId}/document`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    if (res.status === 401) kickSessionExpiree(!!token);
+    return null;
+  }
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }
@@ -372,6 +378,7 @@ export async function exportEtudiantsCsv(params?: {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
+    if (res.status === 401) kickSessionExpiree(!!token);
     const err = await res.json().catch(() => ({ error: "Erreur d'exportation" }));
     throw new Error(err.error || "Erreur d'exportation");
   }
@@ -641,7 +648,10 @@ export async function downloadSeanceDocumentApi(
   const res = await fetch(`${API_BASE_SEANCE}/seances/${seanceId}/document`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!res.ok) throw new Error("Impossible de télécharger le document");
+  if (!res.ok) {
+    if (res.status === 401) kickSessionExpiree(!!token);
+    throw new Error("Impossible de télécharger le document");
+  }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -666,7 +676,10 @@ export async function previewSeanceDocumentApi(
   const res = await fetch(`${API_BASE_SEANCE}/seances/${seanceId}/document`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    if (res.status === 401) kickSessionExpiree(!!token);
+    return null;
+  }
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }

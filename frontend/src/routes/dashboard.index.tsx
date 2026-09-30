@@ -976,7 +976,7 @@ function StudentAvatarList({ etudiants, limit = 6 }: { etudiants: { id: string; 
   return (
     <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
       {etudiants.slice(0, limit).map((e) => (
-        <Link key={e.id} to="/dashboard/etudiants" className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-brand/8 sm:px-5">
+        <Link key={e.id} to="/dashboard/etudiants" search={{ etudiantId: e.id }} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-brand/8 sm:px-5">
           <PersonAvatar name={`${e.prenom} ${e.nom}`} photoUrl={e.photoUrl} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium text-foreground">{e.prenom} {e.nom}</span>

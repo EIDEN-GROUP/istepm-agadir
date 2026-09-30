@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { kickSessionExpiree, resetKickSession } from "./api";
 
 export type UserRole = "directeur" | "assistant_directeur" | "enseignant" | "responsable" | "etudiant";
 
@@ -175,6 +176,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await fetch(`${API_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (res.status === 401) {
+          kickSessionExpiree(true);
+          return;
+        }
         if (!res.ok || cancelled) return;
         const me: { role?: string; photoUrl?: string } = await res.json();
         if (me.role && mapBackendRole(me.role) !== role) return;
@@ -234,6 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: mappedRole,
       };
       window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      resetKickSession();
       persistRole(mappedRole, authUser);
     },
     [persistRole],

@@ -26,6 +26,35 @@ export class ApiError extends Error {
   }
 }
 
+let kickEnCours = false;
+
+/** Réarme l'expulsion (après une reconnexion réussie). */
+export function resetKickSession() {
+  kickEnCours = false;
+}
+
+/**
+ * Session expirée ou révoquée : purge les clés locales UNE fois puis renvoie
+ * vers /login (jamais de boucle : le stockage vidé, `beforeLoad` n'y
+ * reconduit plus). Sans jeton envoyé, simple 401 sans redirection.
+ */
+export function kickSessionExpiree(avaiUnJeton: boolean) {
+  if (typeof window === "undefined" || !avaiUnJeton) return;
+  if (window.location.pathname === "/login" || kickEnCours) return;
+  kickEnCours = true;
+  try {
+    const condamnees: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith("istpm-")) condamnees.push(k);
+    }
+    for (const k of condamnees) window.localStorage.removeItem(k);
+  } catch {
+    /* stockage indisponible */
+  }
+  window.location.assign("/login?expired=1");
+}
+
 async function request<T>(
   path: string,
   options: RequestOptions = {},
@@ -71,6 +100,7 @@ async function request<T>(
   }
 
   if (res.status === 401) {
+    kickSessionExpiree(!!token);
     throw new ApiError("Non authentifié", 401);
   }
 

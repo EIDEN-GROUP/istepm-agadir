@@ -328,8 +328,7 @@ function EtudiantsPage() {
         }
       />
 
-      {/* Espace enseignant : liste déjà périmétrée côté serveur, pas de filtres. */}
-      {!isTeacher ? (
+      {/* Espace enseignant : périmètre restreint (niveau/groupe/module du formateur). */}
       <FilterPanel
         search={search}
         onSearch={setSearch}
@@ -461,7 +460,6 @@ function EtudiantsPage() {
           )
         }
       />
-      ) : null}
 
       {inviteInfo ? (
         <InviteLinkBanner
@@ -522,13 +520,8 @@ function EtudiantsPage() {
             <th className="text-center">Niveau</th>
             <th>Statut</th>
             {enseignantScope ? (
-              <>
-                <th className="text-center">Note</th>
-                <th className="text-right">Moyenne</th>
-              </>
-            ) : (
-              <th className="text-right">Moyenne</th>
-            )}
+              <th className="text-center">Note</th>
+            ) : null}
             <th className="w-28 text-center">Actions</th>
           </>
         }
@@ -567,36 +560,19 @@ function EtudiantsPage() {
               </span>
             </td>
             {enseignantScope ? (
-              <>
-                <td className="text-center">
-                  {(() => {
-                    const mNote = moduleFilter !== ALL
-                      ? e.notes.find((n) => n.module === moduleFilter)
-                      : null;
-                    return (
-                      <span className={toneBadge(mNote ? "teal" : "neutral")}>
-                        {mNote ? `${mNote.note.toFixed(1)}/20` : ""}
-                      </span>
-                    );
-                  })()}
-                </td>
-                <td className="text-right tabular-nums">
-                  {e.moyenne > 0 ? (
-                    <span className="font-medium">{e.moyenne.toFixed(2)}</span>
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </td>
-              </>
-            ) : (
-              <td className="text-right tabular-nums">
-                {e.moyenne > 0 ? (
-                  <span className="font-medium">{e.moyenne.toFixed(2)}</span>
-                ) : (
-                  <span className="text-muted-foreground">-</span>
-                )}
+              <td className="text-center">
+                {(() => {
+                  const mNote = moduleFilter !== ALL
+                    ? e.notes.find((n) => n.module === moduleFilter)
+                    : null;
+                  return (
+                    <span className={toneBadge(mNote ? "teal" : "neutral")}>
+                      {mNote ? `${mNote.note.toFixed(1)}/20` : ""}
+                    </span>
+                  );
+                })()}
               </td>
-            )}
+            ) : null}
             <td
               className="text-center"
               onClick={(ev) => ev.stopPropagation()}

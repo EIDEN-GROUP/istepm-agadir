@@ -417,6 +417,8 @@ type IstpmCtx = {
   syncFailed: boolean;
   /** Recharge tout depuis le backend (remplace l'ancien `reset()` de démo). */
   refresh: () => Promise<void>;
+  /** Recharge si les données sont périmées (retours de navigation). */
+  refreshIfStale: (maxAgeMs?: number) => Promise<void>;
 
   /** Photo d'identité d'un étudiant, résolue par id ou par CNE (ou `undefined`). */
   photoDe: (cleOuCne: string | undefined | null) => string | undefined;
@@ -526,6 +528,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
   // Les listes staff (étudiants, formateurs, stages, séances) répondent
   // 403/404 aux rôles sans accès (étudiant via /api/student/*) : on ne les
   // demande même pas pour éviter erreurs console + bandeau abusif.
+  const lastRefreshRef = useRef(0);
   const refresh = useCallback(async () => {
     setLoading(true);
     setSyncFailed(false);
@@ -620,8 +623,19 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
       setSyncFailed(true);
     } finally {
       setLoading(false);
+      lastRefreshRef.current = Date.now();
     }
   }, [userRole]);
+
+  /** Recharge si les données datent de plus de `maxAgeMs` (retours de navigation). */
+  const refreshIfStale = useCallback(
+    async (maxAgeMs = 30_000) => {
+      if (!userId) return;
+      if (Date.now() - lastRefreshRef.current < maxAgeMs) return;
+      await refresh();
+    },
+    [userId, refresh],
+  );
 
   useEffect(() => {
     // Le provider vit au-dessus du routeur : il monte sur l'écran de login,
@@ -1460,6 +1474,7 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     loading,
     syncFailed,
     refresh,
+    refreshIfStale,
     dashboard,
     repartitionFiliere,
     repartitionNiveau,

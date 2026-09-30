@@ -38,6 +38,7 @@ function LoginPage() {
   useEffect(() => {
     document.title = "Connexion étudiant | ISTEPM Agadir";
   }, []);
+  const { expired } = Route.useSearch();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -208,6 +209,11 @@ function LoginPage() {
                     {error}
                   </p>
                 ) : null}
+                {!error && expired ? (
+                  <p className="text-[13px] font-semibold text-warn">
+                    Session expirée, reconnectez-vous.
+                  </p>
+                ) : null}
                 {staffBlocked ? (
                   <p className="text-[13px] font-semibold text-[color:var(--l-red)]">
                     Ce portail est réservé aux étudiants et enseignants.{" "}
@@ -275,6 +281,10 @@ function LoginPage() {
 }
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>): { expired?: string; redirect?: string } => ({
+    expired: typeof search.expired === "string" ? search.expired : undefined,
+    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+  }),
   beforeLoad: () => {
     if (getStoredRole()) {
       throw redirect({ to: "/dashboard" });

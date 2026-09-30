@@ -26,7 +26,13 @@ function DashboardLayout() {
   const navigate = useNavigate();
   // Données 100 % serveur : en cas d'échec de synchronisation on l'affiche
   // au lieu de données inventées ou d'écrans vides silencieux.
-  const { syncFailed, refresh } = useIstpm();
+  const { syncFailed, refresh, refreshIfStale } = useIstpm();
+
+  // Retour de navigation (sidebar) : recharge si périmé pour ne jamais
+  // réafficher un écran vide ou figé.
+  useEffect(() => {
+    void refreshIfStale().catch(() => {});
+  }, [pathname, refreshIfStale]);
 
   // RBAC UI : renvoie un rôle vers ses destinations autorisées
   // (ex. un étudiant sur /dashboard/etudiants → son espace). Attend les
@@ -44,8 +50,10 @@ function DashboardLayout() {
   return (
     <DashSidebarShell brand={brand} nav={nav} dir={dir}>
       {/* Transition de page : chaque changement de route entre en fondu + léger
-          glissement, pour un enchaînement fluide entre les écrans. */}
-      <AnimatePresence mode="wait">
+          glissement, pour un enchaînement fluide entre les écrans. Sans
+          mode="wait" : les transitions simultanées ne peuvent pas bloquer
+          l'affichage sur un écran vide. */}
+      <AnimatePresence>
         <motion.div
           key={pathname}
           initial={{ opacity: 0, y: 14 }}

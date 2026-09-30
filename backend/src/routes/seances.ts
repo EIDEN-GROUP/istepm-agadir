@@ -73,6 +73,30 @@ function safeDownloadName(nom: string): string {
 }
 
 /**
+ * Règle d'affectation : une séance ne peut porter un module hors des
+ * modules du formateur (fiches sans modules = périmètre ouvert, données
+ * historiques). Retourne un message d'erreur ou null si autorisé.
+ */
+async function moduleHorsAffectation(
+  db: ReturnType<typeof getDb>,
+  professeurId: string,
+  module: string,
+): Promise<string | null> {
+  if (!professeurId || !module) return null;
+  const [fiche] = await db
+    .select({ modules: formateurs.modules })
+    .from(formateurs)
+    .where(eq(formateurs.id, professeurId))
+    .limit(1);
+  if (!fiche) return null;
+  const modules = Array.isArray(fiche.modules) ? fiche.modules : [];
+  if (modules.length === 0) return null;
+  if (!modules.includes(module)) {
+    return "Ce module n'est pas assigné à ce formateur";
+  }
+  return null;
+}
+/**
  * Fiche formateur liée au compte (périmètre enseignant). `formateurs.user_id`
  * porte l'`users.id` en texte (voir `services/auth.ts`).
  */
@@ -210,6 +234,8 @@ export async function seanceRoutes(app: FastifyInstance) {
   app.post("/", { preHandler: [authenticate, requireRole("directeur", "assistant_directeur", "responsable")] }, async (request, reply) => {
     const input = createSeanceSchema.parse(request.body);
     const db = getDb();
+    const horsAffectation = await moduleHorsAffectation(db, input.professeurId ?? "", input.module);
+    if (horsAffectation) return reply.status(422).send({ error: horsAffectation });
     const query = request.query as { force?: string };
     if (query.force !== "1") {
       const conflit = await trouverConflit(db, input);
@@ -243,6 +269,16 @@ export async function seanceRoutes(app: FastifyInstance) {
     const db = getDb();
     const [existing] = await db.select().from(seances).where(eq(seances.id, id)).limit(1);
     if (!existing) return reply.status(404).send({ error: "Séance introuvable" });
+
+    // Règle d'affectation (comme à la création) quand le couple change.
+    if (input.professeurId !== undefined || input.module !== undefined) {
+      const horsAffectation = await moduleHorsAffectation(
+        db,
+        (input.professeurId ?? existing.professeurId ?? "") as string,
+        (input.module ?? existing.module ?? "") as string,
+      );
+      if (horsAffectation) return reply.status(422).send({ error: horsAffectation });
+    }
 
     const isTeacher = request.user.role === "enseignant";
     if (isTeacher) {
