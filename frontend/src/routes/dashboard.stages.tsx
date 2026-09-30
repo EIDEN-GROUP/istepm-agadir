@@ -204,9 +204,9 @@ function StagesAnalytics({
         .filter((s) => s.statut !== "valide")
         .map((s) => s.etudiantId),
     );
-    // Éligibles : étudiants non archivés de chaque année, sans stage actif.
+    // Éligibles : inscrits non archivés de chaque année, sans stage actif.
     return etudiants.filter(
-      (e) => !e.archived && !activeIds.has(e.id),
+      (e) => !e.archived && e.statut === "inscrit" && !activeIds.has(e.id),
     );
   }, [etudiants, stages]);
 

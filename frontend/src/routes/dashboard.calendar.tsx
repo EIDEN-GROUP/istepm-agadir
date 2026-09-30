@@ -79,7 +79,8 @@ import {
 } from "@/lib/dash-ui";
 import { escCsvCell } from "@/lib/csv";
 import { ApiError } from "@/lib/api";
-import { createNotificationApi, fetchHeuresParModule } from "@/lib/istpm-api";
+import { useModuleHeures } from "@/hooks/use-module-heures";
+import { createNotificationApi } from "@/lib/istpm-api";
 import {
   PageHeader,
   FilterPanel,
@@ -150,7 +151,6 @@ function PlanningPage() {
     joursChomes: joursChomesApi,
     groupConfigs,
     filieres: filieresApi,
-    modules: modulesRegistrePage,
     loading: storeLoading,
     syncFailed,
     refresh,
@@ -218,30 +218,18 @@ function PlanningPage() {
 
   const [detail, setDetail] = useState<Seance | null>(null);
   const [apercuDoc, setApercuDoc] = useState<Seance | null>(null);
-  const heuresGrilleQ = useQuery({
-    queryKey: ["heures-par-module", "grille"],
-    queryFn: () => fetchHeuresParModule(),
-    retry: false,
-  });
+  const { faitesDe: faitesGrille, volumeDe: volumeGrille } = useModuleHeures();
   // Heures + volume par séance, pour les pastilles des cartes jour/semaine.
   const heuresParCle = useMemo(() => {
-    const faites = new Map<string, number>();
-    for (const h of heuresGrilleQ.data ?? []) {
-      const k = `${h.professeurId}||${h.module}`;
-      faites.set(k, (faites.get(k) ?? 0) + (Number(h.minutes) || 0));
-    }
     const map = new Map<string, { faites: number; volume: number }>();
     for (const s of seances) {
-      const ref = (modulesRegistrePage ?? []).find(
-        (m) => m.nom === s.module && (!m.filiere || !s.filiere || m.filiere === s.filiere),
-      ) ?? (modulesRegistrePage ?? []).find((m) => m.nom === s.module);
-      map.set(`${s.professeurId}||${s.module}`, {
-        faites: Math.round(((faites.get(`${s.professeurId}||${s.module}`) ?? 0) / 60) * 10) / 10,
-        volume: Number(ref?.volumeHoraire ?? 0) || 0,
-      });
+      const k = `${s.professeurId}||${s.module}`;
+      if (!map.has(k)) {
+        map.set(k, { faites: faitesGrille(s.professeurId, s.module), volume: volumeGrille(s.module, s.filiere) });
+      }
     }
     return map;
-  }, [heuresGrilleQ.data, seances, modulesRegistrePage]);
+  }, [seances, faitesGrille, volumeGrille]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Seance | null>(null);
   const [prefill, setPrefill] = useState<{ date: string; debut: string } | null>(
@@ -1015,20 +1003,11 @@ export function SeanceDetail({
   };
 
   // Avancement du volume horaire du module : compté à la confirmation.
-  const { modules: modulesRegistreDetail } = useIstpm();
-  const heuresQ = useQuery({
-    queryKey: ["heures-module", seance.professeurId, seance.module],
-    queryFn: () => fetchHeuresParModule(seance.professeurId || undefined),
-    retry: false,
-  });
-  const moduleRef = (modulesRegistreDetail ?? []).find(
-    (m) => m.nom === seance.module && (!m.filiere || !seance.filiere || m.filiere === seance.filiere),
-  ) ?? (modulesRegistreDetail ?? []).find((m) => m.nom === seance.module);
-  const volumeCible = Number(moduleRef?.volumeHoraire ?? 0) || 0;
-  const minutesFaites = (heuresQ.data ?? [])
-    .filter((h) => h.module === seance.module)
-    .reduce((t, h) => t + (Number(h.minutes) || 0), 0);
-  const heuresFaites = Math.round((minutesFaites / 60) * 10) / 10;
+  const { volumeDe, faitesDe, isLoading: heuresLoading } = useModuleHeures(
+    seance.professeurId || undefined,
+  );
+  const volumeCible = volumeDe(seance.module, seance.filiere);
+  const heuresFaites = faitesDe(seance.professeurId, seance.module);
   const dureeSeanceH = Math.max(
     0,
     Math.round(((minutesDepuisMinuit(seance.fin) - minutesDepuisMinuit(seance.debut)) / 60) * 10) / 10,
@@ -1139,7 +1118,7 @@ export function SeanceDetail({
                   {seance.debut} – {seance.fin}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {heuresQ.isLoading
+                  {heuresLoading
                     ? "Avancement du module…"
                     : volumeCible > 0
                       ? `+${dureeSeanceH} h cette séance · Module : ${heuresFaites} h / ${volumeCible} h · reste ${Math.max(0, Math.round((volumeCible - heuresFaites) * 10) / 10)} h`

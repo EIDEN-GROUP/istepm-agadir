@@ -42,12 +42,14 @@ import { useAuth, ROLE_META } from "@/lib/auth";
 import { useIstpm, useCurrentFormateur } from "@/lib/istpm-store";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
+import { useModuleHeures } from "@/hooks/use-module-heures";
 import { SeanceStatutBadge } from "@/components/seance-validation";
 import { SeanceDetail } from "@/routes/dashboard.calendar";
 import {
   fmtMAD,
   fmtDate,
   libelleNiveau,
+  normGroupe,
   NIVEAUX,
   type Seance,
   type Examen,
@@ -70,8 +72,10 @@ import {
   dashCursor,
   BRAND_CHART_COLORS,
   dialogSurfaceWide,
+  softInput,
 } from "@/lib/dash-ui";
-import { DetailShell, DetailSection } from "@/components/dash-page";
+import { Input } from "@/components/ui/input";
+import { DetailShell, DetailSection, DetailEmpty } from "@/components/dash-page";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { DashTabs, DashTabPanel, type DashTab } from "@/components/dash-tabs";
 import { usePagination, TablePagination } from "@/components/table-pagination";
@@ -297,7 +301,7 @@ function seedOf(label: string) {
 }
 
 function KpiCard({
-  label, value, hint, tone = "teal", icon: Icon, accent = false, spark = true,
+  label, value, hint, tone = "teal", icon: Icon, accent = false, spark = true, onClick,
 }: {
   label: string; value: string | number; hint?: string;
   tone?: keyof typeof TONE_COLORS;
@@ -306,14 +310,17 @@ function KpiCard({
   accent?: boolean;
   /** Show the decorative mini-chart (default true). */
   spark?: boolean;
+  /** Rend la carte cliquable (modale de détail). */
+  onClick?: () => void;
 }) {
   const sparkColor = accent ? "#ffffff" : TONE_COLORS[tone];
-  return (
+  const body = (
     <motion.div
       whileHover={{ y: -4, scale: 1.01 }}
       transition={{ type: "spring", stiffness: 350, damping: 25 }}
       className={cn(
         "group relative overflow-hidden p-4 sm:p-5",
+        onClick && "cursor-pointer",
         accent
           ? "rounded-3xl bg-gradient-to-br from-med to-med-dk text-white shadow-[0_18px_40px_-18px_rgb(var(--istpm-shadow)/0.6)]"
           : cn(softCard, "transition-shadow duration-300 hover:[box-shadow:var(--edge-highlight),var(--elevation-4)]"),
@@ -367,6 +374,109 @@ function KpiCard({
         {spark ? <Sparkline seed={seedOf(label)} stroke={sparkColor} /> : null}
       </div>
     </motion.div>
+  );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="block w-full text-left" aria-label={label}>
+        {body}
+      </button>
+    );
+  }
+  return body;
+}
+
+/**
+ * Heures restantes d'un enseignant par module, avec le détail des séances
+ * validées qui ont rapporté les heures (cliquer un module déplie ses
+ * séances : date · horaire · +X h).
+ */
+function ModulesEnseignantModal({
+  formateur,
+  onClose,
+}: {
+  formateur: Formateur;
+  onClose: () => void;
+}) {
+  const { seances } = useIstpm();
+  const { volumeDe, faitesDe } = useModuleHeures(formateur.id);
+  const [ouvert, setOuvert] = useState<string | null>(null);
+  const duree = (s: Seance) =>
+    Math.max(0, Math.round(((minutesDepuisMinuit(s.fin) - minutesDepuisMinuit(s.debut)) / 60) * 10) / 10);
+  const validees = useMemo(
+    () =>
+      seances
+        .filter((s) => s.professeurId === formateur.id && s.statut === "valide")
+        .slice()
+        .sort((a, b) => `${b.date}T${b.debut}`.localeCompare(`${a.date}T${a.debut}`)),
+    [seances, formateur.id],
+  );
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className={dialogSurfaceWide}>
+        <DialogTitle className="sr-only">Heures par module</DialogTitle>
+        <DialogDescription className="sr-only">
+          Avancement des volumes horaires des modules de {formateur.prenom} {formateur.nom}
+        </DialogDescription>
+        <DetailShell
+          icon={<BookOpen className="h-5 w-5" />}
+          title={`${formateur.prenom} ${formateur.nom}`}
+          subtitle="Heures restantes par module (comptées à la confirmation)"
+        >
+          {!formateur.modules.length ? (
+            <DetailEmpty>Aucun module assigné.</DetailEmpty>
+          ) : (
+            <ul className="space-y-2">
+              {formateur.modules.map((mod) => {
+                const volume = volumeDe(mod, formateur.departement);
+                const faites = faitesDe(formateur.id, mod);
+                const reste = volume > 0 ? Math.max(0, Math.round((volume - faites) * 10) / 10) : null;
+                const valideesModule = validees.filter((s) => s.module === mod);
+                const estOuvert = ouvert === mod;
+                return (
+                  <li key={mod} className="rounded-2xl border border-brand/12 bg-card">
+                    <button
+                      type="button"
+                      onClick={() => setOuvert(estOuvert ? null : mod)}
+                      className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{mod}</span>
+                      {reste === null ? (
+                        <span className={toneBadge("amber")}>Volume à renseigner</span>
+                      ) : reste <= 0 ? (
+                        <span className={toneBadge("teal")}>Terminé</span>
+                      ) : (
+                        <span className="shrink-0 text-xs text-muted-foreground">reste {reste} h</span>
+                      )}
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {faites} h / {volume > 0 ? `${volume} h` : "-"}
+                      </span>
+                    </button>
+                    {estOuvert ? (
+                      <div className="border-t border-brand/8 px-4 py-2.5">
+                        {valideesModule.length ? (
+                          <ul className="space-y-1">
+                            {valideesModule.map((s) => (
+                              <li key={s.id} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                <span>
+                                  {fmtDate(s.date)} · {s.debut}–{s.fin}
+                                </span>
+                                <span className="font-semibold tabular-nums text-brand-dk">+{duree(s)} h</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="py-1 text-xs text-muted-foreground">Aucune séance confirmée pour ce module.</p>
+                        )}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </DetailShell>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -496,20 +606,8 @@ function EmptyState({ icon: Icon, children }: { icon: ComponentType<LucideProps>
  * renseigné (Paramètres › Modules), la ligne l'indique au lieu d'inventer.
  */
 function HeuresModulesSection() {
-  const { formateurs, modules } = useIstpm();
-  const heuresQ = useQuery({
-    queryKey: ["heures-par-module"],
-    queryFn: () => fetchHeuresParModule(),
-    retry: false,
-  });
-  const faitesParCle = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const h of heuresQ.data ?? []) {
-      const k = `${h.professeurId}||${h.module}`;
-      map.set(k, (map.get(k) ?? 0) + (Number(h.minutes) || 0));
-    }
-    return map;
-  }, [heuresQ.data]);
+  const { formateurs } = useIstpm();
+  const { faitesDe, volumeDe, isLoading } = useModuleHeures();
   const lignes = useMemo(() => {
     const out: {
       prof: string;
@@ -520,16 +618,34 @@ function HeuresModulesSection() {
     for (const f of formateurs) {
       if (f.archived) continue;
       for (const mod of f.modules ?? []) {
-        const ref = modules.find((m) => m.nom === mod);
-        const volume = Number(ref?.volumeHoraire ?? 0) || 0;
-        const faites = Math.round(((faitesParCle.get(`${f.id}||${mod}`) ?? 0) / 60) * 10) / 10;
-        out.push({ prof: `${f.prenom} ${f.nom}`, module: mod, faites, volume });
+        out.push({
+          prof: `${f.prenom} ${f.nom}`,
+          module: mod,
+          faites: faitesDe(f.id, mod),
+          volume: volumeDe(mod),
+        });
       }
     }
     return out.sort((a, b) => a.prof.localeCompare(b.prof) || a.module.localeCompare(b.module));
-  }, [formateurs, modules, faitesParCle]);
+  }, [formateurs, faitesDe, volumeDe]);
 
-  const pager = usePagination(lignes, lignes.length, 8);
+  // Filtres compacts : recherche + enseignant + module.
+  const [q, setQ] = useState("");
+  const [fProf, setFProf] = useState<string>("__all__");
+  const [fModule, setFModule] = useState<string>("__all__");
+  const profs = useMemo(() => [...new Set(lignes.map((l) => l.prof))].sort(), [lignes]);
+  const mods = useMemo(() => [...new Set(lignes.map((l) => l.module))].sort(), [lignes]);
+  const filtrees = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return lignes.filter(
+      (l) =>
+        (fProf === "__all__" || l.prof === fProf) &&
+        (fModule === "__all__" || l.module === fModule) &&
+        (!s || `${l.prof} ${l.module}`.toLowerCase().includes(s)),
+    );
+  }, [lignes, q, fProf, fModule]);
+
+  const pager = usePagination(filtrees, `${q}|${fProf}|${fModule}|${filtrees.length}`, 8);
 
   const etat = (l: (typeof lignes)[number]) => {
     if (l.volume <= 0) return <span className={toneBadge("amber")}>Volume à renseigner</span>;
@@ -541,10 +657,42 @@ function HeuresModulesSection() {
 
   return (
     <Section title="Heures modules restantes">
-      {heuresQ.isLoading ? (
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row">
+        <div className="relative flex-1">
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Rechercher enseignant, module…"
+            className={cn(softInput, "h-9 text-sm")}
+          />
+        </div>
+        <select
+          value={fProf}
+          onChange={(e) => setFProf(e.target.value)}
+          className="h-9 rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none focus:border-brand/30"
+          aria-label="Filtrer par enseignant"
+        >
+          <option value="__all__">Tous enseignants</option>
+          {profs.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <select
+          value={fModule}
+          onChange={(e) => setFModule(e.target.value)}
+          className="h-9 rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none focus:border-brand/30"
+          aria-label="Filtrer par module"
+        >
+          <option value="__all__">Tous modules</option>
+          {mods.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+      </div>
+      {isLoading ? (
         <p className="px-5 py-8 text-center text-sm text-muted-foreground">Chargement…</p>
-      ) : !lignes.length ? (
-        <EmptyState icon={BookOpen}>Aucun module suivi.</EmptyState>
+      ) : !filtrees.length ? (
+        <EmptyState icon={BookOpen}>Aucun module ne correspond à ces critères.</EmptyState>
       ) : (
         <>
           <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden md:hidden")}>
@@ -823,11 +971,11 @@ function BulletinsRecentsTable({ bulletins }: { bulletins: Bulletin[] }) {
   );
 }
 
-function StudentAvatarList({ etudiants }: { etudiants: { id: string; prenom: string; nom: string; filiere: string; niveau: string; photoUrl?: string }[] }) {
+function StudentAvatarList({ etudiants, limit = 6 }: { etudiants: { id: string; prenom: string; nom: string; filiere: string; niveau: string; photoUrl?: string }[]; limit?: number }) {
   if (!etudiants.length) return <EmptyState icon={Users}>Aucun étudiant.</EmptyState>;
   return (
     <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
-      {etudiants.slice(0, 6).map((e) => (
+      {etudiants.slice(0, limit).map((e) => (
         <Link key={e.id} to="/dashboard/etudiants" className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-brand/8 sm:px-5">
           <PersonAvatar name={`${e.prenom} ${e.nom}`} photoUrl={e.photoUrl} />
           <span className="min-w-0 flex-1">
@@ -1200,26 +1348,12 @@ function DashboardDirecteur() {
 /* ------------------------------------------------------------------ */
 
 /**
- * Récapitulatif de ce qu'un formateur enseigne : filière, niveaux (lus dans
- * le registre des groupes), groupes et modules.
+ * Récapitulatif de ce qu'un formateur enseigne : filière, niveaux, groupes
+ * et modules. Les niveaux sont calculés par le parent (registre des groupes
+ * + promotions réelles) et passés en prop.
  * Lecture seule - l'affectation est gérée dans Formateurs par la direction.
  */
-function AffectationEnseignant({ formateur }: { formateur: Formateur }) {
-  const { groupConfigs } = useIstpm();
-  // Niveaux auto-assignés depuis les groupes : codes historiques (S1-S6)
-  // normalisés en libellés, triés dans l'ordre canonique du référentiel.
-  const niveaux = useMemo(
-    () =>
-      [...NIVEAUX].filter((n) =>
-        groupConfigs
-          .filter((g) => formateur.groupes.includes(g.name))
-          .flatMap((g) => g.semesters ?? [])
-          .map((s) => libelleNiveau(s))
-          .includes(n),
-      ),
-    [formateur.groupes, groupConfigs],
-  );
-
+function AffectationEnseignant({ formateur, niveaux }: { formateur: Formateur; niveaux: string[] }) {
   const lignes: {
     label: string;
     items: string[];
@@ -1279,23 +1413,55 @@ function DashboardEnseignant() {
   const mesExamens = useMemo(() => (moi ? examens.filter((x) => moi.modules.includes(x.module)) : []), [examens, moi]);
   const seancesAujourdhui = useMemo(() => seances.filter((s) => s.date === today && s.professeurId === moi?.id), [seances, moi?.id]);
   const mesSeances = useMemo(() => seances.filter((s) => s.professeurId === moi?.id).slice().sort((a, b) => (a.date < b.date ? -1 : 1)), [seances, moi?.id]);
-  // Tous les étudiants de la filière du formateur dans ses niveaux (lus dans
-  // le registre des groupes) ou directement dans ses groupes - le professeur
-  // voit ainsi l'intégralité de ses promotions.
+  // Tous les étudiants de la filière du formateur dans ses niveaux (registre
+  // des groupes, noms normalisés) ou directement dans ses groupes - le
+  // professeur voit ainsi l'intégralité de ses promotions.
+  // Niveaux auto-assignés : registre PUIS promotions réelles (si le registre
+  // ne connaît pas ses groupes, ses étudiants font foi - jamais vide abusif).
+  const mesGroupesNorm = useMemo(
+    () => new Set((moi?.groupes ?? []).map((g) => normGroupe(g))),
+    [moi],
+  );
   const mesEtudiants = useMemo(() => {
     if (!moi) return [];
     const niveaux = new Set(
-      groupConfigs.filter((g) => moi.groupes.includes(g.name)).flatMap((g) => g.semesters ?? []).map((s) => libelleNiveau(s)),
+      groupConfigs
+        .filter((g) => mesGroupesNorm.has(normGroupe(g.name)))
+        .flatMap((g) => g.semesters ?? [])
+        .map((s) => libelleNiveau(s)),
     );
     return etudiants.filter(
       (e) =>
         !e.archived &&
         e.filiere === moi.departement &&
-        (niveaux.has(libelleNiveau(e.niveau)) || moi.groupes.includes(e.groupe)),
+        (niveaux.has(libelleNiveau(e.niveau)) || mesGroupesNorm.has(normGroupe(e.groupe))),
     );
-  }, [etudiants, moi, groupConfigs]);
+  }, [etudiants, moi, groupConfigs, mesGroupesNorm]);
+  const mesNiveaux = useMemo(() => {
+    const duRegistre = new Set(
+      groupConfigs
+        .filter((g) => mesGroupesNorm.has(normGroupe(g.name)))
+        .flatMap((g) => g.semesters ?? [])
+        .map((s) => libelleNiveau(s)),
+    );
+    const desPromotions = new Set(mesEtudiants.map((e) => libelleNiveau(e.niveau)));
+    return [...NIVEAUX].filter((n) => duRegistre.has(n) || desPromotions.has(n));
+  }, [groupConfigs, mesGroupesNorm, mesEtudiants]);
   const mesBulletins = useMemo(() => (moi ? bulletins.filter((b) => moi.modules.some((m) => b.notes?.some((n) => n.module === m))) : []), [bulletins, moi]);
   const calendrierProche = useMemo(() => mesSeances.filter((s) => s.date >= today).slice(0, 8), [mesSeances]);
+  const [modulesOpen, setModulesOpen] = useState(false);
+  const [kpiModal, setKpiModal] = useState<"groupes" | "seances" | "examens" | "anoter" | null>(null);
+  // Recherche + filtre niveau sur les étudiants du formateur.
+  const [etuSearch, setEtuSearch] = useState("");
+  const [etuNiveau, setEtuNiveau] = useState<string>("__all__");
+  const etudiantsFiltres = useMemo(() => {
+    const q = etuSearch.trim().toLowerCase();
+    return mesEtudiants.filter((e) => {
+      if (etuNiveau !== "__all__" && libelleNiveau(e.niveau) !== etuNiveau) return false;
+      if (!q) return true;
+      return `${e.prenom} ${e.nom} ${e.cne} ${e.groupe}`.toLowerCase().includes(q);
+    });
+  }, [mesEtudiants, etuSearch, etuNiveau]);
   if (!moi) return <EmptyState icon={GraduationCap}>Aucun formateur enregistré.</EmptyState>;
   const erreurServeur = (err: unknown, repli: string) =>
     err instanceof ApiError && err.message ? err.message : err instanceof Error ? err.message : repli;
@@ -1333,19 +1499,62 @@ function DashboardEnseignant() {
 
   return (
     <>
+      {modulesOpen && moi ? <ModulesEnseignantModal formateur={moi} onClose={() => setModulesOpen(false)} /> : null}
+      {kpiModal && moi ? (
+        <Dialog open onOpenChange={(o) => !o && setKpiModal(null)}>
+          <DialogContent className={dialogSurfaceWide}>
+            <DialogTitle className="sr-only">
+              {kpiModal === "groupes" ? "Mes groupes" : kpiModal === "seances" ? "Séances aujourd'hui" : kpiModal === "examens" ? "Mes examens" : "Examens à noter"}
+            </DialogTitle>
+            <DialogDescription className="sr-only">Détail de l'indicateur</DialogDescription>
+            {kpiModal === "groupes" ? (
+              <DetailShell icon={<Users className="h-5 w-5" />} title="Mes groupes" subtitle={`${moi.groupes.length} groupe(s)`}>
+                {!moi.groupes.length ? (
+                  <DetailEmpty>Aucun groupe assigné.</DetailEmpty>
+                ) : (
+                  <ul className="space-y-2">
+                    {[...moi.groupes].sort().map((g) => {
+                      const cfg = groupConfigs.find((c) => normGroupe(c.name) === normGroupe(g));
+                      const nivs = [...new Set((cfg?.semesters ?? []).map((s) => libelleNiveau(s)))];
+                      const effectif = mesEtudiants.filter((e) => normGroupe(e.groupe) === normGroupe(g)).length;
+                      return (
+                        <li key={g} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-brand/12 px-3 py-2.5">
+                          <span className="min-w-0 flex-1 text-sm font-medium text-foreground">{g}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {nivs.length ? nivs.join(" · ") : "Niveau non renseigné"}
+                          </span>
+                          <span className={toneBadge("blue")}>{effectif} étudiant(s)</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </DetailShell>
+            ) : kpiModal === "seances" ? (
+              <DetailShell icon={<Calendar className="h-5 w-5" />} title="Séances aujourd'hui" subtitle={`${seancesAujourdhui.length} séance(s)`}>
+                <AujourdhuiTable seances={seancesAujourdhui} />
+              </DetailShell>
+            ) : (
+              <DetailShell icon={<BookOpen className="h-5 w-5" />} title={kpiModal === "anoter" ? "Examens à noter" : "Mes examens"}>
+                <ExamensRecentsTable examens={kpiModal === "anoter" ? aNoter : mesExamens} />
+              </DetailShell>
+            )}
+          </DialogContent>
+        </Dialog>
+      ) : null}
       <DashHero chips={[{ label: "Groupes", value: moi.groupes.length }, { label: "Séances ajd", value: seancesAujourdhui.length }, { label: "À noter", value: aNoter.length }]} />
       <DashWorkspace tabs={PROFESSOR_TABS} tab={tab} onChange={setTab} direction={direction}>
         {tab === 0 ? (
           <div className="space-y-5">
             <KpiGrid>
-              <KpiCard label="Mes groupes" value={moi.groupes.length} spark={false} icon={Users} accent />
-              <KpiCard label="Mes modules" value={moi.modules.length} tone="blue" spark={false} icon={BookOpen} />
-              <KpiCard label="Séances aujourd&rsquo;hui" value={seancesAujourdhui.length} icon={Calendar} spark={false} />
-              <KpiCard label="Mes examens" value={mesExamens.length} tone="amber" icon={GraduationCap} spark={false} />
-              <KpiCard label="Examens À  noter" value={aNoter.length} tone={aNoter.length ? "red" : "teal"} icon={PenLine} spark={false} />
+              <KpiCard label="Mes groupes" value={moi.groupes.length} spark={false} icon={Users} accent onClick={() => setKpiModal("groupes")} />
+              <KpiCard label="Mes modules" value={moi.modules.length} tone="blue" spark={false} icon={BookOpen} onClick={() => setModulesOpen(true)} />
+              <KpiCard label="Séances aujourd&rsquo;hui" value={seancesAujourdhui.length} icon={Calendar} spark={false} onClick={() => setKpiModal("seances")} />
+              <KpiCard label="Mes examens" value={mesExamens.length} tone="amber" icon={GraduationCap} onClick={() => setKpiModal("examens")} />
+              <KpiCard label="Examens À noter" value={aNoter.length} tone={aNoter.length ? "red" : "teal"} icon={PenLine} onClick={() => setKpiModal("anoter")} />
             </KpiGrid>
             <Section title="Mon affectation">
-              <AffectationEnseignant formateur={moi} />
+              <AffectationEnseignant formateur={moi} niveaux={mesNiveaux} />
             </Section>
             <div className="grid gap-6 xl:grid-cols-1">
             <Section title="Mon calendrier (7 jours)" action={<SectionLink to="/dashboard/calendar">Voir tout</SectionLink>}>
@@ -1413,7 +1622,28 @@ function DashboardEnseignant() {
         ) : (
           <div className="grid gap-6 xl:grid-cols-1">
             <Section title="Mes étudiants" action={<SectionLink to="/dashboard/etudiants">Tous les étudiants</SectionLink>}>
-              <StudentAvatarList etudiants={mesEtudiants} />
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row">
+                <div className="relative flex-1">
+                  <Input
+                    value={etuSearch}
+                    onChange={(e) => setEtuSearch(e.target.value)}
+                    placeholder="Rechercher nom, CNE, groupe…"
+                    className={cn(softInput, "h-9 text-sm")}
+                  />
+                </div>
+                <select
+                  value={etuNiveau}
+                  onChange={(e) => setEtuNiveau(e.target.value)}
+                  className="h-9 rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none focus:border-brand/30"
+                  aria-label="Filtrer par niveau"
+                >
+                  <option value="__all__">Tous niveaux ({mesEtudiants.length})</option>
+                  {mesNiveaux.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+              <StudentAvatarList etudiants={etudiantsFiltres} limit={etuSearch || etuNiveau !== "__all__" ? 30 : 6} />
             </Section>
             <Section title="Bulletins en attente de publication" action={<SectionLink to="/dashboard/bulletins">Tous les bulletins</SectionLink>}>
               <BulletinsRecentsTable bulletins={bulletinsAPublier} />

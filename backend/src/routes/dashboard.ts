@@ -104,7 +104,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     const [totalInscrits] = await db
       .select({ count: sql<number>`count(*)` })
-      .from(etudiants);
+      .from(etudiants)
+      .where(eq(etudiants.archived, false));
 
     const [formateursActifs] = await db
       .select({ count: sql<number>`count(*)` })
