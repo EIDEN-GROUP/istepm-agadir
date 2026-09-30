@@ -519,9 +519,6 @@ function EtudiantsPage() {
             <th>Filière</th>
             <th className="text-center">Niveau</th>
             <th>Statut</th>
-            {enseignantScope ? (
-              <th className="text-center">Note</th>
-            ) : null}
             <th className="w-28 text-center">Actions</th>
           </>
         }
@@ -559,20 +556,6 @@ function EtudiantsPage() {
                 {STATUT_ETUDIANT_LABEL[e.statut]}
               </span>
             </td>
-            {enseignantScope ? (
-              <td className="text-center">
-                {(() => {
-                  const mNote = moduleFilter !== ALL
-                    ? e.notes.find((n) => n.module === moduleFilter)
-                    : null;
-                  return (
-                    <span className={toneBadge(mNote ? "teal" : "neutral")}>
-                      {mNote ? `${mNote.note.toFixed(1)}/20` : ""}
-                    </span>
-                  );
-                })()}
-              </td>
-            ) : null}
             <td
               className="text-center"
               onClick={(ev) => ev.stopPropagation()}
