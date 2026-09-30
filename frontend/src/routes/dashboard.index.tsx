@@ -606,12 +606,22 @@ function EmptyState({ icon: Icon, children }: { icon: ComponentType<LucideProps>
  * renseigné (Paramètres › Modules), la ligne l'indique au lieu d'inventer.
  */
 function HeuresModulesSection() {
-  const { formateurs } = useIstpm();
+  const { formateurs, modules, filieres } = useIstpm();
   const { faitesDe, volumeDe, isLoading } = useModuleHeures();
+
+  // Filière d'un module : c'est une propriété du module (registre Paramètres),
+  // pas du formateur — un enseignant peut intervenir hors de son département.
+  const filiereDeModule = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const mod of modules) m.set(mod.nom, mod.filiere);
+    return m;
+  }, [modules]);
+
   const lignes = useMemo(() => {
     const out: {
       prof: string;
       module: string;
+      filiere: string;
       faites: number;
       volume: number;
     }[] = [];
@@ -621,31 +631,55 @@ function HeuresModulesSection() {
         out.push({
           prof: `${f.prenom} ${f.nom}`,
           module: mod,
+          filiere: filiereDeModule.get(mod) ?? "",
           faites: faitesDe(f.id, mod),
           volume: volumeDe(mod),
         });
       }
     }
     return out.sort((a, b) => a.prof.localeCompare(b.prof) || a.module.localeCompare(b.module));
-  }, [formateurs, faitesDe, volumeDe]);
+  }, [formateurs, filiereDeModule, faitesDe, volumeDe]);
 
-  // Filtres compacts : recherche + enseignant + module.
+  // Filtres compacts : recherche + filière + module (le module se restreint
+  // à la filière choisie).
   const [q, setQ] = useState("");
-  const [fProf, setFProf] = useState<string>("__all__");
+  const [fFiliere, setFFiliere] = useState<string>("__all__");
   const [fModule, setFModule] = useState<string>("__all__");
-  const profs = useMemo(() => [...new Set(lignes.map((l) => l.prof))].sort(), [lignes]);
-  const mods = useMemo(() => [...new Set(lignes.map((l) => l.module))].sort(), [lignes]);
+  const filieresOptions = useMemo(
+    () =>
+      filieres.length
+        ? [...filieres].sort((a, b) => a.localeCompare(b))
+        : [...new Set(lignes.map((l) => l.filiere).filter(Boolean))].sort(),
+    [filieres, lignes],
+  );
+  // Modules proposés : ceux de la filière choisie, sinon tous.
+  const mods = useMemo(
+    () =>
+      [
+        ...new Set(
+          lignes
+            .filter((l) => fFiliere === "__all__" || l.filiere === fFiliere)
+            .map((l) => l.module),
+        ),
+      ].sort(),
+    [lignes, fFiliere],
+  );
+  // Un module devenu hors filière ne doit pas vider le tableau en silence.
+  useEffect(() => {
+    if (fModule !== "__all__" && !mods.includes(fModule)) setFModule("__all__");
+  }, [mods, fModule]);
+
   const filtrees = useMemo(() => {
     const s = q.trim().toLowerCase();
     return lignes.filter(
       (l) =>
-        (fProf === "__all__" || l.prof === fProf) &&
+        (fFiliere === "__all__" || l.filiere === fFiliere) &&
         (fModule === "__all__" || l.module === fModule) &&
         (!s || `${l.prof} ${l.module}`.toLowerCase().includes(s)),
     );
-  }, [lignes, q, fProf, fModule]);
+  }, [lignes, q, fFiliere, fModule]);
 
-  const pager = usePagination(filtrees, `${q}|${fProf}|${fModule}|${filtrees.length}`, 8);
+  const pager = usePagination(filtrees, `${q}|${fFiliere}|${fModule}|${filtrees.length}`, 8);
 
   const etat = (l: (typeof lignes)[number]) => {
     if (l.volume <= 0) return <span className={toneBadge("amber")}>Volume à renseigner</span>;
@@ -667,14 +701,14 @@ function HeuresModulesSection() {
           />
         </div>
         <select
-          value={fProf}
-          onChange={(e) => setFProf(e.target.value)}
+          value={fFiliere}
+          onChange={(e) => setFFiliere(e.target.value)}
           className="h-9 rounded-lg border border-brand/12 bg-card px-2 text-sm font-medium text-foreground outline-none focus:border-brand/30"
-          aria-label="Filtrer par enseignant"
+          aria-label="Filtrer par filière"
         >
-          <option value="__all__">Tous enseignants</option>
-          {profs.map((p) => (
-            <option key={p} value={p}>{p}</option>
+          <option value="__all__">Toutes filières</option>
+          {filieresOptions.map((f) => (
+            <option key={f} value={f}>{f}</option>
           ))}
         </select>
         <select
