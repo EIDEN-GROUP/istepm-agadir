@@ -10,7 +10,6 @@ import {
   Lock,
   AlertTriangle,
   CalendarDays,
-  ClipboardCheck,
   MapPin,
   Users,
   User,
@@ -62,11 +61,11 @@ import {
   VueMois,
   type VueCalendrier,
 } from "@/components/calendar-views";
-import { AppelSeanceDialog } from "@/components/appel-seance-dialog";
 import {
   SeanceStatutBadge,
   SeanceDocumentSection,
   SeanceValidationActions,
+  SeanceDocPreview,
 } from "@/components/seance-validation";
 import {
   softCard,
@@ -151,6 +150,7 @@ function PlanningPage() {
     joursChomes: joursChomesApi,
     groupConfigs,
     filieres: filieresApi,
+    modules: modulesRegistrePage,
     loading: storeLoading,
     syncFailed,
     refresh,
@@ -217,7 +217,31 @@ function PlanningPage() {
   const [anneeScolaire, setAnneeScolaire] = useState<string>(ALL);
 
   const [detail, setDetail] = useState<Seance | null>(null);
-  const [appel, setAppel] = useState<Seance | null>(null);
+  const [apercuDoc, setApercuDoc] = useState<Seance | null>(null);
+  const heuresGrilleQ = useQuery({
+    queryKey: ["heures-par-module", "grille"],
+    queryFn: () => fetchHeuresParModule(),
+    retry: false,
+  });
+  // Heures + volume par séance, pour les pastilles des cartes jour/semaine.
+  const heuresParCle = useMemo(() => {
+    const faites = new Map<string, number>();
+    for (const h of heuresGrilleQ.data ?? []) {
+      const k = `${h.professeurId}||${h.module}`;
+      faites.set(k, (faites.get(k) ?? 0) + (Number(h.minutes) || 0));
+    }
+    const map = new Map<string, { faites: number; volume: number }>();
+    for (const s of seances) {
+      const ref = (modulesRegistrePage ?? []).find(
+        (m) => m.nom === s.module && (!m.filiere || !s.filiere || m.filiere === s.filiere),
+      ) ?? (modulesRegistrePage ?? []).find((m) => m.nom === s.module);
+      map.set(`${s.professeurId}||${s.module}`, {
+        faites: Math.round(((faites.get(`${s.professeurId}||${s.module}`) ?? 0) / 60) * 10) / 10,
+        volume: Number(ref?.volumeHoraire ?? 0) || 0,
+      });
+    }
+    return map;
+  }, [heuresGrilleQ.data, seances, modulesRegistrePage]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Seance | null>(null);
   const [prefill, setPrefill] = useState<{ date: string; debut: string } | null>(
@@ -662,6 +686,8 @@ const [importOpen, setImportOpen] = useState(false);
               onCreneauVide={canEdit ? ouvrirCreation : undefined}
               jourChome={jourChome}
               creneaux={creneaux}
+              heuresParCle={heuresParCle}
+              onOpenDoc={setApercuDoc}
             />
           ) : vue === "semaine" ? (
             <VueSemaine
@@ -674,6 +700,8 @@ const [importOpen, setImportOpen] = useState(false);
               onCreneauVide={canEdit ? ouvrirCreation : undefined}
               jourChome={jourChome}
               creneaux={creneaux}
+              heuresParCle={heuresParCle}
+              onOpenDoc={setApercuDoc}
             />
           ) : (
             <VueMois
@@ -778,17 +806,16 @@ const [importOpen, setImportOpen] = useState(false);
                 setDetail(null);
                 setToDelete(s);
               }}
-              onAppel={(s) => {
-                setDetail(null);
-                setAppel(s);
-              }}
             />
           ) : null}
         </DialogContent>
       </Dialog>
 
-      {appel ? (
-        <AppelSeanceDialog seance={appel} onClose={() => setAppel(null)} />
+      {apercuDoc ? (
+        <SeanceDocPreview
+          seance={{ id: apercuDoc.id, documentNom: apercuDoc.documentNom, documentMime: apercuDoc.documentMime }}
+          onClose={() => setApercuDoc(null)}
+        />
       ) : null}
 
       {formOpen && canEdit ? (
@@ -889,7 +916,6 @@ export function SeanceDetail({
   canEdit,
   onEdit,
   onDelete,
-  onAppel,
   ownerId,
   profUserId,
   validation,
@@ -900,7 +926,6 @@ export function SeanceDetail({
   canEdit: boolean;
   onEdit: (s: Seance) => void;
   onDelete: (s: Seance) => void;
-  onAppel: (s: Seance) => void;
   /** Fiche formateur du compte connecté (workflow enseignant). */
   ownerId?: string | null;
   /** Compte lié du formateur de la séance (alerte direction). */
@@ -1042,32 +1067,20 @@ export function SeanceDetail({
         </>
       }
       footer={
-        (canEdit || isOwner) && (
+        canEdit && (
           <div className="flex items-center justify-end gap-2">
-            {isOwner ? (
-              <button
-                className={cn(ghostPill, "gap-1.5")}
-                onClick={() => onAppel(seance)}
-              >
-                <ClipboardCheck className="h-3.5 w-3.5" /> Appel
-              </button>
-            ) : null}
-            {canEdit ? (
-              <>
-                <button
-                  className={cn(ghostPill, "gap-1.5")}
-                  onClick={() => onEdit(seance)}
-                >
-                  <Pencil className="h-3.5 w-3.5" /> Modifier
-                </button>
-                <button
-                  className="inline-flex items-center gap-2 rounded-full bg-alert px-5 py-2.5 text-sm font-bold text-white transition hover:bg-alert-dk"
-                  onClick={() => onDelete(seance)}
-                >
-                  <Trash2 className="h-4 w-4" /> Supprimer
-                </button>
-              </>
-            ) : null}
+            <button
+              className={cn(ghostPill, "gap-1.5")}
+              onClick={() => onEdit(seance)}
+            >
+              <Pencil className="h-3.5 w-3.5" /> Modifier
+            </button>
+            <button
+              className="inline-flex items-center gap-2 rounded-full bg-alert px-5 py-2.5 text-sm font-bold text-white transition hover:bg-alert-dk"
+              onClick={() => onDelete(seance)}
+            >
+              <Trash2 className="h-4 w-4" /> Supprimer
+            </button>
           </div>
         )
       }

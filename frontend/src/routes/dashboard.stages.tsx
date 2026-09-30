@@ -189,7 +189,6 @@ function StagesAnalytics({
   etudiants: Etudiant[];
   onConvention: (etudiantId: string) => void;
 }) {
-  const [eligibleOpen, setEligibleOpen] = useState(false);
   // Les deux angles de lecture des stages partagent une carte : on bascule de
   // « par structure » à « par statut » sans consommer deux emplacements. La
   // répartition par structure est affichée en premier.
@@ -205,18 +204,19 @@ function StagesAnalytics({
         .filter((s) => s.statut !== "valide")
         .map((s) => s.etudiantId),
     );
-    // Fin de cycle : seuls les étudiants de 3ème année sans stage actif.
+    // Éligibles : étudiants non archivés de chaque année, sans stage actif.
     return etudiants.filter(
-      (e) => e.niveau === "3ème année" && !activeIds.has(e.id),
+      (e) => !e.archived && !activeIds.has(e.id),
     );
   }, [etudiants, stages]);
 
-  // Part de chaque niveau dans le vivier d'étudiants encore à placer en stage.
+  // Part de chaque niveau dans le vivier d'étudiants encore à placer en stage
+  // (codes historiques S1-S6 normalisés comme l'affichage).
   const eligibleParNiveau = useMemo(
     () =>
       [...NIVEAUX].map((n) => ({
         name: n,
-        value: eligible.filter((e) => e.niveau === n).length,
+        value: eligible.filter((e) => libelleNiveau(e.niveau) === n).length,
       })),
     [eligible],
   );
@@ -391,17 +391,8 @@ function StagesAnalytics({
       <div
         className={cn(
           softCard,
-          "cursor-pointer p-4 transition hover:shadow-md sm:p-5",
+          "p-4 sm:p-5",
         )}
-        onClick={() => setEligibleOpen(true)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setEligibleOpen(true);
-          }
-        }}
       >
         <div className="flex items-baseline justify-between gap-2">
           <p className={eyebrowClass}>Étudiants éligibles</p>
@@ -464,7 +455,7 @@ function StagesAnalytics({
           ))}
         </ul>
         <p className="mt-1 text-center text-xs text-muted-foreground">
-          Fin d&rsquo;année d&rsquo;étude (S2, S4, S6) sans stage actif
+          Étudiants sans stage actif, toutes années
         </p>
       </div>
     </section>

@@ -37,16 +37,59 @@ export function SeanceDocPreview({
   onClose: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [html, setHtml] = useState<string | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing">("loading");
   const docNom = seance?.documentNom ?? null;
   const docMime = seance?.documentMime ?? null;
   const seanceId = seance?.id;
+  const isPdf = docMime === "application/pdf";
+  const isDocx =
+    docMime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    docMime === "application/msword";
 
   useEffect(() => {
     if (!docNom || !seanceId) return;
     let cancelled = false;
     let created: string | null = null;
     setState("loading");
+    setHtml(null);
+    // DOCX : conversion locale en HTML (mammoth) ; PDF : URL blob en iframe.
+    if (isDocx) {
+      previewSeanceDocumentApi(seanceId)
+        .then(async (u) => {
+          if (cancelled) {
+            if (u) URL.revokeObjectURL(u);
+            return;
+          }
+          if (!u) {
+            setState("missing");
+            return;
+          }
+          try {
+            const buf = await (await fetch(u)).arrayBuffer();
+            if (cancelled) {
+              URL.revokeObjectURL(u);
+              return;
+            }
+            const { default: mammoth } = await import("mammoth");
+            const out = await mammoth.convertToHtml({ arrayBuffer: buf });
+            if (cancelled) {
+              URL.revokeObjectURL(u);
+              return;
+            }
+            setHtml(out.value || "<p>Document vide.</p>");
+            setState("ready");
+          } catch {
+            if (!cancelled) setState("missing");
+          } finally {
+            URL.revokeObjectURL(u);
+          }
+        });
+      return () => {
+        cancelled = true;
+        setUrl(null);
+      };
+    }
     previewSeanceDocumentApi(seanceId).then((u) => {
       if (cancelled) {
         if (u) URL.revokeObjectURL(u);
@@ -65,9 +108,7 @@ export function SeanceDocPreview({
       if (created) URL.revokeObjectURL(created);
       setUrl(null);
     };
-  }, [docNom, seanceId]);
-
-  const isPdf = docMime === "application/pdf";
+  }, [docNom, seanceId, isDocx]);
 
   const telecharger = async () => {
     if (!seance || !docNom) return;
@@ -108,10 +149,17 @@ export function SeanceDocPreview({
             <div className="min-h-0 flex-1 overflow-hidden bg-muted/40">
               {state === "loading" ? (
                 <p className="px-5 py-10 text-center text-sm text-muted-foreground">Chargement de l'aperçu…</p>
-              ) : state === "missing" || !url ? (
+              ) : state === "missing" ? (
                 <p className="px-5 py-10 text-center text-sm text-muted-foreground">Aperçu indisponible.</p>
-              ) : isPdf ? (
+              ) : isPdf && url ? (
                 <iframe title={`Aperçu - ${docNom}`} src={url} className="h-full w-full" />
+              ) : isDocx && html ? (
+                <div className="h-full overflow-y-auto bg-white px-6 py-5">
+                  <div
+                    className="mx-auto max-w-[640px] text-sm leading-relaxed text-foreground [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_p]:my-2 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-brand/20 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-brand/20 [&_th]:bg-muted/60 [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:pl-5"
+                    dangerouslySetInnerHTML={{ __html: html }}
+                  />
+                </div>
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-5 py-10">
                   <FileText className="h-10 w-10 text-muted-foreground" />

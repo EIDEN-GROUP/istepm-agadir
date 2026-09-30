@@ -4,6 +4,10 @@ import { authenticate, requireRole } from "@/middleware/auth";
 import { requirePerm } from "@/lib/permissions";
 import { getDb } from "@/db";
 import { stages } from "@/db/schema/stages";
+import { etudiants } from "@/db/schema/etudiants";
+import { users } from "@/db/schema/users";
+import { notifyBestEffort } from "@/lib/notify";
+import { buildStageHtml, buildStageText, stageSubject } from "@/lib/stage-mail";
 import { codesHistoriques } from "@/lib/niveaux";
 import { eq, desc, sql, or, inArray } from "drizzle-orm";
 
@@ -102,6 +106,46 @@ export async function stageRoutes(app: FastifyInstance) {
             : null,
       })
       .returning();
+    // Notifications best-effort (non bloquantes) : l'étudiant concerné et
+    // les responsables des affaires estudiantines.
+    void (async () => {
+      try {
+        const [etu] = await db
+          .select({ email: etudiants.email })
+          .from(etudiants)
+          .where(eq(etudiants.id, stage.etudiantId))
+          .limit(1);
+        const staff = await db
+          .select({ email: users.email })
+          .from(users)
+          .where(eq(users.role, "responsable"));
+        const row = {
+          prenom: stage.prenom,
+          nom: stage.nom,
+          filiere: stage.filiere,
+          niveau: stage.niveau,
+          structure: stage.structure,
+          service: stage.service,
+          debut: stage.debut,
+          fin: stage.fin,
+        };
+        const sujet = stageSubject(row);
+        const jobs: Promise<unknown>[] = staff
+          .map((u) => u.email)
+          .filter((e) => e && e.includes("@"))
+          .map((to) =>
+            notifyBestEffort(to, sujet, buildStageHtml(row, true), buildStageText(row, true), "stage-nouveau-staff"),
+          );
+        if (etu?.email && etu.email.includes("@")) {
+          jobs.push(
+            notifyBestEffort(etu.email, sujet, buildStageHtml(row, false), buildStageText(row, false), "stage-nouveau"),
+          );
+        }
+        await Promise.allSettled(jobs);
+      } catch {
+        // Best-effort : la création est déjà validée.
+      }
+    })();
     return stage;
   });
 

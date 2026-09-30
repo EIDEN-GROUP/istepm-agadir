@@ -12,7 +12,6 @@ import {
 } from "@/lib/istpm-api";
 import { motion, animate, useInView } from "framer-motion";
 import {
-  UserPlus,
   PenLine,
   Wallet,
   ArrowRight,
@@ -49,7 +48,7 @@ import {
   fmtMAD,
   fmtDate,
   libelleNiveau,
-  type ActiviteItem,
+  NIVEAUX,
   type Seance,
   type Examen,
   type Bulletin,
@@ -491,11 +490,6 @@ function EmptyState({ icon: Icon, children }: { icon: ComponentType<LucideProps>
   );
 }
 
-const ACTIVITE_ICON: Record<ActiviteItem["type"], typeof UserPlus> = {
-  inscription: UserPlus,
-  note: PenLine,
-};
-
 /**
  * Heures restantes par enseignant et par module : le volume horaire du
  * module se consomme à chaque séance confirmée (`valide`). Sans volume
@@ -535,103 +529,79 @@ function HeuresModulesSection() {
     return out.sort((a, b) => a.prof.localeCompare(b.prof) || a.module.localeCompare(b.module));
   }, [formateurs, modules, faitesParCle]);
 
+  const pager = usePagination(lignes, lignes.length, 8);
+
+  const etat = (l: (typeof lignes)[number]) => {
+    if (l.volume <= 0) return <span className={toneBadge("amber")}>Volume à renseigner</span>;
+    const reste = Math.max(0, Math.round((l.volume - l.faites) * 10) / 10);
+    return reste <= 0
+      ? <span className={toneBadge("teal")}>Terminé</span>
+      : <span className="shrink-0 text-xs text-muted-foreground">reste {reste} h</span>;
+  };
+
   return (
     <Section title="Heures modules restantes">
       {heuresQ.isLoading ? (
         <p className="px-5 py-8 text-center text-sm text-muted-foreground">Chargement…</p>
       ) : !lignes.length ? (
-        <p className="px-5 py-8 text-center text-sm text-muted-foreground">Aucun module suivi.</p>
+        <EmptyState icon={BookOpen}>Aucun module suivi.</EmptyState>
       ) : (
-        <div className={cn(softCard, "max-h-[380px] divide-y divide-brand/8 overflow-y-auto")}>
-          {lignes.map((l, i) => {
-            const reste = l.volume > 0 ? Math.max(0, Math.round((l.volume - l.faites) * 10) / 10) : null;
-            const ratio = l.volume > 0 ? Math.min(1, l.faites / l.volume) : 0;
-            return (
-              <div key={`${l.prof}|${l.module}|${i}`} className="space-y-1 px-4 py-3 sm:px-5">
-                <p className="flex items-baseline justify-between gap-2 text-sm">
-                  <span className="min-w-0 truncate font-medium text-foreground">
-                    {l.prof} · {l.module}
-                  </span>
-                  {reste === null ? (
-                    <span className={toneBadge("amber")}>Volume à renseigner</span>
-                  ) : reste <= 0 ? (
-                    <span className={toneBadge("teal")}>Terminé</span>
-                  ) : (
-                    <span className="shrink-0 text-xs text-muted-foreground">reste {reste} h</span>
-                  )}
+        <>
+          <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden md:hidden")}>
+            {pager.pageItems.map((l, i) => (
+              <div key={`${l.prof}|${l.module}|${i}`} className="space-y-1.5 px-4 py-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-sm font-semibold text-foreground">{l.module}</span>
+                  {etat(l)}
+                </div>
+                <p className="text-xs text-muted-foreground">{l.prof}</p>
+                <p className="text-xs text-muted-foreground">
+                  {l.faites} h / {l.volume > 0 ? `${l.volume} h` : "-"}
                 </p>
-                {reste !== null ? (
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand/12">
-                    <div
-                      className={cn("h-full rounded-full", reste <= 0 ? "bg-teal-600" : "bg-brand")}
-                      style={{ width: `${Math.round(ratio * 100)}%` }}
-                    />
-                  </div>
-                ) : null}
-                <p className="text-[11px] text-muted-foreground">{l.faites} h / {l.volume > 0 ? `${l.volume} h` : "-"}</p>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+          <div className="hidden md:block">
+            <TableCard>
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead className={TH}>
+                  <tr>
+                    <th className="px-4 py-3">Enseignant</th>
+                    <th className="px-4 py-3">Module</th>
+                    <th className="px-4 py-3">Faites</th>
+                    <th className="px-4 py-3">Volume</th>
+                    <th className="px-4 py-3">Reste</th>
+                    <th className="px-4 py-3">État</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand/8">
+                  {pager.pageItems.map((l, i) => (
+                    <tr key={`${l.prof}|${l.module}|${i}`} className="transition-colors hover:bg-brand/6">
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-foreground">{l.prof}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{l.module}</td>
+                      <td className="whitespace-nowrap px-4 py-3 tabular-nums">{l.faites} h</td>
+                      <td className="whitespace-nowrap px-4 py-3 tabular-nums">{l.volume > 0 ? `${l.volume} h` : "-"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 tabular-nums">
+                        {l.volume > 0 ? `${Math.max(0, Math.round((l.volume - l.faites) * 10) / 10)} h` : "-"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">{etat(l)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableCard>
+          </div>
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            pageSize={pager.pageSize}
+            onPage={pager.setPage}
+            label="module(s)"
+          />
+        </>
       )}
     </Section>
-  );
-}
-
-function ActiviteFeed() {
-  // Fil dérivé des lignes serveur (jamais de session seule) : derniers examens
-  // notés, derniers stages - triés par date décroissante.
-  const { examens, stages } = useIstpm();
-  const items: ActiviteItem[] = useMemo(() => {
-    const out: ActiviteItem[] = [];
-    for (const x of examens) {
-      if (x.statut !== "notes_saisies" || !x.date) continue;
-      out.push({
-        type: "note",
-        texte: `Notes saisies · ${x.module} (${x.classe})`,
-        date: x.date,
-      });
-    }
-    for (const s of stages) {
-      if (!s.debut) continue;
-      out.push({
-        type: "inscription",
-        texte: `Stage · ${s.prenom} ${s.nom} · ${s.structure}`,
-        date: s.debut,
-      });
-    }
-    return out.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 8);
-  }, [examens, stages]);
-  if (!items.length) {
-    return (
-      <div className={cn(softCard, "px-5 py-10 text-center text-sm text-muted-foreground")}>
-        Aucune activité récente.
-      </div>
-    );
-  }
-  return (
-    <div className={cn(softCard, "divide-y divide-brand/8 overflow-hidden")}>
-      {items.map((a, i) => {
-        const Icon = ACTIVITE_ICON[a.type];
-        return (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.03, duration: 0.25 }}
-            className="flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-brand/6 sm:px-5"
-          >
-            <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand/12 text-brand-dk">
-              <Icon className="h-4 w-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm text-foreground">{a.texte}</span>
-              <span className="block text-xs text-muted-foreground">{fmtDate(a.date)}</span>
-            </span>
-          </motion.div>
-        );
-      })}
-    </div>
   );
 }
 
@@ -1061,12 +1031,7 @@ function DashboardDirecteur() {
             <Section title="Aujourd&rsquo;hui" action={<SectionLink to="/dashboard/calendar">Voir le planning</SectionLink>}>
               <AujourdhuiTable seances={seancesAujourdhui} />
             </Section>
-            <div className="grid gap-6 xl:grid-cols-2">
-              <Section title="Logs">
-                <ActiviteFeed />
-              </Section>
-              <HeuresModulesSection />
-            </div>
+            <HeuresModulesSection />
           </div>
         ) : tab === 1 ? (
           <div className="space-y-6">
@@ -1222,7 +1187,6 @@ function DashboardDirecteur() {
               validation="direction"
               onEdit={() => setChargeDetail(null)}
               onDelete={() => setChargeDetail(null)}
-              onAppel={() => setChargeDetail(null)}
             />
           ) : null}
         </DialogContent>
@@ -1242,15 +1206,17 @@ function DashboardDirecteur() {
  */
 function AffectationEnseignant({ formateur }: { formateur: Formateur }) {
   const { groupConfigs } = useIstpm();
+  // Niveaux auto-assignés depuis les groupes : codes historiques (S1-S6)
+  // normalisés en libellés, triés dans l'ordre canonique du référentiel.
   const niveaux = useMemo(
     () =>
-      [
-        ...new Set(
-          groupConfigs
-            .filter((g) => formateur.groupes.includes(g.name))
-            .flatMap((g) => g.semesters ?? []),
-        ),
-      ].sort(),
+      [...NIVEAUX].filter((n) =>
+        groupConfigs
+          .filter((g) => formateur.groupes.includes(g.name))
+          .flatMap((g) => g.semesters ?? [])
+          .map((s) => libelleNiveau(s))
+          .includes(n),
+      ),
     [formateur.groupes, groupConfigs],
   );
 
@@ -1319,13 +1285,13 @@ function DashboardEnseignant() {
   const mesEtudiants = useMemo(() => {
     if (!moi) return [];
     const niveaux = new Set(
-      groupConfigs.filter((g) => moi.groupes.includes(g.name)).flatMap((g) => g.semesters ?? []),
+      groupConfigs.filter((g) => moi.groupes.includes(g.name)).flatMap((g) => g.semesters ?? []).map((s) => libelleNiveau(s)),
     );
     return etudiants.filter(
       (e) =>
         !e.archived &&
         e.filiere === moi.departement &&
-        (niveaux.has(e.niveau) || moi.groupes.includes(e.groupe)),
+        (niveaux.has(libelleNiveau(e.niveau)) || moi.groupes.includes(e.groupe)),
     );
   }, [etudiants, moi, groupConfigs]);
   const mesBulletins = useMemo(() => (moi ? bulletins.filter((b) => moi.modules.some((m) => b.notes?.some((n) => n.module === m))) : []), [bulletins, moi]);

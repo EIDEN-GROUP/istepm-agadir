@@ -21,6 +21,7 @@ import {
   type Creneau,
 } from "@/lib/istpm-data";
 import { cn } from "@/lib/utils";
+import { FileText } from "lucide-react";
 
 export type VueCalendrier = "jour" | "semaine" | "mois";
 
@@ -70,6 +71,9 @@ export function estAujourdhui(d: Date) {
 /*  Bloc de séance                                                     */
 /* ------------------------------------------------------------------ */
 
+/** Heures du module pour un bloc : affichées + doc cliquable. */
+export type BlocHeures = { faites: number; volume: number } | null;
+
 function SeanceBloc({
   seance,
   nomProf,
@@ -77,6 +81,8 @@ function SeanceBloc({
   compact,
   onOpen,
   onDragStart,
+  heures,
+  onOpenDoc,
 }: {
   seance: Seance;
   nomProf: string;
@@ -84,6 +90,8 @@ function SeanceBloc({
   compact?: boolean;
   onOpen: (s: Seance) => void;
   onDragStart: (s: Seance, e: DragEvent) => void;
+  heures?: BlocHeures;
+  onOpenDoc?: (s: Seance) => void;
 }) {
   const c = couleurSeance(seance.module);
   const duree =
@@ -133,6 +141,28 @@ function SeanceBloc({
           style={{ backgroundColor: pastille.bg }}
         >
           {pastille.label}
+        </span>
+      ) : null}
+      {!compact && (heures || seance.documentId) ? (
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9px] opacity-90">
+          {heures && heures.volume > 0 ? (
+            <span title={`${heures.faites} h faites sur ${heures.volume} h`}>
+              reste {Math.max(0, Math.round((heures.volume - heures.faites) * 10) / 10)} h
+            </span>
+          ) : null}
+          {seance.documentId && onOpenDoc ? (
+            <button
+              type="button"
+              title={`Voir ${seance.documentNom ?? "le compte-rendu"}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDoc(seance);
+              }}
+              className="inline-flex items-center gap-0.5 font-bold underline underline-offset-1 hover:opacity-100"
+            >
+              <FileText className="h-2.5 w-2.5" /> doc
+            </button>
+          ) : null}
         </span>
       ) : null}
       {!court && !compact ? (
@@ -221,6 +251,8 @@ function GrilleHoraire({
   jourChome,
   creneaux = CRENEAUX,
   fit,
+  heuresParCle,
+  onOpenDoc,
 }: {
   jours: Date[];
   seances: Seance[];
@@ -234,6 +266,9 @@ function GrilleHoraire({
   creneaux?: readonly Creneau[];
   /** Vue consultation : la grille se limite aux heures réellement occupées. */
   fit?: boolean;
+  /** Heures du module par séance (`${professeurId}||${module}`) + volume. */
+  heuresParCle?: Map<string, { faites: number; volume: number }>;
+  onOpenDoc?: (s: Seance) => void;
 }) {
   // Consultation (`fit`) : on cadre la grille sur les séances de la semaine -
   // pas de plages mortes avant 8 h ou après le dernier cours. Sinon l'amplitude
@@ -476,6 +511,8 @@ function GrilleHoraire({
                       canDrag={canDrag}
                       compact={colonnes > 1}
                       onOpen={onOpen}
+                      heures={heuresParCle?.get(`${seance.professeurId}||${seance.module}`) ?? null}
+                      onOpenDoc={onOpenDoc}
                       onDragStart={(s, e) => {
                         dragId.current = s.id;
                         e.dataTransfer.effectAllowed = "move";
@@ -509,6 +546,8 @@ export function VueJour(props: {
   jourChome?: LookupJourChome;
   creneaux?: readonly Creneau[];
   fit?: boolean;
+  heuresParCle?: Map<string, { faites: number; volume: number }>;
+  onOpenDoc?: (s: Seance) => void;
 }) {
   return <GrilleHoraire {...props} jours={[props.date]} />;
 }
@@ -524,6 +563,8 @@ export function VueSemaine(props: {
   jourChome?: LookupJourChome;
   creneaux?: readonly Creneau[];
   fit?: boolean;
+  heuresParCle?: Map<string, { faites: number; volume: number }>;
+  onOpenDoc?: (s: Seance) => void;
 }) {
   return <GrilleHoraire {...props} />;
 }

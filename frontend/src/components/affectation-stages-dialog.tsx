@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DetailShell } from "@/components/dash-page";
+import { PersonAvatar } from "@/components/person-avatar";
 import { SelectField, TextField } from "@/components/dash-form";
 import {
   Select,
@@ -42,7 +43,6 @@ import {
   primaryPill,
   ghostPill,
   toneBadge,
-  initials,
   softSelectTrigger,
   softSelectContent,
 } from "@/lib/dash-ui";
@@ -542,9 +542,7 @@ export function AffectationStagesDialog({
                       className="flex flex-col gap-2 rounded-2xl border border-brand/12 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3"
                     >
                       <span className="flex min-w-0 flex-1 items-center gap-2.5">
-                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand/10 text-[11px] font-bold text-brand-dk">
-                          {initials(`${e.prenom} ${e.nom}`)}
-                        </span>
+                        <PersonAvatar name={`${e.prenom} ${e.nom}`} photoUrl={e.photoUrl} />
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-medium text-foreground">
                             {e.prenom} {e.nom}

@@ -540,41 +540,6 @@ export function fetchExceptions() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Présences (appel en séance)                                        */
-/* ------------------------------------------------------------------ */
-
-export interface AttendanceEntry {
-  etudiantId: string;
-  present: boolean;
-  justifie?: boolean;
-  note?: string;
-}
-
-export function openAttendanceSession(seanceId: string) {
-  return api.post<{ id: string; seanceId: string; statut: string }>(`/attendance/session/open`, {
-    seanceId,
-  });
-}
-
-export function fetchAttendanceSession(seanceId: string) {
-  return api.get<{ id: string; seanceId: string; statut: string }>(
-    `/attendance/session/${seanceId}`,
-  );
-}
-
-export function closeAttendanceSession(sessionId: string) {
-  return api.post<Record<string, unknown>>(`/attendance/session/${sessionId}/close`);
-}
-
-export function fetchSeanceAttendance(seanceId: string) {
-  return api.get<AttendanceEntry[]>(`/attendance/seance/${seanceId}`);
-}
-
-export function saveAttendanceBulk(seanceId: string, entries: AttendanceEntry[]) {
-  return api.post<unknown>(`/attendance/bulk`, { seanceId, entries });
-}
-
-/* ------------------------------------------------------------------ */
 /*  Modules                                                           */
 /* ------------------------------------------------------------------ */
 

@@ -112,15 +112,9 @@ import {
   fetchHolidays as apiFetchHolidays,
   fetchVacations as apiFetchVacations,
   fetchExceptions as apiFetchExceptions,
-  openAttendanceSession as apiOpenAttendanceSession,
-  fetchAttendanceSession as apiFetchAttendanceSession,
-  closeAttendanceSession as apiCloseAttendanceSession,
-  fetchSeanceAttendance as apiFetchSeanceAttendance,
-  saveAttendanceBulk as apiSaveAttendanceBulk,
   type HolidayRow,
   type VacationRow,
   type CalendarExceptionRow,
-  type AttendanceEntry,
 } from "@/lib/istpm-api";
 import { useAuth, getStoredRole } from "@/lib/auth";
 
@@ -509,13 +503,6 @@ type IstpmCtx = {
   /** Glisser-déposer : conserve la durée, ne change que le départ. */
   moveSeance: (id: string, date: string, debut: string, force?: boolean) => Promise<void>;
   conflitsSeance: (c: ConflitCandidate, ignorerId?: string) => Conflit[];
-
-  /* Appel en séance (roll-call) */
-  openSession: (seanceId: string) => Promise<{ id: string }>;
-  fetchSession: (seanceId: string) => Promise<{ id: string } | null>;
-  closeSession: (sessionId: string) => Promise<void>;
-  fetchPresences: (seanceId: string) => Promise<AttendanceEntry[]>;
-  savePresences: (seanceId: string, entries: AttendanceEntry[]) => Promise<void>;
 };
 
 const Ctx = createContext<IstpmCtx | null>(null);
@@ -1348,40 +1335,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     [seancesParJour],
   );
 
-  /* ---------------- Appel en séance (roll-call) ---------------- */
-
-  const openSession = useCallback(async (seanceId: string) => {
-    const session = await apiOpenAttendanceSession(seanceId);
-    return { id: String((session as { id?: unknown })?.id ?? "") };
-  }, []);
-
-  const fetchSession = useCallback(async (seanceId: string) => {
-    try {
-      const session = await apiFetchAttendanceSession(seanceId);
-      return { id: String((session as { id?: unknown })?.id ?? "") };
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const closeSession = useCallback(async (sessionId: string) => {
-    await apiCloseAttendanceSession(sessionId);
-  }, []);
-
-  const fetchPresences = useCallback(async (seanceId: string) => {
-    const rows = (await apiFetchSeanceAttendance(seanceId)) as AttendanceEntry[];
-    return rows.map((r) => ({
-      etudiantId: String(r.etudiantId ?? ""),
-      present: r.present === true,
-      justifie: r.justifie === true,
-      note: String(r.note ?? ""),
-    }));
-  }, []);
-
-  const savePresences = useCallback(async (seanceId: string, entries: AttendanceEntry[]) => {
-    await apiSaveAttendanceBulk(seanceId, entries);
-  }, []);
-
   /* ---------------- Dérivés ---------------- */
 
   const dashboard = useMemo(() => {
@@ -1541,11 +1494,6 @@ export function IstpmProvider({ children }: { children: ReactNode }) {
     removeSeanceDocument,
     moveSeance,
     conflitsSeance,
-    openSession,
-    closeSession,
-    fetchSession,
-    fetchPresences,
-    savePresences,
     addStage,
     updateStage,
     deleteStage,
