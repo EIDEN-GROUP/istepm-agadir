@@ -263,6 +263,14 @@ Traefik auto-provisions Let's Encrypt TLS certificates for `API_DOMAIN`.
 
 See `frontend/STRUCTURE.md` and `backend/STRUCTURE.md` for detailed file-by-file breakdown.
 
+## Data model & maintenance history
+
+- `SESSION-WORK-REPORT.md`   data model conventions (`niveau` vs `annee` vs
+  `groupe`, the `fraisAnnuels = fraisMensuels × 10` rule, how role
+  permissions resolve), the S1–S6 → study-year migration applied in
+  production, root causes of the bugs fixed, and known open issues.
+- `SESSION_LOG.md`   chronological changelog, one entry per work session.
+
 ## Working notes (M:\plan\istepm)
 
 - `STUDENT_WORKSPACE.md`   spec + API contract of the student workspace

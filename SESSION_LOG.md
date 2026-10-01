@@ -268,3 +268,41 @@ Full diff reviewed end-to-end for regressions:
   start of the session — committed as `7c5f1d1` on request. The student week
   view later replaced the grid with a table, so `fit` is now only wired in
   `calendar-views.tsx` for potential reuse elsewhere.
+
+---
+
+## 2026-09-18 → 2026-09-30 — Modèle années d'étude, permissions, MinIO, photos
+
+Session longue, détaillée dans **`SESSION-WORK-REPORT.md`** (structure,
+processus, causes racines, preuves de vérification). Résumé :
+
+**Données de production corrigées** (sauvegardes `bk_*_20260923` avant
+chaque écriture) : migration S1–S6 → années d'étude sur `etudiants` (300),
+`bulletins` (290), `stages` (218), `examens` (96), `formateurs` (57),
+`seances` (56) ; `levels` 6 → 3 ; `settings.semestres` supprimée ; fiches
+`roles` réalignées sur `ROLE_FALLBACKS` (directeur 26 → 52, responsable
+15 → 40, enseignant 5 → 8, comptable et etudiant créés) ; 95 photos de
+profil attribuées (`bk_photourl_20260923`).
+
+**Code** : validation du format `annee` à l'import + modèle CSV corrigé
+(cause racine de la confusion niveau/année scolaire) ; helper
+`academicYearOf()` unique pour la bascule de septembre (3 implémentations
+dupliquées et fausses) ; code mort retiré de `bulletins.ts` ; images MinIO
+repointées vers `quay.io` (Docker Hub ne les publie plus — dépôt des sujets
+d'examen était cassé en production) ; graphiques du tableau de bord
+Responsable (hauteur, palette, top 12) ; filtre filière + cascade modules sur
+« Heures modules restantes ».
+
+**Documentation** : mémo (9 p.) et guide (32 p.) régénérés en v1.1 avec le
+logo réel et le rôle Comptable ; `credentials.md` du jeu de données créé.
+
+### À savoir
+
+- **Travail en attente** : le durcissement de `backend/migrations/sql-istepm`
+  est dans `git stash@{0}`. Les mêmes fichiers ont été réécrits en amont
+  pendant la session — l'appliquer tel quel écraserait ce travail amont.
+- **VPS sous tension** : 172 Mo de RAM libre, 1 Go de swap, disque à 81 %.
+  Pas d'OOM constaté, mais peu de marge (deux stacks clients + monitoring
+  sur 1 cœur).
+- **Filet de sécurité quasi inexistant** : 1 fichier de test backend, 0 test
+  frontend. Tous les bugs corrigés ici passaient `tsc` sans erreur.
