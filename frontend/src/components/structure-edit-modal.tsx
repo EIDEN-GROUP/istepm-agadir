@@ -91,6 +91,9 @@ export function StructureEditModal({
   const [dNiveaux, setDNiveaux] = useState<Record<string, number>>({});
   const [importFiliere, setImportFiliere] = useState("");
   const [saving, setSaving] = useState(false);
+  // Le formulaire d'ajout occupait un tiers de la fenêtre en permanence :
+  // replié par défaut, la liste des stages respire.
+  const [ajoutOuvert, setAjoutOuvert] = useState(false);
 
   useEffect(() => {
     if (!structure) return;
@@ -105,6 +108,7 @@ export function StructureEditModal({
     setDNom("");
     setDNiveaux({});
     setSaving(false);
+    setAjoutOuvert(false);
   }, [structure]);
 
   const programmeParService = useMemo(() => {
@@ -196,6 +200,9 @@ export function StructureEditModal({
     setFService("");
     setFNiveaux({});
     setFFiliere("");
+    // Le stage ajouté apparaît dans la liste : on referme le formulaire au
+    // lieu de laisser un bloc vide ouvert sous les yeux.
+    setAjoutOuvert(false);
   };
 
   /** Ouvre le sous-formulaire pré-rempli des niveaux encore portés par le stage. */
@@ -329,11 +336,11 @@ export function StructureEditModal({
     set: (v: Record<string, number>) => void,
     prefix: string,
   ) => (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2">
       {NIVEAUX.map((n) => {
         const actif = sel[n] !== undefined;
         return (
-          <span key={n} className="inline-flex items-center gap-1">
+          <span key={n} className="inline-flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => {
@@ -342,21 +349,24 @@ export function StructureEditModal({
                 basculeNiveau(sel, set, n, match?.heures ?? servicesHeures[fService.trim()] ?? 0);
               }}
               className={cn(
-                "rounded-full px-3 py-1 text-[11px] font-semibold transition-colors",
+                "rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors",
                 actif ? "bg-brand text-white" : "border border-brand/20 text-muted-foreground hover:text-brand-dk",
               )}
             >
               {n}
             </button>
             {actif ? (
-              <Input
-                type="number"
-                min={0}
-                value={sel[n]}
-                aria-label={`${prefix} heures - ${n}`}
-                onChange={(e) => set({ ...sel, [n]: Math.max(0, Number(e.target.value) || 0) })}
-                className="h-7 w-16 rounded-lg border-brand/20 text-center text-xs tabular-nums"
-              />
+              <span className="inline-flex items-center gap-1">
+                <Input
+                  type="number"
+                  min={0}
+                  value={sel[n]}
+                  aria-label={`${prefix} heures - ${n}`}
+                  onChange={(e) => set({ ...sel, [n]: Math.max(0, Number(e.target.value) || 0) })}
+                  className="h-9 w-20 rounded-lg border-brand/20 text-center text-sm tabular-nums"
+                />
+                <span className="text-sm text-muted-foreground">h</span>
+              </span>
             ) : null}
           </span>
         );
@@ -369,8 +379,8 @@ export function StructureEditModal({
       open={!!structure}
       onOpenChange={(o) => !o && onClose()}
       wide
-      title={structure ? `Structure - ${structure.nom}` : "Structure"}
-      subtitle="Stages du carnet : heures par niveau, une filière, sous-stages"
+      title={structure ? structure.nom : "Structure"}
+      subtitle="Les stages que cette structure peut accueillir"
       submitLabel={saving || busy ? "Enregistrement…" : "Enregistrer"}
       onSubmit={() => void enregistrer()}
       busy={saving || busy}
@@ -378,81 +388,81 @@ export function StructureEditModal({
       <FullWidth>
         <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
           <label className="space-y-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Nom</span>
+            <span className="text-sm font-medium text-foreground">Nom de la structure</span>
             <Input
               value={nom}
               readOnly={readOnly}
               onChange={(e) => setNom(e.target.value)}
-              className={cn(softInput, "h-9 text-sm")}
+              className={cn(softInput, "h-10 text-sm")}
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground" title="Seul plafond d'accueil : ni les stages ni les sous-stages n'en portent">
-              Capacité d'accueil
-            </span>
+            <span className="text-sm font-medium text-foreground">Places</span>
             <Input
               type="number"
               min={1}
               value={capacite}
               readOnly={readOnly}
               onChange={(e) => setCapacite(Number(e.target.value))}
-              className={cn(softInput, "h-9 text-sm")}
+              className={cn(softInput, "h-10 text-sm")}
             />
+            <span className="block text-xs text-muted-foreground">
+              Nombre de stagiaires accueillis en même temps
+            </span>
           </label>
         </div>
       </FullWidth>
 
       <FullWidth>
-        <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Stages ({stages.length}) · Heures totales : <strong className="text-foreground">{heuresTotales}</strong>
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={importFiliere}
-              onChange={(e) => setImportFiliere(e.target.value)}
-              aria-label="Filière du carnet à importer"
-              className={cn(softInput, "h-8 text-xs")}
-            >
-              <option value="">Carnet d'une filière…</option>
-              {FILIERES_CARNET.map((f) => (
-                <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
-            <button type="button" onClick={importerCarnet} className="text-xs font-semibold text-brand-dk hover:underline">
-              Importer le programme
-            </button>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-sm font-semibold text-foreground">
+              {stages.length === 0
+                ? "Aucun stage pour l'instant"
+                : `${stages.length} stage${stages.length > 1 ? "s" : ""}`}
+              {stages.length ? (
+                <span className="font-normal text-muted-foreground">
+                  {" · "}{heuresTotales} heures au total
+                </span>
+              ) : null}
+            </p>
           </div>
+          {readOnly ? null : (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/40 px-3 py-2">
+              <span className="text-xs text-muted-foreground">Gagner du temps :</span>
+              <select
+                value={importFiliere}
+                onChange={(e) => setImportFiliere(e.target.value)}
+                aria-label="Filière dont reprendre les stages"
+                className={cn(softInput, "h-9 text-sm")}
+              >
+                <option value="">Choisir une filière…</option>
+                {FILIERES_CARNET.map((f) => (
+                  <option key={f} value={f}>{f}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={importerCarnet}
+                className="text-sm font-semibold text-brand-dk hover:underline"
+              >
+                Reprendre ses stages
+              </button>
+            </div>
+          )}
           {stages.length ? (
-            <ul className="max-h-64 space-y-2 overflow-y-auto">
+            <ul className="space-y-2">
               {stages.map((st, i) => (
-                <li key={`${st.nom}|${i}`} className="rounded-xl border border-brand/12 bg-card px-3 py-2">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                    <span className="min-w-0 flex-1 font-medium text-foreground">{st.nom}</span>
+                <li key={`${st.nom}|${i}`} className="group rounded-xl border border-brand/12 bg-card px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="min-w-0 flex-1 text-sm font-semibold text-foreground">{st.nom}</span>
                     {st.filiere ? (
-                      <span className="rounded-full bg-brand/10 px-2 py-0.5 font-semibold text-brand-dk">{st.filiere}</span>
+                      <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand-dk">{st.filiere}</span>
                     ) : null}
                     {readOnly ? null : (
                       <button
                         type="button"
-                        onClick={() => {
-                          if (subPour === i) {
-                            setSubPour(null);
-                            setDNom("");
-                            setDNiveaux({});
-                          } else {
-                            ouvrirSub(i);
-                          }
-                        }}
-                        className="font-semibold text-brand-dk hover:underline"
-                      >
-                        {subPour === i ? "Fermer" : "+ Sous-stage"}
-                      </button>
-                    )}
-                    {readOnly ? null : (
-                      <button
-                        type="button"
-                        aria-label={`Retirer ${st.nom}`}
+                        aria-label={`Supprimer ${st.nom}`}
                         onClick={() => {
                           setStages((prev) => prev.filter((_, j) => j !== i));
                           if (subPour === i) {
@@ -461,22 +471,22 @@ export function StructureEditModal({
                             setDNiveaux({});
                           }
                         }}
-                        className="grid h-6 w-6 place-items-center rounded-full transition hover:bg-alert/20 hover:text-alert"
+                        className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>
                   {st.niveaux.length ? (
-                    <p className="mt-1 text-[11px] text-muted-foreground">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {st.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")}
                     </p>
                   ) : null}
                   {st.subStages.length ? (
-                    <ul className="mt-1.5 space-y-1 border-l-2 border-brand/20 pl-2">
+                    <ul className="mt-2 space-y-1 border-l-2 border-brand/20 pl-3">
                       {st.subStages.map((d, k) => (
-                        <li key={`${d.nom}|${k}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                          <span className="min-w-0 flex-1 font-medium text-foreground">↳ {d.nom}</span>
+                        <li key={`${d.nom}|${k}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
+                          <span className="min-w-0 flex-1 font-medium text-foreground">{d.nom}</span>
                           <span className="text-muted-foreground">
                             {d.niveaux.length
                               ? d.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")
@@ -485,81 +495,144 @@ export function StructureEditModal({
                           {readOnly ? null : (
                             <button
                               type="button"
-                              aria-label={`Retirer ${d.nom}`}
+                              aria-label={`Supprimer ${d.nom}`}
                               onClick={() => retirerSub(i, k)}
-                              className="grid h-6 w-6 place-items-center rounded-full transition hover:bg-alert/20 hover:text-alert"
+                              className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           )}
                         </li>
                       ))}
                     </ul>
                   ) : null}
-                  {subPour === i && !readOnly ? (
-                    <div className="mt-2 space-y-2 rounded-lg bg-muted/40 p-2.5">
+                  {/* Découpage en sous-stages : usage rare (2 en base), donc
+                      discret — visible au survol/focus ou quand il est ouvert. */}
+                  {readOnly ? null : subPour === i ? (
+                    <div className="mt-3 space-y-2.5 rounded-lg bg-muted/40 p-3">
+                      <p className="text-sm font-medium text-foreground">Découper « {st.nom} » en parties</p>
                       <Input
                         value={dNom}
                         onChange={(e) => setDNom(e.target.value)}
-                        placeholder="Nom du sous-stage…"
-                        aria-label="Nom du sous-stage"
-                        className={cn(softInput, "h-8 text-xs")}
+                        placeholder="Nom de la partie (ex. Urgences de nuit)…"
+                        aria-label="Nom de la partie"
+                        className={cn(softInput, "h-9 text-sm")}
                       />
-                      <p className="text-[11px] text-muted-foreground">
-                        Les niveaux cochés (avec leurs heures) sont déplacés du stage vers ce sous-stage.
+                      <p className="text-xs text-muted-foreground">
+                        Les années cochées et leurs heures passent du stage vers cette partie.
                       </p>
-                      {niveauxHeuresEditor(dNiveaux, setDNiveaux, "Sous-stage")}
-                      <button type="button" onClick={ajouterSub} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-dk hover:underline">
-                        <Plus className="h-3.5 w-3.5" /> Ajouter le sous-stage
-                      </button>
+                      {niveauxHeuresEditor(dNiveaux, setDNiveaux, "Partie")}
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={ajouterSub} className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-dk hover:underline">
+                          <Plus className="h-4 w-4" /> Ajouter la partie
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSubPour(null);
+                            setDNom("");
+                            setDNiveaux({});
+                          }}
+                          className="text-sm text-muted-foreground hover:underline"
+                        >
+                          Annuler
+                        </button>
+                      </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => ouvrirSub(i)}
+                      className="mt-1.5 text-xs text-muted-foreground opacity-0 transition hover:text-brand-dk hover:underline focus:opacity-100 group-hover:opacity-100"
+                    >
+                      Découper en parties
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-muted-foreground">Aucun stage : ajoutez ci-dessous les services du carnet.</p>
+            <p className="rounded-xl border border-dashed border-brand/20 px-4 py-6 text-center text-sm text-muted-foreground">
+              Ajoutez les services où vos étudiants feront leur stage.
+            </p>
           )}
         </div>
       </FullWidth>
 
       {readOnly ? null : (
         <FullWidth>
-          <div className="space-y-2 rounded-xl border border-brand/12 bg-muted/40 p-3">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Ajouter un stage (heures par niveau, une filière)</p>
-            <div className="grid gap-2 sm:grid-cols-[1fr_180px]">
-              <Input
-                value={fService}
-                onChange={(e) => setFService(e.target.value)}
-                onBlur={() => reprendreCarnet(fService)}
-                list="services-stage-connus"
-                placeholder="Service…"
-                aria-label="Service"
-                className={cn(softInput, "h-9 text-sm")}
-              />
-              <datalist id="services-stage-connus">
-                {services.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-              <select
-                value={fFiliere}
-                onChange={(e) => setFFiliere(e.target.value)}
-                aria-label="Filière du stage"
-                className={cn(softInput, "h-9 text-sm")}
-              >
-                <option value="">Filière…</option>
-                {FILIERES_CARNET.map((f) => (
-                  <option key={f} value={f}>{f}</option>
-                ))}
-              </select>
+          {ajoutOuvert ? (
+            <div className="space-y-3 rounded-xl border border-brand/12 bg-muted/40 p-4">
+              <p className="text-sm font-semibold text-foreground">Nouveau stage</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-foreground">Service</span>
+                  <Input
+                    value={fService}
+                    onChange={(e) => setFService(e.target.value)}
+                    onBlur={() => reprendreCarnet(fService)}
+                    list="services-stage-connus"
+                    placeholder="Ex. Bloc opératoire"
+                    aria-label="Service"
+                    className={cn(softInput, "h-10 text-sm")}
+                  />
+                  <datalist id="services-stage-connus">
+                    {services.map((s) => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-foreground">Filière concernée</span>
+                  <select
+                    value={fFiliere}
+                    onChange={(e) => setFFiliere(e.target.value)}
+                    aria-label="Filière du stage"
+                    className={cn(softInput, "h-10 text-sm")}
+                  >
+                    <option value="">Choisir…</option>
+                    {FILIERES_CARNET.map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="space-y-1.5">
+                <span className="block text-sm font-medium text-foreground">
+                  Années concernées et heures
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Cliquez sur une année pour l'activer, puis saisissez ses heures.
+                </span>
+                {niveauxHeuresEditor(fNiveaux, setFNiveaux, "Stage")}
+              </div>
+              {aideCarnet ? <p className="text-xs text-muted-foreground">{aideCarnet}</p> : null}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={ajouterStage}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dk"
+                >
+                  <Plus className="h-4 w-4" /> Ajouter ce stage
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAjoutOuvert(false)}
+                  className="text-sm text-muted-foreground hover:underline"
+                >
+                  Annuler
+                </button>
+              </div>
             </div>
-            {aideCarnet ? <p className="text-[11px] text-muted-foreground">{aideCarnet}</p> : null}
-            {niveauxHeuresEditor(fNiveaux, setFNiveaux, "Stage")}
-            <button type="button" onClick={ajouterStage} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-dk hover:underline">
-              <Plus className="h-3.5 w-3.5" /> Ajouter le stage
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAjoutOuvert(true)}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/30 px-4 py-3 text-sm font-semibold text-brand-dk transition hover:border-brand/50 hover:bg-brand/5"
+            >
+              <Plus className="h-4 w-4" /> Ajouter un stage
             </button>
-          </div>
+          )}
         </FullWidth>
       )}
     </FormDialog>
