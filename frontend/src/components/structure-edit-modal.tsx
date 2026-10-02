@@ -459,14 +459,22 @@ export function StructureEditModal({
             </div>
           )}
           {stages.length ? (
-            <ul className="space-y-2">
+            // Une vraie liste : un cadre, des lignes séparées par un filet.
+            // Les cartes individuelles gaspillaient la hauteur et donnaient
+            // l'impression de blocs sans rapport entre eux.
+            <ul className="divide-y divide-brand/10 overflow-hidden rounded-xl border border-brand/12 bg-card">
               {stages.map((st, i) => (
-                <li key={`${st.nom}|${i}`} className="group rounded-xl border border-brand/12 bg-card px-4 py-3">
+                <li key={`${st.nom}|${i}`} className="group px-4 py-2.5">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="min-w-0 flex-1 text-sm font-semibold text-foreground">{st.nom}</span>
+                    <span className="text-sm font-semibold text-foreground">{st.nom}</span>
                     {st.filiere ? (
                       <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand-dk">{st.filiere}</span>
                     ) : null}
+                    <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                      {st.niveaux.length
+                        ? st.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")
+                        : "Aucune année renseignée"}
+                    </span>
                     {readOnly ? null : (
                       <button
                         type="button"
@@ -485,34 +493,44 @@ export function StructureEditModal({
                       </button>
                     )}
                   </div>
-                  {st.niveaux.length ? (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {st.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")}
-                    </p>
-                  ) : null}
+                  {/* Les parties d'un stage se comparent colonne par colonne :
+                      un tableau avec en-têtes, pas une liste à puces. */}
                   {st.subStages.length ? (
-                    <ul className="mt-2 space-y-1 border-l-2 border-brand/20 pl-3">
-                      {st.subStages.map((d, k) => (
-                        <li key={`${d.nom}|${k}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
-                          <span className="min-w-0 flex-1 font-medium text-foreground">{d.nom}</span>
-                          <span className="text-muted-foreground">
-                            {d.niveaux.length
-                              ? d.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")
-                              : "-"}
-                          </span>
-                          {readOnly ? null : (
-                            <button
-                              type="button"
-                              aria-label={`Supprimer ${d.nom}`}
-                              onClick={() => retirerSub(i, k)}
-                              className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="mt-2 overflow-x-auto rounded-lg border border-brand/12">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <th className="px-3 py-1.5 font-semibold">Partie</th>
+                            <th className="px-3 py-1.5 font-semibold">Années et heures</th>
+                            {readOnly ? null : <th className="w-10 px-3 py-1.5" />}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-brand/10">
+                          {st.subStages.map((d, k) => (
+                            <tr key={`${d.nom}|${k}`}>
+                              <td className="px-3 py-1.5 font-medium text-foreground">{d.nom}</td>
+                              <td className="px-3 py-1.5 text-muted-foreground">
+                                {d.niveaux.length
+                                  ? d.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")
+                                  : "-"}
+                              </td>
+                              {readOnly ? null : (
+                                <td className="px-3 py-1.5 text-right">
+                                  <button
+                                    type="button"
+                                    aria-label={`Supprimer ${d.nom}`}
+                                    onClick={() => retirerSub(i, k)}
+                                    className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   ) : null}
                   {/* Découpage en sous-stages : usage rare (2 en base), donc
                       discret — visible au survol/focus ou quand il est ouvert. */}
