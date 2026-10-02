@@ -89,6 +89,7 @@ import { cn } from "@/lib/utils";
 /** Libellé court + icône pour la navigation par catégorie de réglages. */
 const GROUPE_META: Record<string, { short: string; icone: typeof Users }> = {
   "Organisation pédagogique": { short: "Pédagogie", icone: LayoutGrid },
+  "Modules & structures": { short: "Modules & structures", icone: BookOpen },
   "Structure de l'institut": { short: "Institut", icone: Building2 },
   Administration: { short: "Administration", icone: ShieldCheck },
   Évaluation: { short: "Évaluation", icone: ClipboardList },
@@ -190,7 +191,7 @@ const META: Record<
 > = {
   annees: { titre: "Années universitaires", desc: "Années ouvertes à l'inscription", icone: CalendarRange, groupe: "Organisation pédagogique" },
   groupes: { titre: "Groupes / classes", desc: "Groupes constitués par niveau", icone: Users, groupe: "Organisation pédagogique" },
-  modules: { titre: "Modules", desc: "Modules enseignés par filière", icone: BookOpen, groupe: "Organisation pédagogique" },
+  modules: { titre: "Modules", desc: "Modules enseignés par filière", icone: BookOpen, groupe: "Modules & structures" },
   salles: { titre: "Salles", desc: "Salles, amphis et laboratoires", icone: DoorOpen, groupe: "Organisation pédagogique" },
   creneaux: { titre: "Créneaux horaires", desc: "Plages horaires de l'emploi du temps", icone: Clock, groupe: "Organisation pédagogique" },
   planning: { titre: "Configuration du planning", desc: "Jours ouvrés et amplitude horaire", icone: SlidersHorizontal, groupe: "Organisation pédagogique" },
@@ -205,7 +206,7 @@ const META: Record<
 
   securite: { titre: "Sécurité", desc: "Mots de passe et sessions", icone: Lock, groupe: "Administration" },
   cachet: { titre: "Cachet officiel", desc: "Tampon apposé sur tous les PDF (bulletins, conventions, rapports)", icone: Stamp, groupe: "Administration" },
-  structures: { titre: "Structures d'accueil", desc: "CHU, hôpitaux et cliniques partenaires", icone: Hospital, groupe: "Organisation pédagogique" },
+  structures: { titre: "Structures d'accueil", desc: "CHU, hôpitaux et cliniques partenaires", icone: Hospital, groupe: "Modules & structures" },
 };
 
 /**
@@ -248,6 +249,7 @@ const ORDRE_SECTIONS: SectionId[] = [
   "annees",
   "groupes",
   "modules",
+  "structures",
   "salles",
   "creneaux",
   "examens",
@@ -255,7 +257,6 @@ const ORDRE_SECTIONS: SectionId[] = [
   "institut",
   "securite",
   "cachet",
-  "structures",
 ];
 
 /* ------------------------------------------------------------------ */

@@ -339,8 +339,16 @@ export function StructureEditModal({
     <div className="flex flex-wrap gap-2">
       {NIVEAUX.map((n) => {
         const actif = sel[n] !== undefined;
+        // Année + heures forment UN seul bloc : sans cette enveloppe, le champ
+        // d'heures flottait entre deux années et semblait appartenir à l'autre.
         return (
-          <span key={n} className="inline-flex items-center gap-1.5">
+          <span
+            key={n}
+            className={cn(
+              "inline-flex items-center overflow-hidden rounded-full border transition-colors",
+              actif ? "border-brand bg-brand/5" : "border-brand/20",
+            )}
+          >
             <button
               type="button"
               onClick={() => {
@@ -349,21 +357,21 @@ export function StructureEditModal({
                 basculeNiveau(sel, set, n, match?.heures ?? servicesHeures[fService.trim()] ?? 0);
               }}
               className={cn(
-                "rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors",
-                actif ? "bg-brand text-white" : "border border-brand/20 text-muted-foreground hover:text-brand-dk",
+                "px-3.5 py-1.5 text-sm font-semibold transition-colors",
+                actif ? "bg-brand text-white" : "text-muted-foreground hover:text-brand-dk",
               )}
             >
               {n}
             </button>
             {actif ? (
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 pl-2 pr-3">
                 <Input
                   type="number"
                   min={0}
                   value={sel[n]}
                   aria-label={`${prefix} heures - ${n}`}
                   onChange={(e) => set({ ...sel, [n]: Math.max(0, Number(e.target.value) || 0) })}
-                  className="h-9 w-20 rounded-lg border-brand/20 text-center text-sm tabular-nums"
+                  className="h-7 w-14 rounded-md border-brand/25 bg-white px-1 text-center text-sm tabular-nums"
                 />
                 <span className="text-sm text-muted-foreground">h</span>
               </span>
@@ -523,7 +531,11 @@ export function StructureEditModal({
                       </p>
                       {niveauxHeuresEditor(dNiveaux, setDNiveaux, "Partie")}
                       <div className="flex items-center gap-3">
-                        <button type="button" onClick={ajouterSub} className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-dk hover:underline">
+                        <button
+                          type="button"
+                          onClick={ajouterSub}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dk"
+                        >
                           <Plus className="h-4 w-4" /> Ajouter la partie
                         </button>
                         <button
