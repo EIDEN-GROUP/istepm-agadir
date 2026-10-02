@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -21,6 +21,36 @@ export type StructureSaveBody = {
   capacite?: number;
   stages: StageRef[];
 };
+
+/**
+ * Heures d'un stage ventilées en une colonne par année (+ « Hors année »
+ * pour les lignes historiques sans niveau). Une colonne unique « 1ère : 80 h ·
+ * 2ème : 80 h » obligeait à relire la phrase pour comparer deux stages.
+ */
+function cellulesHeures(niveaux: NiveauHeures[], tonalite: string, avecHors: boolean) {
+  const parNiveau = new Map<string, number>();
+  for (const nh of niveaux) parNiveau.set(nh.niveau, (parNiveau.get(nh.niveau) ?? 0) + nh.heures);
+  const hors = [...parNiveau.entries()]
+    .filter(([n]) => !(NIVEAUX as readonly string[]).includes(n))
+    .reduce((t, [, h]) => t + h, 0);
+  return (
+    <>
+      {NIVEAUX.map((n) => {
+        const h = parNiveau.get(n);
+        return (
+          <td key={n} className={cn("whitespace-nowrap px-3 py-2 text-right tabular-nums", h === undefined ? "text-muted-foreground/50" : cn("text-muted-foreground", tonalite))}>
+            {h === undefined ? "—" : `${h} h`}
+          </td>
+        );
+      })}
+      {avecHors ? (
+        <td className={cn("whitespace-nowrap px-3 py-2 text-right tabular-nums", hors ? cn("text-muted-foreground", tonalite) : "text-muted-foreground/50")}>
+          {hors ? `${hors} h` : "—"}
+        </td>
+      ) : null}
+    </>
+  );
+}
 
 function libelleNiveauVide(n: string): string {
   return n || "Toutes années";
@@ -214,6 +244,42 @@ export function StructureEditModal({
     setDNom("");
     setDNiveaux(init);
   };
+
+  // Stages regroupés par filière, l'ordre alphabétique étant conservé à
+  // l'intérieur de chaque groupe. On garde l'index d'origine : c'est lui qui
+  // sert aux suppressions et au découpage.
+  const groupesFiliere = useMemo(() => {
+    const par = new Map<string, number[]>();
+    stages.forEach((st, i) => {
+      const k = st.filiere ?? "";
+      const l = par.get(k);
+      if (l) l.push(i);
+      else par.set(k, [i]);
+    });
+    return [...par.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([filiere, indices]) => ({
+        filiere,
+        indices,
+        heures: heuresTotalesStructure(indices.map((i) => stages[i])),
+      }));
+  }, [stages]);
+
+  // Colonne « Hors année » seulement si des heures sans niveau existent
+  // (données historiques) : sinon elle resterait vide en permanence.
+  const horsAnnee = useMemo(
+    () =>
+      stages.some((st) =>
+        [...st.niveaux, ...st.subStages.flatMap((d) => d.niveaux)].some(
+          (nh) => !(NIVEAUX as readonly string[]).includes(nh.niveau),
+        ),
+      ),
+    [stages],
+  );
+
+  const nbColonnes = (readOnly ? 4 : 5) + (horsAnnee ? 1 : 0);
+
+  const stageDecoupe = subPour === null ? null : (stages[subPour] ?? null);
 
   const ajouterSub = () => {
     if (subPour === null) return;
@@ -468,17 +534,41 @@ export function StructureEditModal({
                 <thead>
                   <tr className="border-b border-brand/12 bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <th className="px-4 py-2 font-semibold">Stage</th>
-                    <th className="px-4 py-2 font-semibold">Filière</th>
-                    <th className="px-4 py-2 font-semibold">Années et heures</th>
+                    {NIVEAUX.map((n) => (
+                      <th key={n} className="px-3 py-2 text-right font-semibold">{n}</th>
+                    ))}
+                    {horsAnnee ? (
+                      <th className="px-3 py-2 text-right font-semibold">Hors année</th>
+                    ) : null}
                     {readOnly ? null : <th className="w-12 px-4 py-2" />}
                   </tr>
                 </thead>
-                {stages.map((st, i) => (
+                {groupesFiliere.map((g) => (
+                  <Fragment key={g.filiere || "__sans__"}>
+                    {/* La filière était répétée à l'identique sur chaque ligne.
+                        Elle devient un intitulé de section, lisible d'un coup
+                        d'œil et porteur du total du groupe. */}
+                    <tbody>
+                      <tr className="border-y border-brand/12 bg-brand/8">
+                        <th
+                          colSpan={nbColonnes - 1}
+                          className="px-4 py-2 text-left text-sm font-bold text-brand-dk"
+                        >
+                          {g.filiere || "Sans filière"}
+                        </th>
+                        <th className="whitespace-nowrap px-3 py-2 text-right text-xs font-semibold text-brand-dk">
+                          {g.indices.length} stage{g.indices.length > 1 ? "s" : ""} · {g.heures} h
+                        </th>
+                      </tr>
+                    </tbody>
+                    {g.indices.map((i) => {
+                      const st = stages[i];
+                      return (
                   <tbody key={`${st.nom}|${i}`} className="group border-b border-brand/10 last:border-0">
                     <tr>
                       <td className="px-4 py-2 align-top font-semibold text-foreground">
                         {st.nom}
-                        {readOnly || subPour === i ? null : (
+                        {readOnly ? null : (
                           <button
                             type="button"
                             onClick={() => ouvrirSub(i)}
@@ -488,20 +578,7 @@ export function StructureEditModal({
                           </button>
                         )}
                       </td>
-                      <td className="px-4 py-2 align-top">
-                        {st.filiere ? (
-                          <span className="whitespace-nowrap rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand-dk">
-                            {st.filiere}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 align-top text-muted-foreground">
-                        {st.niveaux.length
-                          ? st.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")
-                          : "-"}
-                      </td>
+                      {cellulesHeures(st.niveaux, "font-medium text-foreground", horsAnnee)}
                       {readOnly ? null : (
                         <td className="px-4 py-2 text-right align-top">
                           <button
@@ -526,12 +603,7 @@ export function StructureEditModal({
                     {st.subStages.map((d, k) => (
                       <tr key={`${d.nom}|${k}`} className="bg-muted/20">
                         <td className="py-1.5 pl-8 pr-4 text-muted-foreground">↳ {d.nom}</td>
-                        <td className="px-4 py-1.5" />
-                        <td className="px-4 py-1.5 text-muted-foreground">
-                          {d.niveaux.length
-                            ? d.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")
-                            : "-"}
-                        </td>
+                        {cellulesHeures(d.niveaux, "", horsAnnee)}
                         {readOnly ? null : (
                           <td className="px-4 py-1.5 text-right">
                             <button
@@ -546,47 +618,10 @@ export function StructureEditModal({
                         )}
                       </tr>
                     ))}
-                    {readOnly || subPour !== i ? null : (
-                      <tr>
-                        <td colSpan={readOnly ? 3 : 4} className="px-4 pb-3">
-                          <div className="space-y-2.5 rounded-lg bg-muted/40 p-3">
-                            <p className="text-sm font-medium text-foreground">Découper « {st.nom} » en parties</p>
-                            <Input
-                              value={dNom}
-                              onChange={(e) => setDNom(e.target.value)}
-                              placeholder="Nom de la partie (ex. Urgences de nuit)…"
-                              aria-label="Nom de la partie"
-                              className={cn(softInput, "h-9 text-sm")}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              Les années cochées et leurs heures passent du stage vers cette partie.
-                            </p>
-                            {niveauxHeuresEditor(dNiveaux, setDNiveaux, "Partie")}
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={ajouterSub}
-                                className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dk"
-                              >
-                                <Plus className="h-4 w-4" /> Ajouter la partie
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSubPour(null);
-                                  setDNom("");
-                                  setDNiveaux({});
-                                }}
-                                className="text-sm text-muted-foreground hover:underline"
-                              >
-                                Annuler
-                              </button>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
+                      );
+                    })}
+                  </Fragment>
                 ))}
               </table>
             </div>
@@ -668,6 +703,47 @@ export function StructureEditModal({
             <p className="text-xs text-muted-foreground">{aideCarnet}</p>
           </FullWidth>
         ) : null}
+      </FormDialog>
+
+      {/* Découper un stage : fenêtre à part elle aussi, pour ne pas faire
+          surgir un formulaire au milieu du tableau. */}
+      <FormDialog
+        open={!readOnly && stageDecoupe !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setSubPour(null);
+            setDNom("");
+            setDNiveaux({});
+          }
+        }}
+        title={stageDecoupe ? `Découper « ${stageDecoupe.nom} » en parties` : "Découper en parties"}
+        subtitle="Les années cochées et leurs heures passent du stage vers cette partie."
+        submitLabel="Ajouter la partie"
+        onSubmit={ajouterSub}
+      >
+        <FullWidth>
+          <label className="space-y-1.5">
+            <span className="text-sm font-medium text-foreground">Nom de la partie</span>
+            <Input
+              value={dNom}
+              onChange={(e) => setDNom(e.target.value)}
+              placeholder="Ex. Urgences de nuit"
+              aria-label="Nom de la partie"
+              className={cn(softInput, "h-10 text-sm")}
+            />
+          </label>
+        </FullWidth>
+        <FullWidth>
+          <div className="space-y-1.5">
+            <span className="block text-sm font-medium text-foreground">
+              Années et heures reprises
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              Cliquez sur une année pour la déplacer vers la partie, puis ajustez ses heures.
+            </span>
+            {niveauxHeuresEditor(dNiveaux, setDNiveaux, "Partie")}
+          </div>
+        </FullWidth>
       </FormDialog>
     </>
   );
