@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -38,13 +38,13 @@ function cellulesHeures(niveaux: NiveauHeures[], tonalite: string, avecHors: boo
       {NIVEAUX.map((n) => {
         const h = parNiveau.get(n);
         return (
-          <td key={n} className={cn("whitespace-nowrap px-3 py-2 text-right tabular-nums", h === undefined ? "text-muted-foreground/50" : cn("text-muted-foreground", tonalite))}>
+          <td key={n} className={cn("whitespace-nowrap border-r border-brand/10 px-3 py-2 text-right tabular-nums", h === undefined ? "text-muted-foreground/50" : cn("text-muted-foreground", tonalite))}>
             {h === undefined ? "—" : `${h} h`}
           </td>
         );
       })}
       {avecHors ? (
-        <td className={cn("whitespace-nowrap px-3 py-2 text-right tabular-nums", hors ? cn("text-muted-foreground", tonalite) : "text-muted-foreground/50")}>
+        <td className={cn("whitespace-nowrap border-r border-brand/10 px-3 py-2 text-right tabular-nums", hors ? cn("text-muted-foreground", tonalite) : "text-muted-foreground/50")}>
           {hors ? `${hors} h` : "—"}
         </td>
       ) : null}
@@ -276,8 +276,6 @@ export function StructureEditModal({
       ),
     [stages],
   );
-
-  const nbColonnes = (readOnly ? 4 : 5) + (horsAnnee ? 1 : 0);
 
   const stageDecoupe = subPour === null ? null : (stages[subPour] ?? null);
 
@@ -525,105 +523,116 @@ export function StructureEditModal({
               </button>
             </div>
           )}
+          {/* Le bouton d'ajout vivait sous le tableau : hors de vue dès que la
+              liste dépassait la fenêtre. Il passe au-dessus, toujours visible. */}
+          {readOnly ? null : (
+            <button
+              type="button"
+              onClick={() => setAjoutOuvert(true)}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/30 px-4 py-3 text-sm font-semibold text-brand-dk transition hover:border-brand/50 hover:bg-brand/5"
+            >
+              <Plus className="h-4 w-4" /> Ajouter un stage
+            </button>
+          )}
           {stages.length ? (
-            // Tableau : une ligne par stage, les parties en lignes filles.
-            // Les cartes empilaient chaque stage sur deux ou trois lignes et
-            // rien ne s'alignait d'un stage à l'autre.
-            <div className="overflow-x-auto rounded-xl border border-brand/12 bg-card">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-brand/12 bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <th className="px-4 py-2 font-semibold">Stage</th>
-                    {NIVEAUX.map((n) => (
-                      <th key={n} className="px-3 py-2 text-right font-semibold">{n}</th>
-                    ))}
-                    {horsAnnee ? (
-                      <th className="px-3 py-2 text-right font-semibold">Hors année</th>
-                    ) : null}
-                    {readOnly ? null : <th className="w-12 px-4 py-2" />}
-                  </tr>
-                </thead>
-                {groupesFiliere.map((g) => (
-                  <Fragment key={g.filiere || "__sans__"}>
-                    {/* La filière était répétée à l'identique sur chaque ligne.
-                        Elle devient un intitulé de section, lisible d'un coup
-                        d'œil et porteur du total du groupe. */}
-                    <tbody>
-                      <tr className="border-y border-brand/12 bg-brand/8">
-                        <th
-                          colSpan={nbColonnes - 1}
-                          className="px-4 py-2 text-left text-sm font-bold text-brand-dk"
-                        >
-                          {g.filiere || "Sans filière"}
-                        </th>
-                        <th className="whitespace-nowrap px-3 py-2 text-right text-xs font-semibold text-brand-dk">
-                          {g.indices.length} stage{g.indices.length > 1 ? "s" : ""} · {g.heures} h
-                        </th>
+            // Un tableau par filière : son intitulé coiffe ses propres
+            // en-têtes de colonnes au lieu d'être une ligne perdue dessous.
+            <div className="space-y-3">
+              {groupesFiliere.map((g) => (
+                <div
+                  key={g.filiere || "__sans__"}
+                  className="overflow-x-auto rounded-xl border border-brand/12 bg-card"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-brand/12 bg-brand/8 px-4 py-2">
+                    <span className="text-sm font-bold text-brand-dk">
+                      {g.filiere || "Sans filière"}
+                    </span>
+                    <span className="text-xs font-semibold text-brand-dk">
+                      {g.indices.length} stage{g.indices.length > 1 ? "s" : ""} · {g.heures} h
+                    </span>
+                  </div>
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-brand/12 bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <th className="border-r border-brand/10 px-4 py-2 font-semibold">Stage</th>
+                        {NIVEAUX.map((n) => (
+                          <th key={n} className="border-r border-brand/10 px-3 py-2 text-right font-semibold">
+                            {n}
+                          </th>
+                        ))}
+                        {horsAnnee ? (
+                          <th className="border-r border-brand/10 px-3 py-2 text-right font-semibold">
+                            Hors année
+                          </th>
+                        ) : null}
+                        {readOnly ? null : <th className="w-12 px-4 py-2" />}
                       </tr>
-                    </tbody>
+                    </thead>
                     {g.indices.map((i) => {
                       const st = stages[i];
                       return (
-                  <tbody key={`${st.nom}|${i}`} className="group border-b border-brand/10 last:border-0">
-                    <tr>
-                      <td className="px-4 py-2 align-top font-semibold text-foreground">
-                        {st.nom}
-                        {readOnly ? null : (
-                          <button
-                            type="button"
-                            onClick={() => ouvrirSub(i)}
-                            className="ml-2 align-middle text-xs font-normal text-muted-foreground opacity-0 transition hover:text-brand-dk hover:underline focus:opacity-100 group-hover:opacity-100"
-                          >
-                            Découper en parties
-                          </button>
-                        )}
-                      </td>
-                      {cellulesHeures(st.niveaux, "font-medium text-foreground", horsAnnee)}
-                      {readOnly ? null : (
-                        <td className="px-4 py-2 text-right align-top">
-                          <button
-                            type="button"
-                            aria-label={`Supprimer ${st.nom}`}
-                            onClick={() => {
-                              setStages((prev) => prev.filter((_, j) => j !== i));
-                              if (subPour === i) {
-                                setSubPour(null);
-                                setDNom("");
-                                setDNiveaux({});
-                              }
-                            }}
-                            className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                    {/* Parties : lignes filles du stage, mêmes colonnes. */}
-                    {st.subStages.map((d, k) => (
-                      <tr key={`${d.nom}|${k}`} className="bg-muted/20">
-                        <td className="py-1.5 pl-8 pr-4 text-muted-foreground">↳ {d.nom}</td>
-                        {cellulesHeures(d.niveaux, "", horsAnnee)}
-                        {readOnly ? null : (
-                          <td className="px-4 py-1.5 text-right">
-                            <button
-                              type="button"
-                              aria-label={`Supprimer ${d.nom}`}
-                              onClick={() => retirerSub(i, k)}
-                              className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
+                        <tbody key={`${st.nom}|${i}`} className="group border-b border-brand/10 last:border-0">
+                          <tr>
+                            <td className="border-r border-brand/10 px-4 py-2 align-top font-semibold text-foreground">
+                              {st.nom}
+                              {readOnly ? null : (
+                                <button
+                                  type="button"
+                                  onClick={() => ouvrirSub(i)}
+                                  className="ml-2 align-middle text-xs font-normal text-muted-foreground opacity-0 transition hover:text-brand-dk hover:underline focus:opacity-100 group-hover:opacity-100"
+                                >
+                                  Découper en parties
+                                </button>
+                              )}
+                            </td>
+                            {cellulesHeures(st.niveaux, "font-medium text-foreground", horsAnnee)}
+                            {readOnly ? null : (
+                              <td className="px-4 py-2 text-right align-top">
+                                <button
+                                  type="button"
+                                  aria-label={`Supprimer ${st.nom}`}
+                                  onClick={() => {
+                                    setStages((prev) => prev.filter((_, j) => j !== i));
+                                    if (subPour === i) {
+                                      setSubPour(null);
+                                      setDNom("");
+                                      setDNiveaux({});
+                                    }
+                                  }}
+                                  className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                          {/* Parties : lignes filles du stage, mêmes colonnes. */}
+                          {st.subStages.map((d, k) => (
+                            <tr key={`${d.nom}|${k}`} className="bg-muted/20">
+                              <td className="border-r border-brand/10 py-1.5 pl-8 pr-4 text-muted-foreground">
+                                ↳ {d.nom}
+                              </td>
+                              {cellulesHeures(d.niveaux, "", horsAnnee)}
+                              {readOnly ? null : (
+                                <td className="px-4 py-1.5 text-right">
+                                  <button
+                                    type="button"
+                                    aria-label={`Supprimer ${d.nom}`}
+                                    onClick={() => retirerSub(i, k)}
+                                    className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
                       );
                     })}
-                  </Fragment>
-                ))}
-              </table>
+                  </table>
+                </div>
+              ))}
             </div>
           ) : (
             <p className="rounded-xl border border-dashed border-brand/20 px-4 py-6 text-center text-sm text-muted-foreground">
@@ -632,18 +641,6 @@ export function StructureEditModal({
           )}
         </div>
       </FullWidth>
-
-      {readOnly ? null : (
-        <FullWidth>
-          <button
-            type="button"
-            onClick={() => setAjoutOuvert(true)}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/30 px-4 py-3 text-sm font-semibold text-brand-dk transition hover:border-brand/50 hover:bg-brand/5"
-          >
-            <Plus className="h-4 w-4" /> Ajouter un stage
-          </button>
-        </FullWidth>
-      )}
       </FormDialog>
 
       {/* Le formulaire d'ajout vivait en bas de la fenêtre : on ne voyait pas
