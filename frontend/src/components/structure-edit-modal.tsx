@@ -215,12 +215,12 @@ export function StructureEditModal({
       return;
     }
     if (!fFiliere) {
-      toast.error("Choisissez la filière du stage");
+      toast.error("Choisissez la filière du lieu de service");
       return;
     }
     setStages((prev) => {
       if (prev.some((s) => s.nom === service)) {
-        toast.error("Ce stage existe déjà");
+        toast.error("Ce lieu de service existe déjà");
         return prev;
       }
       return [...prev, { nom: service, niveaux, filiere: fFiliere, subStages: [] }]
@@ -283,7 +283,7 @@ export function StructureEditModal({
     if (subPour === null) return;
     const nomSub = dNom.trim().replace(/\s+/g, " ");
     if (!nomSub) {
-      toast.error("Indiquez le nom du sous-stage");
+      toast.error("Indiquez le nom de la partie");
       return;
     }
     const niveaux = Object.entries(dNiveaux).map(([niveau, heures]) => ({ niveau, heures: Math.max(0, heures || 0) }));
@@ -453,7 +453,7 @@ export function StructureEditModal({
       onOpenChange={(o) => !o && onClose()}
       wide
       title={structure ? structure.nom : "Structure"}
-      subtitle="Les stages que cette structure peut accueillir"
+      subtitle="Les lieux de service que cette structure peut accueillir"
       submitLabel={saving || busy ? "Enregistrement…" : "Enregistrer"}
       onSubmit={() => void enregistrer()}
       busy={saving || busy}
@@ -491,8 +491,8 @@ export function StructureEditModal({
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p className="text-sm font-semibold text-foreground">
               {stages.length === 0
-                ? "Aucun stage pour l'instant"
-                : `${stages.length} stage${stages.length > 1 ? "s" : ""}`}
+                ? "Aucun lieu de service pour l'instant"
+                : `${stages.length} lieu${stages.length > 1 ? "x" : ""} de service`}
               {stages.length ? (
                 <span className="font-normal text-muted-foreground">
                   {" · "}{heuresTotales} heures au total
@@ -506,7 +506,7 @@ export function StructureEditModal({
               <select
                 value={importFiliere}
                 onChange={(e) => setImportFiliere(e.target.value)}
-                aria-label="Filière dont reprendre les stages"
+                aria-label="Filière dont reprendre les lieux de service"
                 className={cn(softInput, "h-9 text-sm")}
               >
                 <option value="">Choisir une filière…</option>
@@ -519,7 +519,7 @@ export function StructureEditModal({
                 onClick={importerCarnet}
                 className="text-sm font-semibold text-brand-dk hover:underline"
               >
-                Reprendre ses stages
+                Reprendre ses lieux de service
               </button>
             </div>
           )}
@@ -531,7 +531,7 @@ export function StructureEditModal({
               onClick={() => setAjoutOuvert(true)}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/30 px-4 py-3 text-sm font-semibold text-brand-dk transition hover:border-brand/50 hover:bg-brand/5"
             >
-              <Plus className="h-4 w-4" /> Ajouter un stage
+              <Plus className="h-4 w-4" /> Ajouter un lieu de service
             </button>
           )}
           {stages.length ? (
@@ -548,13 +548,13 @@ export function StructureEditModal({
                       {g.filiere || "Sans filière"}
                     </span>
                     <span className="text-xs font-semibold text-brand-dk">
-                      {g.indices.length} stage{g.indices.length > 1 ? "s" : ""} · {g.heures} h
+                      {g.indices.length} lieu{g.indices.length > 1 ? "x" : ""} de service · {g.heures} h
                     </span>
                   </div>
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="border-b border-brand/12 bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        <th className="border-r border-brand/10 px-4 py-2 font-semibold">Stage</th>
+                        <th className="border-r border-brand/10 px-4 py-2 font-semibold">Lieu de service</th>
                         {NIVEAUX.map((n) => (
                           <th key={n} className="border-r border-brand/10 px-3 py-2 text-right font-semibold">
                             {n}
@@ -636,7 +636,7 @@ export function StructureEditModal({
             </div>
           ) : (
             <p className="rounded-xl border border-dashed border-brand/20 px-4 py-6 text-center text-sm text-muted-foreground">
-              Ajoutez les services où vos étudiants feront leur stage.
+              Ajoutez les lieux de service où vos étudiants seront accueillis.
             </p>
           )}
         </div>
@@ -648,9 +648,9 @@ export function StructureEditModal({
       <FormDialog
         open={!readOnly && ajoutOuvert}
         onOpenChange={(o) => setAjoutOuvert(o)}
-        title="Nouveau stage"
+        title="Nouveau lieu de service"
         subtitle={structure ? `À ajouter à ${structure.nom}` : undefined}
-        submitLabel="Ajouter ce stage"
+        submitLabel="Ajouter ce lieu de service"
         onSubmit={ajouterStage}
       >
         <label className="space-y-1.5">
@@ -675,7 +675,7 @@ export function StructureEditModal({
           <select
             value={fFiliere}
             onChange={(e) => setFFiliere(e.target.value)}
-            aria-label="Filière du stage"
+            aria-label="Filière du lieu de service"
             className={cn(softInput, "h-10 text-sm")}
           >
             <option value="">Choisir…</option>
@@ -714,7 +714,7 @@ export function StructureEditModal({
           }
         }}
         title={stageDecoupe ? `Découper « ${stageDecoupe.nom} » en parties` : "Découper en parties"}
-        subtitle="Les années cochées et leurs heures passent du stage vers cette partie."
+        subtitle="Les années cochées et leurs heures passent du lieu de service vers cette partie."
         submitLabel="Ajouter la partie"
         onSubmit={ajouterSub}
       >
