@@ -383,8 +383,9 @@ export function StructureEditModal({
   );
 
   return (
-    <FormDialog
-      open={!!structure}
+    <>
+      <FormDialog
+        open={!!structure}
       onOpenChange={(o) => !o && onClose()}
       wide
       title={structure ? structure.nom : "Structure"}
@@ -459,128 +460,136 @@ export function StructureEditModal({
             </div>
           )}
           {stages.length ? (
-            // Une vraie liste : un cadre, des lignes séparées par un filet.
-            // Les cartes individuelles gaspillaient la hauteur et donnaient
-            // l'impression de blocs sans rapport entre eux.
-            <ul className="divide-y divide-brand/10 overflow-hidden rounded-xl border border-brand/12 bg-card">
-              {stages.map((st, i) => (
-                <li key={`${st.nom}|${i}`} className="group px-4 py-2.5">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="text-sm font-semibold text-foreground">{st.nom}</span>
-                    {st.filiere ? (
-                      <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand-dk">{st.filiere}</span>
-                    ) : null}
-                    <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-                      {st.niveaux.length
-                        ? st.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")
-                        : "Aucune année renseignée"}
-                    </span>
-                    {readOnly ? null : (
-                      <button
-                        type="button"
-                        aria-label={`Supprimer ${st.nom}`}
-                        onClick={() => {
-                          setStages((prev) => prev.filter((_, j) => j !== i));
-                          if (subPour === i) {
-                            setSubPour(null);
-                            setDNom("");
-                            setDNiveaux({});
-                          }
-                        }}
-                        className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+            // Tableau : une ligne par stage, les parties en lignes filles.
+            // Les cartes empilaient chaque stage sur deux ou trois lignes et
+            // rien ne s'alignait d'un stage à l'autre.
+            <div className="overflow-x-auto rounded-xl border border-brand/12 bg-card">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-brand/12 bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <th className="px-4 py-2 font-semibold">Stage</th>
+                    <th className="px-4 py-2 font-semibold">Filière</th>
+                    <th className="px-4 py-2 font-semibold">Années et heures</th>
+                    {readOnly ? null : <th className="w-12 px-4 py-2" />}
+                  </tr>
+                </thead>
+                {stages.map((st, i) => (
+                  <tbody key={`${st.nom}|${i}`} className="group border-b border-brand/10 last:border-0">
+                    <tr>
+                      <td className="px-4 py-2 align-top font-semibold text-foreground">
+                        {st.nom}
+                        {readOnly || subPour === i ? null : (
+                          <button
+                            type="button"
+                            onClick={() => ouvrirSub(i)}
+                            className="ml-2 align-middle text-xs font-normal text-muted-foreground opacity-0 transition hover:text-brand-dk hover:underline focus:opacity-100 group-hover:opacity-100"
+                          >
+                            Découper en parties
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 align-top">
+                        {st.filiere ? (
+                          <span className="whitespace-nowrap rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand-dk">
+                            {st.filiere}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 align-top text-muted-foreground">
+                        {st.niveaux.length
+                          ? st.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")
+                          : "-"}
+                      </td>
+                      {readOnly ? null : (
+                        <td className="px-4 py-2 text-right align-top">
+                          <button
+                            type="button"
+                            aria-label={`Supprimer ${st.nom}`}
+                            onClick={() => {
+                              setStages((prev) => prev.filter((_, j) => j !== i));
+                              if (subPour === i) {
+                                setSubPour(null);
+                                setDNom("");
+                                setDNiveaux({});
+                              }
+                            }}
+                            className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                    {/* Parties : lignes filles du stage, mêmes colonnes. */}
+                    {st.subStages.map((d, k) => (
+                      <tr key={`${d.nom}|${k}`} className="bg-muted/20">
+                        <td className="py-1.5 pl-8 pr-4 text-muted-foreground">↳ {d.nom}</td>
+                        <td className="px-4 py-1.5" />
+                        <td className="px-4 py-1.5 text-muted-foreground">
+                          {d.niveaux.length
+                            ? d.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")
+                            : "-"}
+                        </td>
+                        {readOnly ? null : (
+                          <td className="px-4 py-1.5 text-right">
+                            <button
+                              type="button"
+                              aria-label={`Supprimer ${d.nom}`}
+                              onClick={() => retirerSub(i, k)}
+                              className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                    {readOnly || subPour !== i ? null : (
+                      <tr>
+                        <td colSpan={readOnly ? 3 : 4} className="px-4 pb-3">
+                          <div className="space-y-2.5 rounded-lg bg-muted/40 p-3">
+                            <p className="text-sm font-medium text-foreground">Découper « {st.nom} » en parties</p>
+                            <Input
+                              value={dNom}
+                              onChange={(e) => setDNom(e.target.value)}
+                              placeholder="Nom de la partie (ex. Urgences de nuit)…"
+                              aria-label="Nom de la partie"
+                              className={cn(softInput, "h-9 text-sm")}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Les années cochées et leurs heures passent du stage vers cette partie.
+                            </p>
+                            {niveauxHeuresEditor(dNiveaux, setDNiveaux, "Partie")}
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={ajouterSub}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dk"
+                              >
+                                <Plus className="h-4 w-4" /> Ajouter la partie
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSubPour(null);
+                                  setDNom("");
+                                  setDNiveaux({});
+                                }}
+                                className="text-sm text-muted-foreground hover:underline"
+                              >
+                                Annuler
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </div>
-                  {/* Les parties d'un stage se comparent colonne par colonne :
-                      un tableau avec en-têtes, pas une liste à puces. */}
-                  {st.subStages.length ? (
-                    <div className="mt-2 overflow-x-auto rounded-lg border border-brand/12">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            <th className="px-3 py-1.5 font-semibold">Partie</th>
-                            <th className="px-3 py-1.5 font-semibold">Années et heures</th>
-                            {readOnly ? null : <th className="w-10 px-3 py-1.5" />}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-brand/10">
-                          {st.subStages.map((d, k) => (
-                            <tr key={`${d.nom}|${k}`}>
-                              <td className="px-3 py-1.5 font-medium text-foreground">{d.nom}</td>
-                              <td className="px-3 py-1.5 text-muted-foreground">
-                                {d.niveaux.length
-                                  ? d.niveaux.map((nh) => `${nh.niveau || "Toutes années"} : ${nh.heures} h`).join(" · ")
-                                  : "-"}
-                              </td>
-                              {readOnly ? null : (
-                                <td className="px-3 py-1.5 text-right">
-                                  <button
-                                    type="button"
-                                    aria-label={`Supprimer ${d.nom}`}
-                                    onClick={() => retirerSub(i, k)}
-                                    className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-alert/20 hover:text-alert"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : null}
-                  {/* Découpage en sous-stages : usage rare (2 en base), donc
-                      discret — visible au survol/focus ou quand il est ouvert. */}
-                  {readOnly ? null : subPour === i ? (
-                    <div className="mt-3 space-y-2.5 rounded-lg bg-muted/40 p-3">
-                      <p className="text-sm font-medium text-foreground">Découper « {st.nom} » en parties</p>
-                      <Input
-                        value={dNom}
-                        onChange={(e) => setDNom(e.target.value)}
-                        placeholder="Nom de la partie (ex. Urgences de nuit)…"
-                        aria-label="Nom de la partie"
-                        className={cn(softInput, "h-9 text-sm")}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Les années cochées et leurs heures passent du stage vers cette partie.
-                      </p>
-                      {niveauxHeuresEditor(dNiveaux, setDNiveaux, "Partie")}
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={ajouterSub}
-                          className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dk"
-                        >
-                          <Plus className="h-4 w-4" /> Ajouter la partie
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSubPour(null);
-                            setDNom("");
-                            setDNiveaux({});
-                          }}
-                          className="text-sm text-muted-foreground hover:underline"
-                        >
-                          Annuler
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => ouvrirSub(i)}
-                      className="mt-1.5 text-xs text-muted-foreground opacity-0 transition hover:text-brand-dk hover:underline focus:opacity-100 group-hover:opacity-100"
-                    >
-                      Découper en parties
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+                  </tbody>
+                ))}
+              </table>
+            </div>
           ) : (
             <p className="rounded-xl border border-dashed border-brand/20 px-4 py-6 text-center text-sm text-muted-foreground">
               Ajoutez les services où vos étudiants feront leur stage.
@@ -591,81 +600,76 @@ export function StructureEditModal({
 
       {readOnly ? null : (
         <FullWidth>
-          {ajoutOuvert ? (
-            <div className="space-y-3 rounded-xl border border-brand/12 bg-muted/40 p-4">
-              <p className="text-sm font-semibold text-foreground">Nouveau stage</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-foreground">Service</span>
-                  <Input
-                    value={fService}
-                    onChange={(e) => setFService(e.target.value)}
-                    onBlur={() => reprendreCarnet(fService)}
-                    list="services-stage-connus"
-                    placeholder="Ex. Bloc opératoire"
-                    aria-label="Service"
-                    className={cn(softInput, "h-10 text-sm")}
-                  />
-                  <datalist id="services-stage-connus">
-                    {services.map((s) => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
-                </label>
-                <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-foreground">Filière concernée</span>
-                  <select
-                    value={fFiliere}
-                    onChange={(e) => setFFiliere(e.target.value)}
-                    aria-label="Filière du stage"
-                    className={cn(softInput, "h-10 text-sm")}
-                  >
-                    <option value="">Choisir…</option>
-                    {FILIERES_CARNET.map((f) => (
-                      <option key={f} value={f}>{f}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="space-y-1.5">
-                <span className="block text-sm font-medium text-foreground">
-                  Années concernées et heures
-                </span>
-                <span className="block text-xs text-muted-foreground">
-                  Cliquez sur une année pour l'activer, puis saisissez ses heures.
-                </span>
-                {niveauxHeuresEditor(fNiveaux, setFNiveaux, "Stage")}
-              </div>
-              {aideCarnet ? <p className="text-xs text-muted-foreground">{aideCarnet}</p> : null}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={ajouterStage}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dk"
-                >
-                  <Plus className="h-4 w-4" /> Ajouter ce stage
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAjoutOuvert(false)}
-                  className="text-sm text-muted-foreground hover:underline"
-                >
-                  Annuler
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAjoutOuvert(true)}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/30 px-4 py-3 text-sm font-semibold text-brand-dk transition hover:border-brand/50 hover:bg-brand/5"
-            >
-              <Plus className="h-4 w-4" /> Ajouter un stage
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setAjoutOuvert(true)}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/30 px-4 py-3 text-sm font-semibold text-brand-dk transition hover:border-brand/50 hover:bg-brand/5"
+          >
+            <Plus className="h-4 w-4" /> Ajouter un stage
+          </button>
         </FullWidth>
       )}
-    </FormDialog>
+      </FormDialog>
+
+      {/* Le formulaire d'ajout vivait en bas de la fenêtre : on ne voyait pas
+          qu'il s'était ouvert. Il a désormais sa propre fenêtre, empilée. */}
+      <FormDialog
+        open={!readOnly && ajoutOuvert}
+        onOpenChange={(o) => setAjoutOuvert(o)}
+        title="Nouveau stage"
+        subtitle={structure ? `À ajouter à ${structure.nom}` : undefined}
+        submitLabel="Ajouter ce stage"
+        onSubmit={ajouterStage}
+      >
+        <label className="space-y-1.5">
+          <span className="text-sm font-medium text-foreground">Service</span>
+          <Input
+            value={fService}
+            onChange={(e) => setFService(e.target.value)}
+            onBlur={() => reprendreCarnet(fService)}
+            list="services-stage-connus"
+            placeholder="Ex. Bloc opératoire"
+            aria-label="Service"
+            className={cn(softInput, "h-10 text-sm")}
+          />
+          <datalist id="services-stage-connus">
+            {services.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-sm font-medium text-foreground">Filière concernée</span>
+          <select
+            value={fFiliere}
+            onChange={(e) => setFFiliere(e.target.value)}
+            aria-label="Filière du stage"
+            className={cn(softInput, "h-10 text-sm")}
+          >
+            <option value="">Choisir…</option>
+            {FILIERES_CARNET.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
+        </label>
+        <FullWidth>
+          <div className="space-y-1.5">
+            <span className="block text-sm font-medium text-foreground">
+              Années concernées et heures
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              Cliquez sur une année pour l'activer, puis saisissez ses heures.
+            </span>
+            {niveauxHeuresEditor(fNiveaux, setFNiveaux, "Stage")}
+          </div>
+        </FullWidth>
+        {aideCarnet ? (
+          <FullWidth>
+            <p className="text-xs text-muted-foreground">{aideCarnet}</p>
+          </FullWidth>
+        ) : null}
+      </FormDialog>
+    </>
   );
 }
 
