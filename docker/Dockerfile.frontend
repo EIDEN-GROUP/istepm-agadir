@@ -10,14 +10,29 @@
 #   /usr/share/nginx/html/crm-index.html  → CRM (routes /login, /dashboard…)
 #   /usr/share/nginx/html/crm-assets/*    → assets CRM (assetsDir dédié)
 #   autres fichiers racine                → publics fusionnés (logos, favicons)
-# Routage : voir docker/nginx.frontend-merged.conf.
+# Routage : voir docker/nginx.frontend-merged.conf.template (template traité
+# au démarrage par envsubst — seule ${LANDING_LOCK} est substituée grâce à
+# NGINX_ENVSUBST_FILTER, les variables natives nginx restent intactes).
 FROM nginx:1.27-alpine
+
+# Runtime config du mode maintenance (page "Nous revenons très vite !").
+# Le filtre garantit qu'envsubst ne touche à aucune autre variable.
+ENV NGINX_ENVSUBST_FILTER=LANDING_LOCK
+# Défaut sûr : verrou inactif (surchargé par compose / -e / service update).
+ENV LANDING_LOCK=off
+# Garde-fou sourcé avant envsubst : même var vide/absente → "off".
+COPY docker/entrypoint-landing-lock.envsh /docker-entrypoint.d/05-landing-lock.envsh
+RUN chmod +x /docker-entrypoint.d/05-landing-lock.envsh
 
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
 
 # Merged routing (landing at /, CRM at /login, /dashboard/*, …)
-COPY docker/nginx.frontend-merged.conf /etc/nginx/conf.d/default.conf
+COPY docker/nginx.frontend-merged.conf.template /etc/nginx/templates/default.conf.template
+
+# Page de maintenance statique (servie en 503 quand LANDING_LOCK=on).
+# La landing d'origine (index.html) reste intacte : le mode est réversible.
+COPY docker/maintenance.html /usr/share/nginx/html/maintenance.html
 
 # 1. Landing à la racine (index.html + /assets + favicons + istpm-logo.svg).
 COPY landing-page/dist/ /usr/share/nginx/html/

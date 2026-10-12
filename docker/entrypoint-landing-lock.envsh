@@ -1,0 +1,6 @@
+#!/bin/sh
+# Garde-fou du mode maintenance : le verrou est INACTIF sauf
+# LANDING_LOCK=on explicite (compose, -e, ou service update).
+# Sourcé (pas exécuté) par /docker-entrypoint.sh AVANT envsubst.
+: "${LANDING_LOCK:=off}"
+export LANDING_LOCK

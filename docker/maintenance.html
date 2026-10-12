@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maintenance en cours — ISTEPM Agadir</title>
+<meta name="description" content="ISTEPM Agadir — site momentanément en maintenance. Nous revenons très vite.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  :root{
+    --ink:#17353a;--ink-2:#1e4449;--ink-3:#0e2629;
+    --teal:#089a96;--teal-700:#075e5c;--teal-300:#7fd3cf;--teal-100:#d6efed;--teal-50:#eaf7f6;
+    --bg:#f0f5f5;--muted:#536a6e;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;color:#fff;
+    font:400 16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:
+      radial-gradient(60% 45% at 85% 8%, rgba(127,211,207,.22), transparent 60%),
+      radial-gradient(55% 45% at 8% 95%, rgba(8,154,150,.28), transparent 60%),
+      linear-gradient(150deg,#1b4146 0%,#17353a 45%,#0e2629 100%);
+    display:flex;align-items:center;justify-content:center;
+    padding:clamp(16px,4vw,40px);
+    -webkit-font-smoothing:antialiased;
+  }
+  .card{
+    width:min(580px,100%);background:#fff;color:var(--ink);
+    border-radius:26px;padding:clamp(28px,5vw,52px);
+    text-align:center;box-shadow:0 40px 90px rgba(10,34,38,.35);
+  }
+  .logo{height:64px;width:auto;margin:0 auto 20px}
+  .chip{
+    display:inline-block;padding:6px 14px;border-radius:999px;
+    background:var(--teal-50);border:1px solid var(--teal-100);
+    color:var(--teal-700);font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  }
+  h1{margin:16px 0 10px;font-size:clamp(1.7rem,1.2rem + 3vw,2.6rem);line-height:1.1;letter-spacing:-.02em}
+  h1 .accent{color:var(--teal)}
+  p.lead{margin:0 auto;max-width:44ch;color:var(--muted)}
+  hr{border:0;border-top:1px solid var(--teal-100);margin:26px 0 18px}
+  .contact{display:flex;flex-direction:column;gap:8px;font-size:15px}
+  .contact a.tel{font-weight:700;font-size:1.25rem;color:var(--ink);text-decoration:none;letter-spacing:.01em}
+  .contact a.tel:hover{color:var(--teal-700);text-decoration:underline}
+  .contact small{color:var(--muted)}
+  .foot{margin-top:26px;font-size:12.5px;color:rgba(255,255,255,.72)}
+  @media (max-width:420px){ .logo{height:52px} }
+</style>
+</head>
+<body>
+  <main>
+    <div class="card">
+      <img class="logo" src="/istpm-logo.svg" alt="ISTEPM Agadir" width="220" height="64">
+      <span class="chip">Maintenance en cours</span>
+      <h1>Nous revenons <span class="accent">très vite&nbsp;!</span></h1>
+      <p class="lead">Nous effectuons actuellement une maintenance afin d’améliorer votre expérience. Merci de votre patience.</p>
+      <hr>
+      <div class="contact">
+        <small>Une urgence&nbsp;? Contactez-nous&nbsp;:</small>
+        <a class="tel" href="tel:+212528235511">05&nbsp;28&nbsp;23&nbsp;55&nbsp;11</a>
+        <small>49, rue Abdellah Guenoune, Cité Salam, Agadir</small>
+      </div>
+    </div>
+    <p class="foot">ISTEPM Agadir</p>
+  </main>
+</body>
+</html>

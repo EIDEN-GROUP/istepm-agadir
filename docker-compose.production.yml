@@ -96,8 +96,15 @@ services:
         published: 3003
         protocol: tcp
     restart: unless-stopped
+    environment:
+      # Landing maintenance mode: "on" shows the branded maintenance page
+      # (HTTP 503) on / only — CRM, assets and API keep working.
+      # Default "off". Changing it recreates (not rebuilds) the tasks.
+      LANDING_LOCK: ${LANDING_LOCK:-off}
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
+      # /crm-index.html stays 200 in both modes (exact-match location,
+      # never locked) — probing / would flap while maintenance is on.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/crm-index.html || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3

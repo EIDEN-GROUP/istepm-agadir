@@ -1,0 +1,176 @@
+# Template nginx (landing + CRM, même domaine).
+# Traité au DÉMARRAGE du conteneur par envsubst (voir
+# /docker-entrypoint.d/20-envsubst-on-templates.sh de l'image nginx).
+# Sécurité envsubst : le Dockerfile fixe NGINX_ENVSUBST_FILTER=LANDING_LOCK,
+# donc seule la variable LANDING_LOCK est substituée — les variables natives
+# nginx ($uri, $maintenance…) traversent intactes. Vérifié par test.
+#
+# Maintenance mode (runtime, sans rebuild) :
+#   LANDING_LOCK=on   → / affiche maintenance.html (HTTP 503 + Retry-After)
+#   absent/autre      → comportement normal (défaut sûr : verrou inactif)
+# Seule la valeur exacte "on" active la maintenance.
+map "${LANDING_LOCK}" $maintenance {
+    default 0;
+    "on"    1;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name _;
+
+    # Image fusionnée landing + CRM (même domaine) :
+    #   /                               → landing page (index.html)
+    #   /login /dashboard/* /istepm     → CRM (crm-index.html)
+    #   /definir-mot-de-passe           → CRM (crm-index.html)
+    #   /maintenance.html               → page de maintenance (erreur 503)
+    #   /api/* /health                  → backend (via eiden-nginx, pas ici)
+    # Tout chemin inconnu retombe sur la landing (le CRM a sa propre 404
+    # une fois chargé, accessible via /login).
+
+    # Toute erreur 503 (mode maintenance, voir `if ($maintenance)`
+    # ci-dessous) sert la page de maintenance au lieu du corps nginx.
+    error_page 503 /maintenance.html;
+
+    # Security headers
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    # Gzip
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript image/svg+xml;
+    gzip_min_length 256;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Assets hachés de la landing (immuables).
+    # NOTE : nginx abandonne les add_header hérités dans les blocs location,
+    # les en-têtes de sécurité sont donc répétés ici volontairement.
+    location /assets/ {
+        if ($maintenance) { return 503; }
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    }
+
+    # Assets hachés du CRM (immuables, dossier dédié — voir
+    # frontend/vite.config.ts `assetsDir: "crm-assets"`).
+    # Jamais verrouillés : le CRM reste utilisable en maintenance.
+    location /crm-assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    }
+
+    # CRM — points d'entrée SPA (fichiers réels d'abord : logos, favicon…).
+    # Jamais verrouillés : /login et /dashboard restent accessibles.
+    location /login {
+        try_files $uri $uri/ /crm-index.html;
+    }
+    location /dashboard {
+        try_files $uri $uri/ /crm-index.html;
+    }
+    location /istepm {
+        try_files $uri $uri/ /crm-index.html;
+    }
+    location /definir-mot-de-passe {
+        try_files $uri $uri/ /crm-index.html;
+    }
+
+    # Page de maintenance (self-contained : CSS inline, logo + favicon
+    # alloués ci-dessous). Bloc exact : prioritaire sur `location /`,
+    # donc pas de boucle de redirection via `error_page 503`.
+    # Jamais de cache (les navigateurs ne doivent pas la garder après
+    # la fin de la maintenance).
+    location = /maintenance.html {
+        add_header Cache-Control "no-store" always;
+        add_header Retry-After "3600" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    }
+
+    # Entrée CRM servie directement (fichier réel). Bloc exact et toujours
+    # ouvert : cible du try_files des routes CRM + sonde de healthcheck
+    # (le healthcheck ne doit pas flapper quand la landing est verrouillée).
+    location = /crm-index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    }
+
+    # Fichiers racine consommés par le CRM (login, sidebar, loader) et par
+    # la page de maintenance (logo). Blocs exacts toujours ouverts pour
+    # ne pas casser le CRM quand la landing est verrouillée.
+    location = /istpm-logo.svg {
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    }
+    location = /istpm-logo-mark.svg {
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    }
+    location = /login-student-hero.png {
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    }
+    location = /favicon.svg {
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    }
+
+    # Bruit navigateurs : pas de log, pas de 503 — hors maintenance comme
+    # en maintenance.
+    location = /favicon.ico {
+        access_log off;
+        log_not_found off;
+        return 204;
+    }
+
+    # Landing — toutes les autres routes non-fichiers servent index.html.
+    # Verrouillée en mode maintenance (503 + page de maintenance).
+    location / {
+        if ($maintenance) { return 503; }
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Coquilles SPA : jamais de cache navigateur (évite les bundles
+    # fantômes après déploiement). Les assets hachés restent immuables.
+    location = /index.html {
+        if ($maintenance) { return 503; }
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    }
+}
