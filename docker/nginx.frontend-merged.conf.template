@@ -33,6 +33,14 @@ server {
     # ci-dessous) sert la page de maintenance au lieu du corps nginx.
     error_page 503 /maintenance.html;
 
+    # Gate + maintenance peuvent être actifs ensemble : la redirection
+    # interne vers /maintenance.html repasse par auth_request. Sans
+    # `recursive_error_pages`, le 401 du gate sur cette page interne n'est
+    # pas converti et l'anonyme reçoit un 401 nu. Avec, il est bien redirigé
+    # vers l'écran de gate (302), et un visiteur déjà authentifié voit la
+    # page de maintenance (503).
+    recursive_error_pages on;
+
     # ── Verrou global optionnel (PROJECT_LOCK_ENABLED) ──────────────────────
     # Fichier inclus résolu au démarrage par envsubst : true.conf (gate actif,
     # auth_request sur toutes les routes) ou false.conf (aucun gate).
