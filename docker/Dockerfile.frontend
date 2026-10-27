@@ -11,16 +11,19 @@
 #   /usr/share/nginx/html/crm-assets/*    → assets CRM (assetsDir dédié)
 #   autres fichiers racine                → publics fusionnés (logos, favicons)
 # Routage : voir docker/nginx.frontend-merged.conf.template (template traité
-# au démarrage par envsubst — seule ${LANDING_LOCK} est substituée grâce à
-# NGINX_ENVSUBST_FILTER, les variables natives nginx restent intactes).
+# au démarrage par envsubst — seules LANDING_LOCK et PROJECT_LOCK_ENABLED sont
+# substituées grâce à NGINX_ENVSUBST_FILTER, les variables natives nginx
+# restent intactes).
 FROM nginx:1.27-alpine
 
-# Runtime config du mode maintenance (page "Nous revenons très vite !").
-# Le filtre garantit qu'envsubst ne touche à aucune autre variable.
-ENV NGINX_ENVSUBST_FILTER=LANDING_LOCK
-# Défaut sûr : verrou inactif (surchargé par compose / -e / service update).
+# Runtime config : mode maintenance (LANDING_LOCK) + verrou global
+# (PROJECT_LOCK_ENABLED). Le filtre garantit qu'envsubst ne touche à aucune
+# autre variable.
+ENV NGINX_ENVSUBST_FILTER='^(LANDING_LOCK|PROJECT_LOCK_ENABLED)$'
+# Défauts sûrs : les deux verrous sont inactifs (surchargés par compose / -e).
 ENV LANDING_LOCK=off
-# Garde-fou sourcé avant envsubst : même var vide/absente → "off".
+ENV PROJECT_LOCK_ENABLED=false
+# Garde-fou sourcé avant envsubst : variables vides/absentes → valeurs sûres.
 COPY docker/entrypoint-landing-lock.envsh /docker-entrypoint.d/05-landing-lock.envsh
 RUN chmod +x /docker-entrypoint.d/05-landing-lock.envsh
 
@@ -30,9 +33,17 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Merged routing (landing at /, CRM at /login, /dashboard/*, …)
 COPY docker/nginx.frontend-merged.conf.template /etc/nginx/templates/default.conf.template
 
+# Fragments du verrou global, inclus conditionnellement par le template
+# (include /etc/nginx/gate/${PROJECT_LOCK_ENABLED}.conf).
+COPY docker/nginx/gate/ /etc/nginx/gate/
+
 # Page de maintenance statique (servie en 503 quand LANDING_LOCK=on).
 # La landing d'origine (index.html) reste intacte : le mode est réversible.
 COPY docker/maintenance.html /usr/share/nginx/html/maintenance.html
+
+# Écran d'accès global + ses assets (publics uniquement quand le gate est actif).
+COPY docker/project-gate.html /usr/share/nginx/html/project-gate.html
+COPY docker/project-gate-assets/ /usr/share/nginx/html/project-gate-assets/
 
 # 1. Landing à la racine (index.html + /assets + favicons + istpm-logo.svg).
 COPY landing-page/dist/ /usr/share/nginx/html/

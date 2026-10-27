@@ -1,9 +1,10 @@
 # Template nginx (landing + CRM, même domaine).
 # Traité au DÉMARRAGE du conteneur par envsubst (voir
 # /docker-entrypoint.d/20-envsubst-on-templates.sh de l'image nginx).
-# Sécurité envsubst : le Dockerfile fixe NGINX_ENVSUBST_FILTER=LANDING_LOCK,
-# donc seule la variable LANDING_LOCK est substituée — les variables natives
-# nginx ($uri, $maintenance…) traversent intactes. Vérifié par test.
+# Sécurité envsubst : le Dockerfile fixe
+# NGINX_ENVSUBST_FILTER='^(LANDING_LOCK|PROJECT_LOCK_ENABLED)$', donc seules ces
+# deux variables sont substituées — les variables natives nginx ($uri,
+# $maintenance…) traversent intactes. Vérifié par test.
 #
 # Maintenance mode (runtime, sans rebuild) :
 #   LANDING_LOCK=on   → / affiche maintenance.html (HTTP 503 + Retry-After)
@@ -32,6 +33,18 @@ server {
     # ci-dessous) sert la page de maintenance au lieu du corps nginx.
     error_page 503 /maintenance.html;
 
+    # ── Verrou global optionnel (PROJECT_LOCK_ENABLED) ──────────────────────
+    # Fichier inclus résolu au démarrage par envsubst : true.conf (gate actif,
+    # auth_request sur toutes les routes) ou false.conf (aucun gate).
+    include /etc/nginx/gate/${PROJECT_LOCK_ENABLED}.conf;
+
+    # Sonde de santé stable dans les deux modes : 204, aucune donnée exposée.
+    location = /gate-health {
+        auth_request off;
+        access_log off;
+        return 204;
+    }
+
     # Security headers
     add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -46,6 +59,11 @@ server {
 
     root /usr/share/nginx/html;
     index index.html;
+
+    # Redirects relatifs (pas de scheme/host absolu) : derrière eiden-nginx
+    # (TLS terminé en amont) un `return 302` absolu produirait une URL http://
+    # et un aller-retour de downgrade. Un Location relatif reste correct.
+    absolute_redirect off;
 
     # Assets hachés de la landing (immuables).
     # NOTE : nginx abandonne les add_header hérités dans les blocs location,
@@ -115,7 +133,12 @@ server {
     # Fichiers racine consommés par le CRM (login, sidebar, loader) et par
     # la page de maintenance (logo). Blocs exacts toujours ouverts pour
     # ne pas casser le CRM quand la landing est verrouillée.
+    #
+    # Le logo et le favicon sont aussi nécessaires à l'écran de gate : ils
+    # restent publics (marque visuelle déjà exposée sur le site marketing,
+    # aucune donnée applicative).
     location = /istpm-logo.svg {
+        auth_request off;
         expires 1y;
         add_header Cache-Control "public, immutable" always;
         add_header X-Frame-Options "DENY" always;
@@ -140,6 +163,7 @@ server {
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
     }
     location = /favicon.svg {
+        auth_request off;
         expires 1y;
         add_header Cache-Control "public, immutable" always;
         add_header X-Frame-Options "DENY" always;
@@ -149,8 +173,9 @@ server {
     }
 
     # Bruit navigateurs : pas de log, pas de 503 — hors maintenance comme
-    # en maintenance.
+    # en maintenance. Exempté du gate pour éviter un aller-retour inutile.
     location = /favicon.ico {
+        auth_request off;
         access_log off;
         log_not_found off;
         return 204;

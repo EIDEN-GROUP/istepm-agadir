@@ -41,6 +41,9 @@ import { agentRoutes } from "@/routes/agent";
 import { aiConvoRoutes } from "@/routes/ai-convos";
 import { featureTicketRoutes } from "@/routes/feature-tickets";
 import { inscriptionRoutes } from "@/routes/inscriptions";
+import { projectGateMiddleware } from "@/middleware/project-gate";
+import { projectGateRoutes } from "@/routes/project-gate";
+import cookie from "@fastify/cookie";
 import { ensureBucket } from "@/lib/minio";
 
 export async function buildApp() {
@@ -81,6 +84,8 @@ export async function buildApp() {
     },
   });
 
+  await app.register(cookie);
+
   // Defense in depth: security headers on every response (the SPA's nginx
   // sets its own; HSTS/CSP for the public domain belong at eiden-nginx).
   app.addHook("onRequest", async (_request, reply) => {
@@ -93,6 +98,9 @@ export async function buildApp() {
     // the domain is served); ignored on direct plain-HTTP access.
     reply.header("Strict-Transport-Security", "max-age=63072000");
   });
+
+  // Global project access gate (server-side enforcement)
+  app.addHook("onRequest", projectGateMiddleware);
 
   // Ensure MinIO bucket exists (non-blocking; app works without it)
   ensureBucket().catch(() => {});
@@ -145,6 +153,7 @@ export async function buildApp() {
   await app.register(aiConvoRoutes, { prefix: "/api/ai" });
   await app.register(featureTicketRoutes, { prefix: "/api/feature-tickets" });
   await app.register(inscriptionRoutes, { prefix: "/api/inscriptions" });
+  await app.register(projectGateRoutes, { prefix: "/api/project-gate" });
 
   return app;
 }

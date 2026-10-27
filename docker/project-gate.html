@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accès restreint — ISTEPM Agadir</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/project-gate-assets/gate.css">
+</head>
+<body>
+  <main class="gate">
+    <section class="gate__card" aria-labelledby="gate-title">
+      <img class="gate__logo" src="/istpm-logo.svg" alt="ISTEPM Agadir" width="200" height="58">
+      <span class="gate__chip">Accès restreint</span>
+      <h1 id="gate-title">Connexion requise</h1>
+      <p class="gate__lead">Cette application est protégée. Veuillez saisir vos identifiants d’accès pour continuer.</p>
+
+      <form id="gate-form" class="gate__form" novalidate>
+        <div class="gate__field">
+          <label for="gate-username">Nom d’utilisateur</label>
+          <input id="gate-username" name="username" type="text" autocomplete="username"
+                 autocapitalize="none" spellcheck="false" required>
+        </div>
+
+        <div class="gate__field">
+          <label for="gate-password">Mot de passe</label>
+          <div class="gate__password">
+            <input id="gate-password" name="password" type="password"
+                   autocomplete="current-password" required>
+            <button type="button" id="gate-toggle" class="gate__toggle"
+                    aria-label="Afficher le mot de passe" aria-pressed="false">Afficher</button>
+          </div>
+        </div>
+
+        <p id="gate-error" class="gate__error" role="alert" hidden></p>
+
+        <button type="submit" id="gate-submit" class="gate__submit">Se connecter</button>
+      </form>
+
+      <div id="gate-session" class="gate__session" hidden>
+        <p>Vous êtes déjà authentifié sur ce poste.</p>
+        <div class="gate__session-actions">
+          <a class="gate__link" href="/">Continuer vers le site</a>
+          <button type="button" id="gate-logout" class="gate__link gate__link--muted">Se déconnecter</button>
+        </div>
+      </div>
+
+      <p class="gate__foot">ISTEPM Agadir — accès réservé au personnel autorisé.</p>
+    </section>
+  </main>
+  <script src="/project-gate-assets/gate.js" defer></script>
+</body>
+</html>

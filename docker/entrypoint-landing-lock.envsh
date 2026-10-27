@@ -1,6 +1,10 @@
 #!/bin/sh
-# Garde-fou du mode maintenance : le verrou est INACTIF sauf
-# LANDING_LOCK=on explicite (compose, -e, ou service update).
-# Sourcé (pas exécuté) par /docker-entrypoint.sh AVANT envsubst.
+# Garde-fous sourcés (pas exécutés) par /docker-entrypoint.sh AVANT envsubst.
+# Toute valeur absente ou vide retombe sur un comportement sûr :
+#   - LANDING_LOCK=off          → landing normale
+#   - PROJECT_LOCK_ENABLED=false → aucun verrou global
+# Seules les valeurs explicites "on" / "true" activent les verrous.
 : "${LANDING_LOCK:=off}"
+: "${PROJECT_LOCK_ENABLED:=false}"
 export LANDING_LOCK
+export PROJECT_LOCK_ENABLED

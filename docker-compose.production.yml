@@ -101,10 +101,14 @@ services:
       # (HTTP 503) on / only — CRM, assets and API keep working.
       # Default "off". Changing it recreates (not rebuilds) the tasks.
       LANDING_LOCK: ${LANDING_LOCK:-off}
+      # Global access gate: "true" requires gate credentials for the whole
+      # site/app/API (server-side, via backend session + nginx auth_request).
+      # Default "false". Keep it in sync with the backend value.
+      PROJECT_LOCK_ENABLED: ${PROJECT_LOCK_ENABLED:-false}
     healthcheck:
-      # /crm-index.html stays 200 in both modes (exact-match location,
-      # never locked) — probing / would flap while maintenance is on.
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/crm-index.html || exit 1"]
+      # /gate-health is a 204 probe available in both modes (never locked,
+      # no data) — probing / would flap while maintenance/gate is on.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/gate-health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -160,6 +164,15 @@ services:
       AI_BASE_URL: ${AI_BASE_URL}
       AI_MODEL: ${AI_MODEL}
       LOG_LEVEL: info
+      # ── Global access gate (must match the frontend's PROJECT_LOCK_ENABLED) ──
+      PROJECT_LOCK_ENABLED: ${PROJECT_LOCK_ENABLED:-false}
+      PROJECT_LOCK_USERNAME: ${PROJECT_LOCK_USERNAME:-}
+      PROJECT_LOCK_PASSWORD_HASH: ${PROJECT_LOCK_PASSWORD_HASH:-}
+      PROJECT_LOCK_SESSION_SECRET: ${PROJECT_LOCK_SESSION_SECRET:-}
+      PROJECT_LOCK_IDLE_TIMEOUT_MINUTES: ${PROJECT_LOCK_IDLE_TIMEOUT_MINUTES:-15}
+      PROJECT_LOCK_ABSOLUTE_TIMEOUT_MINUTES: ${PROJECT_LOCK_ABSOLUTE_TIMEOUT_MINUTES:-480}
+      PROJECT_LOCK_MAX_LOGIN_ATTEMPTS: ${PROJECT_LOCK_MAX_LOGIN_ATTEMPTS:-5}
+      PROJECT_LOCK_RATE_LIMIT_WINDOW_MINUTES: ${PROJECT_LOCK_RATE_LIMIT_WINDOW_MINUTES:-15}
     depends_on:
       - postgres
       - redis
