@@ -35,7 +35,12 @@ function getRedis(): IORedis {
     redis = new IORedis(getEnv().REDIS_URL, {
       lazyConnect: false,
       maxRetriesPerRequest: 2,
-      enableOfflineQueue: false,
+      connectTimeout: 3000,
+      // Bound every command so a Redis outage cannot hang a request. The
+      // default offline queue is kept ON: the first request that creates the
+      // client waits (briefly) for the initial connection instead of failing
+      // spuriously — commandTimeout still turns real outages into errors.
+      commandTimeout: 3000,
     });
     redis.on("error", (err) => {
       // Do not crash the process; protected requests will fail closed.

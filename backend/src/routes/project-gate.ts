@@ -64,9 +64,10 @@ export async function projectGateRoutes(app: FastifyInstance) {
       if (!env.PROJECT_LOCK_ENABLED) return reply.status(204).send();
       const result = await checkGateSession(request);
       if (!result.ok) {
-        return reply
-          .status(result.reason === "unavailable" ? 503 : 401)
-          .send({ error: "unauthorized" });
+        // Always 401 (never 503): nginx maps 401 to the gate screen, while a
+        // 5xx from an auth_request subrequest surfaces as an opaque 500.
+        // Failing closed to the gate is the safe behavior on store outages.
+        return reply.status(401).send({ error: "unauthorized" });
       }
       return reply.status(204).send();
     },
